@@ -18,11 +18,11 @@ class Response {
 	}
 
 	public function get_header( $name ) {
-		if ( false === $this->get_headers() ) {
+		$headers = $this->get_headers();
+		if ( false === $headers ) {
 			return false;
 		}
-
-		return $this->headers[ strtolower( $name ) ] ?? null;
+		return $headers[ strtolower( $name ) ] ?? false;
 	}
 
 	public function get_headers() {

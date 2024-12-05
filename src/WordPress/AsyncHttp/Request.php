@@ -31,6 +31,9 @@ class Request {
 	public $redirected_to;
 
 	public $error;
+	/**
+	 * @var Response
+	 */
 	public $response;
 
 	/**

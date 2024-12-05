@@ -589,12 +589,17 @@ class Client {
 				$response->status_message = $parsed['status']['message'];
 				$response->protocol       = $parsed['status']['protocol'];
 
-				$total = $request->response->get_header( 'content-length' ) ?: null;
+				$total = $request->response->get_header( 'content-length' );
 				if ( $total !== null ) {
 					$response->total_bytes = (int) $total;
 				}
 
 				$this->events[ $request->id ][ Client::EVENT_GOT_HEADERS ] = true;
+
+				if ( $response->total_bytes === 0 ) {
+					$request->state = Request::STATE_RECEIVED;
+					break;
+				}
 
 				// If we're being redirected, we don't need to wait for the body.
 				if ( $response->status_code >= 300 && $response->status_code < 400 ) {
