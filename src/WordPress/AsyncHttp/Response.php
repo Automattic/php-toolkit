@@ -18,19 +18,7 @@ class Response {
 	}
 
 	public function get_header( $name ) {
-		$headers = $this->get_headers();
-		if ( false === $headers ) {
-			return false;
-		}
-		return $headers[ strtolower( $name ) ] ?? false;
-	}
-
-	public function get_headers() {
-		if ( ! $this->headers ) {
-			return false;
-		}
-
-		return $this->headers;
+		return $this->headers[ strtolower( $name ) ] ?? false;
 	}
 
 }

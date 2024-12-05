@@ -590,7 +590,7 @@ class Client {
 				$response->protocol       = $parsed['status']['protocol'];
 
 				$total = $request->response->get_header( 'content-length' );
-				if ( $total !== null ) {
+				if ( false !== $total ) {
 					$response->total_bytes = (int) $total;
 				}
 
@@ -660,7 +660,7 @@ class Client {
 			}
 
 			$location = $response->get_header( 'location' );
-			if ( $location === null ) {
+			if ( false === $location ) {
 				continue;
 			}
 

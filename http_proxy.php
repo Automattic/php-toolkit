@@ -57,7 +57,7 @@ while ( $client->await_next_event() ) {
 	switch ( $client->get_event() ) {
 		case Client::EVENT_GOT_HEADERS:
 			http_response_code($request->response->status_code);
-			foreach ( $request->response->get_headers() as $name => $value ) {
+			foreach ( $request->response->headers as $name => $value ) {
 				if(
 					$name === 'transfer-encoding' ||
 					$name === 'set-cookie' ||
