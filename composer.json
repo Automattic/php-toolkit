@@ -37,5 +37,8 @@
     "classmap": [
       "tests/"
     ]
+  },
+  "scripts": {
+    "test": "phpunit --testdox"
   }
 }
