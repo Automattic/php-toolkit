@@ -6,7 +6,7 @@ namespace WordPress\Filesystem;
  * Abstract class for filesystem implementations.
  * 
  * It enables navigating multiple filesystem implementations in a unified way.
- * For example, WP_Zip_Filesystem and WP_Filesystem are both implemented
+ * For example, WP_Zip_Filesystem and WP_Local_Filesystem are both implemented
  * as subclasses of this class.
  */
 abstract class WP_Abstract_Filesystem {
@@ -76,6 +76,15 @@ abstract class WP_Abstract_Filesystem {
 	 * Close the file reader.
 	 */
 	abstract public function close_file_reader();
+
+	// @TODO: Support for write methods, perhaps in a separate interface?
+	// abstract public function append_to($path, $data);
+	// abstract public function overwrite($path, $data);
+	// abstract public function rename($old_path, $new_path);
+	// abstract public function mkdir($path);
+	// abstract public function rm($path);
+	// abstract public function rmdir($path, $options = []);
+
 
 	/**
 	 * Buffers the entire contents of a file into a string

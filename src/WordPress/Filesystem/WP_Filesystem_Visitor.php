@@ -4,26 +4,20 @@ namespace WordPress\Filesystem;
 
 class WP_Filesystem_Visitor {
 	private $filesystem;
-	private $root_dir;
 	private $directories = array();
 	private $files       = array();
 	private $current_event;
 	private $iterator_stack = array();
 	private $current_iterator;
-	private $depth = 0;
+	private $depth = -1;
 
-	public function __construct( WP_Abstract_Filesystem $filesystem, $dir ) {
+	public function __construct( WP_Abstract_Filesystem $filesystem ) {
 		$this->filesystem = $filesystem;
-		$this->root_dir = $dir;
-		$this->iterator_stack[] = $this->create_iterator( $dir );
+		$this->iterator_stack[] = $this->create_iterator();
 	}
 	
 	public function get_current_depth() {
 		return $this->depth;
-	}
-
-	public function get_root_dir() {
-		return $this->root_dir;
 	}
 
 	public function next() {
@@ -60,7 +54,7 @@ class WP_Filesystem_Visitor {
 		return $this->current_event;
 	}
 
-	private function create_iterator( $dir ) {
+	private function create_iterator( $dir = '/' ) {
 		$this->directories = array();
 		$this->files       = array();
 
