@@ -26,6 +26,9 @@ class Request {
 	public $method;
 	public $headers;
 	public $http_version;
+	/**
+	 * @var WP_Byte_Reader
+	 */
 	public $upload_body_stream;
 	public $redirected_from;
 	public $redirected_to;
@@ -49,9 +52,30 @@ class Request {
 		], $request_info );
 
 		$this->id     = ++ self::$last_id;
-		$this->url    = $url;
 		$this->is_ssl = strpos( $url, 'https://' ) === 0;
 
+		// Extract username/password from URL if present
+		// @TODO: Use the WHATWG URL parser
+		$url_parts = parse_url($url);
+		if (!empty($url_parts['user'])) {
+			$auth = $url_parts['user'];
+			if (!empty($url_parts['pass'])) {
+				$auth .= ':' . $url_parts['pass']; 
+			}
+			// Add basic auth header
+			$request_info['headers']['authorization'] = 'Basic ' . base64_encode($auth);
+			
+			// Remove credentials from URL
+			$url = 
+				$url_parts['scheme'] . '://' .
+				$url_parts['host'] .
+				(!empty($url_parts['port']) ? ':' . $url_parts['port'] : '') .
+				(!empty($url_parts['path']) ? $url_parts['path'] : '') .
+				(!empty($url_parts['query']) ? '?' . $url_parts['query'] : '') .
+				(!empty($url_parts['fragment']) ? '#' . $url_parts['fragment'] : '');
+		}
+
+		$this->url                = $url;
 		$this->method             = $request_info['method'];
 		$this->headers            = array_change_key_case($request_info['headers'], CASE_LOWER);
 		$this->upload_body_stream = $request_info['body_stream'];

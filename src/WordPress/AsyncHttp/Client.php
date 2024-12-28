@@ -41,8 +41,14 @@ use WordPress\AsyncHttp\StreamWrapper\InflateStreamWrapper;
  *     // Handle other events...
  * }
  * ```
+ * 
+ * @TODO
+ * * When uploading a body – use transfer-encoding: chunked when the number of uploaded bytes is unknown upfront.
+ * * Request headers – accept string lines such as "Content-type: text/plain" instead of key-value pairs. K/V pairs
+ *   are confusing and lead to accidental errors such as `0: Content-type: text/plain`. They also diverge from the
+ *   format that curl accepts.
  *
- * @since    Next Release
+ * @since    Next Release 
  * @package  WordPress
  * @subpackage Async_HTTP
  */
@@ -531,21 +537,22 @@ class Client {
 	 */
 	private function send_request_body( array $requests ) {
 		foreach ( $this->stream_select( $requests, self::STREAM_SELECT_WRITE ) as $request ) {
-			$chunk = fread( $request->upload_body_stream, 8192 );
-			if ( false === $chunk ) {
-				$this->set_error( $request, new HttpError( 'Failed to read from the request body stream' ) );
-				continue;
+			if(!$request->upload_body_stream->next_bytes()) {
+				if($request->upload_body_stream->is_finished()) {
+					$request->upload_body_stream->close();
+					$request->upload_body_stream = null;
+					$request->state	             = Request::STATE_RECEIVING_HEADERS;
+					continue;
+				} else {
+					$this->set_error( $request, new HttpError( 'Failed to read from the request body stream' ) );
+					continue;
+				}
 			}
 
+			$chunk = $request->upload_body_stream->get_bytes();
 			if ( false === fwrite( $this->connections[ $request->id ]->http_socket, $chunk ) ) {
 				$this->set_error( $request, new HttpError( 'Failed to write request bytes.' ) );
 				continue;
-			}
-
-			if ( '' === $chunk || feof( $request->upload_body_stream ) ) {
-				fclose( $request->upload_body_stream );
-				$request->upload_body_stream = null;
-				$request->state              = Request::STATE_RECEIVING_HEADERS;
 			}
 		}
 	}
@@ -843,6 +850,10 @@ class Client {
 			"accept-language" => "en-US,en;q=0.9",
 			"connection"      => "close",
 		];
+		if($request->upload_body_stream) {
+			// @TODO: if length() is not available, use chunked transfer encoding.
+			$headers['content-length'] = $request->upload_body_stream->length();
+		}
 		foreach ( $request->headers as $k => $v ) {
 			$headers[ $k ] = $v;
 		}
