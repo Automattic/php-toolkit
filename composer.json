@@ -29,6 +29,7 @@
     },
     "files": [
       "src/WordPress/Blueprints/functions.php",
+      "src/WordPress/Filesystem/functions.php",
       "src/WordPress/Streams/stream_str_replace.php"
     ]
   },
