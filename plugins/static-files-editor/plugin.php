@@ -171,7 +171,7 @@ class WP_Static_Files_Editor_Plugin {
 
     static public function initialize() {
         // Register hooks
-        // register_activation_hook( __FILE__, array(self::class, 'import_static_pages') );
+        register_activation_hook( __FILE__, array(self::class, 'import_static_pages') );
 
         add_action('init', function() {
             self::get_fs();
