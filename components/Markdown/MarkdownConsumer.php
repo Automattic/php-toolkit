@@ -53,17 +53,8 @@ class MarkdownConsumer implements DataFormatConsumer {
 		return $this->blocks_with_metadata;
 	}
 
-	public function get_all_metadata( $options = array() ) {
-		$metadata = $this->frontmatter;
-		if ( isset( $options['first_value_only'] ) && $options['first_value_only'] ) {
-			$metadata = array_map(
-				function ( $value ) {
-					return $value[0];
-				},
-				$metadata
-			);
-		}
-		return $metadata;
+	public function get_all_metadata() {
+		return $this->frontmatter;
 	}
 
 	public function get_meta_value( $key ) {

@@ -118,6 +118,7 @@ class DeltaResolver {
                     }
                 }
 
+                // @TODO: instead of failing, wait for $needed_bytes to be available with a timeout.
                 $offset_bytes = ReaderUtils::read_exactly_n_bytes($this->delta_reader, $needed_bytes);
                 $read_offset = 0;
                 if ( $command_byte & 0b00000001 ) {

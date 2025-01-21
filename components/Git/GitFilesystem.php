@@ -9,21 +9,24 @@ use WordPress\ByteStream\MemoryPipe;
 use WordPress\ByteStream\Reader\ReaderUtils;
 use WordPress\Filesystem\Filesystem;
 use WordPress\Filesystem\Layer\ChrootLayer;
+use WordPress\Filesystem\Mixin\BufferedWriteStreamViaPutContents;
 use WordPress\Filesystem\Mixin\CopyRecursiveViaStreaming;
-use WordPress\Filesystem\Mixin\PutContentsViaWriteStream;
 use WordPress\Filesystem\Mixin\RenameFileViaCopyAndRm;
 
 class GitFilesystem implements Filesystem {
 
     use CopyRecursiveViaStreaming,
         RenameFileViaCopyAndRm,
-        PutContentsViaWriteStream;
+        BufferedWriteStreamViaPutContents;
 
 	/**
 	 * @var GitRepository
 	 */
 	private $repo;
 	private $auto_push;
+    /**
+     * @var GitRemote
+     */
 	private $remote;
 	private $write_stream;
 
@@ -138,26 +141,20 @@ class GitFilesystem implements Filesystem {
 		);
 	}
 
-	public function open_write_stream($path): ByteWriter {
+	public function put_contents($path, $contents, $options = []) {
 		if ( $this->write_stream ) {
 			throw new FilesystemException('Cannot open a new write stream while another write stream is open.');
 		}
-		$temp_file = tempnam( sys_get_temp_dir(), 'git_write_stream' );
-		if ( false === $temp_file ) {
-			throw new FilesystemException('Failed to create temporary file');
-		}
-		$this->write_stream = array(
-			'repo_path' => $path,
-			'local_path' => $temp_file,
-			'fp' => fopen( $temp_file, 'wb' ),
-		);
-		return new MemoryPipe();
+		$this->commit( array(
+			'updates' => array(
+				$path => $contents,
+			),
+		) );
 	}
 
 	private function commit( $options ) {
-		if ( false === $this->repo->commit( $options ) ) {
-			return false;
-		}
+        $this->repo->commit( $options );
+
 		/**
 		 * Auto push if enabled
 		 *
@@ -169,24 +166,16 @@ class GitFilesystem implements Filesystem {
 		 * Let's re-work this once the notes management prototype is more mature.
 		 */
 		if ( $this->auto_push ) {
-			if ( $this->remote->force_push_one_commit() ) {
-				return true;
-			}
+            try {
+			    $this->remote->force_push_one_commit();
+            } catch (GitException $e) {
+                // If push failed, force pull and retry
+                $this->remote->force_pull();
 
-			// If push failed, force pull and retry
-			if ( false === $this->remote->force_pull() ) {
-				// If this failed, we're out of luck
-				return false;
-			}
-
-			// If pull succeeded, try committing and pushing again
-			if ( false === $this->repo->commit( $options ) ) {
-				return false;
-			}
-
-			if ( false === $this->remote->force_push_one_commit() ) {
-				return false;
-			}
+                // If pull succeeded, try committing and pushing again
+                $this->repo->commit( $options );
+			    $this->remote->force_push_one_commit();
+            }
 		}
 		return true;
 	}

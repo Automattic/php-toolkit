@@ -10,8 +10,9 @@ function wp_path_segments($path) {
 
 function wp_parent_paths($path, $options = []) {
     $include_self = $options['include_self'] ?? false;
+    $path = '/' . trim($path, '/');
     $segments = wp_path_segments($path);
-    $paths = [];
+    $paths = ['/'];
     yield '/';
     for($i = 0; $i < count($segments) - 1; $i++) {
         $paths[] = $segments[$i];

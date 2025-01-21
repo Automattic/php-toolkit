@@ -6,7 +6,7 @@ use WordPress\Filesystem\FilesystemException;
 
 abstract class FilesystemTestCase extends TestCase {
 
-    private $fs;
+    protected $fs;
 
     protected function setUp(): void {
         $this->fs = $this->create_fs();
@@ -56,8 +56,10 @@ abstract class FilesystemTestCase extends TestCase {
     }
 
     public function testMkdirRecursive() {
-        $this->fs->mkdir('/parent/child/grandchild', ['recursive' => true]);
-        $this->assertTrue($this->fs->is_dir('/parent/child/grandchild'));
+        $this->fs->mkdir('/new-dir/sub-dir/more/nested/layers', [
+            'recursive' => true,
+        ]);
+        $this->assertTrue($this->fs->is_dir('/new-dir/sub-dir/more/nested/layers'));
     }
 
     public function testRmRemovesExistingFile() {

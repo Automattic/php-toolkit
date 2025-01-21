@@ -89,7 +89,7 @@ class ChunkedDecoderFilter implements ByteFilter {
         return implode( '', $chunks );
     }
 
-    public function close(): string {
+    public function flush(): string {
         return $this->is_feof ? '' : $this->decoded_buffer;
     }
 

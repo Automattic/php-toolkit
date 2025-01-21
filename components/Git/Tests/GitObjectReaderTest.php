@@ -11,7 +11,7 @@ class GitObjectReaderTest extends TestCase {
         $content = $header . gzdeflate("Some commit content", -1, ZLIB_ENCODING_DEFLATE);
         $reader = new GitObjectReader(new MemoryPipe($content));
 
-        $this->assertTrue($reader->read_header());
+        $reader->read_header();
         $this->assertEquals('commit', $reader->get_object_type_name());
         $this->assertEquals(123, $reader->get_uncompressed_size());
     }

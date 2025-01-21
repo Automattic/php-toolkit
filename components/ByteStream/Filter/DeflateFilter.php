@@ -23,15 +23,17 @@ class DeflateFilter implements ByteFilter {
             throw new ByteStreamException('Deflate handle is not initialized');
         }
 
-        $deflated_data = deflate_add($this->deflate_handle, $bytes, ZLIB_NO_FLUSH);
-        return $deflated_data;
+        $chunk = deflate_add($this->deflate_handle, $bytes, ZLIB_NO_FLUSH);
+        if(false === $chunk) {
+            throw new ByteStreamException('Failed to deflate bytes');
+        }
+        return $chunk;
     }
 
-    public function close(): string {
+    public function flush(): string {
         if(null === $this->deflate_handle) {
             throw new ByteStreamException('closing the deflate filter?');
         }
-
         $last_chunk = deflate_add($this->deflate_handle, '', ZLIB_FINISH);
         $this->deflate_handle = null;
         return $last_chunk;

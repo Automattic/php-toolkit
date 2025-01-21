@@ -433,6 +433,7 @@ class FilesystemEntityReader implements EntityReader {
 				continue;
 			}
 
+
 			if ( $event->is_entering() ) {
 				$abs_paths = array();
 				foreach ( $event->files as $filename ) {

@@ -77,7 +77,26 @@ class Request {
 
 		$this->url                = $url;
 		$this->method             = $request_info['method'];
-		$this->headers            = array_change_key_case($request_info['headers'], CASE_LOWER);
+
+		$headers = [
+			"host"            => $url_parts['host'],
+			"user-agent"      => "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/93.0.4577.82 Safari/537.36",
+			"accept"          => "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9",
+			"accept-language" => "en-US,en;q=0.9",
+			"connection"      => "close",
+		];
+		if($request_info['body_stream']) {
+            $length = $request_info['body_stream']->length();
+            if(null !== $length) {
+			    $headers['content-length'] = $length;
+            } else {
+                $headers['transfer-encoding'] = 'chunked';
+            }
+		}
+        foreach($request_info['headers'] as $k => $v) {
+            $headers[$k] = $v;
+        }
+		$this->headers            = array_change_key_case($headers, CASE_LOWER);
 		$this->upload_body_stream = $request_info['body_stream'];
 		$this->http_version       = $request_info['http_version'];
 		$this->redirected_from    = $request_info['redirected_from'];
@@ -85,6 +104,10 @@ class Request {
 			$this->redirected_from->redirected_to = $this;
 		}
 	}
+
+    public function get_header($name) {
+        return $this->headers[$name] ?? null;
+    }
 
 	public function latest_redirect() {
 		$request = $this;

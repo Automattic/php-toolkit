@@ -105,4 +105,8 @@ class EPubEntityReader implements EntityReader {
 		return $this->finished;
 	}
 
+    public function get_reentrancy_cursor() {
+        return '';
+    }
+
 }

@@ -53,7 +53,7 @@ class BlocksWithMetadata {
 	 * @return array The metadata sourced from the input document.
 	 */
 	public function get_all_metadata() {
-		return array_column($this->metadata, 0);
+		return $this->metadata;
 	}
 
 	/**

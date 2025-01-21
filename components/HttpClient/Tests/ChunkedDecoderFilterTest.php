@@ -3,8 +3,8 @@
 namespace WordPress\HttpClient\Tests;
 
 use WordPress\ByteStream\Reader\ResourceReader;
-use WordPress\HttpClient\ChunkedEncoder;
 use WordPress\HttpClient\Filter\ChunkedDecoderFilter;
+use WordPress\HttpClient\Filter\ChunkedEncoderFilter;
 
 class ChunkedDecoderFilterTest extends \PHPUnit\Framework\TestCase {
 
@@ -14,7 +14,7 @@ class ChunkedDecoderFilterTest extends \PHPUnit\Framework\TestCase {
 
     public function setUp(): void {
         $this->pygmalion_reader = ResourceReader::from_local_file( dirname(__FILE__) . '/fixtures/preface-to-pygmalion.txt');
-        $this->chunked_encoder = new ChunkedEncoder();
+        $this->chunked_encoder = new ChunkedEncoderFilter();
         $this->decoder = new ChunkedDecoderFilter();
     }
 
@@ -45,9 +45,7 @@ As will be seen later on, Pygmalion needs, not a preface, but a sequel,", $decod
 
     private function get_next_chunk($n) {
         $this->pygmalion_reader->next_bytes($n);
-        $this->chunked_encoder->append_bytes($this->pygmalion_reader->get_bytes());
-        $this->chunked_encoder->next_bytes();
-        return $this->chunked_encoder->get_bytes();
+        return $this->chunked_encoder->filter_bytes($this->pygmalion_reader->get_bytes());
     }
 
 }

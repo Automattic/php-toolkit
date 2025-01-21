@@ -3,6 +3,7 @@
 namespace WordPress\Git\Protocol\Parser;
 
 use WordPress\ByteStream\NotEnoughDataException;
+use WordPress\Git\GitException;
 
 class PacketParser {
 
@@ -89,7 +90,7 @@ class PacketParser {
             $this->state = self::STATE_READ_PACKET_BODY;
             return;
         } else if(!preg_match('/^[0-9a-f]{4}$/', $length_hex)) {
-            throw new \Exception('Invalid packet length hex "' . $length_hex . '" at offset ' . $this->get_offset_in_stream());
+            throw new GitException('Invalid packet length hex "' . $length_hex . '" at offset ' . $this->get_offset_in_stream());
         }
 
         $at += 4;

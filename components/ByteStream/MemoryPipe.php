@@ -2,10 +2,7 @@
 
 namespace WordPress\ByteStream;
 
-use WordPress\ByteStream\Reader\ByteReader;
-use WordPress\ByteStream\Writer\ByteWriter;
-
-class MemoryPipe implements ByteReader, ByteWriter {
+class MemoryPipe implements BytePipe {
 
 	protected $buffer='';
 	protected $offset_in_current_buffer = 0;
@@ -92,6 +89,8 @@ class MemoryPipe implements ByteReader, ByteWriter {
 	}
 
 	public function next_bytes($max_bytes = 8096): bool {
+        $this->output_chunk = '';
+        
 		if($this->is_closed) {
 			return false;
 		}

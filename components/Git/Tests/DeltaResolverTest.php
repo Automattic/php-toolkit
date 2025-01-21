@@ -3,32 +3,33 @@
 namespace WordPress\Git\Tests;
 
 use WordPress\ByteStream\MemoryPipe;
+use WordPress\ByteStream\Reader\ProducerReader;
 use WordPress\ByteStream\Reader\ReaderUtils;
+use WordPress\Filesystem\InMemoryFilesystem;
 use WordPress\Git\GitObjectReader;
+use WordPress\Git\GitRepository;
 use WordPress\Git\Protocol\Parser\DeltaResolver;
-use WordPress\Git\Protocol\Writers\PackWriter;
+use WordPress\Git\Protocol\GitProtocolProducer;
 
 class DeltaResolverTest extends \PHPUnit\Framework\TestCase {
 
     public function test_resolve_next_chunk() {
-        $string_reader = new MemoryPipe();
         $base_bytes = "Hello, world!";
-        $pack_writer = new PackWriter($string_reader);
-        $pack_writer->append_object_header('blob', strlen($base_bytes));
-        $pack_writer->append_bytes($base_bytes);
-        $pack_writer->flush_object_body();
-        $string_reader->seek(0);
-        $encoded_base_bytes = ReaderUtils::read_all_remaining_bytes($string_reader);
-        $pack_writer->close();
 
-        $base_reader = new GitObjectReader(new MemoryPipe(
-            $encoded_base_bytes
-        ));
+        $repository = new GitRepository(InMemoryFilesystem::create());
+        $readme_oid = $repository->add_object('blob', 'Hello, world!');
+        $pack_producer = new GitProtocolProducer();
+        $pack_producer->append_packfile($repository, [$readme_oid]);
+        $pack_producer->close_writing();
+
+        $base_reader = new GitObjectReader(
+            new ProducerReader($pack_producer)
+        );
 
         $resolved_chunk = "World? Hello, I am changed!";
         $delta_bytes = implode('', [
-            PackWriter::encode_variable_length(strlen($base_bytes)),
-            PackWriter::encode_variable_length(strlen($resolved_chunk)),
+            GitProtocolProducer::encode_variable_length(strlen($base_bytes)),
+            GitProtocolProducer::encode_variable_length(strlen($resolved_chunk)),
             // The leftmost bit is 0 = we're consuming from the delta
             // The next 7 bits amount to 0b110 = we're consuming the next 6 bytes
             chr(0b00000110),

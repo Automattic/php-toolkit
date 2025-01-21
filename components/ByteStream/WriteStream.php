@@ -17,7 +17,7 @@ class WriteStream implements ByteWriter, ArrayAccess {
      */
     private $filters = [];
 
-    public function __construct(ByteWriter $writer, array $filters) {
+    public function __construct(ByteWriter $writer, array $filters = []) {
         $this->writer = $writer;
         $this->filters = $filters;
     }
@@ -39,8 +39,9 @@ class WriteStream implements ByteWriter, ArrayAccess {
 
     public function close(): void {
         foreach($this->filters as $filter) {
-            $last_chunk = $filter->close();
-            $this->writer->append_bytes($last_chunk);
+            $this->writer->append_bytes(
+                $filter->flush()
+            );
         }
     }
 

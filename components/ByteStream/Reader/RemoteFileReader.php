@@ -4,6 +4,7 @@ namespace WordPress\ByteStream\Reader;
 
 use WordPress\ByteStream\ByteStreamException;
 use WordPress\HttpClient\Request;
+use WordPress\HttpClient\Response;
 
 /**
  * Streams bytes from a remote file.
@@ -11,13 +12,17 @@ use WordPress\HttpClient\Request;
 class RemoteFileReader implements ByteReader {
 
 	/**
-	 * @var WordPress\HttpClient\Client
+	 * @var \WordPress\HttpClient\Client
 	 */
 	private $client;
     /**
-     * @var WordPress\HttpClient\Request
+     * @var \WordPress\HttpClient\Request
      */
 	private $request;
+    /**
+     * @var \WordPress\HttpClient\Response
+     */
+    private $response;
     /**
      * @var string
      */
@@ -33,7 +38,7 @@ class RemoteFileReader implements ByteReader {
     /**
      * @var int
      */
-	private $bytes_already_read;
+	private $bytes_already_read = 0;
     /**
      * @var int
      */
@@ -64,8 +69,18 @@ class RemoteFileReader implements ByteReader {
 	}
 
 	public function next_bytes($max_bytes = 8096): bool {
+        return $this->pull_until_event([
+            'max_bytes' => $max_bytes,
+            'event' => \WordPress\HttpClient\Client::EVENT_BODY_CHUNK_AVAILABLE,
+        ]);
+    }
+
+	private function pull_until_event($options = []): bool {
+        $max_bytes = $options['max_bytes'] ?? 8096;
+        $stop_at_event = $options['event'] ?? \WordPress\HttpClient\Client::EVENT_BODY_CHUNK_AVAILABLE;
 		if ($this->buffered_bytes !== '') {
 			$this->current_chunk = substr($this->buffered_bytes, 0, $max_bytes);
+            $this->bytes_already_read += strlen($this->current_chunk);
 			$this->buffered_bytes = substr($this->buffered_bytes, $max_bytes);
 			return true;
 		}
@@ -91,16 +106,18 @@ class RemoteFileReader implements ByteReader {
 			if ( $request->redirected_to ) {
 				continue;
 			}
-
 			switch ( $this->client->get_event() ) {
 				case \WordPress\HttpClient\Client::EVENT_GOT_HEADERS:
-					if(null !== $this->remote_file_length) {
-						continue 2;
-					}
-					$content_length = $response->get_header( 'Content-Length' );
-					if ( false !== $content_length ) {
-						$this->remote_file_length = (int) $content_length;
-					}
+                    $this->response = $response;
+					if(null === $this->remote_file_length) {
+                        $content_length = $response->get_header( 'Content-Length' );
+                        if ( false !== $content_length ) {
+                            $this->remote_file_length = (int) $content_length;
+                        }
+                    }
+                    if($stop_at_event === \WordPress\HttpClient\Client::EVENT_GOT_HEADERS) {
+                        return true;
+                    }
 					break;
 				case \WordPress\HttpClient\Client::EVENT_BODY_CHUNK_AVAILABLE:
 					$chunk = $this->client->get_response_body_chunk();
@@ -132,13 +149,15 @@ class RemoteFileReader implements ByteReader {
 					} else {
 						$this->current_chunk = $chunk;
 					}
-					return true;
+                    $this->bytes_already_read += strlen($this->current_chunk);
+                    if($stop_at_event === \WordPress\HttpClient\Client::EVENT_BODY_CHUNK_AVAILABLE) {
+                        return true;
+                    }
 				case \WordPress\HttpClient\Client::EVENT_FAILED:
 					// TODO: Think through error handling. Errors are expected when working with
 					//       the network. Should we auto retry? Make it easy for the caller to retry?
 					//       Something else?
-					$this->last_error = $this->client->get_request()->error;
-					return false;
+                    throw new ByteStreamException('HTTP request failed: ' . $this->client->get_request()->error);
 			}
 		}
 
@@ -150,37 +169,23 @@ class RemoteFileReader implements ByteReader {
 			return $this->remote_file_length;
 		}
 
-		$request = new \WordPress\HttpClient\Request(
-			$this->request->url,
-			array(
-                'method' => 'HEAD',
-                'headers' => $this->request->headers,
-            )
-		);
-		$this->client->enqueue( $request );
-		while ( $this->client->await_next_event( [
-            'requests' => [ $request ]
-        ] ) ) {
-			switch ( $this->client->get_event() ) {
-				case \WordPress\HttpClient\Client::EVENT_GOT_HEADERS:
-					$request = $this->client->get_request();
-					if($request->redirected_to) {
-						continue 2;
-					}
-					$response = $request->response;
-					$content_length = $response->get_header( 'Content-Length' );
-					if ( false === $content_length ) {
-						return false;
-					}
-					$this->remote_file_length = (int) $content_length;
-					break;
-			}
-		}
-		if(null === $this->remote_file_length) {
-			return false;
-		}
+        $response = $this->await_response();
+        $content_length = $response->get_header( 'Content-Length' );
+        if ( false === $content_length ) {
+            return false;
+        }
+        $this->remote_file_length = (int) $content_length;
 		return $this->remote_file_length;
 	}
+
+    public function await_response() {
+		if ( ! $this->response ) {
+            $this->pull_until_event([
+                'event' => \WordPress\HttpClient\Client::EVENT_GOT_HEADERS,
+            ]);
+        }
+        return $this->response;
+    }
 
 	private function after_chunk() {
 		if ( $this->current_chunk ) {
@@ -202,7 +207,12 @@ class RemoteFileReader implements ByteReader {
 	}
 
 	public function reached_end_of_data(): bool {
-		return Request::STATE_FINISHED === $this->request->latest_redirect()->state && !$this->buffered_bytes;
+		return (
+            Request::STATE_FINISHED === $this->request->latest_redirect()->state &&
+            ! $this->client->has_pending_event($this->request, \WordPress\HttpClient\Client::EVENT_BODY_CHUNK_AVAILABLE) &&
+            ! $this->buffered_bytes &&
+            ! $this->current_chunk
+        );
 	}
 
 	public function close(): void {

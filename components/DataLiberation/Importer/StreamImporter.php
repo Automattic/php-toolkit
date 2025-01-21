@@ -317,7 +317,9 @@ class StreamImporter {
 				$this->next_stage = self::STAGE_TOPOLOGICAL_SORT;
 				return false;
 			case self::STAGE_TOPOLOGICAL_SORT:
-				// @TODO: Topologically sort the entities.
+				// @TODO: Different modes:
+                //        1. skip, reprocess
+                //        2. sort topologically
 				$this->next_stage = self::STAGE_FRONTLOAD_ASSETS;
 				return false;
 			case self::STAGE_FRONTLOAD_ASSETS:

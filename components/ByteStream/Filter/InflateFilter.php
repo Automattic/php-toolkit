@@ -34,7 +34,7 @@ class InflateFilter implements ByteFilter {
         return $inflated_data;
     }
 
-    public function close(): string {
+    public function flush(): string {
         if(null === $this->inflate_handle) {
             throw new ByteStreamException('closing the inflate filter?');
         }

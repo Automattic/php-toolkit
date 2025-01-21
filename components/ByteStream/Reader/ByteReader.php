@@ -2,6 +2,8 @@
 
 namespace WordPress\ByteStream\Reader;
 
+use WordPress\ByteStream\ByteSource;
+
 /**
  * Interface for streaming, seekable byte readers.
  *
@@ -46,10 +48,9 @@ interface ByteReader {
     /**
      * Read the next chunk of bytes from the data stream.
      *
-     * @param int $max_bytes The maximum number of bytes to read.
      * @return bool Whether bytes were successfully read.
      */
-    public function next_bytes($max_bytes = 8096): bool;
+    public function next_bytes($max_bytes = 8192): bool;
 
     /**
      * Get the bytes read in the last operation.

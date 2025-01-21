@@ -19,10 +19,10 @@ interface ByteFilter {
     public function filter_bytes(string $bytes): string|false;
 
     /**
-     * Closes the filter and returns the last chunk of data.
+     * Flushes the filter and returns the last chunk of data.
      *
      * @return string The last chunk of data.
      */
-    public function close(): string;
+    public function flush(): string;
 
 }

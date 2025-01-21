@@ -99,12 +99,11 @@ class WP_Static_Files_Editor_Plugin {
             if (!$last_pull_time) {
                 self::$remote->force_pull([
                     'branch' => GIT_BRANCH,
-                    'path' => GIT_DIRECTORY_ROOT,
-                    'shallow' => true,
+                    // 'path' => GIT_DIRECTORY_ROOT,
+                    // 'shallow' => true,
                 ]);
                 set_transient('wp_git_last_pull_time', time(), 10 * MINUTE_IN_SECONDS);
             }
-
             self::$fs = GitFilesystem::create(
                 $repo,
                 [
@@ -316,7 +315,7 @@ class WP_Static_Files_Editor_Plugin {
 
             wp_register_script(
                 'static-files-editor',
-                plugins_url('ui/build/index.tsx.js', __FILE__),
+                plugins_url('build/index.js', __FILE__),
                 array('wp-element', 'wp-components', 'wp-block-editor', 'wp-edit-post', 'wp-plugins', 'wp-editor', 'wp-api-fetch'),
                 '1.0.0',
                 true
@@ -330,7 +329,7 @@ class WP_Static_Files_Editor_Plugin {
 
             wp_register_style(
                 'static-files-editor',
-                plugins_url('ui/build/style-index.tsx.css', __FILE__),
+                plugins_url('build/style-index.css', __FILE__),
                 array('wp-components', 'wp-block-editor', 'wp-edit-post'),
                 '1.0.0'
             );
@@ -639,7 +638,7 @@ class WP_Static_Files_Editor_Plugin {
             $new_content = self::wordpressify_static_assets_urls(
                 $converter->get_block_markup()
             );
-            $metadata = $converter->get_all_metadata(['first_value_only' => true]);
+            $metadata = array_column($converter->get_all_metadata(), 0);
             $updated = wp_update_post(array(
                 'ID' => $post_id,
                 'post_content' => $new_content,
@@ -1104,7 +1103,7 @@ class WP_Static_Files_Editor_Plugin {
                     );
                     $new_content = self::convert_post_data_to_string(
                         $parsed->get_block_markup(),
-                        $parsed->get_all_metadata(['first_value_only' => true]),
+                        array_column($parsed->get_all_metadata(), 0),
                         $new_extension
                     );
                     $fs->put_contents(

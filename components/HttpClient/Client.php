@@ -7,6 +7,7 @@ use WordPress\ByteStream\Filter\InflateFilter;
 use WordPress\ByteStream\Reader\RemoteFileReader;
 use WordPress\ByteStream\Reader\ResourceReader;
 use WordPress\ByteStream\ReadStream;
+use WordPress\HttpClient\Filter\ChunkedEncoderFilter;
 
 /**
  * An asynchronous HTTP client library.
@@ -249,6 +250,10 @@ class Client {
 
 		return false;
 	}
+
+    public function has_pending_event($request, $event_type) {
+        return $this->events[ $request->id ][ $event_type ] ?? false;
+    }
 
     /**
      * Returns the next event found by await_next_event().
@@ -537,6 +542,13 @@ class Client {
 
 			if ( $request->upload_body_stream ) {
 				$request->state = Request::STATE_WILL_SEND_BODY;
+
+                if($request->get_header('transfer-encoding') === 'chunked') {
+                    $request->upload_body_stream = new ReadStream(
+                        $request->upload_body_stream,
+                        [new ChunkedEncoderFilter()]
+                    );
+                }
 			} else {
 				$request->state = Request::STATE_RECEIVING_HEADERS;
 			}
@@ -858,23 +870,9 @@ class Client {
 	static protected function prepare_request_headers( Request $request ) {
 		$url   = $request->url;
 		$parts = parse_url( $url );
-		$host  = $parts['host'];
 		$path  = ( isset( $parts['path'] ) ? $parts['path'] : '/' ) . ( isset( $parts['query'] ) ? '?' . $parts['query'] : '' );
 
-		$headers = [
-			"host"            => $host,
-			"user-agent"      => "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/93.0.4577.82 Safari/537.36",
-			"accept"          => "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9",
-			"accept-language" => "en-US,en;q=0.9",
-			"connection"      => "close",
-		];
-		if($request->upload_body_stream) {
-			// @TODO: if length() is not available, use chunked transfer encoding.
-			$headers['content-length'] = $request->upload_body_stream->length();
-		}
-		foreach ( $request->headers as $k => $v ) {
-			$headers[ $k ] = $v;
-		}
+        $headers = $request->headers;
 
 		/**
 		 * Disable the gzip transfer compression when requesting a byte range.

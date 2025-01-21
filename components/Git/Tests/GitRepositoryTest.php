@@ -7,7 +7,9 @@ use WordPress\Git\GitRepository;
 use WordPress\Git\Model\Commit;
 use WordPress\Git\Model\Tree;
 use WordPress\Git\Model\TreeEntry;
-use WordPress\Git\Protocol\Writers\PackWriter;
+use WordPress\Git\Protocol\GitProtocolProducer;
+
+use function WordPress\Git\get_all_descendant_oids_in_tree;
 
 class GitRepositoryTest extends \PHPUnit\Framework\TestCase {
 
@@ -54,14 +56,14 @@ class GitRepositoryTest extends \PHPUnit\Framework\TestCase {
     public function test_find_hash_by_path() {
         $repo = new GitRepository(InMemoryFilesystem::create());
         $blob_oid = $repo->add_object('blob', 'Hello, world!');
-        $tree_oid = $repo->add_object('tree', PackWriter::encode_tree_bytes(new Tree(array(
+        $tree_oid = $repo->add_object('tree', GitProtocolProducer::encode_tree_bytes(new Tree(array(
             new TreeEntry(array(
                 'mode' => TreeEntry::FILE_MODE_REGULAR_NON_EXECUTABLE,
                 'name' => 'hello-world.txt',
                 'hash' => $blob_oid,
             )),
         ))));
-        $root_tree_oid = $repo->add_object('tree', PackWriter::encode_tree_bytes(new Tree(array(
+        $root_tree_oid = $repo->add_object('tree', GitProtocolProducer::encode_tree_bytes(new Tree(array(
             new TreeEntry(array(
                 'mode' => TreeEntry::FILE_MODE_DIRECTORY,
                 'name' => 'subdirectory',
@@ -74,14 +76,14 @@ class GitRepositoryTest extends \PHPUnit\Framework\TestCase {
     public function test_read_object_by_path() {
         $repo = new GitRepository(InMemoryFilesystem::create());
         $blob_oid = $repo->add_object('blob', 'Hello, world!');
-        $tree_oid = $repo->add_object('tree', PackWriter::encode_tree_bytes(new Tree(array(
+        $tree_oid = $repo->add_object('tree', GitProtocolProducer::encode_tree_bytes(new Tree(array(
             new TreeEntry(array(
                 'mode' => TreeEntry::FILE_MODE_REGULAR_NON_EXECUTABLE,
                 'name' => 'hello-world.txt',
                 'hash' => $blob_oid,
             )),
         ))));
-        $root_tree_oid = $repo->add_object('tree', PackWriter::encode_tree_bytes(new Tree(array(
+        $root_tree_oid = $repo->add_object('tree', GitProtocolProducer::encode_tree_bytes(new Tree(array(
             new TreeEntry(array(
                 'mode' => TreeEntry::FILE_MODE_DIRECTORY,
                 'name' => 'subdirectory',
@@ -120,8 +122,8 @@ class GitRepositoryTest extends \PHPUnit\Framework\TestCase {
                 'subdirectory/README.md' => '# README file',
             ),
         ));
-
-        $descendants = $repo->find_path_descendants('subdirectory');
+        $tree_oid = $repo->find_hash_by_path('/subdirectory');
+        $descendants = get_all_descendant_oids_in_tree($repo, $tree_oid);
         $this->assertCount(2, $descendants);
     }
 
@@ -138,7 +140,7 @@ class GitRepositoryTest extends \PHPUnit\Framework\TestCase {
         
         // Create first commit
         $blob1_oid = $repo->add_object('blob', 'First file');
-        $tree1_oid = $repo->add_object('tree', PackWriter::encode_tree_bytes(new Tree(array(
+        $tree1_oid = $repo->add_object('tree', GitProtocolProducer::encode_tree_bytes(new Tree(array(
             new TreeEntry(array(
                 'mode' => TreeEntry::FILE_MODE_REGULAR_NON_EXECUTABLE,
                 'name' => 'file1.txt',
@@ -149,7 +151,7 @@ class GitRepositoryTest extends \PHPUnit\Framework\TestCase {
 
         // Create second commit
         $blob2_oid = $repo->add_object('blob', 'Second file');
-        $tree2_oid = $repo->add_object('tree', PackWriter::encode_tree_bytes(new Tree(array(
+        $tree2_oid = $repo->add_object('tree', GitProtocolProducer::encode_tree_bytes(new Tree(array(
             new TreeEntry(array(
                 'mode' => TreeEntry::FILE_MODE_REGULAR_NON_EXECUTABLE,
                 'name' => 'file1.txt',

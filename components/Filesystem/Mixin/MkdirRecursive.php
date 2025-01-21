@@ -4,6 +4,8 @@ namespace WordPress\Filesystem\Mixin;
 
 use WordPress\Filesystem\FilesystemException;
 
+use function WordPress\Filesystem\wp_parent_paths;
+
 /**
  * Implements a recursive mkdir() function by calling mkdir_single() for
  * each non-existing segment of the path.
@@ -38,24 +40,15 @@ trait MkdirRecursive {
         // to start iterating over the path segment by segment.
 
         // Start at the root.
-        $next_slash = strlen($root);
-        while(true) {
-            $next_slash = strpos($path, '/', $next_slash + 1);
-            if($next_slash === false) {
-                break;
-            }
-            $path_so_far = substr($path, 0, $next_slash);
-            if(!$path_so_far) {
+        foreach(wp_parent_paths($path, [
+            'include_self' => true,
+        ]) as $parent_path) {
+            if($parent_path === $root) {
                 continue;
             }
-            if(!$this->exists($path_so_far)) {
-                $this->mkdir_single($path_so_far, $options);
+            if(!$this->exists($parent_path)) {
+                $this->mkdir_single($parent_path, $options);
             }
-        }
-
-        // Finally, create the last segment of the path.
-        if(!$this->exists($path)) {
-            $this->mkdir_single($path, $options);
         }
 	}
 

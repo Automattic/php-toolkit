@@ -7,7 +7,7 @@ use WordPress\Git\Diff\MergeEngine;
 use WordPress\Git\Model\Commit;
 use WordPress\Git\Model\Tree;
 use WordPress\Git\Model\TreeEntry;
-use WordPress\Git\Protocol\Writers\PackWriter;
+use WordPress\Git\Protocol\GitProtocolProducer;
 
 use function WordPress\Filesystem\wp_canonicalize_path;
 use function WordPress\Filesystem\wp_join_paths;
@@ -41,14 +41,14 @@ class GitRepository {
 	) {
 		$this->fs          = $fs;
 		$this->diff_engine = $options['diff_engine'] ?? new MergeEngine();
-		$this->initialize_filesystem();
+		$this->initialize_filesystem($options);
 	}
 
     public function get_object_storage_filesystem() {
         return $this->fs;
     }
 
-	private function initialize_filesystem() {
+	private function initialize_filesystem($options=[]) {
 		$paths = array(
 			'objects',
 			'refs',
@@ -62,8 +62,9 @@ class GitRepository {
 		}
         if ( ! $this->fs->is_file( 'HEAD' ) ) {
             // Initialize the repository with a default branch
-            $this->set_ref_head('HEAD', "ref: refs/heads/trunk\n");
-            $this->set_ref_head('refs/heads/trunk', Commit::NULL_HASH);
+            $default_branch = $options['default_branch'] ?? 'trunk';
+            $this->set_ref_head('HEAD', "ref: refs/heads/{$default_branch}\n");
+            $this->set_ref_head("refs/heads/{$default_branch}", Commit::NULL_HASH);
         }
 	}
 
@@ -675,7 +676,7 @@ class GitRepository {
 		// Create new tree object
 		return $this->add_object(
 			'tree',
-			PackWriter::encode_tree_bytes( new Tree( $tree_objects ) )
+			GitProtocolProducer::encode_tree_bytes( new Tree( $tree_objects ) )
 		);
 	}
 

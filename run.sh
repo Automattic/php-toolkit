@@ -8,4 +8,5 @@ npx @wp-playground/cli@latest \
     --mount=`pwd`/components:/wordpress/wp-content/components \
     --mount=`pwd`/plugins/data-liberation:/wordpress/wp-content/plugins/data-liberation \
     --mount=`pwd`/plugins/static-files-editor:/wordpress/wp-content/plugins/static-files-editor \
+    --mount=`pwd`/.my-notes-git:/wordpress/wp-content/uploads \
     --blueprint=./blueprint.json

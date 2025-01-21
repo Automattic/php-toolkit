@@ -94,4 +94,12 @@ class HTMLEntityReader implements EntityReader {
 	public function is_finished(): bool {
 		return $this->finished;
 	}
+
+    /**
+     * @TODO: Implement this.
+     * @return string
+     */
+    public function get_reentrancy_cursor() {
+        return '';
+    }
 }

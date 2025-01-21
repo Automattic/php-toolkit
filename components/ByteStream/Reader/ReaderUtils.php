@@ -26,6 +26,14 @@ class ReaderUtils {
         return $buffer;
     }
 
+    static public function peek_n_bytes(ByteReader $reader, int $n): string|false {
+        $start = $reader->tell();
+        $reader->next_bytes($n);
+        $bytes = $reader->get_bytes();
+        $reader->seek($start);
+        return $bytes;
+    }
+
     static public function read_all_remaining_bytes(ByteReader $reader): string|false {
         $buffer = '';
         while(false !== $reader->next_bytes(8192)) {

@@ -22,6 +22,8 @@ class ReadStream implements ByteReader, ArrayAccess {
      */
     private $output;
 
+    private $flushed = false;
+
     public function __construct(ByteReader $reader, array $filters=[]) {
         $this->reader = $reader;
         $this->filters = $filters;
@@ -34,6 +36,12 @@ class ReadStream implements ByteReader, ArrayAccess {
 
     public function next_bytes($max_bytes = 8096): bool {
         if(!$this->reader->next_bytes($max_bytes)) {
+            if($this->reader->reached_end_of_data() && !$this->flushed) {
+                $this->output->append_bytes($this->flush_filters());
+                $this->output->next_bytes();
+                $this->flushed = true;
+                return true;
+            }
             return false;
         }
 
@@ -51,6 +59,15 @@ class ReadStream implements ByteReader, ArrayAccess {
 
     public function get_bytes(): string {
         return $this->output->get_bytes();
+    }
+
+    private function flush_filters(): string {
+        $flush = '';
+        foreach($this->filters as $filter) {
+            $flush = $filter->filter_bytes($flush);
+            $flush .= $filter->flush();
+        }
+        return $flush;
     }
 
     /** @disregard P1038 */
@@ -93,7 +110,7 @@ class ReadStream implements ByteReader, ArrayAccess {
     }
 
     public function reached_end_of_data(): bool {
-        throw new ByteStreamException('reached_end_of_data() is not supported on ReadStream');
+        return $this->reader->reached_end_of_data();
     }
 
     public function close(): void {}

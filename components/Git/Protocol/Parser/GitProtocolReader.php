@@ -29,7 +29,7 @@ class GitProtocolReader {
      */
     private $new_object_write_stream;
 
-    public function __construct($options = []) {
+    public function __construct(ByteReader $upstream, $options = []) {
         $this->write_to_repository = $options['write_to_repository'] ?? null;
         $this->resolve_deltas_from_repository = $options['resolve_deltas_from_repository'] ?? $options['write_to_repository'] ?? null;
         $this->will_process_pack = $options['will_process_pack'] ?? true;
@@ -44,22 +44,15 @@ class GitProtocolReader {
             ERROR
             );
         }
-        $this->demuxer = new ProtocolDemultiplexer();
+        $this->demuxer = new ProtocolDemultiplexer($upstream);
         $this->packet_parser = new PacketParser();
         $this->pack_parser = new PackParser();
     }
 
-    public function consume_stream(ByteReader $reader) {
-        while($reader->next_bytes()) {
-            $this->append_bytes($reader->get_bytes());
-            while($this->next_token()) {
-                // ... Twiddle our thumbs as GitProtocolReader indexes the trees and commits ...
-            }
+    public function consume_stream() {
+        while($this->next_token()) {
+            // ... Twiddle our thumbs as GitProtocolReader indexes the trees and commits ...
         }
-    }
-
-    public function append_bytes($bytes) {
-        $this->demuxer->append_bytes($bytes);
     }
 
     public function get_progress_data() {
@@ -77,7 +70,10 @@ class GitProtocolReader {
     }
 
     public function get_packet_body() {
-        if('#data' !== $this->get_token_type()) {
+        if(
+            '#packet-body' !== $this->get_token_type() &&
+            '#packet-footer' !== $this->get_token_type()
+        ) {
             return null;
         }
         return $this->packet_body;
@@ -93,11 +89,11 @@ class GitProtocolReader {
         if($this->pack_parser->get_token_type()) {
             return $this->pack_parser->get_token_type();
         }
-        if($this->packet_body) {
-            return '#data';
-        }
         if($this->packet_parser->is_command()) {
             return $this->packet_parser->get_packet_type();
+        }
+        if($this->packet_body) {
+            return $this->packet_parser->get_token_type();
         }
         return null;
     }
@@ -110,6 +106,7 @@ class GitProtocolReader {
         if('#error' === $this->get_token_type()) {
             return false;
         }
+        $this->packet_body = '';
 
         // Process the next multiplexed chunk
         while ($this->demuxer->next_chunk()) {
@@ -135,7 +132,6 @@ class GitProtocolReader {
                     if($this->packet_parser->is_command()) {
                         return true;
                     }
-                    $this->packet_body = '';
                     break;
                 case '#packet-body':
                     switch($this->packet_parser->get_packet_type()) {

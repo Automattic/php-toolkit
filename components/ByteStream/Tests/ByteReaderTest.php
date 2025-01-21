@@ -2,6 +2,7 @@
 
 use PHPUnit\Framework\TestCase;
 use WordPress\ByteStream\MemoryPipe;
+use WordPress\ByteStream\Reader\BufferedReader;
 use WordPress\ByteStream\Reader\ByteReader;
 use WordPress\ByteStream\Reader\DeflateReader;
 use WordPress\ByteStream\Reader\ResourceReader;
@@ -19,6 +20,7 @@ class ByteReaderTest extends TestCase {
         return [
             'ResourceReader' => [ResourceReader::from_local_file( dirname(__FILE__) . '/fixtures/preface-to-pygmalion.txt'), strlen($text)],
             'StringReader' => [new MemoryPipe($text), strlen($text)],
+            'BufferedReader' => [new BufferedReader(new MemoryPipe($text), 1024), strlen($text)],
             'InflateReader' => [new InflateReader(new MemoryPipe($compressedData)), strlen($text)],
             'DeflateReader' => [new DeflateReader(new MemoryPipe($text)), strlen($text)],
         ];

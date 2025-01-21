@@ -7,7 +7,7 @@ use WordPress\Filesystem\LocalFilesystem;
 class FilesystemEntityReaderTest extends TestCase {
 
     public function test_with_create_index_pages_true() {
-        $reader = FilesystemEntityReader::create(
+        $reader = new FilesystemEntityReader(
             LocalFilesystem::create( __DIR__ . '/fixtures/filesystem-entity-reader' ),
             [
                 'first_post_id' => 2,

@@ -5,6 +5,7 @@ rest/
 dist/
 outdir/
 .idea/
+.my-notes-git/
 .vscode
 test.php
 run_phar.php
