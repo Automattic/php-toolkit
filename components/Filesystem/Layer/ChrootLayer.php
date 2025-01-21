@@ -2,8 +2,8 @@
 
 namespace WordPress\Filesystem\Layer;
 
-use WordPress\ByteStream\Reader\ByteReader;
-use WordPress\ByteStream\Writer\ByteWriter;
+use WordPress\ByteStream\Producer\ByteProducer;
+use WordPress\ByteStream\Writer\ByteConsumer;
 use WordPress\Filesystem\Filesystem;
 use function WordPress\Filesystem\wp_join_paths;
 use function WordPress\Filesystem\wp_canonicalize_path;
@@ -72,12 +72,12 @@ class ChrootLayer extends Layer {
         return $this->fs->ls($path);
     }
 
-    public function open_read_stream($path): ByteReader {
+    public function open_read_stream($path): ByteProducer {
         $path = $this->normalize_path($path);
         return $this->fs->open_read_stream($path);
     }
 
-    public function open_write_stream($path): ByteWriter {
+    public function open_write_stream($path): ByteConsumer {
         $path = $this->normalize_path($path);
         return $this->fs->open_write_stream($path);
     }
@@ -105,4 +105,3 @@ class ChrootLayer extends Layer {
     }
 
 }
-    

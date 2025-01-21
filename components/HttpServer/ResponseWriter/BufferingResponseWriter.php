@@ -2,12 +2,12 @@
 
 namespace WordPress\HttpServer\ResponseWriter;
 
-class BufferingResponseWriter implements ResponseWriter {
+class BufferingResponseWriter implements ResponseConsumer {
 
     private $http_code = 200;
     private $headers = [];
     private $body = '';
-    
+
     public function send_http_code($code) {
         $this->http_code = $code;
     }

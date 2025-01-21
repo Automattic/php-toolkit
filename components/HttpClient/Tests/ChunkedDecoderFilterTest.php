@@ -2,9 +2,9 @@
 
 namespace WordPress\HttpClient\Tests;
 
-use WordPress\ByteStream\Reader\ResourceReader;
-use WordPress\HttpClient\Filter\ChunkedDecoderFilter;
-use WordPress\HttpClient\Filter\ChunkedEncoderFilter;
+use WordPress\ByteStream\Producer\ResourceProducer;
+use WordPress\HttpClient\Filter\ChunkedDecoderTransformer;
+use WordPress\HttpClient\Filter\ChunkedEncoderTransformer;
 
 class ChunkedDecoderFilterTest extends \PHPUnit\Framework\TestCase {
 
@@ -13,9 +13,9 @@ class ChunkedDecoderFilterTest extends \PHPUnit\Framework\TestCase {
     private $decoder;
 
     public function setUp(): void {
-        $this->pygmalion_reader = ResourceReader::from_local_file( dirname(__FILE__) . '/fixtures/preface-to-pygmalion.txt');
-        $this->chunked_encoder = new ChunkedEncoderFilter();
-        $this->decoder = new ChunkedDecoderFilter();
+        $this->pygmalion_reader = ResourceProducer::from_local_file( dirname(__FILE__) . '/fixtures/preface-to-pygmalion.txt');
+        $this->chunked_encoder = new ChunkedEncoderTransformer();
+        $this->decoder = new ChunkedDecoderTransformer();
     }
 
     public function test_decodes_two_consecutive_chunks() {

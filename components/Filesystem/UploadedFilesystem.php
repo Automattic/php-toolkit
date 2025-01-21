@@ -3,7 +3,7 @@
 namespace WordPress\Filesystem;
 
 use WordPress\ByteStream\MemoryPipe;
-use WordPress\ByteStream\Reader\ByteReader;
+use WordPress\ByteStream\Producer\ByteProducer;
 use WordPress\Filesystem\Layer\ChrootLayer;
 
 /**
@@ -119,7 +119,7 @@ class UploadedFilesystem implements Filesystem {
         throw new FilesystemException( 'Not implemented' );
     }
 
-    public function open_read_stream($path): ByteReader {
+    public function open_read_stream($path): ByteProducer {
         $node = $this->find_node($path);
         if (!$node || $node['type'] !== 'file') {
             throw new FilesystemException(

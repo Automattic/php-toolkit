@@ -2,7 +2,7 @@
 
 namespace WordPress\Filesystem\Mixin;
 
-use WordPress\ByteStream\Reader\ByteReader;
+use WordPress\ByteStream\Producer\ByteProducer;
 use WordPress\Filesystem\FilesystemException;
 
 /**
@@ -15,7 +15,7 @@ trait PutContentsViaWriteStream {
         try {
             if(is_string($data)) {
                 $stream->append_bytes($data);
-            } else if(is_object($data) && $data instanceof ByteReader) {
+            } else if(is_object($data) && $data instanceof ByteProducer) {
                 while($data->next_bytes()) {
                     $stream->append_bytes($data->get_bytes());
                 }

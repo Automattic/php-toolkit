@@ -2,14 +2,14 @@
 
 namespace WordPress\Git\Tests;
 
-use WordPress\ByteStream\Reader\ResourceReader;
+use WordPress\ByteStream\Producer\ResourceProducer;
 use WordPress\Git\Protocol\Parser\PacketParser;
 use WordPress\Git\Protocol\Parser\ProtocolDemultiplexer;
 
 class PacketParserTest extends \PHPUnit\Framework\TestCase {
 
     public function test_parse_response_no_blobs() {
-        $reader = ResourceReader::from_local_file(__DIR__ . '/fixtures/wordpress-develop-response-no-blobs.bin');
+        $reader = ResourceProducer::from_local_file( __DIR__ . '/fixtures/wordpress-develop-response-no-blobs.bin');
         $demuxer = new ProtocolDemultiplexer($reader);
         $packet_parser = new PacketParser();
         $token_types = [];

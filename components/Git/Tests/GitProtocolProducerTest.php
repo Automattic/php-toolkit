@@ -2,9 +2,9 @@
 
 namespace WordPress\Git\Tests;
 
-use WordPress\ByteStream\Reader\ResourceReader;
+use WordPress\ByteStream\Producer\ResourceProducer;
 use WordPress\Git\Protocol\Parser\GitProtocolReader;
-use WordPress\Git\Protocol\GitProtocolProducer;
+use WordPress\Git\Protocol\GitProtocolGenerator;
 
 class GitProtocolProducerTest extends \PHPUnit\Framework\TestCase {
 

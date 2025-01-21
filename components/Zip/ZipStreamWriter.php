@@ -2,10 +2,10 @@
 
 namespace WordPress\Zip;
 
-use WordPress\ByteStream\Filter\ChecksumFilter;
-use WordPress\ByteStream\Reader\DeflateReader;
-use WordPress\ByteStream\ReadStream;
-use WordPress\ByteStream\Writer\ByteWriter;
+use WordPress\ByteStream\Producer\DeflateProducer;
+use WordPress\ByteStream\Producer\TransformedProducer;
+use WordPress\ByteStream\Transformer\ChecksumTransformer;
+use WordPress\ByteStream\Writer\ByteConsumer;
 
 class ZipStreamWriter {
 
@@ -13,7 +13,7 @@ class ZipStreamWriter {
 	private $centralDirectory = array();
 	private $bytes_written = 0;
 
-	public function __construct(ByteWriter $output)
+	public function __construct(ByteConsumer $output)
 	{
 		$this->output = $output;
 	}
@@ -28,7 +28,7 @@ class ZipStreamWriter {
 
         try {
             if($entry->compressionMethod === ZipStreamReader::COMPRESSION_DEFLATE) {
-                $body_reader = new DeflateReader($entry->body_reader, ZLIB_ENCODING_RAW, 9);
+                $body_reader = new DeflateProducer($entry->body_reader, ZLIB_ENCODING_RAW, 9);
             } else {
                 $body_reader = $entry->body_reader;
             }
@@ -64,12 +64,12 @@ class ZipStreamWriter {
 	private function compute_file_hash_and_size(FileEntry $entry) {
         // Pass 1: Calculate the CRC32, uncompressed size, and compressed size
         if($entry->compressionMethod === ZipStreamReader::COMPRESSION_DEFLATE) {
-            $reader = new DeflateReader($entry->body_reader, ZLIB_ENCODING_RAW, 9);
+            $reader = new DeflateProducer($entry->body_reader, ZLIB_ENCODING_RAW, 9);
         } else {
             $reader = $entry->body_reader;
         }
-        $stream = new ReadStream($reader, [
-            'checksum' => new ChecksumFilter('crc32b'),
+        $stream = new TransformedProducer($reader, [
+            'checksum' => new ChecksumTransformer('crc32b'),
         ]);
         while($stream->next_bytes()) {
             // ... twiddle our thumbs ...

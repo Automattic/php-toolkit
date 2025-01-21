@@ -7,7 +7,7 @@ use WordPress\Git\GitRepository;
 use WordPress\Git\Model\Commit;
 use WordPress\Git\Model\Tree;
 use WordPress\Git\Model\TreeEntry;
-use WordPress\Git\Protocol\GitProtocolProducer;
+use WordPress\Git\Protocol\GitProtocolGenerator;
 
 use function WordPress\Git\get_all_descendant_oids_in_tree;
 
@@ -56,14 +56,14 @@ class GitRepositoryTest extends \PHPUnit\Framework\TestCase {
     public function test_find_hash_by_path() {
         $repo = new GitRepository(InMemoryFilesystem::create());
         $blob_oid = $repo->add_object('blob', 'Hello, world!');
-        $tree_oid = $repo->add_object('tree', GitProtocolProducer::encode_tree_bytes(new Tree(array(
+        $tree_oid = $repo->add_object('tree', GitProtocolGenerator::encode_tree_bytes(new Tree(array(
             new TreeEntry(array(
                 'mode' => TreeEntry::FILE_MODE_REGULAR_NON_EXECUTABLE,
                 'name' => 'hello-world.txt',
                 'hash' => $blob_oid,
             )),
         ))));
-        $root_tree_oid = $repo->add_object('tree', GitProtocolProducer::encode_tree_bytes(new Tree(array(
+        $root_tree_oid = $repo->add_object('tree', GitProtocolGenerator::encode_tree_bytes(new Tree(array(
             new TreeEntry(array(
                 'mode' => TreeEntry::FILE_MODE_DIRECTORY,
                 'name' => 'subdirectory',
@@ -76,14 +76,14 @@ class GitRepositoryTest extends \PHPUnit\Framework\TestCase {
     public function test_read_object_by_path() {
         $repo = new GitRepository(InMemoryFilesystem::create());
         $blob_oid = $repo->add_object('blob', 'Hello, world!');
-        $tree_oid = $repo->add_object('tree', GitProtocolProducer::encode_tree_bytes(new Tree(array(
+        $tree_oid = $repo->add_object('tree', GitProtocolGenerator::encode_tree_bytes(new Tree(array(
             new TreeEntry(array(
                 'mode' => TreeEntry::FILE_MODE_REGULAR_NON_EXECUTABLE,
                 'name' => 'hello-world.txt',
                 'hash' => $blob_oid,
             )),
         ))));
-        $root_tree_oid = $repo->add_object('tree', GitProtocolProducer::encode_tree_bytes(new Tree(array(
+        $root_tree_oid = $repo->add_object('tree', GitProtocolGenerator::encode_tree_bytes(new Tree(array(
             new TreeEntry(array(
                 'mode' => TreeEntry::FILE_MODE_DIRECTORY,
                 'name' => 'subdirectory',
@@ -130,17 +130,17 @@ class GitRepositoryTest extends \PHPUnit\Framework\TestCase {
     public function test_has_object() {
         $repo = new GitRepository(InMemoryFilesystem::create());
         $blob_oid = $repo->add_object('blob', 'Hello, world!');
-        
+
         $this->assertTrue($repo->has_object($blob_oid));
         $this->assertFalse($repo->has_object('nonexistent'));
     }
 
     public function test_find_objects_added_in() {
         $repo = new GitRepository(InMemoryFilesystem::create());
-        
+
         // Create first commit
         $blob1_oid = $repo->add_object('blob', 'First file');
-        $tree1_oid = $repo->add_object('tree', GitProtocolProducer::encode_tree_bytes(new Tree(array(
+        $tree1_oid = $repo->add_object('tree', GitProtocolGenerator::encode_tree_bytes(new Tree(array(
             new TreeEntry(array(
                 'mode' => TreeEntry::FILE_MODE_REGULAR_NON_EXECUTABLE,
                 'name' => 'file1.txt',
@@ -151,7 +151,7 @@ class GitRepositoryTest extends \PHPUnit\Framework\TestCase {
 
         // Create second commit
         $blob2_oid = $repo->add_object('blob', 'Second file');
-        $tree2_oid = $repo->add_object('tree', GitProtocolProducer::encode_tree_bytes(new Tree(array(
+        $tree2_oid = $repo->add_object('tree', GitProtocolGenerator::encode_tree_bytes(new Tree(array(
             new TreeEntry(array(
                 'mode' => TreeEntry::FILE_MODE_REGULAR_NON_EXECUTABLE,
                 'name' => 'file1.txt',
@@ -159,7 +159,7 @@ class GitRepositoryTest extends \PHPUnit\Framework\TestCase {
             )),
             new TreeEntry(array(
                 'mode' => TreeEntry::FILE_MODE_REGULAR_NON_EXECUTABLE,
-                'name' => 'file2.txt', 
+                'name' => 'file2.txt',
                 'hash' => $blob2_oid,
             )),
         ))));
@@ -169,7 +169,7 @@ class GitRepositoryTest extends \PHPUnit\Framework\TestCase {
         $new_objects = $repo->find_objects_added_in($commit2_oid, $commit1_oid);
         $this->assertCount(3, $new_objects);
         $this->assertContains($commit2_oid, $new_objects);
-        $this->assertContains($tree2_oid, $new_objects); 
+        $this->assertContains($tree2_oid, $new_objects);
         $this->assertContains($blob2_oid, $new_objects);
     }
 

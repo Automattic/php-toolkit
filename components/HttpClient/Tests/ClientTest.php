@@ -2,12 +2,12 @@
 
 namespace WordPress\HttpClient\Tests;
 
-use WordPress\ByteStream\Reader\ReaderUtils;
+use WordPress\ByteStream\Producer\ReaderUtils;
 use WordPress\HttpClient\Client;
 use WordPress\HttpClient\Tests\TestClient;
 use WordPress\HttpClient\Request;
 use WordPress\HttpClient\HttpError;
-use WordPress\ByteStream\Reader\RemoteFileReader;
+use WordPress\ByteStream\Producer\RemoteFileProducer;
 
 class ClientTest extends \PHPUnit\Framework\TestCase {
 
@@ -17,7 +17,7 @@ class ClientTest extends \PHPUnit\Framework\TestCase {
         $this->assertEquals(3, $client->getMaxRedirects());
         $this->assertEquals(10, $client->getTimeout());
     }
-    
+
     /**
      * @dataProvider gzip_provider
      */
@@ -207,7 +207,7 @@ class ClientTest extends \PHPUnit\Framework\TestCase {
         $request = new Request('https://wordpress.org');
         $reader = $client->fetch($request);
 
-        $this->assertInstanceOf(RemoteFileReader::class, $reader);
+        $this->assertInstanceOf(RemoteFileProducer::class, $reader);
     }
 
     public function testAwaitNextEvent() {

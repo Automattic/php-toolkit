@@ -2,8 +2,8 @@
 
 namespace WordPress\Filesystem\Layer;
 
-use WordPress\ByteStream\Reader\ByteReader;
-use WordPress\ByteStream\Writer\ByteWriter;
+use WordPress\ByteStream\Producer\ByteProducer;
+use WordPress\ByteStream\Writer\ByteConsumer;
 use WordPress\Filesystem\Filesystem;
 
 /**
@@ -53,11 +53,11 @@ class Layer implements Filesystem {
         return $this->fs->ls($path);
     }
 
-    public function open_read_stream($path): ByteReader {
+    public function open_read_stream($path): ByteProducer {
         return $this->fs->open_read_stream($path);
     }
 
-    public function open_write_stream($path): ByteWriter {
+    public function open_write_stream($path): ByteConsumer {
         return $this->fs->open_write_stream($path);
     }
 
@@ -77,4 +77,4 @@ class Layer implements Filesystem {
         return $this->fs->put_contents($path, $contents, $options);
     }
 
-} 
+}

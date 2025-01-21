@@ -2,7 +2,7 @@
 
 namespace WordPress\Zip;
 
-use WordPress\ByteStream\Reader\ByteReader;
+use WordPress\ByteStream\Producer\ByteProducer;
 
 /**
  * Represents a file entry in a ZIP file.
@@ -98,7 +98,7 @@ class FileEntry {
 	public $extra;
 
     /**
-     * @var ByteReader
+     * @var ByteProducer
      */
     public $body_reader;
 
@@ -117,7 +117,7 @@ class FileEntry {
         if(null === $this->lastModifiedDate) {
             // DOS date format: bits 0-4: day, bits 5-8: month, bits 9-15: years since 1980
             $dt = getdate($this->lastModifiedTime);
-            $this->lastModifiedDate = (($dt['year'] - 1980) << 9) | 
+            $this->lastModifiedDate = (($dt['year'] - 1980) << 9) |
                                     ($dt['mon'] << 5) |
                                     $dt['mday'];
         }
@@ -137,6 +137,6 @@ class FileEntry {
         if(null !== $this->extra) {
             $this->extraLength = strlen($this->extra);
         }
-	}    
+	}
 
 }

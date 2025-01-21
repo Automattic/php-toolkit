@@ -2,7 +2,7 @@
 
 namespace WordPress\DataLiberation\EntityReader;
 
-use WordPress\ByteStream\Reader\ByteReader;
+use WordPress\ByteStream\Producer\ByteProducer;
 use WordPress\DataLiberation\Importer\ImportedEntity;
 use WordPress\XML\XMLProcessor;
 use WordPress\XML\XMLUnsupportedException;
@@ -363,7 +363,7 @@ class WXREntityReader implements EntityReader {
 		),
 	);
 
-	public static function create( ?ByteReader $upstream = null, $cursor = null ) {
+	public static function create( ?ByteProducer $upstream = null, $cursor = null ) {
 		$xml_cursor = null;
 		if ( null !== $cursor ) {
 			$cursor = json_decode( $cursor, true );
@@ -853,7 +853,7 @@ class WXREntityReader implements EntityReader {
 	 *
 	 * @param WP_Byte_Reader $stream The upstream stream.
 	 */
-	public function connect_upstream( ByteReader $stream ) {
+	public function connect_upstream( ByteProducer $stream ) {
 		$this->upstream = $stream;
 	}
 

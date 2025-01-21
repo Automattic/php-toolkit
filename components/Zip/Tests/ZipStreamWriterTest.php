@@ -2,7 +2,7 @@
 
 use PHPUnit\Framework\TestCase;
 use WordPress\ByteStream\MemoryPipe;
-use WordPress\ByteStream\Writer\FileWriter;
+use WordPress\ByteStream\Writer\FileConsumer;
 use WordPress\Zip\FileEntry;
 use WordPress\Zip\ZipStreamReader;
 use WordPress\Zip\ZipStreamWriter;
@@ -57,7 +57,7 @@ class ZipStreamWriterTest extends TestCase {
         $this->tempZipPath = tempnam($this->tempDir, 'testzip');
         touch($this->tempZipPath);
 
-        $pipe = FileWriter::from_path($this->tempZipPath, 'truncate');
+        $pipe = FileConsumer::from_path($this->tempZipPath, 'truncate');
         $zipWriter = new ZipStreamWriter($pipe);
         $zipWriter->append_file(new FileEntry(array(
             'compressionMethod' => $should_deflate ? ZipStreamReader::COMPRESSION_DEFLATE : ZipStreamReader::COMPRESSION_NONE,

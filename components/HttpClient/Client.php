@@ -2,12 +2,12 @@
 
 namespace WordPress\HttpClient;
 
-use WordPress\HttpClient\Filter\ChunkedDecoderFilter;
-use WordPress\ByteStream\Filter\InflateFilter;
-use WordPress\ByteStream\Reader\RemoteFileReader;
-use WordPress\ByteStream\Reader\ResourceReader;
-use WordPress\ByteStream\ReadStream;
-use WordPress\HttpClient\Filter\ChunkedEncoderFilter;
+use WordPress\ByteStream\Producer\RemoteFileProducer;
+use WordPress\ByteStream\Producer\ResourceProducer;
+use WordPress\ByteStream\Producer\TransformedProducer;
+use WordPress\ByteStream\Transformer\InflateTransformer;
+use WordPress\HttpClient\Filter\ChunkedDecoderTransformer;
+use WordPress\HttpClient\Filter\ChunkedEncoderTransformer;
 
 /**
  * An asynchronous HTTP client library.
@@ -44,14 +44,14 @@ use WordPress\HttpClient\Filter\ChunkedEncoderFilter;
  *     // Handle other events...
  * }
  * ```
- * 
+ *
  * @TODO
  * * When uploading a body – use transfer-encoding: chunked when the number of uploaded bytes is unknown upfront.
  * * Request headers – accept string lines such as "Content-type: text/plain" instead of key-value pairs. K/V pairs
  *   are confusing and lead to accidental errors such as `0: Content-type: text/plain`. They also diverge from the
  *   format that curl accepts.
  *
- * @since    Next Release 
+ * @since    Next Release
  * @package  WordPress
  * @subpackage Async_HTTP
  */
@@ -119,12 +119,13 @@ class Client {
     /**
      * Returns a RemoteFileReader that streams the response body of the
      * given request.
-     * 
+     *
      * @param Request $request The request to stream.
-     * @return RemoteFileReader
+     *
+     * @return RemoteFileProducer
      */
     public function fetch( $request ) {
-        return new RemoteFileReader($request, ['client' => $this]);
+        return new RemoteFileProducer($request, [ 'client' => $this]);
     }
 
 	/**
@@ -472,10 +473,10 @@ class Client {
 		foreach ( $transfer_encodings as $transfer_encoding ) {
 			switch ( $transfer_encoding ) {
 				case 'chunked':
-					$filters[] = new ChunkedDecoderFilter();
+					$filters[] = new ChunkedDecoderTransformer();
 					break;
 				case 'gzip':
-					$filters[] = new InflateFilter(
+					$filters[] = new InflateTransformer(
 						$transfer_encoding === 'gzip' ? ZLIB_ENCODING_GZIP : ZLIB_ENCODING_RAW
 					);
 					break;
@@ -489,8 +490,8 @@ class Client {
 			}
 		}
 
-		return new ReadStream(
-            ResourceReader::from_resource_handle(
+		return new TransformedProducer(
+			ResourceProducer::from_resource_handle(
                 $this->connections[ $request->id ]->http_socket
             ),
             $filters
@@ -544,9 +545,9 @@ class Client {
 				$request->state = Request::STATE_WILL_SEND_BODY;
 
                 if($request->get_header('transfer-encoding') === 'chunked') {
-                    $request->upload_body_stream = new ReadStream(
+                    $request->upload_body_stream = new TransformedProducer(
                         $request->upload_body_stream,
-                        [new ChunkedEncoderFilter()]
+                        [new ChunkedEncoderTransformer()]
                     );
                 }
 			} else {

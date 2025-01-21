@@ -7,7 +7,7 @@ use WordPress\Git\Diff\MergeEngine;
 use WordPress\Git\Model\Commit;
 use WordPress\Git\Model\Tree;
 use WordPress\Git\Model\TreeEntry;
-use WordPress\Git\Protocol\GitProtocolProducer;
+use WordPress\Git\Protocol\GitProtocolGenerator;
 
 use function WordPress\Filesystem\wp_canonicalize_path;
 use function WordPress\Filesystem\wp_join_paths;
@@ -147,7 +147,7 @@ class GitRepository {
 			));
 		}
 
-		$object_reader = new GitObjectReader(
+		$object_reader = new GitObjectProducer(
 			$this->fs->open_read_stream($this->get_storage_path($oid))
 		);
         $object_reader->read_header();
@@ -191,7 +191,7 @@ class GitRepository {
 	}
 
     public function new_object_open_write_stream($object_type_name, $object_length) {
-        return new GitObjectWriter($this, $object_type_name, $object_length);
+        return new GitObjectConsumer($this, $object_type_name, $object_length);
     }
 
 	public function has_object( $oid ) {
@@ -215,7 +215,7 @@ class GitRepository {
 		$new_objects_oids = array();
 		// Optimization – don't process the same tree more than once.
 		$processed_trees = array();
-        
+
 		while ( $new_commit_hash !== $old_commit_hash && ! Commit::is_null_hash( $new_commit_hash ) ) {
 			$new_commit = $this->read_object( $new_commit_hash )->as_commit();
 			$new_objects_oids[ $new_commit_hash ] = true;
@@ -676,7 +676,7 @@ class GitRepository {
 		// Create new tree object
 		return $this->add_object(
 			'tree',
-			GitProtocolProducer::encode_tree_bytes( new Tree( $tree_objects ) )
+			GitProtocolGenerator::encode_tree_bytes( new Tree( $tree_objects ) )
 		);
 	}
 

@@ -3,9 +3,9 @@
 namespace WordPress\Git\Protocol\Parser;
 
 use WordPress\ByteStream\NotEnoughDataException;
-use WordPress\ByteStream\Reader\BufferedReader;
-use WordPress\ByteStream\Reader\ByteReader;
-use WordPress\ByteStream\Reader\ReaderUtils;
+use WordPress\ByteStream\Producer\BufferedProducer;
+use WordPress\ByteStream\Producer\ByteProducer;
+use WordPress\ByteStream\Producer\ReaderUtils;
 use WordPress\Git\GitException;
 
 class ProtocolDemultiplexer {
@@ -23,7 +23,7 @@ class ProtocolDemultiplexer {
     ];
 
     /**
-     * @var ByteReader
+     * @var ByteProducer
      */
     protected $upstream = '';
     protected $is_paused_at_incomplete_input = false;
@@ -32,8 +32,8 @@ class ProtocolDemultiplexer {
     protected $stream_code;
     protected $seen_unmultiplexed_pack = false;
 
-    public function __construct(ByteReader $upstream) {
-        $this->upstream = new BufferedReader($upstream, 1024);
+    public function __construct(ByteProducer $upstream) {
+        $this->upstream = new BufferedProducer($upstream, 1024);
     }
 
     public function next_chunk() {

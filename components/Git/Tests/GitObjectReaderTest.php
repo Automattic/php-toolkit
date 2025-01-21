@@ -2,14 +2,14 @@
 
 use PHPUnit\Framework\TestCase;
 use WordPress\ByteStream\MemoryPipe;
-use WordPress\Git\GitObjectReader;
+use WordPress\Git\GitObjectProducer;
 
 class GitObjectReaderTest extends TestCase {
 
     public function testReadHeader() {
         $header = "commit 123\x00";
         $content = $header . gzdeflate("Some commit content", -1, ZLIB_ENCODING_DEFLATE);
-        $reader = new GitObjectReader(new MemoryPipe($content));
+        $reader = new GitObjectProducer(new MemoryPipe($content));
 
         $reader->read_header();
         $this->assertEquals('commit', $reader->get_object_type_name());
@@ -20,7 +20,7 @@ class GitObjectReaderTest extends TestCase {
         $uncompressed = "1234567890";
         $header = "blob " . strlen($uncompressed) . "\x00";
         $content = $header . gzdeflate($uncompressed, -1, ZLIB_ENCODING_DEFLATE);
-        $reader = new GitObjectReader(new MemoryPipe($content));
+        $reader = new GitObjectProducer(new MemoryPipe($content));
         $this->assertTrue($reader->next_bytes(5));
         // Note "5" is max bytes to read, not the exact number of bytes to read
         $this->assertEquals('12', $reader->get_bytes());
@@ -33,7 +33,7 @@ class GitObjectReaderTest extends TestCase {
         $uncompressed = "1234567890";
         $header = "blob " . strlen($uncompressed) . "\x00";
         $content = $header . gzdeflate($uncompressed, -1, ZLIB_ENCODING_DEFLATE);
-        $reader = new GitObjectReader(new MemoryPipe($content));
+        $reader = new GitObjectProducer(new MemoryPipe($content));
 
         $reader->seek(5);
         $this->assertTrue($reader->next_bytes(5));
@@ -44,7 +44,7 @@ class GitObjectReaderTest extends TestCase {
         $uncompressed = "1234567890";
         $header = "blob " . strlen($uncompressed) . "\x00";
         $content = $header . gzdeflate($uncompressed, -1, ZLIB_ENCODING_DEFLATE);
-        $reader = new GitObjectReader(new MemoryPipe($content));
+        $reader = new GitObjectProducer(new MemoryPipe($content));
 
         $reader->read_header();
         $this->assertEquals($uncompressed, $reader->read_entire_object_contents());
@@ -54,7 +54,7 @@ class GitObjectReaderTest extends TestCase {
         $uncompressed = "tree 1234567890\nauthor John Doe <john@example.com> 1234567890 +0000\ncommitter John Doe <john@example.com> 1234567890 +0000\n\nInitial commit";
         $header = "commit " . strlen($uncompressed) . "\x00";
         $content = $header . gzdeflate($uncompressed, -1, ZLIB_ENCODING_DEFLATE);
-        $reader = new GitObjectReader(new MemoryPipe($content));
+        $reader = new GitObjectProducer(new MemoryPipe($content));
 
         $reader->read_header();
         $commit = $reader->as_commit();
@@ -65,7 +65,7 @@ class GitObjectReaderTest extends TestCase {
         $uncompressed = "100644 README.md\x00" . str_repeat('a', 20) . "100644 test.txt\x00" . str_repeat('b', 20);
         $header = "tree " . strlen($uncompressed) . "\x00";
         $content = $header . gzdeflate($uncompressed, -1, ZLIB_ENCODING_DEFLATE);
-        $reader = new GitObjectReader(new MemoryPipe($content));
+        $reader = new GitObjectProducer(new MemoryPipe($content));
 
         $reader->read_header();
         $tree = $reader->as_tree();
@@ -79,7 +79,7 @@ class GitObjectReaderTest extends TestCase {
         $uncompressed = "Hello World!";
         $header = "blob " . strlen($uncompressed) . "\x00";
         $content = $header . gzdeflate($uncompressed, -1, ZLIB_ENCODING_DEFLATE);
-        $reader = new GitObjectReader(new MemoryPipe($content));
+        $reader = new GitObjectProducer(new MemoryPipe($content));
 
         $this->assertEquals($uncompressed, $reader->read_entire_object_contents());
     }
@@ -88,7 +88,7 @@ class GitObjectReaderTest extends TestCase {
         $uncompressed = "1234567890";
         $header = "blob " . strlen($uncompressed) . "\x00";
         $content = $header . gzdeflate($uncompressed, -1, ZLIB_ENCODING_DEFLATE);
-        $reader = new GitObjectReader(new MemoryPipe($content));
+        $reader = new GitObjectProducer(new MemoryPipe($content));
 
         $reader->read_header();
         $reader->seek(0);
@@ -101,7 +101,7 @@ class GitObjectReaderTest extends TestCase {
         $uncompressed = "1234567890";
         $header = "blob " . strlen($uncompressed) . "\x00";
         $content = $header . gzdeflate($uncompressed, -1, ZLIB_ENCODING_DEFLATE);
-        $reader = new GitObjectReader(new MemoryPipe($content));
+        $reader = new GitObjectProducer(new MemoryPipe($content));
 
         $reader->read_header();
         $reader->seek(5);
@@ -115,7 +115,7 @@ class GitObjectReaderTest extends TestCase {
         $uncompressed = "1234567890";
         $header = "blob " . strlen($uncompressed) . "\x00";
         $content = $header . gzdeflate($uncompressed, -1, ZLIB_ENCODING_DEFLATE);
-        $reader = new GitObjectReader(new MemoryPipe($content));
+        $reader = new GitObjectProducer(new MemoryPipe($content));
 
         $reader->read_header();
         $reader->seek(20); // Beyond the end
@@ -125,7 +125,7 @@ class GitObjectReaderTest extends TestCase {
         $uncompressed = "1234567890";
         $header = "blob " . strlen($uncompressed) . "\x00";
         $content = $header . gzdeflate($uncompressed, -1, ZLIB_ENCODING_DEFLATE);
-        $reader = new GitObjectReader(new MemoryPipe($content));
+        $reader = new GitObjectProducer(new MemoryPipe($content));
 
         $reader->read_header();
         $reader->seek(5);

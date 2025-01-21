@@ -3,7 +3,7 @@
 namespace WordPress\Git\Protocol\Parser;
 
 use WordPress\ByteStream\MemoryPipe;
-use WordPress\ByteStream\Reader\ByteReader;
+use WordPress\ByteStream\Producer\ByteProducer;
 use WordPress\Git\GitException;
 use WordPress\Git\GitRepository;
 
@@ -29,7 +29,7 @@ class GitProtocolReader {
      */
     private $new_object_write_stream;
 
-    public function __construct(ByteReader $upstream, $options = []) {
+    public function __construct(ByteProducer $upstream, $options = []) {
         $this->write_to_repository = $options['write_to_repository'] ?? null;
         $this->resolve_deltas_from_repository = $options['resolve_deltas_from_repository'] ?? $options['write_to_repository'] ?? null;
         $this->will_process_pack = $options['will_process_pack'] ?? true;

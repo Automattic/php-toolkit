@@ -3,7 +3,7 @@
 namespace WordPress\Filesystem;
 
 use WordPress\ByteStream\MemoryPipe;
-use WordPress\ByteStream\Reader\ByteReader;
+use WordPress\ByteStream\Producer\ByteProducer;
 use WordPress\Filesystem\Layer\ChrootLayer;
 use WordPress\Filesystem\Mixin\BufferedWriteStreamViaPutContents;
 use WordPress\Filesystem\Mixin\CopyRecursiveViaStreaming;
@@ -101,7 +101,7 @@ class SQLiteFilesystem implements Filesystem {
 		return $result->fetchArray() !== false;
 	}
 
-	public function open_read_stream($path): ByteReader {
+	public function open_read_stream($path): ByteProducer {
 		return new MemoryPipe($this->get_contents($path));
 	}
 

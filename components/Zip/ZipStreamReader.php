@@ -4,10 +4,10 @@ namespace WordPress\Zip;
 
 use WordPress\ByteStream\ByteStreamException;
 use WordPress\ByteStream\NotEnoughDataException;
-use WordPress\ByteStream\Reader\ByteReader;
-use WordPress\ByteStream\Reader\InflateReader;
-use WordPress\ByteStream\Reader\LimitReader;
-use WordPress\ByteStream\Reader\ReaderUtils;
+use WordPress\ByteStream\Producer\ByteProducer;
+use WordPress\ByteStream\Producer\InflateProducer;
+use WordPress\ByteStream\Producer\LimitProducer;
+use WordPress\ByteStream\Producer\ReaderUtils;
 
 class ZipStreamReader {
 
@@ -26,7 +26,7 @@ class ZipStreamReader {
 	private $byte_reader;
 	private $paused_at_incomplete_input = false;
 
-	public function __construct(ByteReader $byte_reader) {
+	public function __construct(ByteProducer $byte_reader) {
 		$this->byte_reader = $byte_reader;
 	}
 
@@ -123,14 +123,14 @@ class ZipStreamReader {
             $extra = ReaderUtils::read_exactly_n_bytes($this->byte_reader, $this->object->extraLength);
             $this->object->extra = $extra;
 
-            $limit_reader = new LimitReader(
+            $limit_reader = new LimitProducer(
                 $this->byte_reader,
                 $this->object->compressedSize
             );
 
             $is_compressed = $this->object->compressionMethod === ZipStreamReader::COMPRESSION_DEFLATE;
             if($is_compressed) {
-                $this->object->body_reader = new InflateReader($limit_reader, ZLIB_ENCODING_RAW);
+                $this->object->body_reader = new InflateProducer($limit_reader, ZLIB_ENCODING_RAW);
             } else {
                 $this->object->body_reader = $limit_reader;
             }

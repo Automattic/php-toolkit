@@ -1,7 +1,7 @@
 <?php
 
 use PHPUnit\Framework\TestCase;
-use WordPress\ByteStream\Reader\ResourceReader;
+use WordPress\ByteStream\Producer\ResourceProducer;
 use WordPress\Zip\ZipFilesystem;
 
 class ZipFilesystemTest extends TestCase {
@@ -12,7 +12,7 @@ class ZipFilesystemTest extends TestCase {
     private $fs;
 
     protected function setUp(): void {
-        $this->fs = ZipFilesystem::create(ResourceReader::from_local_file( __DIR__ . '/fixtures/childrens-literature.zip'));
+        $this->fs = ZipFilesystem::create(ResourceProducer::from_local_file( __DIR__ . '/fixtures/childrens-literature.zip'));
     }
 
     public function testLs() {

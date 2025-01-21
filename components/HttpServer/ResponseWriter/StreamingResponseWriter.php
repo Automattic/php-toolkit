@@ -2,7 +2,7 @@
 
 namespace WordPress\HttpServer\ResponseWriter;
 
-class StreamingResponseWriter implements ResponseWriter {
+class StreamingResponseWriter implements ResponseConsumer {
 
     public function send_http_code($code) {
         http_response_code($code);

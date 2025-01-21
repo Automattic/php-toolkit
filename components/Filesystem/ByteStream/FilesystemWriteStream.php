@@ -2,10 +2,10 @@
 
 namespace WordPress\Filesystem\ByteStream;
 
-use WordPress\ByteStream\Writer\ByteWriter;
+use WordPress\ByteStream\Writer\ByteConsumer;
 use WordPress\Filesystem\Mixin\Interfaces\InternalizedWriteStream;
 
-class FilesystemWriteStream implements ByteWriter {
+class FilesystemWriteStream implements ByteConsumer {
 
     /**
      * @var InternalizedWriteStream

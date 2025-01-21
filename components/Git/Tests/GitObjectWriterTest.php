@@ -1,9 +1,9 @@
 <?php
 
 use PHPUnit\Framework\TestCase;
-use WordPress\ByteStream\Reader\ReaderUtils;
+use WordPress\ByteStream\Producer\ReaderUtils;
 use WordPress\Filesystem\InMemoryFilesystem;
-use WordPress\Git\GitObjectWriter;
+use WordPress\Git\GitObjectConsumer;
 use WordPress\Git\GitRepository;
 
 class GitObjectWriterTest extends TestCase {
@@ -11,7 +11,7 @@ class GitObjectWriterTest extends TestCase {
     public function testWriteBlob() {
         $blob_content = file_get_contents(__DIR__ . '/fixtures/preface-to-pygmalion.txt');
         $repo = new GitRepository(InMemoryFilesystem::create());
-        $writer = new GitObjectWriter($repo, 'blob', strlen($blob_content));
+        $writer = new GitObjectConsumer($repo, 'blob', strlen($blob_content));
         $writer->append_bytes($blob_content);
         $writer->close();
 

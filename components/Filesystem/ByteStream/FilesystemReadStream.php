@@ -2,10 +2,10 @@
 
 namespace WordPress\Filesystem\ByteStream;
 
-use WordPress\ByteStream\Reader\ByteReader;
+use WordPress\ByteStream\Producer\ByteProducer;
 use WordPress\Filesystem\Mixin\Interfaces\InternalizedReadStream;
 
-class FilesystemReadStream implements ByteReader {
+class FilesystemReadStream implements ByteProducer {
 
     /**
      * @var InternalizedReadStream

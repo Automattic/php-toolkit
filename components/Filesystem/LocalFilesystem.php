@@ -2,10 +2,10 @@
 
 namespace WordPress\Filesystem;
 
-use WordPress\ByteStream\Reader\ByteReader;
-use WordPress\ByteStream\Reader\ResourceReader;
-use WordPress\ByteStream\Writer\ByteWriter;
-use WordPress\ByteStream\Writer\FileWriter;
+use WordPress\ByteStream\Producer\ByteProducer;
+use WordPress\ByteStream\Producer\ResourceProducer;
+use WordPress\ByteStream\Writer\ByteConsumer;
+use WordPress\ByteStream\Writer\FileConsumer;
 use WordPress\Filesystem\Layer\ChrootLayer;
 
 /**
@@ -125,12 +125,12 @@ class LocalFilesystem implements Filesystem {
 		}
 	}
 
-    public function open_write_stream($path): ByteWriter {
-        return FileWriter::from_path($path, 'truncate');
+    public function open_write_stream($path): ByteConsumer {
+        return FileConsumer::from_path($path, 'truncate');
     }
 
-	public function open_read_stream($path): ByteReader {
-		return ResourceReader::from_local_file($path);
+	public function open_read_stream($path): ByteProducer {
+		return ResourceProducer::from_local_file($path);
 	}
 
 }

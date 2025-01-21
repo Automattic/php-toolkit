@@ -2,7 +2,7 @@
 
 namespace WordPress\Filesystem\Mixin;
 
-use WordPress\ByteStream\Writer\ByteWriter;
+use WordPress\ByteStream\Writer\ByteConsumer;
 use WordPress\Filesystem\FilesystemException;
 
 trait ReadOnlyFilesystem {
@@ -49,7 +49,7 @@ trait ReadOnlyFilesystem {
         );
     }
 
-    public function open_write_stream($path): ByteWriter {
+    public function open_write_stream($path): ByteConsumer {
         throw new FilesystemException(
             sprintf('Cannot open write stream: %s', $path)
         );

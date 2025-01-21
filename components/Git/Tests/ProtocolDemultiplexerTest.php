@@ -3,15 +3,15 @@
 namespace WordPress\Git\Tests;
 
 use WordPress\ByteStream\MemoryPipe;
-use WordPress\ByteStream\Reader\ProducerReader;
-use WordPress\ByteStream\Reader\ResourceReader;
+use WordPress\ByteStream\Producer\ProducerProducer;
+use WordPress\ByteStream\Producer\ResourceProducer;
 use WordPress\Filesystem\InMemoryFilesystem;
 use WordPress\Git\GitRepository;
 use WordPress\Git\Model\Commit;
 use WordPress\Git\Model\Tree;
 use WordPress\Git\Model\TreeEntry;
 use WordPress\Git\Protocol\Parser\ProtocolDemultiplexer;
-use WordPress\Git\Protocol\GitProtocolProducer;
+use WordPress\Git\Protocol\GitProtocolGenerator;
 
 class ProtocolDemultiplexerTest extends \PHPUnit\Framework\TestCase {
 
@@ -21,7 +21,7 @@ class ProtocolDemultiplexerTest extends \PHPUnit\Framework\TestCase {
         $repo = new GitRepository(InMemoryFilesystem::create());
         $oid = $repo->add_object(
             'tree',
-            GitProtocolProducer::encode_tree_bytes(new Tree([
+            GitProtocolGenerator::encode_tree_bytes(new Tree([
                 new TreeEntry([
                     'mode' => '100644',
                     'name' => 'test.txt',
@@ -30,7 +30,7 @@ class ProtocolDemultiplexerTest extends \PHPUnit\Framework\TestCase {
             ]))
         );
 
-        $producer = new GitProtocolProducer();
+        $producer = new GitProtocolGenerator();
         $producer->append_packet_line(Commit::NULL_HASH . " " . Commit::NULL_HASH . " refs/heads/\0report-status force-update\n");
         $producer->append_packet_line("ef9fae98ba6dd17140b45bc657659b6c41a4ad10 HEAD\n");
         $producer->append_packet_line('0000');
@@ -42,7 +42,7 @@ class ProtocolDemultiplexerTest extends \PHPUnit\Framework\TestCase {
         $producer->close_writing();
 
         $chunks = [];
-        $demuxer = new ProtocolDemultiplexer(new ProducerReader($producer));
+        $demuxer = new ProtocolDemultiplexer(new ProducerProducer($producer));
         while ($demuxer->next_chunk()) {
             switch ($demuxer->get_stream_code()) {
                 case ProtocolDemultiplexer::STREAM_CODE_UNKNOWN:
@@ -70,7 +70,7 @@ class ProtocolDemultiplexerTest extends \PHPUnit\Framework\TestCase {
     }
 
     public function test_parse_response_no_blobs() {
-        $reader = ResourceReader::from_local_file(__DIR__ . '/fixtures/wordpress-develop-response-no-blobs.bin');
+        $reader = ResourceProducer::from_local_file( __DIR__ . '/fixtures/wordpress-develop-response-no-blobs.bin');
         $demuxer = new ProtocolDemultiplexer($reader);
         $chunks_counts = [];
         while($demuxer->next_chunk()) {
@@ -91,7 +91,7 @@ class ProtocolDemultiplexerTest extends \PHPUnit\Framework\TestCase {
     }
 
     public function test_parse_full_response() {
-        $reader = ResourceReader::from_local_file(__DIR__ . '/fixtures/wordpress-develop-response-full.bin');
+        $reader = ResourceProducer::from_local_file( __DIR__ . '/fixtures/wordpress-develop-response-full.bin');
         $demuxer = new ProtocolDemultiplexer($reader);
         $chunks_counts = [];
         while($demuxer->next_chunk()) {
