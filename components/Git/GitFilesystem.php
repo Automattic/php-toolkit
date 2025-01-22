@@ -4,9 +4,6 @@ namespace WordPress\Git;
 
 use WordPress\Filesystem\FilesystemException;
 use WordPress\ByteStream\Producer\ByteProducer;
-use WordPress\ByteStream\Writer\ByteConsumer;
-use WordPress\ByteStream\MemoryPipe;
-use WordPress\ByteStream\Producer\ReaderUtils;
 use WordPress\Filesystem\Filesystem;
 use WordPress\Filesystem\Layer\ChrootLayer;
 use WordPress\Filesystem\Mixin\BufferedWriteStreamViaPutContents;
@@ -91,7 +88,7 @@ class GitFilesystem implements Filesystem {
 	}
 
     public function get_contents($path) {
-        return ReaderUtils::read_all_remaining_bytes($this->open_read_stream($path));
+        return $this->open_read_stream($path)->consume_all();
     }
 
 	public function open_read_stream($path): ByteProducer {

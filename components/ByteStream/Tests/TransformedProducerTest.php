@@ -1,7 +1,7 @@
 <?php
 
 use PHPUnit\Framework\TestCase;
-use WordPress\ByteStream\Producer\ReaderUtils;
+use WordPress\ByteStream\Producer\ByteProducer;
 use WordPress\ByteStream\Producer\ResourceProducer;
 use WordPress\ByteStream\Producer\TransformedProducer;
 
@@ -9,20 +9,21 @@ class TransformedProducerTest extends TestCase {
 
     public function test_basic_data_streaming() {
         $reference = file_get_contents(dirname(__FILE__) . '/fixtures/preface-to-pygmalion.txt');
-        $reader = new ResourceProducer(fopen( dirname(__FILE__) . '/fixtures/preface-to-pygmalion.txt', 'r'));
+        $reader = ResourceProducer::from_local_file(dirname(__FILE__) . '/fixtures/preface-to-pygmalion.txt');
         $stream = new TransformedProducer($reader);
         $accumulated = '';
-        $stream->next_bytes(100);
-        $accumulated .= $stream->get_bytes();
-        $this->assertEquals(100, strlen($stream->get_bytes()));
 
-        $stream->next_bytes(100);
-        $accumulated .= $stream->get_bytes();
-        $this->assertEquals(100, strlen($stream->get_bytes()));
+        $this->assertEquals(100, $stream->pull(100, ByteProducer::PULL_EXACTLY));
+        $accumulated .= $stream->consume(100);
 
-        $accumulated .= ReaderUtils::read_all_remaining_bytes($stream);
+        $this->assertEquals(100, $stream->pull(100, ByteProducer::PULL_EXACTLY));
+        $accumulated .= $stream->consume(100);
+
+        $remaining = strlen($reference) - $stream->tell();
+        $this->assertEquals($remaining, $stream->pull($remaining, ByteProducer::PULL_EXACTLY));
+        $accumulated .= $stream->consume($remaining);
+
         $this->assertEquals(8704, strlen($accumulated));
-
         $this->assertEquals($reference, $accumulated);
     }
 

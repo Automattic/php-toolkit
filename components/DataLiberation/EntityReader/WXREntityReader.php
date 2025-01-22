@@ -232,7 +232,7 @@ class WXREntityReader implements EntityReader {
 	/**
 	 * Stream to pull bytes from when the input bytes are exhausted.
 	 *
-	 * @var WP_Byte_Reader
+	 * @var WP_Byte_Producer
 	 */
 	private $upstream;
 
@@ -864,14 +864,14 @@ class WXREntityReader implements EntityReader {
 		if ( ! $this->upstream ) {
 			return false;
 		}
-		if ( ! $this->upstream->next_bytes() ) {
-			if ( $this->upstream->reached_end_of_data() ) {
-				$this->input_finished();
-			}
-			return false;
-		}
-		$this->append_bytes( $this->upstream->get_bytes() );
-		return true;
+        if ( $this->upstream->reached_end_of_data() ) {
+            $this->input_finished();
+            return false;
+        }
+
+        $available_bytes = $this->upstream->pull(8192);
+        $this->append_bytes($this->upstream->consume($available_bytes));
+        return true;
 	}
 
 	/**

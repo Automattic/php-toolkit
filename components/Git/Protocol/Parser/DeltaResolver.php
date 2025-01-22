@@ -2,7 +2,6 @@
 
 namespace WordPress\Git\Protocol\Parser;
 
-use WordPress\ByteStream\Producer\ReaderUtils;
 use WordPress\ByteStream\NotEnoughDataException;
 use WordPress\ByteStream\Producer\ByteProducer;
 use WordPress\Git\GitException;
@@ -27,7 +26,6 @@ class DeltaResolver {
     private $base_length = null;
     private $target_length = null;
     private $resolved_chunk = '';
-    private $is_paused_on_incomplete_input = false;
 
     public function __construct(GitObjectProducer $base_object_reader, ByteProducer $delta_reader) {
         $this->base_object_reader    = $base_object_reader;
@@ -45,37 +43,30 @@ class DeltaResolver {
 
         $this->base_object_reader->read_header();
 
-        try {
+        if(null === $this->base_length) {
+            $this->base_length = $this->read_variable_length();
+            if($this->base_length !== $this->base_object_reader->get_uncompressed_size()) {
+                throw new GitException(sprintf(
+                    'Base length mismatch. Delta declared %d bytes, but base reader has %d bytes',
+                    $this->base_length,
+                    $this->base_object_reader->get_uncompressed_size()
+                ));
+            }
             $revert_to = $this->delta_reader->tell();
-            if(null === $this->base_length) {
-                $this->base_length = $this->read_variable_length();
-                if($this->base_length !== $this->base_object_reader->get_uncompressed_size()) {
-                    throw new GitException(sprintf(
-                        'Base length mismatch. Delta declared %d bytes, but base reader has %d bytes',
-                        $this->base_length,
-                        $this->base_object_reader->get_uncompressed_size()
-                    ));
-                }
-                $revert_to = $this->delta_reader->tell();
-            }
-
-            if(null === $this->target_length) {
-                $this->target_length = $this->read_variable_length();
-            }
-
-            return true;
-        } catch (NotEnoughDataException $e) {
-            $this->delta_reader->seek($revert_to);
-            $this->is_paused_on_incomplete_input = true;
-            return false;
         }
+
+        if(null === $this->target_length) {
+            $this->target_length = $this->read_variable_length();
+        }
+
+        return true;
     }
 
 	private function read_variable_length() {
 		$result = 0;
 		$shift  = 0;
 		do {
-			$byte = ord( ReaderUtils::read_exactly_n_bytes($this->delta_reader, 1) );
+			$byte = ord( $this->delta_reader->consume(1) );
 			$result |= ( $byte & 0x7F ) << $shift;
 			$shift  += 7;
 		} while ( $byte & 0x80 );
@@ -99,68 +90,58 @@ class DeltaResolver {
             }
         }
 
-        $this->is_paused_on_incomplete_input = false;
-        $start = $this->delta_reader->tell();
-        try {
-            $this->resolved_chunk = '';
-            if($this->delta_reader->reached_end_of_data()) {
-                return false;
-            }
-            $command_byte = ord( ReaderUtils::read_exactly_n_bytes($this->delta_reader, 1) );
-            if ( $command_byte & 0b10000000 ) {
-                $copyOffset = 0;
-                $copySize   = 0;
-
-                $needed_bytes = 0;
-                for($i = 0; $i < 7; $i++) {
-                    if ( $command_byte & (1 << $i) ) {
-                        $needed_bytes++;
-                    }
-                }
-
-                // @TODO: instead of failing, wait for $needed_bytes to be available with a timeout.
-                $offset_bytes = ReaderUtils::read_exactly_n_bytes($this->delta_reader, $needed_bytes);
-                $read_offset = 0;
-                if ( $command_byte & 0b00000001 ) {
-                    $copyOffset |= ord( $offset_bytes[$read_offset++] );
-                }
-                if ( $command_byte & 0b00000010 ) {
-                    $copyOffset |= ord( $offset_bytes[$read_offset++] ) << 8;
-                }
-                if ( $command_byte & 0b00000100 ) {
-                    $copyOffset |= ord( $offset_bytes[$read_offset++] ) << 16;
-                }
-                if ( $command_byte & 0b00001000 ) {
-                    $copyOffset |= ord( $offset_bytes[$read_offset++] ) << 24;
-                }
-                if ( $command_byte & 0b00010000 ) {
-                    $copySize |= ord( $offset_bytes[$read_offset++] );
-                }
-                if ( $command_byte & 0b00100000 ) {
-                    $copySize |= ord( $offset_bytes[$read_offset++] ) << 8;
-                }
-                if ( $command_byte & 0b01000000 ) {
-                    $copySize |= ord( $offset_bytes[$read_offset++] ) << 16;
-                }
-                if ( $copySize === 0 ) {
-                    $copySize = 0x10000;
-                }
-                $this->base_object_reader->seek($copyOffset);
-                $this->resolved_chunk = ReaderUtils::read_exactly_n_bytes($this->base_object_reader, $copySize);
-            } else {
-                $this->resolved_chunk = ReaderUtils::read_exactly_n_bytes($this->delta_reader, $command_byte);
-            }
-            return true;
-        } catch (NotEnoughDataException $e) {
-            $this->is_paused_on_incomplete_input = true;
-            $this->resolved_chunk = '';
-            $this->delta_reader->seek($start);
+        $this->resolved_chunk = '';
+        if($this->delta_reader->reached_end_of_data()) {
             return false;
         }
-    }
+        $this->delta_reader->pull(1, ByteProducer::PULL_EXACTLY);
+        $command_byte = ord( $this->delta_reader->consume(1) );
+        if ( $command_byte & 0b10000000 ) {
+            $copyOffset = 0;
+            $copySize   = 0;
 
-    public function is_paused_on_incomplete_input() {
-        return $this->is_paused_on_incomplete_input;
+            $needed_bytes = 0;
+            for($i = 0; $i < 7; $i++) {
+                if ( $command_byte & (1 << $i) ) {
+                    $needed_bytes++;
+                }
+            }
+
+            $this->delta_reader->pull($needed_bytes, ByteProducer::PULL_EXACTLY);
+            $offset_bytes = $this->delta_reader->consume($needed_bytes);
+            $read_offset = 0;
+            if ( $command_byte & 0b00000001 ) {
+                $copyOffset |= ord( $offset_bytes[$read_offset++] );
+            }
+            if ( $command_byte & 0b00000010 ) {
+                $copyOffset |= ord( $offset_bytes[$read_offset++] ) << 8;
+            }
+            if ( $command_byte & 0b00000100 ) {
+                $copyOffset |= ord( $offset_bytes[$read_offset++] ) << 16;
+            }
+            if ( $command_byte & 0b00001000 ) {
+                $copyOffset |= ord( $offset_bytes[$read_offset++] ) << 24;
+            }
+            if ( $command_byte & 0b00010000 ) {
+                $copySize |= ord( $offset_bytes[$read_offset++] );
+            }
+            if ( $command_byte & 0b00100000 ) {
+                $copySize |= ord( $offset_bytes[$read_offset++] ) << 8;
+            }
+            if ( $command_byte & 0b01000000 ) {
+                $copySize |= ord( $offset_bytes[$read_offset++] ) << 16;
+            }
+            if ( $copySize === 0 ) {
+                $copySize = 0x10000;
+            }
+            $this->base_object_reader->seek($copyOffset);
+            $this->base_object_reader->pull($copySize, ByteProducer::PULL_EXACTLY);
+            $this->resolved_chunk = $this->base_object_reader->consume($copySize);
+        } else {
+            $this->delta_reader->pull($command_byte, ByteProducer::PULL_EXACTLY);
+            $this->resolved_chunk = $this->delta_reader->consume($command_byte);
+        }
+        return true;
     }
 
 }

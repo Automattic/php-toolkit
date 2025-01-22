@@ -3,11 +3,9 @@
 namespace WordPress\Zip;
 
 use WordPress\ByteStream\ByteStreamException;
-use WordPress\ByteStream\NotEnoughDataException;
 use WordPress\ByteStream\Producer\ByteProducer;
 use WordPress\ByteStream\Producer\InflateProducer;
 use WordPress\ByteStream\Producer\LimitProducer;
-use WordPress\ByteStream\Producer\ReaderUtils;
 
 class ZipStreamReader {
 
@@ -24,14 +22,9 @@ class ZipStreamReader {
 	private $state = ZipStreamReader::STATE_SCAN;
 	private $object = null;
 	private $byte_reader;
-	private $paused_at_incomplete_input = false;
 
 	public function __construct(ByteProducer $byte_reader) {
 		$this->byte_reader = $byte_reader;
-	}
-
-	public function is_paused_at_incomplete_input(): bool {
-		return $this->paused_at_incomplete_input;
 	}
 
 	public function reached_end_of_data(): bool {
@@ -39,59 +32,58 @@ class ZipStreamReader {
 	}
 
 	public function next_object(): bool {
-        $this->paused_at_incomplete_input = false;
-        try {
-            // If we're calling next_object() when an object is ready,
-            // it means we want to scan for the next object. Let's clear
-            // the state and start scanning again.
-            if($this->state === self::STATE_OBJECT_READY) {
-                $this->after_record();
-            }
+        // If we're calling next_object() when an object is ready,
+        // it means we want to scan for the next object. Let's clear
+        // the state and start scanning again.
+        if($this->state === self::STATE_OBJECT_READY) {
+            $this->after_record();
+        }
 
-            while(true) {
-                switch ($this->state) {
-                    case self::STATE_SCAN:
-                        $signature = ReaderUtils::read_exactly_n_bytes($this->byte_reader, 4);
-                        $signature = unpack('V', $signature)[1];
-                        switch($signature) {
-                            case FileEntry::SIGNATURE:
-                                $this->state = self::STATE_FILE_ENTRY;
-                                break;
-                            case CentralDirectoryEntry::SIGNATURE:
-                                $this->state = self::STATE_CENTRAL_DIRECTORY_ENTRY_READING;
-                                break;
-                            case EndCentralDirectoryEntry::SIGNATURE:
-                                $this->state = self::STATE_END_CENTRAL_DIRECTORY_ENTRY_READING;
-                                break;
-                            default:
-                                throw new ByteStreamException(
-                                    sprintf('Invalid ZIP object signature %d', $signature),
-                                );
-                        }
-                        break;
-
-                    case self::STATE_FILE_ENTRY:
-                        $this->read_file_entry();
-                        break;
-
-                    case self::STATE_CENTRAL_DIRECTORY_ENTRY_READING:
-                        $this->read_central_directory_entry();
-                        break;
-
-                    case self::STATE_END_CENTRAL_DIRECTORY_ENTRY_READING:
-                        $this->read_end_central_directory_entry();
-                        break;
-
-                    case self::STATE_OBJECT_READY:
-                        return true;
-
-                    default:
+        while(true) {
+            switch ($this->state) {
+                case self::STATE_SCAN:
+                    $n = $this->byte_reader->pull(4, ByteProducer::PULL_EXACTLY);
+                    if($n !== 4) {
+                        $this->state = self::STATE_COMPLETE;
                         return false;
-                }
+                    }
+                    $signature = $this->byte_reader->consume(4);
+                    $signature = unpack('V', $signature)[1];
+                    switch($signature) {
+                        case FileEntry::SIGNATURE:
+                            $this->state = self::STATE_FILE_ENTRY;
+                            break;
+                        case CentralDirectoryEntry::SIGNATURE:
+                            $this->state = self::STATE_CENTRAL_DIRECTORY_ENTRY_READING;
+                            break;
+                        case EndCentralDirectoryEntry::SIGNATURE:
+                            $this->state = self::STATE_END_CENTRAL_DIRECTORY_ENTRY_READING;
+                            break;
+                        default:
+                            throw new ByteStreamException(
+                                sprintf('Invalid ZIP object signature %d', $signature),
+                            );
+                    }
+                    break;
+
+                case self::STATE_FILE_ENTRY:
+                    $this->read_file_entry();
+                    break;
+
+                case self::STATE_CENTRAL_DIRECTORY_ENTRY_READING:
+                    $this->read_central_directory_entry();
+                    break;
+
+                case self::STATE_END_CENTRAL_DIRECTORY_ENTRY_READING:
+                    $this->read_end_central_directory_entry();
+                    break;
+
+                case self::STATE_OBJECT_READY:
+                    return true;
+
+                default:
+                    return false;
             }
-        } catch (NotEnoughDataException $e) {
-            $this->paused_at_incomplete_input = true;
-            return false;
         }
 	}
 
@@ -105,89 +97,80 @@ class ZipStreamReader {
 	}
 
     private function read_file_entry() {
-		if (!$this->object) {
-            $data = ReaderUtils::read_exactly_n_bytes($this->byte_reader, FileEntry::HEADER_SIZE);
-            $header_fields = unpack(
-                'vversion/vgeneralPurpose/vcompressionMethod/vlastModifiedTime/vlastModifiedDate/Vcrc/VcompressedSize/VuncompressedSize/vpathLength/vextraLength',
-                $data
-            );
-            $this->object = new FileEntry($header_fields);
+        $this->byte_reader->pull(FileEntry::HEADER_SIZE, ByteProducer::PULL_EXACTLY);
+        $data = $this->byte_reader->consume(FileEntry::HEADER_SIZE);
+        $header_fields = unpack(
+            'vversion/vgeneralPurpose/vcompressionMethod/vlastModifiedTime/vlastModifiedDate/Vcrc/VcompressedSize/VuncompressedSize/vpathLength/vextraLength',
+            $data
+        );
+        $this->object = new FileEntry($header_fields);
+
+        $this->byte_reader->pull($this->object->pathLength, ByteProducer::PULL_EXACTLY);
+        $path = $this->byte_reader->consume($this->object->pathLength);
+        $this->object->path = ZipStreamReader::sanitize_path($path);
+
+        $this->byte_reader->pull($this->object->extraLength, ByteProducer::PULL_EXACTLY);
+        $extra = $this->byte_reader->consume($this->object->extraLength);
+        $this->object->extra = $extra;
+
+        $limit_reader = new LimitProducer(
+            $this->byte_reader,
+            $this->object->compressedSize
+        );
+
+        $is_compressed = $this->object->compressionMethod === ZipStreamReader::COMPRESSION_DEFLATE;
+        if($is_compressed) {
+            $this->object->body_reader = new InflateProducer($limit_reader, ZLIB_ENCODING_RAW);
+        } else {
+            $this->object->body_reader = $limit_reader;
         }
-
-        if(null === $this->object->path) {
-            $path = ReaderUtils::read_exactly_n_bytes($this->byte_reader, $this->object->pathLength);
-            $this->object->path = ZipStreamReader::sanitize_path($path);
-        }
-
-        if(null === $this->object->extra) {
-            $extra = ReaderUtils::read_exactly_n_bytes($this->byte_reader, $this->object->extraLength);
-            $this->object->extra = $extra;
-
-            $limit_reader = new LimitProducer(
-                $this->byte_reader,
-                $this->object->compressedSize
-            );
-
-            $is_compressed = $this->object->compressionMethod === ZipStreamReader::COMPRESSION_DEFLATE;
-            if($is_compressed) {
-                $this->object->body_reader = new InflateProducer($limit_reader, ZLIB_ENCODING_RAW);
-            } else {
-                $this->object->body_reader = $limit_reader;
-            }
-            $this->state = self::STATE_OBJECT_READY;
-        }
+        $this->state = self::STATE_OBJECT_READY;
     }
 
 	private function read_central_directory_entry() {
-		if (!$this->object) {
-			$data = ReaderUtils::read_exactly_n_bytes($this->byte_reader, CentralDirectoryEntry::HEADER_SIZE);
-			$header_fields = unpack(
-				'vversionCreated/vversionNeeded/vgeneralPurpose/vcompressionMethod/vlastModifiedTime/vlastModifiedDate/Vcrc/VcompressedSize/VuncompressedSize/vpathLength/vextraLength/vfileCommentLength/vdiskNumber/vinternalAttributes/VexternalAttributes/VfirstByteAt',
-				$data
-			);
-			$this->object = new CentralDirectoryEntry($header_fields);
-		}
+        $this->byte_reader->pull(CentralDirectoryEntry::HEADER_SIZE, ByteProducer::PULL_EXACTLY);
+        $data = $this->byte_reader->consume(CentralDirectoryEntry::HEADER_SIZE);
+        $header_fields = unpack(
+            'vversionCreated/vversionNeeded/vgeneralPurpose/vcompressionMethod/vlastModifiedTime/vlastModifiedDate/Vcrc/VcompressedSize/VuncompressedSize/vpathLength/vextraLength/vfileCommentLength/vdiskNumber/vinternalAttributes/VexternalAttributes/VfirstByteAt',
+            $data
+        );
+        $this->object = new CentralDirectoryEntry($header_fields);
 
-		if(null === $this->object->path) {
-            $path_bytes = ReaderUtils::read_exactly_n_bytes($this->byte_reader, $this->object->pathLength);
-			$this->object->path = self::sanitize_path($path_bytes);
-        }
+        $this->byte_reader->pull($this->object->pathLength, ByteProducer::PULL_EXACTLY);
+        $path_bytes = $this->byte_reader->consume($this->object->pathLength);
+        $this->object->path = self::sanitize_path($path_bytes);
 
-        if(null === $this->object->extra) {
-			$extra_bytes = ReaderUtils::read_exactly_n_bytes($this->byte_reader, $this->object->extraLength);
-			$this->object->extra = $extra_bytes;
-        }
+        $this->byte_reader->pull($this->object->extraLength, ByteProducer::PULL_EXACTLY);
+        $extra_bytes = $this->byte_reader->consume($this->object->extraLength);
+        $this->object->extra = $extra_bytes;
 
-        if(null === $this->object->fileComment) {
-			$file_comment_bytes = ReaderUtils::read_exactly_n_bytes($this->byte_reader, $this->object->fileCommentLength);
-			$this->object->fileComment = $file_comment_bytes;
-            $this->state = self::STATE_OBJECT_READY;
-        }
+        $this->byte_reader->pull($this->object->fileCommentLength, ByteProducer::PULL_EXACTLY);
+        $file_comment_bytes = $this->byte_reader->consume($this->object->fileCommentLength);
+        $this->object->fileComment = $file_comment_bytes;
+        $this->state = self::STATE_OBJECT_READY;
 	}
 
 	private function read_end_central_directory_entry() {
-		if (!$this->object) {
-			$data = ReaderUtils::read_exactly_n_bytes($this->byte_reader, EndCentralDirectoryEntry::HEADER_SIZE);
-			$header_fields = unpack(
-				'vdiskNumber/vcentralDirectoryStartDisk/vnumberCentralDirectoryRecordsOnThisDisk/vnumberCentralDirectoryRecords/VcentralDirectorySize/VcentralDirectoryOffset/vcommentLength',
-				$data
-			);
-			$this->object = new EndCentralDirectoryEntry(
-                $header_fields
-			);
-		}
+        $this->byte_reader->pull(EndCentralDirectoryEntry::HEADER_SIZE, ByteProducer::PULL_EXACTLY);
+        $data = $this->byte_reader->consume(EndCentralDirectoryEntry::HEADER_SIZE);
+        $header_fields = unpack(
+            'vdiskNumber/vcentralDirectoryStartDisk/vnumberCentralDirectoryRecordsOnThisDisk/vnumberCentralDirectoryRecords/VcentralDirectorySize/VcentralDirectoryOffset/vcommentLength',
+            $data
+        );
+        $this->object = new EndCentralDirectoryEntry(
+            $header_fields
+        );
 
-		if (null === $this->object->comment) {
-			$comment_bytes = ReaderUtils::read_exactly_n_bytes($this->byte_reader, $this->object->commentLength);
-			$this->object->comment = $comment_bytes;
-            $this->state = self::STATE_OBJECT_READY;
-        }
+        $this->byte_reader->pull($this->object->commentLength, ByteProducer::PULL_EXACTLY);
+        $comment_bytes = $this->byte_reader->consume($this->object->commentLength);
+        $this->object->comment = $comment_bytes;
+        $this->state = self::STATE_OBJECT_READY;
 	}
 
 	private function after_record() {
         if( $this->object instanceof FileEntry) {
             // Skip past the file bytes
-            ReaderUtils::read_all_remaining_bytes($this->object->body_reader);
+            $this->object->body_reader->consume_all();
             $this->object->body_reader->close();
         }
 		$this->state = self::STATE_SCAN;

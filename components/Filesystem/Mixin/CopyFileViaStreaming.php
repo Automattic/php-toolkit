@@ -20,8 +20,9 @@ trait CopyFileViaStreaming {
             $from_stream = $this->open_read_stream($from_path);
             try {
                 $chunks_written = 0;
-                while($from_stream->next_bytes()) {
-                    $to_stream->append_bytes($from_stream->get_bytes(), $to_stream);
+                while(!$from_stream->reached_end_of_data()) {
+                    $available = $from_stream->pull(8192);
+                    $to_stream->append_bytes($from_stream->consume($available), $to_stream);
                     $chunks_written++;
                 }
                 if($chunks_written === 0) {

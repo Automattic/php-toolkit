@@ -26,14 +26,14 @@ abstract class FilesystemTestCase extends TestCase {
 
     public function testIsDir() {
         $this->fs->mkdir('/test-dir');
-        
+
         $this->assertTrue($this->fs->is_dir('/test-dir'));
         $this->assertFalse($this->fs->is_dir('/nonexistent'));
     }
 
     public function testIsFile() {
         $this->fs->put_contents('/test.txt', 'test');
-        
+
         $this->assertTrue($this->fs->is_file('/test.txt'));
         $this->assertFalse($this->fs->is_file('/nonexistent.txt'));
     }
@@ -75,7 +75,7 @@ abstract class FilesystemTestCase extends TestCase {
 
     public function testRmdirRemovesExistingDirectory() {
         $this->fs->mkdir('/test-dir');
-        
+
         $this->assertTrue($this->fs->is_dir('/test-dir'));
         $this->fs->rmdir('/test-dir');
         $this->assertFalse($this->fs->exists('/test-dir'));
@@ -111,10 +111,7 @@ abstract class FilesystemTestCase extends TestCase {
         $this->fs->put_contents('/test.txt', 'Hello World');
 
         $reader = $this->fs->open_read_stream('/test.txt');
-        $content = '';
-        while ($reader->next_bytes()) {
-            $content .= $reader->get_bytes();
-        }
+        $content = $reader->consume_all();
         $reader->close();
 
         $this->assertEquals('Hello World', $content);
@@ -122,9 +119,9 @@ abstract class FilesystemTestCase extends TestCase {
 
     public function testRename() {
         $this->fs->put_contents('/old.txt', 'test');
-        
+
         $this->fs->rename('/old.txt', '/new.txt');
-        
+
         $this->assertFalse($this->fs->exists('/old.txt'));
         $this->assertTrue($this->fs->exists('/new.txt'));
         $this->assertEquals('test', $this->fs->get_contents('/new.txt'));
@@ -132,9 +129,9 @@ abstract class FilesystemTestCase extends TestCase {
 
     public function testCopyFile() {
         $this->fs->put_contents('/source.txt', 'test content');
-        
+
         $this->fs->copy('/source.txt', '/dest.txt');
-        
+
         $this->assertTrue($this->fs->exists('/source.txt'));
         $this->assertTrue($this->fs->exists('/dest.txt'));
         $this->assertEquals('test content', $this->fs->get_contents('/dest.txt'));

@@ -7,7 +7,7 @@ use WordPress\Git\Diff\MergeEngine;
 use WordPress\Git\Model\Commit;
 use WordPress\Git\Model\Tree;
 use WordPress\Git\Model\TreeEntry;
-use WordPress\Git\Protocol\GitProtocolGenerator;
+use WordPress\Git\Protocol\GitProtocolProducer;
 
 use function WordPress\Filesystem\wp_canonicalize_path;
 use function WordPress\Filesystem\wp_join_paths;
@@ -481,10 +481,10 @@ class GitRepository {
 
 	public function diff_blobs( $current_blob_entry, $previous_blob_entry ) {
 		// @TODO: Support streaming diffs for large files
-		$current_blob           = $this->read_object( $current_blob_entry->hash )->read_entire_object_contents();
+		$current_blob           = $this->read_object( $current_blob_entry->hash )->consume_all();
 		$current_blob_is_binary = $this->guess_if_binary_blob( $current_blob_entry, $current_blob );
 
-		$previous_blob           = $this->read_object( $previous_blob_entry->hash )->read_entire_object_contents();
+		$previous_blob           = $this->read_object( $previous_blob_entry->hash )->consume_all();
 		$previous_blob_is_binary = $this->guess_if_binary_blob( $previous_blob_entry, $previous_blob );
 
 		if ( $current_blob_is_binary && $previous_blob_is_binary ) {
@@ -676,7 +676,7 @@ class GitRepository {
 		// Create new tree object
 		return $this->add_object(
 			'tree',
-			GitProtocolGenerator::encode_tree_bytes( new Tree( $tree_objects ) )
+			GitProtocolProducer::encode_tree_bytes( new Tree( $tree_objects ) )
 		);
 	}
 

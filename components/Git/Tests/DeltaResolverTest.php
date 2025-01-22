@@ -4,32 +4,28 @@ namespace WordPress\Git\Tests;
 
 use WordPress\ByteStream\MemoryPipe;
 use WordPress\ByteStream\Producer\ProducerProducer;
-use WordPress\ByteStream\Producer\ReaderUtils;
 use WordPress\Filesystem\InMemoryFilesystem;
 use WordPress\Git\GitObjectProducer;
 use WordPress\Git\GitRepository;
 use WordPress\Git\Protocol\Parser\DeltaResolver;
-use WordPress\Git\Protocol\GitProtocolGenerator;
+use WordPress\Git\Protocol\GitProtocolProducer;
 
 class DeltaResolverTest extends \PHPUnit\Framework\TestCase {
 
     public function test_resolve_next_chunk() {
         $base_bytes = "Hello, world!";
 
-        $repository = new GitRepository(InMemoryFilesystem::create());
-        $readme_oid = $repository->add_object('blob', 'Hello, world!');
-        $pack_producer = new GitProtocolGenerator();
-        $pack_producer->append_packfile($repository, [$readme_oid]);
-        $pack_producer->close_writing();
-
-        $base_reader = new GitObjectProducer(
-            new ProducerProducer($pack_producer)
+        $object = new MemoryPipe(
+            'blob ' . strlen($base_bytes) . "\000" . 
+            gzcompress($base_bytes, 9, ZLIB_ENCODING_DEFLATE)
         );
+        $base_reader = new GitObjectProducer($object);
+        $base_reader->read_header();
 
         $resolved_chunk = "World? Hello, I am changed!";
         $delta_bytes = implode('', [
-            GitProtocolGenerator::encode_variable_length(strlen($base_bytes)),
-            GitProtocolGenerator::encode_variable_length(strlen($resolved_chunk)),
+            GitProtocolProducer::encode_variable_length(strlen($base_bytes)),
+            GitProtocolProducer::encode_variable_length(strlen($resolved_chunk)),
             // The leftmost bit is 0 = we're consuming from the delta
             // The next 7 bits amount to 0b110 = we're consuming the next 6 bytes
             chr(0b00000110),

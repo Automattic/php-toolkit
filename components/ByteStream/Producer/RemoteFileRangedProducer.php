@@ -4,39 +4,22 @@ namespace WordPress\ByteStream\Producer;
 
 use WordPress\ByteStream\ByteStreamException;
 use WordPress\HttpClient\Request;
-use WordPress\ByteStream\Producer\ByteProducer;
 
 /**
  * Streams bytes from a remote file. Supports seeking to a specific offset and
  * requesting sub-ranges of the file.
  *
- * Usage:
- *
- * $file = new WP_Remote_File_Ranged_Reader('https://example.com/file.txt');
- * $file->seek(0);
- * $file->request_bytes(100);
- * while($file->next_chunk()) {
- *     var_dump($file->get_bytes());
- * }
- * $file->seek(600);
- * $file->request_bytes(40);
- * while($file->next_chunk()) {
- *     var_dump($file->get_bytes());
- * }
- *
  * @TODO: Abort in-progress requests when seeking to a new offset.
  */
-class RemoteFileRangedProducer implements ByteProducer {
+class RemoteFileRangedProducer extends BaseByteProducer {
 
 	private $url;
 	private $remote_file_length;
-
 	private $current_reader;
 	private $offset_in_remote_file = 0;
 	private $default_expected_chunk_size = 10 * 1024; // 10 KB
 	private $expected_chunk_size = 10 * 1024; // 10 KB
 	private $stop_after_chunk = false;
-	private $buffer = '';
 
 	/**
 	 * Creates a seekable reader for the remote file.
@@ -44,40 +27,22 @@ class RemoteFileRangedProducer implements ByteProducer {
 	 * file to disk when the remote server does not support range requests.
 	 */
 	static public function create( $url ) {
-		$remote_file_reader = new RemoteFileRangedProducer( $url );
-		/**
-		 * We don't **need** the content-length header to be present.
-		 *
-		 * However, this reader is only used to read remote ZIP files,
-		 * we do need to know the length of the file to be able to read
-		 * the central directory index.
-		 *
-		 * Let's revisit this check once we need to read other types of
-		 * files.
-		 */
+		$remote_file_reader = new self( $url );
+		
 		if(false === $remote_file_reader->length()) {
 			return self::save_to_disk( $url );
 		}
 
-		/**
-		 * Try to read the first two bytes of the file to confirm that
-		 * the remote server supports range requests.
-		 */
 		$remote_file_reader->seek_to_chunk(0, 2);
-		if(false === $remote_file_reader->next_bytes()) {
+		if(false === $remote_file_reader->pull(2)) {
 			return self::save_to_disk( $url );
 		}
 
-		$bytes = $remote_file_reader->get_bytes();
+		$bytes = $remote_file_reader->peek(2);
 		if(strlen($bytes) !== 2) {
-			// Oops! We're streaming the entire file to disk now. Let's
-			// redirect the output to a local file and provide the caller
-			// with a regular file reader.
 			return self::redirect_output_to_disk( $remote_file_reader );
 		}
 
-		// The remote server supports range requests, good! We can use this reader.
-		// Let's return to the beginning of the file before returning.
 		$remote_file_reader->seek(0);
 		return $remote_file_reader;
 	}
@@ -93,18 +58,19 @@ class RemoteFileRangedProducer implements ByteProducer {
         if(false === $file) {
             throw new ByteStreamException('Failed to open file for writing');
         }
-		// We may have a bytes chunk available at this point.
-		if($reader->get_bytes()) {
-			if(false === fwrite($file, $reader->get_bytes())) {
+		
+		if($bytes = $reader->peek(8096)) {
+			if(false === fwrite($file, $bytes)) {
 				throw new ByteStreamException('Failed to write bytes to file');
 			}
 		}
-		// Keep streaming the file until we're done.
-		while($reader->next_bytes()) {
-			if(false === fwrite($file, $reader->get_bytes())) {
+		
+		while($reader->pull(8096)) {
+			if(false === fwrite($file, $reader->peek(8096))) {
 				throw new ByteStreamException('Failed to write bytes to file');
 			}
 		}
+		
 		if(false === fclose($file)) {
 			throw new ByteStreamException('Failed to close file');
 		}
@@ -115,53 +81,34 @@ class RemoteFileRangedProducer implements ByteProducer {
 		$this->url = $url;
 	}
 
-	public function next_bytes($max_bytes = 8096): bool {
-		while (true) {
-			if (null === $this->current_reader) {
-				$this->create_reader();
-			}
-
-			// Use buffered data first
-			if (strlen($this->buffer) > 0) {
-				$bytes_to_return = substr($this->buffer, 0, $max_bytes);
-				$this->buffer = substr($this->buffer, $max_bytes);
-				return $bytes_to_return;
-			}
-
-			// Advance the offset by the length of the current chunk.
-			if ($this->current_reader->get_bytes()) {
-				$this->offset_in_remote_file += strlen($this->current_reader->get_bytes());
-			}
-
-			// We've reached the end of the remote file, we're done.
-			if ($this->offset_in_remote_file >= $this->length() - 1) {
-				return false;
-			}
-
-			// We've reached the end of the current chunk, request the next one.
-			if (false === $this->current_reader->next_bytes()) {
-				if ($this->stop_after_chunk) {
-					return false;
-				}
-				$this->current_reader = null;
-				continue;
-			}
-
-			// Store the current chunk in the buffer
-			$this->buffer .= $this->current_reader->get_bytes();
-
-			// Return the requested number of bytes
-			$bytes_to_return = substr($this->buffer, 0, $max_bytes);
-			$this->buffer = substr($this->buffer, $max_bytes);
-			return $bytes_to_return;
+	protected function internal_pull( $n ): string {
+		if (null === $this->current_reader) {
+			$this->create_reader();
 		}
+
+		if ($this->current_reader->get_bytes()) {
+			$this->offset_in_remote_file += strlen($this->current_reader->get_bytes());
+		}
+
+		if ($this->offset_in_remote_file >= $this->length() - 1) {
+			$this->is_closed = true;
+			return '';
+		}
+
+		if (false === $this->current_reader->pull($n)) {
+			if ($this->stop_after_chunk) {
+				$this->is_closed = true;
+				return '';
+			}
+			$this->current_reader = null;
+			return $this->internal_pull($n);
+		}
+
+		return $this->current_reader->get_bytes();
 	}
 
 	public function length(): ?int {
 		$this->ensure_content_length();
-		if ( null === $this->remote_file_length ) {
-			return null;
-		}
 		return $this->remote_file_length;
 	}
 
@@ -170,9 +117,6 @@ class RemoteFileRangedProducer implements ByteProducer {
 			$this->url,
 			array(
 				'headers' => array(
-					// @TODO: Detect when the remote server doesn't support range requests,
-					//        do something sensible. We could either stream the entire file,
-					//        or give up.
 					'Range' => 'bytes=' . $this->offset_in_remote_file . '-' . (
 						$this->offset_in_remote_file + $this->expected_chunk_size - 1
 					),
@@ -182,41 +126,28 @@ class RemoteFileRangedProducer implements ByteProducer {
 	}
 
 	public function seek_to_chunk($offset, $length) {
-		$this->current_reader->seek($offset);
+		$this->seek($offset);
 		$this->expected_chunk_size = $length;
 		$this->stop_after_chunk = true;
 	}
 
-	public function seek( $offset ): bool {
+	public function seek( int $offset ): void {
 		$this->offset_in_remote_file = $offset;
-		// @TODO cancel any pending requests
 		$this->current_reader = null;
 		$this->expected_chunk_size = $this->default_expected_chunk_size;
 		$this->stop_after_chunk = false;
-		return true;
-	}
-
-	public function tell(): int {
-		return $this->offset_in_remote_file;
-	}
-
-	public function reached_end_of_data(): bool {
-		return false;
-	}
-
-	public function get_bytes(): ?string {
-		return $this->current_reader->get_bytes();
+		$this->buffer = '';
+		$this->offset_in_current_buffer = 0;
 	}
 
 	private function ensure_content_length() {
 		if ( null !== $this->remote_file_length ) {
-			return $this->remote_file_length;
+			return;
 		}
 		if(null === $this->current_reader) {
 			$this->current_reader = new RemoteFileProducer( $this->url );
 		}
 		$this->remote_file_length = $this->current_reader->length();
-		return $this->remote_file_length;
 	}
 
 	public function close(): void {
@@ -224,5 +155,6 @@ class RemoteFileRangedProducer implements ByteProducer {
 			$this->current_reader->close();
 			$this->current_reader = null;
 		}
+		$this->is_closed = true;
 	}
 }

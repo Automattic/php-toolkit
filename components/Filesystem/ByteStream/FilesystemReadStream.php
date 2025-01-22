@@ -38,11 +38,11 @@ class FilesystemReadStream implements ByteProducer {
         return $this->filesystem->read_stream_is_finished($this->stream_id);
     }
 
-    public function next_bytes($max_bytes = 8192): bool {
-        return $this->filesystem->read_stream_next_bytes($this->stream_id, $max_bytes);
+    public function pull($n = 8192): bool {
+        return $this->filesystem->read_stream_next_bytes($this->stream_id, $n);
     }
 
-    public function get_bytes(): string {
+    public function peek(): string {
         return $this->filesystem->read_stream_get_bytes($this->stream_id);
     }
 

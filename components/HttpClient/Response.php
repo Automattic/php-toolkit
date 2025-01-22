@@ -18,7 +18,7 @@ class Response {
 	}
 
 	public function get_header( $name ) {
-		return $this->headers[ strtolower( $name ) ] ?? false;
+		return $this->headers[ strtolower( $name ) ] ?? null;
 	}
 
 }

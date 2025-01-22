@@ -2,6 +2,7 @@
 namespace WordPress\ByteStream\Writer;
 
 use ArrayAccess;
+use WordPress\ByteStream\ByteStreamException;
 use WordPress\ByteStream\Transformer\ByteTransformer;
 
 class TransformedConsumer implements ByteConsumer, ArrayAccess {

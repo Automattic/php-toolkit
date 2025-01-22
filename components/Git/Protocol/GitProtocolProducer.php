@@ -2,18 +2,18 @@
 
 namespace WordPress\Git\Protocol;
 
-use WordPress\ByteStream\ByteGenerator;
 use WordPress\ByteStream\MemoryPipe;
+use WordPress\ByteStream\Producer\BaseByteProducer;
 use WordPress\ByteStream\Transformer\ChecksumTransformer;
 use WordPress\ByteStream\Transformer\DeflateTransformer;
 use WordPress\ByteStream\Writer\TransformedConsumer;
 use WordPress\Git\Model\Tree;
 use WordPress\Git\Protocol\Parser\PackParser;
 
-class GitProtocolGenerator implements ByteGenerator {
+class GitProtocolProducer extends BaseByteProducer {
 
-    private $output_bytes;
     private $object_reader;
+    private $packfile_pipe;
     private $packfile_writer;
     private $packfile_object_body_writer;
     private $operation_queue = [];
@@ -60,51 +60,34 @@ class GitProtocolGenerator implements ByteGenerator {
 		return $tree_bytes;
 	}
 
-    public function __construct() {
-        $this->output_bytes = new MemoryPipe();
-    }
+    protected function internal_pull($n): string {
+        if(null === $this->operation) {
+            $this->operation = array_shift($this->operation_queue);
+        }
 
-    public function next_bytes($max_bytes = null): bool {
-        try {
-            while(true) {
-                if ($this->reached_end_of_data()) {
-                    return false;
+        $operation = $this->operation;
+        switch ($operation['type']) {
+            case 'progress':
+            case 'error':
+            case 'sideband':
+            case 'packet-line':
+                $this->operation = null;
+                return self::encode_packet_line($operation['chunk'], $operation['channel_code']);
+
+            case 'packet-lines':
+                $this->operation = null;
+                return self::encode_packet_lines($operation['chunk'], $operation['channel_code']);
+
+            case 'packfile':
+                if (!$this->append_packfile_data()) {
+                    $this->operation = null;
+                    return $this->pull($n);
                 }
-
-                if(null === $this->operation) {
-                    $this->operation = array_shift($this->operation_queue);
-                }
-                $operation = $this->operation;
-                switch ($operation['type']) {
-                    case 'progress':
-                    case 'error':
-                    case 'sideband':
-                    case 'packet-line':
-                        $this->output_bytes->append_bytes(
-                            self::encode_packet_line($operation['chunk'], $operation['channel_code'])
-                        );
-                        $this->operation = null;
-                        return true;
-
-                    case 'packet-lines':
-                        $this->output_bytes->append_bytes(
-                            self::encode_packet_lines($operation['chunk'], $operation['channel_code'])
-                        );
-                        $this->operation = null;
-                        return true;
-
-                    case 'packfile':
-                        if ($this->append_packfile_data()) {
-                            return true;
-                        }
-                        $this->operation = null;
-                        break;
-                    default:
-                        return false;
-                }
-            }
-        } finally {
-            $this->output_bytes->next_bytes($max_bytes);
+                $available = $this->packfile_pipe->pull(8096);
+                $chunk = $this->packfile_pipe->consume($available);
+                return $chunk;
+            default:
+                return '';
         }
     }
 
@@ -112,16 +95,7 @@ class GitProtocolGenerator implements ByteGenerator {
         return empty($this->operation_queue) && !$this->operation;
     }
 
-    public function get_bytes(): string {
-        return $this->output_bytes->get_bytes();
-    }
-
-    public function close_reading(): void {
-        $this->output_bytes->close();
-    }
-
-    public function close_writing(): void {
-    }
+    public function close_writing(): void {}
 
     public function append_progress_chunk($chunk): void {
         $this->operation_queue[] = [
@@ -175,11 +149,13 @@ class GitProtocolGenerator implements ByteGenerator {
     private function append_packfile_data(): bool {
         $operation = &$this->operation;
         if ($operation['object_index'] >= count($operation['pack_objects'])) {
+            $this->operation = null;
             return false;
         }
 
         if(!$this->packfile_writer) {
-            $this->packfile_writer = new TransformedConsumer($this->output_bytes, [
+            $this->packfile_pipe = new MemoryPipe();
+            $this->packfile_writer = new TransformedConsumer($this->packfile_pipe, [
                 'checksum' => new ChecksumTransformer('sha1', [
                     'flush_hash' => true,
                     'binary_output' => true,
@@ -206,9 +182,10 @@ class GitProtocolGenerator implements ByteGenerator {
             return true;
         }
 
-        if ($this->object_reader->next_bytes()) {
+        $available = $this->object_reader->pull(8096);
+        if ($available) {
             $this->packfile_object_body_writer->append_bytes(
-                $this->object_reader->get_bytes()
+                $this->object_reader->consume($available)
             );
             return true;
         }

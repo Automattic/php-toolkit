@@ -33,8 +33,8 @@ class ZipStreamWriter {
                 $body_reader = $entry->body_reader;
             }
 
-            while($body_reader->next_bytes()) {
-                $this->output->append_bytes($body_reader->get_bytes());
+            while($bytes =$body_reader->pull(10)) {
+                $this->output->append_bytes($body_reader->consume($bytes));
             }
             $this->bytes_written += $entry->compressedSize;
         } finally {
@@ -71,8 +71,13 @@ class ZipStreamWriter {
         $stream = new TransformedProducer($reader, [
             'checksum' => new ChecksumTransformer('crc32b'),
         ]);
-        while($stream->next_bytes()) {
-            // ... twiddle our thumbs ...
+
+        while(true) {
+            $n = $stream->pull(10);
+            if($n === 0) {
+                break;
+            }
+            $stream->consume($n);
         }
 
         if($entry->compressionMethod === ZipStreamReader::COMPRESSION_DEFLATE) {

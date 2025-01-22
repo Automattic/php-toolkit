@@ -6,7 +6,7 @@ use WordPress\ByteStream\MemoryPipe;
 use WordPress\Git\Model\Commit;
 use WordPress\Git\Protocol\Parser\GitProtocolReader;
 use WordPress\Git\Protocol\Parser\PacketParser;
-use WordPress\Git\Protocol\GitProtocolGenerator;
+use WordPress\Git\Protocol\GitProtocolProducer;
 use WordPress\HttpServer\ResponseWriter\ResponseConsumer;
 
 /**
@@ -26,7 +26,7 @@ class GitEndpoint {
 	public function handle_request( $path, $request_bytes, ResponseConsumer $http_response ) {
 		error_log( 'Request: ' . $path );
 
-        $git_response = new GitProtocolGenerator($http_response);
+        $git_response = new GitProtocolProducer($http_response);
 		switch ( $path ) {
 			case '/info/refs?service=git-upload-pack':
 				$this->send_protocol_v2_headers( $http_response, 'git-upload-pack' );
@@ -123,7 +123,7 @@ class GitEndpoint {
 	 * @param array $request_bytes The parsed request data
 	 * @return string The response in Git protocol v2 format
 	 */
-	public function handle_ls_refs_request( $request_bytes, GitProtocolGenerator $git_response ) {
+	public function handle_ls_refs_request( $request_bytes, GitProtocolProducer $git_response ) {
 		$parsed = $this->parse_message( $request_bytes );
 		if ( ! $parsed ) {
 			// return false;
@@ -138,7 +138,7 @@ class GitEndpoint {
 		);
 	}
 
-	private function respond_with_ls_refs( GitProtocolGenerator $git_response, $options ) {
+	private function respond_with_ls_refs( GitProtocolProducer $git_response, $options ) {
 		$ref_prefixes              = $options['ref-prefix'] ?? array( '' );
 		$capabilities_to_advertise = $options['capabilities'];
 
@@ -247,7 +247,7 @@ class GitEndpoint {
 	 * @param array $request_bytes The parsed request data
 	 * @return string The response in Git protocol v2 format containing the pack data
 	 */
-	public function handle_fetch_request( $request_bytes, GitProtocolGenerator $git_response ) {
+	public function handle_fetch_request( $request_bytes, GitProtocolProducer $git_response ) {
 		$parsed = $this->parse_message( $request_bytes );
 		if ( ! $parsed || empty( $parsed['arguments']['want'] ) ) {
 			return false;
@@ -371,7 +371,7 @@ class GitEndpoint {
 	 *
 	 * @return bool Success status
 	 */
-	public function handle_push_request( $request_bytes, GitProtocolGenerator $git_response ) {
+	public function handle_push_request( $request_bytes, GitProtocolProducer $git_response ) {
         $protocol_reader = new GitProtocolReader(
             new MemoryPipe($request_bytes),
             ['write_to_repository' => $this->repository]

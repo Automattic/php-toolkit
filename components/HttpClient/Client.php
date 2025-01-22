@@ -6,8 +6,8 @@ use WordPress\ByteStream\Producer\RemoteFileProducer;
 use WordPress\ByteStream\Producer\ResourceProducer;
 use WordPress\ByteStream\Producer\TransformedProducer;
 use WordPress\ByteStream\Transformer\InflateTransformer;
-use WordPress\HttpClient\Filter\ChunkedDecoderTransformer;
-use WordPress\HttpClient\Filter\ChunkedEncoderTransformer;
+use WordPress\HttpClient\ByteStream\ChunkedDecoder;
+use WordPress\HttpClient\ByteStream\ChunkedEncoderTransformer;
 
 /**
  * An asynchronous HTTP client library.
@@ -396,7 +396,7 @@ class Client {
 			// Close the TCP socket
             if($this->connections[ $request->id ]->decoded_response_stream) {
                 $stream = $this->connections[ $request->id ]->decoded_response_stream;
-                $stream->get_upstream_reader()->close();
+                $stream->close();
                 unset($this->connections[ $request->id ]->decoded_response_stream);
             } else {
                 @fclose( $socket );
@@ -469,14 +469,18 @@ class Client {
 			$transfer_encodings[] = $content_encoding;
 		}
 
-        $filters = [];
+        $body_stream = ResourceProducer::from_resource_handle(
+            $this->connections[ $request->id ]->http_socket
+        );
+
+        $transformers = [];
 		foreach ( $transfer_encodings as $transfer_encoding ) {
 			switch ( $transfer_encoding ) {
 				case 'chunked':
-					$filters[] = new ChunkedDecoderTransformer();
+                    $body_stream = new ChunkedDecoder( $body_stream );
 					break;
 				case 'gzip':
-					$filters[] = new InflateTransformer(
+					$transformers[] = new InflateTransformer(
 						$transfer_encoding === 'gzip' ? ZLIB_ENCODING_GZIP : ZLIB_ENCODING_RAW
 					);
 					break;
@@ -491,10 +495,8 @@ class Client {
 		}
 
 		return new TransformedProducer(
-			ResourceProducer::from_resource_handle(
-                $this->connections[ $request->id ]->http_socket
-            ),
-            $filters
+			$body_stream,
+            $transformers
         );
 	}
 
@@ -563,19 +565,20 @@ class Client {
 	 */
 	protected function send_request_body( array $requests ) {
 		foreach ( $this->stream_select( $requests, self::STREAM_SELECT_WRITE ) as $request ) {
-			if(!$request->upload_body_stream->next_bytes()) {
-				if($request->upload_body_stream->reached_end_of_data()) {
-					$request->upload_body_stream->close();
-					$request->upload_body_stream = null;
-					$request->state	             = Request::STATE_RECEIVING_HEADERS;
-					continue;
-				} else {
-					$this->set_error( $request, new HttpError( 'Failed to read from the request body stream' ) );
-					continue;
-				}
-			}
+            if($request->upload_body_stream->reached_end_of_data()) {
+                $request->upload_body_stream->close();
+                $request->upload_body_stream = null;
+                $request->state	             = Request::STATE_RECEIVING_HEADERS;
+                continue;
+            }
 
-			$chunk = $request->upload_body_stream->get_bytes();
+            $available_bytes = $request->upload_body_stream->pull(8192);
+            if($available_bytes === 0) {
+                $this->set_error( $request, new HttpError( 'Failed to read from the request body stream' ) );
+                continue;
+            }
+
+			$chunk = $request->upload_body_stream->consume($available_bytes);
 			if ( false === fwrite( $this->connections[ $request->id ]->http_socket, $chunk ) ) {
 				$this->set_error( $request, new HttpError( 'Failed to write request bytes.' ) );
 				continue;
@@ -625,7 +628,7 @@ class Client {
 				$response->protocol       = $parsed['status']['protocol'];
 
 				$total = $request->response->get_header( 'content-length' );
-				if ( false !== $total ) {
+				if ( null !== $total ) {
 					$response->total_bytes = (int) $total;
 				}
 
@@ -666,20 +669,20 @@ class Client {
             $stream = $this->connections[ $request->id ]->decoded_response_stream;
 
 			while ( true ) {
-				if ( $stream->get_upstream_reader()->reached_end_of_data() ) {
+                $available_bytes = $stream->pull(8192);
+				if($available_bytes > 0) {
+					$body_chunk = $stream->consume($available_bytes);
+					$request->response->received_bytes                  += $available_bytes;
+					$this->connections[ $request->id ]->response_buffer .= $body_chunk;
+
+					$this->events[ $request->id ][ Client::EVENT_BODY_CHUNK_AVAILABLE ] = true;
+				} else if ( $stream->reached_end_of_data() ) {
+					// No data came in during this poll, we need to break out of the loop
+					// and get a chance to call stream_select() one more time to receive
+					// the next chunk.
 					$request->state = Request::STATE_RECEIVED;
 					break;
 				}
-
-                if ( false === $stream->next_bytes() ) {
-                    break;
-                }
-
-				$body_chunk = $stream->get_bytes();
-				$request->response->received_bytes                  += strlen( $body_chunk );
-				$this->connections[ $request->id ]->response_buffer .= $body_chunk;
-
-				$this->events[ $request->id ][ Client::EVENT_BODY_CHUNK_AVAILABLE ] = true;
 			}
 		}
 	}
@@ -700,7 +703,7 @@ class Client {
 			}
 
 			$location = $response->get_header( 'location' );
-			if ( false === $location ) {
+			if ( null === $location ) {
 				continue;
 			}
 

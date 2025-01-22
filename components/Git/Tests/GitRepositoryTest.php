@@ -7,7 +7,7 @@ use WordPress\Git\GitRepository;
 use WordPress\Git\Model\Commit;
 use WordPress\Git\Model\Tree;
 use WordPress\Git\Model\TreeEntry;
-use WordPress\Git\Protocol\GitProtocolGenerator;
+use WordPress\Git\Protocol\GitProtocolProducer;
 
 use function WordPress\Git\get_all_descendant_oids_in_tree;
 
@@ -24,8 +24,8 @@ class GitRepositoryTest extends \PHPUnit\Framework\TestCase {
         $this->assertEquals('5dd01c177f5d7d1be5346a5bc18a569a7410c2ef', $oid);
 
         $reader = $repo->read_object($oid);
-        $reader->next_bytes();
-        $this->assertEquals($blob_data, $reader->get_bytes());
+        $nb_bytes = $reader->pull(8096);
+        $this->assertEquals($blob_data, $reader->peek($nb_bytes));
     }
 
     public function test_seek() {
@@ -37,33 +37,33 @@ class GitRepositoryTest extends \PHPUnit\Framework\TestCase {
 
         $oid = $writer->get_hash();
         $reader = $repo->read_object($oid);
-        $reader->next_bytes();
-        $this->assertEquals($blob_data, $reader->get_bytes());
+        $nb_bytes = $reader->pull(8096);
+        $this->assertEquals($blob_data, $reader->peek($nb_bytes));
 
         $reader->seek(5);
-        $reader->next_bytes(7);
-        $this->assertEquals(', world', $reader->get_bytes());
+        $nb_bytes = $reader->pull(7);
+        $this->assertEquals(', world', $reader->peek($nb_bytes));
 
         $reader->seek(7);
-        $reader->next_bytes(5);
-        $this->assertEquals('world', $reader->get_bytes());
+        $nb_bytes = $reader->pull(5);
+        $this->assertEquals('world', $reader->peek($nb_bytes));
 
         $reader->seek(0);
-        $reader->next_bytes(10);
-        $this->assertEquals('Hello, ', $reader->get_bytes());
+        $nb_bytes = $reader->pull(10);
+        $this->assertEquals('Hello, wor', $reader->peek($nb_bytes));
     }
 
     public function test_find_hash_by_path() {
         $repo = new GitRepository(InMemoryFilesystem::create());
         $blob_oid = $repo->add_object('blob', 'Hello, world!');
-        $tree_oid = $repo->add_object('tree', GitProtocolGenerator::encode_tree_bytes(new Tree(array(
+        $tree_oid = $repo->add_object('tree', GitProtocolProducer::encode_tree_bytes(new Tree(array(
             new TreeEntry(array(
                 'mode' => TreeEntry::FILE_MODE_REGULAR_NON_EXECUTABLE,
                 'name' => 'hello-world.txt',
                 'hash' => $blob_oid,
             )),
         ))));
-        $root_tree_oid = $repo->add_object('tree', GitProtocolGenerator::encode_tree_bytes(new Tree(array(
+        $root_tree_oid = $repo->add_object('tree', GitProtocolProducer::encode_tree_bytes(new Tree(array(
             new TreeEntry(array(
                 'mode' => TreeEntry::FILE_MODE_DIRECTORY,
                 'name' => 'subdirectory',
@@ -76,21 +76,21 @@ class GitRepositoryTest extends \PHPUnit\Framework\TestCase {
     public function test_read_object_by_path() {
         $repo = new GitRepository(InMemoryFilesystem::create());
         $blob_oid = $repo->add_object('blob', 'Hello, world!');
-        $tree_oid = $repo->add_object('tree', GitProtocolGenerator::encode_tree_bytes(new Tree(array(
+        $tree_oid = $repo->add_object('tree', GitProtocolProducer::encode_tree_bytes(new Tree(array(
             new TreeEntry(array(
                 'mode' => TreeEntry::FILE_MODE_REGULAR_NON_EXECUTABLE,
                 'name' => 'hello-world.txt',
                 'hash' => $blob_oid,
             )),
         ))));
-        $root_tree_oid = $repo->add_object('tree', GitProtocolGenerator::encode_tree_bytes(new Tree(array(
+        $root_tree_oid = $repo->add_object('tree', GitProtocolProducer::encode_tree_bytes(new Tree(array(
             new TreeEntry(array(
                 'mode' => TreeEntry::FILE_MODE_DIRECTORY,
                 'name' => 'subdirectory',
                 'hash' => $tree_oid,
             )),
         ))));
-        $this->assertEquals('Hello, world!', $repo->read_object_by_path('/subdirectory/hello-world.txt', $root_tree_oid)->read_entire_object_contents());
+        $this->assertEquals('Hello, world!', $repo->read_object_by_path('/subdirectory/hello-world.txt', $root_tree_oid)->consume_all());
     }
 
     public function test_get_ref_head() {
@@ -140,7 +140,7 @@ class GitRepositoryTest extends \PHPUnit\Framework\TestCase {
 
         // Create first commit
         $blob1_oid = $repo->add_object('blob', 'First file');
-        $tree1_oid = $repo->add_object('tree', GitProtocolGenerator::encode_tree_bytes(new Tree(array(
+        $tree1_oid = $repo->add_object('tree', GitProtocolProducer::encode_tree_bytes(new Tree(array(
             new TreeEntry(array(
                 'mode' => TreeEntry::FILE_MODE_REGULAR_NON_EXECUTABLE,
                 'name' => 'file1.txt',
@@ -151,7 +151,7 @@ class GitRepositoryTest extends \PHPUnit\Framework\TestCase {
 
         // Create second commit
         $blob2_oid = $repo->add_object('blob', 'Second file');
-        $tree2_oid = $repo->add_object('tree', GitProtocolGenerator::encode_tree_bytes(new Tree(array(
+        $tree2_oid = $repo->add_object('tree', GitProtocolProducer::encode_tree_bytes(new Tree(array(
             new TreeEntry(array(
                 'mode' => TreeEntry::FILE_MODE_REGULAR_NON_EXECUTABLE,
                 'name' => 'file1.txt',

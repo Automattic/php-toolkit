@@ -3,14 +3,13 @@
 namespace WordPress\ByteStream\Producer;
 
 use WordPress\ByteStream\ByteStreamException;
+use WordPress\ByteStream\Producer\BaseByteProducer;
 
-class InflateProducer implements ByteProducer {
+class InflateProducer extends BaseByteProducer {
 
     protected $inflate_context;
-    protected $inflated_chunk = '';
-    protected $inflated_offset = 0;
-    protected $buffered_next_bytes = '';
-    protected $is_closed = false;
+    protected $inflate_encoding;
+    protected $upstream;
 
     /**
      * The offset of the underlying reader at the time of the first read
@@ -27,8 +26,12 @@ class InflateProducer implements ByteProducer {
      */
     protected $delegate_offset_0;
 
-    private $inflate_encoding = ZLIB_ENCODING_DEFLATE;
-    private $upstream;
+    // Ensure properties are defined or inherited
+    protected $is_closed = false;
+    protected $buffer = '';
+    protected $bytes_already_forgotten = 0;
+    protected $offset_in_current_buffer = 0;
+    protected $inflated_offset = 0;
 
     public function __construct(ByteProducer $upstream, $encoding = ZLIB_ENCODING_DEFLATE) {
         $this->inflate_encoding = $encoding;
@@ -36,110 +39,71 @@ class InflateProducer implements ByteProducer {
         $this->upstream = $upstream;
     }
 
-    public function next_bytes($max_bytes = 8096): bool {
-        if ($this->is_closed) {
-            return false;
-        }
-
-        if ($this->buffered_next_bytes !== '') {
-            $this->inflated_chunk = substr($this->buffered_next_bytes, 0, $max_bytes);
-            $this->buffered_next_bytes = substr($this->buffered_next_bytes, $max_bytes);
-            $this->inflated_offset += strlen($this->inflated_chunk);
-            return true;
-        }
-
+    protected function internal_pull($n): string {
         if(null === $this->delegate_offset_0) {
             $this->delegate_offset_0 = $this->upstream->tell();
         }
 
-        do {
-            if ($this->upstream->next_bytes($max_bytes)) {
-                $bytes = $this->upstream->get_bytes($max_bytes);
-                $inflated = inflate_add($this->inflate_context, $bytes, ZLIB_NO_FLUSH);
-            } else {
-                $inflated = inflate_add($this->inflate_context, '', ZLIB_FINISH);
-                if(!$inflated) {
-                    return false;
-                }
-            }
-            if ($inflated === false) {
-                throw new ByteStreamException('Inflate error: ' . $this->get_error_string());
-            }
-        } while ( $inflated === '' );
-
-        if (strlen($inflated) > $max_bytes) {
-            $this->inflated_chunk = substr($inflated, 0, $max_bytes);
-            $this->buffered_next_bytes = substr($inflated, $max_bytes);
-        } else {
-            $this->inflated_chunk = $inflated;
-            $this->buffered_next_bytes = '';
-        }
-        $this->inflated_offset += strlen($this->inflated_chunk);
-
-        if(strlen($this->inflated_chunk) === 0) {
-            return false;
+        if(!$this->inflate_context) {
+            return '';
         }
 
-        return true;
+        if($this->upstream->reached_end_of_data()) {
+            $bytes = inflate_add($this->inflate_context, '', ZLIB_FINISH);
+            $this->inflate_context = null;
+            return $bytes;
+        }
+
+        $n = max(200, $n);
+        $deflated = $this->upstream->peek($n);
+        if(!strlen($deflated)) {
+            $this->upstream->pull($n);
+            $deflated = $this->upstream->peek($n);
+        }
+        $this->upstream->consume(strlen($deflated));
+        $inflated = inflate_add($this->inflate_context, $deflated);
+        if(false === $inflated) {
+            throw new ByteStreamException('Inflate error: ' . $this->get_error_string());
+        }
+        return $inflated;
     }
 
     public function length(): ?int {
-        // The length of the inflated stream is unknown until the stream is closed.
         return null;
     }
 
-    public function get_bytes(): ?string {
-        return $this->inflated_chunk;
+    protected function internal_close(): void {
+        $this->inflate_context = null;
     }
 
-    public function tell(): int {
-        return $this->inflated_offset;
+    protected function internal_reached_end_of_data(): bool {
+        return $this->inflate_context === null && $this->upstream->reached_end_of_data();
     }
 
-    public function close(): void {
-        $this->is_closed = true;
-        $this->inflated_chunk = '';
-        $this->buffered_next_bytes = '';
-        $this->inflated_offset = 0;
-    }
+    protected function seek_outside_of_buffer($target_offset): void {
+        if($target_offset < $this->tell()) {
+            $this->buffer = '';
+            $this->bytes_already_forgotten = 0;
+            $this->offset_in_current_buffer = 0;
 
-    public function reached_end_of_data(): bool {
-        return $this->is_closed || $this->upstream->reached_end_of_data();
-    }
-
-    /**
-     * Seeks within the inflated stream.
-     */
-    public function seek($offset) {
-        if($offset < 0) {
-            throw new ByteStreamException('Cannot seek to a negative offset');
-        }
-
-        /**
-         * We cannot go back in the stream. Without access to the internal state of the
-         * gzip decompressor, we're only able to move forward. The only way to seek
-         * to an earlier offset is to re-inflate the stream from the beginning.
-         */
-        if($offset < $this->tell()) {
             $this->inflate_init();
-            $this->inflated_offset = 0;
-            $this->inflated_chunk = '';
-            $this->buffered_next_bytes = '';
             $this->upstream->seek($this->delegate_offset_0 ?? 0);
         }
 
-        while($offset > $this->tell()) {
-            $remaining_bytes = $offset - $this->tell();
-
-            // Get the next deflated chunk, but no more than 50KB at a time.
+        while($this->tell() < $target_offset) {
+            $remaining_bytes = $target_offset - $this->tell();
             $next_chunk_size = min(50 * 1024, $remaining_bytes);
-            if(false === $this->next_bytes($next_chunk_size)) {
-                throw new ByteStreamException('Requested offset ' . $offset . ' is beyond the end of the inflated stream');
-            }
+            $pulled = $this->pull($next_chunk_size);
+            // Keep skipping bytes until we've consumed enough
+            $this->consume(min($remaining_bytes, $pulled));
         }
+    }
 
-        $this->inflated_chunk = substr($this->inflated_chunk, $offset - $this->tell());
-        $this->inflated_offset = $offset;
+    private function inflate_init() {
+        $this->inflate_context = inflate_init($this->inflate_encoding);
+        if(!$this->inflate_context) {
+            throw new \Exception('Failed to initialize inflate context');
+        }
     }
 
     protected function get_error_string() {
@@ -176,10 +140,4 @@ class InflateProducer implements ByteProducer {
         return "Error $status: $error_string";
     }
 
-    private function inflate_init() {
-        $this->inflate_context = inflate_init($this->inflate_encoding);
-        if(!$this->inflate_context) {
-            throw new \Exception('Failed to initialize inflate context');
-        }
-    }
 }

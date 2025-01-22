@@ -4,7 +4,6 @@ namespace WordPress\Filesystem\Mixin;
 
 use WordPress\ByteStream\Writer\ByteConsumer;
 use WordPress\ByteStream\MemoryPipe;
-use WordPress\ByteStream\Producer\ReaderUtils;
 
 /**
  * Implements open_write_stream() as a buffered write stream that, upon closing,
@@ -24,7 +23,7 @@ trait BufferedWriteStreamViaPutContents {
             }
 
             public function close(): void {
-                $pipe_contents = ReaderUtils::read_all_remaining_bytes($this);
+                $pipe_contents = $this->consume_all();
                 parent::close();
                 $this->fs->put_contents($this->path, $pipe_contents);
             }

@@ -1,6 +1,6 @@
 <?php
 
-namespace WordPress\HttpClient\Filter;
+namespace WordPress\HttpClient\ByteStream;
 
 use WordPress\ByteStream\Transformer\ByteTransformer;
 

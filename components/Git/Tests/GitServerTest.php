@@ -3,7 +3,6 @@
 use PHPUnit\Framework\TestCase;
 use WordPress\ByteStream\MemoryPipe;
 use WordPress\ByteStream\Producer\ProducerProducer;
-use WordPress\ByteStream\Producer\ReaderUtils;
 use WordPress\Filesystem\InMemoryFilesystem;
 use WordPress\Git\GitEndpoint;
 use WordPress\Git\GitRepository;
@@ -11,7 +10,7 @@ use WordPress\Git\Model\Commit;
 use WordPress\Git\Model\Tree;
 use WordPress\Git\Model\TreeEntry;
 use WordPress\Git\Protocol\Parser\GitProtocolReader;
-use WordPress\Git\Protocol\GitProtocolGenerator;
+use WordPress\Git\Protocol\GitProtocolProducer;
 use WordPress\HttpServer\ResponseWriter\BufferingResponseWriter;
 
 class GitServerTest extends TestCase {
@@ -58,7 +57,7 @@ class GitServerTest extends TestCase {
     static public function provide_request_data() {
         return [
             'basic ls-refs request' => [
-                GitProtocolGenerator::encode_packet_lines([
+                GitProtocolProducer::encode_packet_lines([
                     "command=ls-refs\n",
                     "0000",
                 ]),
@@ -70,7 +69,7 @@ class GitServerTest extends TestCase {
                 ]
             ],
             'request with multiple capabilities' => [
-                GitProtocolGenerator::encode_packet_lines([
+                GitProtocolProducer::encode_packet_lines([
                     "command=ls-refs\n",
                     "agent=git/2.37.3\n",
                     "0000",
@@ -84,7 +83,7 @@ class GitServerTest extends TestCase {
                 ]
             ],
             'request with multiple arguments' => [
-                GitProtocolGenerator::encode_packet_lines([
+                GitProtocolProducer::encode_packet_lines([
                     "command=ls-refs\n",
                     "0001",
                     "peel\n",
@@ -102,7 +101,7 @@ class GitServerTest extends TestCase {
                 ]
             ],
             'basic want request' => [
-                GitProtocolGenerator::encode_packet_lines([
+                GitProtocolProducer::encode_packet_lines([
                     "command=fetch\n",
                     "agent=git/2.37.3\n",
                     "object-format=sha1\n",
@@ -124,7 +123,7 @@ class GitServerTest extends TestCase {
                 ]
             ],
             'want with have and filter' => [
-                GitProtocolGenerator::encode_packet_lines([
+                GitProtocolProducer::encode_packet_lines([
                     "command=fetch\n",
                     "agent=git/2.37.3\n",
                     "object-format=sha1\n",
@@ -150,7 +149,7 @@ class GitServerTest extends TestCase {
                 ]
             ],
             'want with deepen and blob size limit' => [
-                GitProtocolGenerator::encode_packet_lines([
+                GitProtocolProducer::encode_packet_lines([
                     "command=fetch\n",
                     "agent=git/2.37.3\n",
                     "object-format=sha1\n",
@@ -176,7 +175,7 @@ class GitServerTest extends TestCase {
                 ]
             ],
             'multiple want and have' => [
-                GitProtocolGenerator::encode_packet_lines([
+                GitProtocolProducer::encode_packet_lines([
                     "command=fetch\n",
                     "0000",
                     "want e0d02a851d0c461a7c725dc69eb2d53f57f666a6\n",
@@ -218,14 +217,14 @@ class GitServerTest extends TestCase {
             $expected_response
         );
         $buffer = new BufferingResponseWriter();
-        $this->server->handle_ls_refs_request($request, new GitProtocolGenerator($buffer));
+        $this->server->handle_ls_refs_request($request, new GitProtocolProducer($buffer));
         $this->assertBinaryEquals($expected_response, $buffer->get_buffered_body());
     }
 
     static public function provide_ref_requests() {
         return [
             'all refs' => [
-                GitProtocolGenerator::encode_packet_lines([
+                GitProtocolProducer::encode_packet_lines([
                     "command=ls-refs\n",
                     "0000",
                 ]),
@@ -239,7 +238,7 @@ class GitServerTest extends TestCase {
 RESPONSE
             ],
             'specific branch' => [
-                GitProtocolGenerator::encode_packet_lines([
+                GitProtocolProducer::encode_packet_lines([
                     "command=ls-refs\n",
                     "0001",
                     "peel\n",
@@ -253,7 +252,7 @@ RESPONSE
 RESPONSE
             ],
             'HEAD ref' => [
-                GitProtocolGenerator::encode_packet_lines([
+                GitProtocolProducer::encode_packet_lines([
                     "command=ls-refs\n",
                     "0001",
                     "peel\n",
@@ -281,7 +280,7 @@ RESPONSE
 
         $tree_oid = $this->repository->add_object(
             'tree',
-            GitProtocolGenerator::encode_tree_bytes(new Tree([
+            GitProtocolProducer::encode_tree_bytes(new Tree([
                 new TreeEntry([
                     'mode' => TreeEntry::FILE_MODE_REGULAR_NON_EXECUTABLE,
                     'name' => 'README.md',
@@ -302,7 +301,7 @@ RESPONSE
 
         $test_cases = [
             'basic fetch' => [
-                'request' => GitProtocolGenerator::encode_packet_lines([
+                'request' => GitProtocolProducer::encode_packet_lines([
                     "command=fetch\n",
                     "0000",
                     "want $commit_oid\n",
@@ -317,7 +316,7 @@ RESPONSE
                 ],
             ],
             'fetch with blob:none filter' => [
-                'request' => GitProtocolGenerator::encode_packet_lines([
+                'request' => GitProtocolProducer::encode_packet_lines([
                     "command=fetch\n",
                     "0000",
                     "want $commit_oid\n",
@@ -331,7 +330,7 @@ RESPONSE
                 ],
             ],
             'fetch with blob size limit' => [
-                'request' => GitProtocolGenerator::encode_packet_lines([
+                'request' => GitProtocolProducer::encode_packet_lines([
                     "command=fetch\n",
                     "0000",
                     "want $commit_oid\n",
@@ -346,7 +345,7 @@ RESPONSE
                 ],
             ],
             'fetch with multiple wants' => [
-                'request' => GitProtocolGenerator::encode_packet_lines([
+                'request' => GitProtocolProducer::encode_packet_lines([
                     "command=fetch\n",
                     "0000",
                     "want $commit_oid\n",
@@ -369,11 +368,11 @@ RESPONSE
             $response = $this->getMockBuilder(BufferingResponseWriter::class)
                 ->onlyMethods(['close'])
                 ->getMock();
-            $this->server->handle_fetch_request($test['request'], new GitProtocolGenerator($response));
+            $this->server->handle_fetch_request($test['request'], new GitProtocolProducer($response));
 
             // Verify response format
             $response = $response->get_buffered_body();
-            $expected_response_start = GitProtocolGenerator::encode_packet_lines([
+            $expected_response_start = GitProtocolProducer::encode_packet_lines([
                 "packfile\n",
             ]);
             $actual_response_start = substr($response, 0, strlen($expected_response_start));
@@ -448,7 +447,7 @@ RESPONSE
 
         $tree_oid = $this->repository->add_object(
             'tree',
-            GitProtocolGenerator::encode_tree_bytes(new Tree([
+            GitProtocolProducer::encode_tree_bytes(new Tree([
                 new TreeEntry([
                     'mode' => TreeEntry::FILE_MODE_REGULAR_NON_EXECUTABLE,
                     'name' => 'README.md',
@@ -464,7 +463,7 @@ RESPONSE
 
         $test_cases = [
             'basic push' => [
-                'request' => GitProtocolGenerator::encode_packet_lines([
+                'request' => GitProtocolProducer::encode_packet_lines([
                     "0000000000000000000000000000000000000000 $commit_oid refs/heads/main\0\n",
                     "0000"
                 ]),
@@ -472,7 +471,7 @@ RESPONSE
                 'expected_oid' => $commit_oid
             ],
             'delete ref' => [
-                'request' => GitProtocolGenerator::encode_packet_lines([
+                'request' => GitProtocolProducer::encode_packet_lines([
                     "$commit_oid 0000000000000000000000000000000000000000 refs/heads/main\0\n",
                     "0000"
                 ]),
@@ -487,7 +486,7 @@ RESPONSE
                 ->onlyMethods(['close'])
                 ->getMock();
 
-            $this->server->handle_push_request($test['request'], new GitProtocolGenerator($response));
+            $this->server->handle_push_request($test['request'], new GitProtocolProducer($response));
 
             $response_body = $response->get_buffered_body();
 
@@ -521,15 +520,15 @@ RESPONSE
 
         $repository = new GitRepository(InMemoryFilesystem::create());
         $readme_oid = $repository->add_object('blob', 'Hello, world!');
-        $pack_producer = new GitProtocolGenerator();
+        $pack_producer = new GitProtocolProducer();
         $pack_producer->append_packfile($repository, [$readme_oid]);
         $pack_producer->close_writing();
 
-        $pack_data = ReaderUtils::read_all_remaining_bytes(new ProducerProducer($pack_producer));
+        $pack_data = $pack_producer->consume_all();
 
         $readme_oid = sha1("blob " . strlen($readme_content) . "\0" . $readme_content);
 
-        $request = GitProtocolGenerator::encode_packet_lines([
+        $request = GitProtocolProducer::encode_packet_lines([
             "0000000000000000000000000000000000000000 $readme_oid refs/heads/test\0\n",
             "0000"
         ]) . $pack_data . "0000";
@@ -539,7 +538,7 @@ RESPONSE
             ->onlyMethods(['close'])
             ->getMock();
 
-        $this->server->handle_push_request($request, new GitProtocolGenerator($response));
+        $this->server->handle_push_request($request, new GitProtocolProducer($response));
 
         // Verify the object was stored
         $this->assertTrue(

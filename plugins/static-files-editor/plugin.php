@@ -112,7 +112,7 @@ class WP_Static_Files_Editor_Plugin {
                     'remote' => self::$remote,
                 ]
             );
-            
+
             // @TODO: Uncomment
             // if(!self::$fs->is_dir('/' . WP_AUTOSAVES_DIRECTORY)) {
             //     self::$fs->mkdir('/' . WP_AUTOSAVES_DIRECTORY);
@@ -573,8 +573,8 @@ class WP_Static_Files_Editor_Plugin {
         header('Content-Length: ' . $object->length());
         header('Cache-Control: no-cache');
 
-        while($object->next_bytes()) {
-            echo $object->get_bytes();
+        while($object->pull()) {
+            echo $object->peek();
         }
     }
 

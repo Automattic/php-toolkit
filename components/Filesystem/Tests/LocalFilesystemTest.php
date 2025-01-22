@@ -42,14 +42,14 @@ class LocalFilesystemTest extends TestCase {
 
     public function testIsDir() {
         mkdir($this->test_dir . '/test-dir');
-        
+
         $this->assertTrue($this->fs->is_dir('/test-dir'));
         $this->assertFalse($this->fs->is_dir('/nonexistent'));
     }
 
     public function testIsFile() {
         file_put_contents($this->test_dir . '/test.txt', 'test');
-        
+
         $this->assertTrue($this->fs->is_file('/test.txt'));
         $this->assertFalse($this->fs->is_file('/nonexistent.txt'));
     }
@@ -101,7 +101,7 @@ class LocalFilesystemTest extends TestCase {
 
     public function testRmdirRemovesExistingDirectory() {
         mkdir($this->test_dir . '/test-dir');
-        
+
         $this->assertTrue(is_dir($this->test_dir . '/test-dir'));
         $this->fs->rmdir('/test-dir');
         $this->assertFalse(is_dir($this->test_dir . '/test-dir'));
@@ -149,10 +149,7 @@ class LocalFilesystemTest extends TestCase {
         file_put_contents($this->test_dir . '/test.txt', 'Hello World');
 
         $reader = $this->fs->open_read_stream('/test.txt');
-        $content = '';
-        while ($reader->next_bytes()) {
-            $content .= $reader->get_bytes();
-        }
+        $content = $reader->consume_all();
         $reader->close();
 
         $this->assertEquals('Hello World', $content);
@@ -160,9 +157,9 @@ class LocalFilesystemTest extends TestCase {
 
     public function testRename() {
         file_put_contents($this->test_dir . '/old.txt', 'test');
-        
+
         $this->fs->rename('/old.txt', '/new.txt');
-        
+
         $this->assertFalse(file_exists($this->test_dir . '/old.txt'));
         $this->assertTrue(file_exists($this->test_dir . '/new.txt'));
         $this->assertEquals('test', file_get_contents($this->test_dir . '/new.txt'));
@@ -170,9 +167,9 @@ class LocalFilesystemTest extends TestCase {
 
     public function testCopyFile() {
         file_put_contents($this->test_dir . '/source.txt', 'test content');
-        
+
         $this->fs->copy('/source.txt', '/dest.txt');
-        
+
         $this->assertTrue(file_exists($this->test_dir . '/source.txt'));
         $this->assertTrue(file_exists($this->test_dir . '/dest.txt'));
         $this->assertEquals('test content', file_get_contents($this->test_dir . '/dest.txt'));

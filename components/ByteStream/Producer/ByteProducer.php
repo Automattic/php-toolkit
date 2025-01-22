@@ -2,8 +2,6 @@
 
 namespace WordPress\ByteStream\Producer;
 
-use WordPress\ByteStream\ByteSource;
-
 /**
  * Interface for streaming, seekable byte readers.
  *
@@ -12,6 +10,9 @@ use WordPress\ByteStream\ByteSource;
  * parsers, etc.
  */
 interface ByteProducer {
+
+	const PULL_NO_MORE_THAN = '#pull-no-more-than';
+	const PULL_EXACTLY = '#pull-exactly';
 
     /**
      * Get the total length of the data stream.
@@ -48,16 +49,31 @@ interface ByteProducer {
     /**
      * Read the next chunk of bytes from the data stream.
      *
-     * @return bool Whether bytes were successfully read.
+     * @return int how many bytes were pulled
      */
-    public function next_bytes($max_bytes = 8192): bool;
+    public function pull($n, $mode = self::PULL_NO_MORE_THAN): int;
 
     /**
-     * Get the bytes read in the last operation.
+     * Get the next $n bytes without advancing the pointer.
      *
-     * @return string|null The bytes read, or null if no bytes were read.
+     * @return string The bytes read.
      */
-    public function get_bytes(): ?string;
+    public function peek($n): string;
+
+	/**
+	 * Returns $n bytes and advances the pointer.
+	 *
+	 * @param $n
+	 * @return string
+	 */
+	public function consume($n): string;
+
+    /**
+     * Returns all remaining bytes in the stream.
+     *
+     * @return string
+     */
+    public function consume_all(): string;
 
     /**
      * Close the data stream.

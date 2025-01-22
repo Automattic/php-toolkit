@@ -16,8 +16,8 @@ trait PutContentsViaWriteStream {
             if(is_string($data)) {
                 $stream->append_bytes($data);
             } else if(is_object($data) && $data instanceof ByteProducer) {
-                while($data->next_bytes()) {
-                    $stream->append_bytes($data->get_bytes());
+                while($data->pull()) {
+                    $stream->append_bytes($data->peek());
                 }
             } else {
 				throw new FilesystemException( 'Invalid $data argument provided. Expected a string or a Byte_Reader instance. Received: ' . gettype($data) );

@@ -2,10 +2,10 @@
 namespace WordPress\ByteStream\Producer;
 
 use ArrayAccess;
-use WordPress\ByteStream\MemoryPipe;
 use WordPress\ByteStream\Transformer\ByteTransformer;
+use WordPress\ByteStream\ByteStreamException;
 
-class TransformedProducer implements ByteProducer, ArrayAccess {
+class TransformedProducer extends BaseByteProducer implements ArrayAccess {
 
     /**
      * @var ByteProducer
@@ -17,51 +17,40 @@ class TransformedProducer implements ByteProducer, ArrayAccess {
      */
     private $filters = [];
 
-    /**
-     * @var MemoryPipe
-     */
-    private $output;
-
-    private $flushed = false;
+    private $filters_flushed = false;
 
     public function __construct(ByteProducer $reader, array $filters=[]) {
         $this->reader = $reader;
         $this->filters = $filters;
-        $this->output = new MemoryPipe();
     }
 
     public function get_upstream_reader(): ByteProducer {
         return $this->reader;
     }
 
-    public function next_bytes($max_bytes = 8096): bool {
-        if(!$this->reader->next_bytes($max_bytes)) {
-            if($this->reader->reached_end_of_data() && !$this->flushed) {
-                $this->output->append_bytes($this->flush_filters());
-                $this->output->next_bytes();
-                $this->flushed = true;
-                return true;
+    protected function internal_pull($max_bytes): string {
+        $bytes_pulled = $this->reader->pull($max_bytes);
+        if(0 === $bytes_pulled) {
+            if($this->reader->reached_end_of_data() && !$this->filters_flushed) {
+                return $this->flush_filters();
             }
-            return false;
+            return '';
         }
 
-        $chunk = $this->reader->get_bytes();
+        $chunk = $this->reader->consume($bytes_pulled);
         foreach($this->filters as $filter) {
             $chunk = $filter->filter_bytes($chunk);
             if($chunk === false) {
-                return false;
+                return '';
             }
         }
 
-        $this->output->append_bytes($chunk);
-        return $this->output->next_bytes($max_bytes);
-    }
-
-    public function get_bytes(): string {
-        return $this->output->get_bytes();
+        return $chunk;
     }
 
     private function flush_filters(): string {
+        $this->filters_flushed = true;
+
         $flush = '';
         foreach($this->filters as $filter) {
             $flush = $filter->filter_bytes($flush);
@@ -97,22 +86,19 @@ class TransformedProducer implements ByteProducer, ArrayAccess {
         throw new ByteStreamException('Filters are immutable');
     }
 
-    public function length(): int {
-        throw new ByteStreamException('The length of the ReadStream is not known upfront');
+    public function length(): ?int {
+        return null;
     }
 
-    public function tell(): int {
-        throw new ByteStreamException('Tell is not supported on ReadStream');
+    protected function internal_reached_end_of_data(): bool {
+        return $this->filters_flushed;
     }
 
-    public function seek($offset): bool {
-        throw new ByteStreamException('Seek is not supported on ReadStream');
+    protected function seek_outside_of_buffer(int $target_offset): void {
+        throw new ByteStreamException('Seek is not supported on TransformedProducer');
     }
 
-    public function reached_end_of_data(): bool {
-        return $this->reader->reached_end_of_data();
+    protected function internal_close(): void {
+        $this->filters_flushed = true;
     }
-
-    public function close(): void {}
-
 }

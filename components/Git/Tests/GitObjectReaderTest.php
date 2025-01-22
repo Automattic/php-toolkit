@@ -2,6 +2,7 @@
 
 use PHPUnit\Framework\TestCase;
 use WordPress\ByteStream\MemoryPipe;
+use WordPress\ByteStream\Producer\ByteProducer;
 use WordPress\Git\GitObjectProducer;
 
 class GitObjectReaderTest extends TestCase {
@@ -21,12 +22,11 @@ class GitObjectReaderTest extends TestCase {
         $header = "blob " . strlen($uncompressed) . "\x00";
         $content = $header . gzdeflate($uncompressed, -1, ZLIB_ENCODING_DEFLATE);
         $reader = new GitObjectProducer(new MemoryPipe($content));
-        $this->assertTrue($reader->next_bytes(5));
-        // Note "5" is max bytes to read, not the exact number of bytes to read
-        $this->assertEquals('12', $reader->get_bytes());
+        $this->assertEquals(5, $reader->pull(5, ByteProducer::PULL_EXACTLY));
+        $this->assertEquals('12345', $reader->consume(5));
 
-        $this->assertTrue($reader->next_bytes(5));
-        $this->assertEquals('34567', $reader->get_bytes());
+        $this->assertEquals(5, $reader->pull(5, ByteProducer::PULL_EXACTLY));
+        $this->assertEquals('67890', $reader->consume(5));
     }
 
     public function testSeek() {
@@ -36,8 +36,8 @@ class GitObjectReaderTest extends TestCase {
         $reader = new GitObjectProducer(new MemoryPipe($content));
 
         $reader->seek(5);
-        $this->assertTrue($reader->next_bytes(5));
-        $this->assertEquals('67890', $reader->get_bytes());
+        $this->assertEquals(5, $reader->pull(5));
+        $this->assertEquals('67890', $reader->peek(5));
     }
 
     public function testReadEntireObjectContents() {
@@ -47,7 +47,7 @@ class GitObjectReaderTest extends TestCase {
         $reader = new GitObjectProducer(new MemoryPipe($content));
 
         $reader->read_header();
-        $this->assertEquals($uncompressed, $reader->read_entire_object_contents());
+        $this->assertEquals($uncompressed, $reader->consume_all());
     }
 
     public function testAsCommit() {
@@ -81,7 +81,7 @@ class GitObjectReaderTest extends TestCase {
         $content = $header . gzdeflate($uncompressed, -1, ZLIB_ENCODING_DEFLATE);
         $reader = new GitObjectProducer(new MemoryPipe($content));
 
-        $this->assertEquals($uncompressed, $reader->read_entire_object_contents());
+        $this->assertEquals($uncompressed, $reader->consume_all());
     }
 
     public function testSeekToBeginning() {
@@ -92,9 +92,9 @@ class GitObjectReaderTest extends TestCase {
 
         $reader->read_header();
         $reader->seek(0);
-        $this->assertTrue($reader->next_bytes(5));
+        $this->assertEquals(5, $reader->pull(5));
         // Note "5" is max bytes to read, not the exact number of bytes to read
-        $this->assertEquals('12', $reader->get_bytes());
+        $this->assertEquals('12345', $reader->peek(5));
     }
 
     public function testSeekToMiddle() {
@@ -105,8 +105,8 @@ class GitObjectReaderTest extends TestCase {
 
         $reader->read_header();
         $reader->seek(5);
-        $this->assertTrue($reader->next_bytes(5));
-        $this->assertEquals('67890', $reader->get_bytes());
+        $this->assertEquals(5, $reader->pull(5));
+        $this->assertEquals('67890', $reader->peek(5));
     }
 
     public function testSeekBeyondEnd() {
@@ -129,12 +129,12 @@ class GitObjectReaderTest extends TestCase {
 
         $reader->read_header();
         $reader->seek(5);
-        $this->assertTrue($reader->next_bytes(5));
-        $this->assertEquals('67890', $reader->get_bytes());
+        $this->assertEquals(5, $reader->pull(5));
+        $this->assertEquals('67890', $reader->peek(5));
 
         $reader->seek(2);
-        $this->assertTrue($reader->next_bytes(3));
-        $this->assertEquals('345', $reader->get_bytes());
+        $this->assertEquals(3, $reader->pull(3));
+        $this->assertEquals('345', $reader->peek(3));
     }
 
     // public function testLargeBlob() {
@@ -143,6 +143,6 @@ class GitObjectReaderTest extends TestCase {
     //     $content = $header . gzdeflate($uncompressed, -1, ZLIB_ENCODING_DEFLATE);
     //     $reader = new GitObjectReader(new StringReader($content));
 
-    //     $this->assertEquals($uncompressed, $reader->read_entire_object_contents());
+    //     $this->assertEquals($uncompressed, $reader->consume_all());
     // }
 }

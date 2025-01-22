@@ -1,7 +1,9 @@
 <?php
 
 use PHPUnit\Framework\TestCase;
+use WordPress\ByteStream\ByteStreamException;
 use WordPress\ByteStream\MemoryPipe;
+use WordPress\ByteStream\Producer\ByteProducer;
 use WordPress\ByteStream\Producer\DeflateProducer;
 use WordPress\ByteStream\Producer\InflateProducer;
 
@@ -15,20 +17,20 @@ class DeflateProducerTest extends TestCase {
         $inflateReader = new InflateProducer($deflateReader);
 
         $inflateReader->seek(998);
-        $this->assertTrue($inflateReader->next_bytes(40));
-        $this->assertEquals('apologize to public meetings in a very c', $inflateReader->get_bytes());
+        $this->assertEquals(40, $inflateReader->pull(40));
+        $this->assertEquals('apologize to public meetings in a very c', $inflateReader->peek(40));
 
         $inflateReader->seek(0);
-        $this->assertTrue($inflateReader->next_bytes(21));
-        $this->assertStringStartsWith('PREFACE TO PYGMALI', $inflateReader->get_bytes());
+        $this->assertEquals(21, $inflateReader->pull(21));
+        $this->assertEquals('PREFACE TO PYGMALION.', $inflateReader->peek(21));
 
         $inflateReader->seek(200);
-        $this->assertTrue($inflateReader->next_bytes(10));
-        $this->assertEquals('language, ', $inflateReader->get_bytes());
+        $this->assertEquals(10, $inflateReader->pull(10));
+        $this->assertEquals('language, ', $inflateReader->peek(10));
 
         $inflateReader->seek(10);
-        $this->assertTrue($inflateReader->next_bytes(10));
-        $this->assertEquals(' PYGMALIO', $inflateReader->get_bytes());
+        $this->assertEquals(10, $inflateReader->pull(10));
+        $this->assertEquals(' PYGMALION', $inflateReader->peek(10));
     }
 
     public function testDeflateReaderEndOfData() {
@@ -37,10 +39,7 @@ class DeflateProducerTest extends TestCase {
         $deflateReader = new DeflateProducer($stringReader, ZLIB_ENCODING_DEFLATE);
         $inflateReader = new InflateProducer($deflateReader);
 
-        $text = '';
-        while ($inflateReader->next_bytes()) {
-            $text .= $inflateReader->get_bytes();
-        }
+        $text = $inflateReader->consume_all();
 
         $this->assertEquals($pygmalionText, $text);
         $this->assertTrue($deflateReader->reached_end_of_data());
@@ -51,8 +50,9 @@ class DeflateProducerTest extends TestCase {
         $stringReader = new MemoryPipe($text);
         $deflateReader = new DeflateProducer($stringReader);
 
-        $deflateReader->next_bytes();
+        $deflateReader->pull(10);
         $deflateReader->close();
-        $this->assertFalse($deflateReader->next_bytes());
+        $this->expectException(ByteStreamException::class);
+        $this->assertFalse($deflateReader->pull(10));
     }
 }

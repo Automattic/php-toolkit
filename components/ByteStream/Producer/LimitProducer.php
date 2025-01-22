@@ -2,10 +2,12 @@
 
 namespace WordPress\ByteStream\Producer;
 
+use WordPress\ByteStream\ByteStreamException;
+
 /**
  * A reader that limits the number of bytes that can be read.
  */
-class LimitProducer implements ByteProducer {
+class LimitProducer extends BaseByteProducer {
     private $upstream;
     private $limit;
     private $initial_offset;
@@ -16,36 +18,31 @@ class LimitProducer implements ByteProducer {
         $this->initial_offset = $upstream->tell();
     }
 
-    public function next_bytes($max_bytes = 8096): bool {
+    protected function internal_pull($max_bytes): string {
         $max_bytes = min(
             $max_bytes,
             $this->limit - $this->tell()
         );
-        if($max_bytes <= 0) {
-            return false;
+        if ($max_bytes <= 0) {
+            return '';
         }
-        return $this->upstream->next_bytes($max_bytes);
+        $this->upstream->pull($max_bytes);
+        return $this->upstream->consume($max_bytes);
     }
 
-    public function tell(): int {
-        return $this->upstream->tell() - $this->initial_offset;
-    }
-
-    public function length(): int {
+    public function length(): ?int {
         return $this->limit;
     }
 
-    public function reached_end_of_data(): bool {
+    protected function internal_reached_end_of_data(): bool {
         return $this->tell() >= $this->limit || $this->upstream->reached_end_of_data();
     }
 
-    public function get_bytes(): string {
-        return $this->upstream->get_bytes();
+    protected function seek_outside_of_buffer(int $target_offset): void {
+        $this->upstream->seek($this->initial_offset + $target_offset);
     }
 
-    public function seek(int $offset, int $whence = SEEK_SET): void {
-        $this->upstream->seek($offset, $whence);
+    protected function internal_close(): void {
+        $this->upstream->close();
     }
-
-    public function close(): void {}
 }

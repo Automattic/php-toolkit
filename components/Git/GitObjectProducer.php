@@ -2,12 +2,13 @@
 
 namespace WordPress\Git;
 
+use WordPress\ByteStream\Producer\BaseByteProducer;
 use WordPress\ByteStream\Producer\ByteProducer;
 use WordPress\ByteStream\Producer\InflateProducer;
 use WordPress\Git\Protocol\Parser\CommitParser;
 use WordPress\Git\Protocol\Parser\TreeParser;
 
-class GitObjectProducer implements ByteProducer {
+class GitObjectProducer extends BaseByteProducer {
 
     private $object_header;
     private $object_type_name;
@@ -44,40 +45,24 @@ class GitObjectProducer implements ByteProducer {
         return $this->uncompressed_length;
     }
 
-    public function next_bytes($max_bytes=8096): bool {
+    protected function internal_pull($n): string {
         $this->ensure_object_header();
-        return $this->inflated_body_reader->next_bytes($max_bytes);
-    }
-
-    public function get_bytes(): ?string {
-        return $this->inflated_body_reader->get_bytes();
-    }
-
-    public function seek($offset) {
-        $this->ensure_object_header();
-        $this->inflated_body_reader->seek($offset);
-    }
-
-    public function read_entire_object_contents() {
-        $buffer = '';
-        while($this->next_bytes()) {
-            $buffer .= $this->get_bytes();
-        }
-        return $buffer;
+        $this->inflated_body_reader->pull($n);
+        return $this->inflated_body_reader->peek($n);
     }
 
     public function as_commit() {
         if ( $this->get_object_type_name() !== 'commit' ) {
             throw new GitException( sprintf( 'Object was %s and not a commit in as_commit', $this->get_object_type_name() ) );
         }
-        return CommitParser::parse($this->read_entire_object_contents());
+        return CommitParser::parse($this->consume_all());
     }
 
     public function as_tree() {
         if ( $this->get_object_type_name() !== 'tree' ) {
             throw new GitException( sprintf( 'Object was %s and not a tree in as_tree', $this->get_object_type_name() ) );
         }
-        return TreeParser::parse_entire_tree($this->read_entire_object_contents());
+        return TreeParser::parse_entire_tree($this->consume_all());
     }
 
     public function read_header() {
@@ -95,8 +80,8 @@ class GitObjectProducer implements ByteProducer {
 		// for the specific get_* methods below.
 		$header  = '';
         $byte = '';
-		while ( $this->upstream->next_bytes(1) ) {
-			$byte = $this->upstream->get_bytes();
+		while ( $this->upstream->pull(1) ) {
+			$byte = $this->upstream->consume(1);
             $header .= $byte;
             if("\x00" === $byte) {
                 break;
@@ -114,23 +99,23 @@ class GitObjectProducer implements ByteProducer {
 
         $length_as_string = substr($header, $type_length + 1);
         $this->uncompressed_length = intval($length_as_string);
+        $this->expected_length = $this->uncompressed_length;
     }
 
-    public function length(): int {
+    protected function seek_outside_of_buffer(int $target_offset): void {
         $this->ensure_object_header();
-        return $this->uncompressed_length;
+        $this->inflated_body_reader->seek($target_offset);
+        
+	    $this->buffer = '';
+		$this->offset_in_current_buffer = 0;
+		$this->bytes_already_forgotten = $target_offset;
     }
 
-    public function tell(): int {
-        $this->ensure_object_header();
-        return $this->inflated_body_reader->tell();
-    }
-
-    public function reached_end_of_data(): bool {
+    protected function internal_reached_end_of_data(): bool {
         return $this->inflated_body_reader->reached_end_of_data();
     }
 
-    public function close(): void {
+    protected function internal_close(): void {
         $this->inflated_body_reader->close();
     }
 

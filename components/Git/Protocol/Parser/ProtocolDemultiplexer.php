@@ -5,7 +5,6 @@ namespace WordPress\Git\Protocol\Parser;
 use WordPress\ByteStream\NotEnoughDataException;
 use WordPress\ByteStream\Producer\BufferedProducer;
 use WordPress\ByteStream\Producer\ByteProducer;
-use WordPress\ByteStream\Producer\ReaderUtils;
 use WordPress\Git\GitException;
 
 class ProtocolDemultiplexer {
@@ -33,33 +32,25 @@ class ProtocolDemultiplexer {
     protected $seen_unmultiplexed_pack = false;
 
     public function __construct(ByteProducer $upstream) {
-        $this->upstream = new BufferedProducer($upstream, 1024);
+        $this->upstream = $upstream;
     }
 
     public function next_chunk() {
         $this->is_paused_at_incomplete_input = false;
-        $at = $this->upstream->tell();
-        try {
-            while(true) {
-                if($this->is_finished()) {
-                    return false;
-                }
-
-                $this->parse_chunk();
-                return true;
-            }
-        } catch(NotEnoughDataException $e) {
-            $this->upstream->seek($at);
-            $this->is_paused_at_incomplete_input = true;
+        if($this->is_finished()) {
             return false;
         }
+
+        $this->parse_chunk();
+        return true;
     }
 
     private function parse_chunk() {
         $this->chunk = '';
         $this->stream_code = 'unknown';
 
-        $length_hex = ReaderUtils::read_exactly_n_bytes($this->upstream, 4);
+        $this->upstream->pull(4, ByteProducer::PULL_EXACTLY);
+        $length_hex = $this->upstream->consume(4);
         if($length_hex === 'PACK') {
             $this->seen_unmultiplexed_pack = true;
         }
@@ -68,23 +59,29 @@ class ProtocolDemultiplexer {
          * until the end of the stream.
          */
         if($this->seen_unmultiplexed_pack) {
-            if(false === $this->upstream->next_bytes()) {
-                throw new NotEnoughDataException('Could not read PACK packet at ' . $this->upstream->tell());
+            $available = $this->upstream->pull(1024);
+            if($available > 0) {
+                $this->chunk = $length_hex . $this->upstream->consume($available);
+                return;
+            } else {
+                if($length_hex !== '0000') {
+                    throw new NotEnoughDataException('Could not read PACK packet at ' . $this->upstream->tell());
+                }
+                $this->seen_unmultiplexed_pack = false;
             }
-            $this->chunk = $length_hex . $this->upstream->get_bytes();
-            return;
         }
 
         $length = hexdec($length_hex);
 
         $stream_code = 'unknown';
         // Peek the next byte to determine the stream code.
-        $stream_code_byte = ReaderUtils::peek_n_bytes($this->upstream, 1);
+        $this->upstream->pull(1, ByteProducer::PULL_EXACTLY);
+        $stream_code_byte = $this->upstream->peek(1);
         $potential_stream_code = ord($stream_code_byte);
         if(isset(self::STREAM_CODE_MAP[$potential_stream_code])) {
             $stream_code = self::STREAM_CODE_MAP[$potential_stream_code];
             // Skip over the stream code byte.
-            $this->upstream->next_bytes(1);
+            $this->upstream->consume(1);
             $length -= 1;
         }
 
@@ -100,7 +97,8 @@ class ProtocolDemultiplexer {
 
         // Buffer the multiplexed chunk and yield it to the consumer.
         $length -= 4;
-        $chunk = ReaderUtils::read_exactly_n_bytes($this->upstream, $length);
+        $this->upstream->pull($length, ByteProducer::PULL_EXACTLY);
+        $chunk = $this->upstream->consume($length);
         $this->stream_code = $stream_code;
         if('unknown' === $this->stream_code) {
             // $chunk is not actually multiplexed so we need to relay
