@@ -52,7 +52,7 @@ class ProtocolDemultiplexerTest extends \PHPUnit\Framework\TestCase {
             }
         }
 
-        $this->assertCount(8, $chunks);
+        $this->assertCount(9, $chunks);
         $this->assertEquals(
             array(
                 "007d0000000000000000000000000000000000000000 0000000000000000000000000000000000000000 refs/heads/\0report-status force-update\n",
@@ -65,8 +65,8 @@ class ProtocolDemultiplexerTest extends \PHPUnit\Framework\TestCase {
             array_slice($chunks, 0, 6)
         );
         $this->assertStringStartsWith('PACK', $chunks[6]);
-        $this->assertEquals(16, strlen($chunks[6]));
-        $this->assertEquals(69, strlen($chunks[7]));
+        $this->assertEquals(59, strlen($chunks[6]));
+        $this->assertEquals(20, strlen($chunks[7]));
     }
 
     public function test_parse_response_no_blobs() {
