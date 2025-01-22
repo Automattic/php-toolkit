@@ -2,7 +2,6 @@
 
 namespace WordPress\Git\Protocol\Parser;
 
-use WordPress\ByteStream\NotEnoughDataException;
 use WordPress\ByteStream\Producer\ByteProducer;
 use WordPress\Git\GitException;
 use WordPress\Git\GitObjectDecoder;
