@@ -5,7 +5,7 @@ namespace WordPress\Zip;
 use WordPress\ByteStream\ByteStreamException;
 use WordPress\ByteStream\Producer\ByteProducer;
 use WordPress\ByteStream\Producer\InflateProducer;
-use WordPress\ByteStream\Producer\LimitProducer;
+use WordPress\ByteStream\Producer\LimitedProducer;
 
 class ZipStreamReader {
 
@@ -113,7 +113,7 @@ class ZipStreamReader {
         $extra = $this->byte_reader->consume($this->object->extraLength);
         $this->object->extra = $extra;
 
-        $limit_reader = new LimitProducer(
+        $limit_reader = new LimitedProducer(
             $this->byte_reader,
             $this->object->compressedSize
         );

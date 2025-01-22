@@ -7,7 +7,7 @@ use WordPress\ByteStream\ByteStreamException;
 /**
  * A reader that limits the number of bytes that can be read.
  */
-class LimitProducer extends BaseByteProducer {
+class LimitedProducer extends BaseByteProducer {
     private $upstream;
     private $limit;
     private $initial_offset;

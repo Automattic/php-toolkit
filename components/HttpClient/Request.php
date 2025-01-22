@@ -33,6 +33,9 @@ class Request {
 	public $redirected_from;
 	public $redirected_to;
 
+    /**
+     * @var HttpError
+     */
 	public $error;
 	/**
 	 * @var Response

@@ -2,7 +2,7 @@
 
 namespace WordPress\HttpClient\Tests;
 
-use WordPress\ByteStream\Producer\RemoteFileProducer;
+use WordPress\HttpClient\ByteStream\RequestReadStream;
 use WordPress\HttpClient\Client;
 use WordPress\HttpClient\HttpError;
 use WordPress\HttpClient\Request;
@@ -205,7 +205,7 @@ class ClientTest extends \PHPUnit\Framework\TestCase {
         $request = new Request('https://wordpress.org');
         $reader = $client->fetch($request);
 
-        $this->assertInstanceOf(RemoteFileProducer::class, $reader);
+        $this->assertInstanceOf(RequestReadStream::class, $reader);
     }
 
     public function testAwaitNextEvent() {

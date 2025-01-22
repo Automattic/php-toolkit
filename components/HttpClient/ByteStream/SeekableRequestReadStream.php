@@ -1,8 +1,11 @@
 <?php
 
-namespace WordPress\ByteStream\Producer;
+namespace WordPress\HttpClient\ByteStream;
 
 use WordPress\ByteStream\ByteStreamException;
+use WordPress\ByteStream\Producer\BaseByteProducer;
+use WordPress\ByteStream\Producer\ByteProducer;
+use WordPress\ByteStream\Producer\ResourceProducer;
 use WordPress\HttpClient\Request;
 
 /**
@@ -11,7 +14,10 @@ use WordPress\HttpClient\Request;
  *
  * @TODO: Abort in-progress requests when seeking to a new offset.
  */
-class RemoteFileRangedProducer extends BaseByteProducer {
+class SeekableRequestReadStream extends BaseByteProducer {
+
+    // const CONTEXT_SIZE_MIN = 0;
+    // const CONTEXT_SIZE_MAX = 0;
 
 	private $url;
 	private $remote_file_length;
@@ -28,7 +34,7 @@ class RemoteFileRangedProducer extends BaseByteProducer {
 	 */
 	static public function create( $url ) {
 		$remote_file_reader = new self( $url );
-		
+
 		if(false === $remote_file_reader->length()) {
 			return self::save_to_disk( $url );
 		}
@@ -48,7 +54,7 @@ class RemoteFileRangedProducer extends BaseByteProducer {
 	}
 
 	static private function save_to_disk( $url ) {
-		$remote_file_reader = new RemoteFileProducer( $url );
+		$remote_file_reader = new RequestReadStream( $url );
 		return self::redirect_output_to_disk( $remote_file_reader );
 	}
 
@@ -58,19 +64,19 @@ class RemoteFileRangedProducer extends BaseByteProducer {
         if(false === $file) {
             throw new ByteStreamException('Failed to open file for writing');
         }
-		
+
 		if($bytes = $reader->peek(8096)) {
 			if(false === fwrite($file, $bytes)) {
 				throw new ByteStreamException('Failed to write bytes to file');
 			}
 		}
-		
+
 		while($reader->pull(8096)) {
 			if(false === fwrite($file, $reader->peek(8096))) {
 				throw new ByteStreamException('Failed to write bytes to file');
 			}
 		}
-		
+
 		if(false === fclose($file)) {
 			throw new ByteStreamException('Failed to close file');
 		}
@@ -113,7 +119,7 @@ class RemoteFileRangedProducer extends BaseByteProducer {
 	}
 
 	private function create_reader() {
-		$this->current_reader = new RemoteFileProducer( new Request(
+		$this->current_reader = new RequestReadStream( new Request(
 			$this->url,
 			array(
 				'headers' => array(
@@ -145,7 +151,7 @@ class RemoteFileRangedProducer extends BaseByteProducer {
 			return;
 		}
 		if(null === $this->current_reader) {
-			$this->current_reader = new RemoteFileProducer( $this->url );
+			$this->current_reader = new RequestReadStream( $this->url );
 		}
 		$this->remote_file_length = $this->current_reader->length();
 	}

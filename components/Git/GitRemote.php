@@ -106,6 +106,11 @@ class GitRemote {
 		// $delta = $this->repository->find_objects_added_in($push_commit, $parent_hash);
 		$delta = $this->repository->find_objects_added_in( $push_commit, $remote_commit );
 
+        if(!count($delta)) {
+            // Don't push empty commits
+            return;
+        }
+
         $producer = new GitProtocolEncoder();
         $producer->append_packet_line("$remote_commit $push_commit refs/heads/$push_ref_name\0report-status force-update\n");
         $producer->append_packet_line('0000');
@@ -341,9 +346,6 @@ class GitRemote {
 		$reader = $this->http_client->fetch( $request );
 
         $response = $reader->await_response();
-        if(!$response) {
-            throw new GitException('HTTP request failed');
-        }
         if($response->status_code > 299 || $response->status_code < 200) {
             throw new GitException('HTTP request failed with status code ' . $response->status_code . '. First 100 body bytes: ' . $reader->peek(100));
         }

@@ -7,6 +7,8 @@ use WordPress\ByteStream\Writer\ByteConsumer;
 
 class MemoryPipe extends BaseByteProducer implements ByteConsumer {
 
+	protected $is_writing_closed;
+
 	public function __construct(string $string='', $expected_length = null) {
 		if(strlen($string) > 0 && null !== $expected_length) {
 			throw new ByteStreamException('A MemoryPipe accepts either a non-empty string representing the entire data, or an expected length when the data is not available yet. It does not accept both arguments.');
@@ -14,13 +16,23 @@ class MemoryPipe extends BaseByteProducer implements ByteConsumer {
 		if(strlen($string) > 0) {
 			$this->buffer = $string;
 			$this->expected_length = strlen($string);
+            // If we have a full buffer, it's already in memory and we don't need
+            // to clean up old data as we stream it.
+            // If we did clean up old data, we would lose the ability to seek() to
+            // the beginning of the buffer.
+            $this->context_size_max = PHP_INT_MAX;
 		} else if(null !== $expected_length) {
 			$this->expected_length = $expected_length;
 		}
 	}
 
+	public function close_writing(): void {
+		$this->is_writing_closed = true;
+		$this->expected_length = $this->bytes_already_forgotten + strlen($this->buffer);
+	}
+
 	public function append_bytes(string $new_bytes): void {
-		if($this->is_closed) {
+		if($this->is_writing_closed) {
 			throw new ByteStreamException('Cannot append bytes to a closed stream.');
 		}
 		if(null !== $this->length() && $this->tell() + strlen($new_bytes) > $this->length()) {
@@ -29,12 +41,26 @@ class MemoryPipe extends BaseByteProducer implements ByteConsumer {
 		$this->buffer .= $new_bytes;
 	}
 
+	protected function pull_no_more_than( $n ): int {
+		if($this->count_consumable_bytes() > 0) {
+			return min($n, $this->count_consumable_bytes());
+		}
+		throw new NotEnoughDataException('Cannot pull bytes from a MemoryPipe.');
+	}
+
+	protected function pull_exactly( $n ): int {
+		if($this->count_consumable_bytes() >= $n) {
+			return min($n, $this->count_consumable_bytes());
+		}
+		throw new NotEnoughDataException('Cannot pull bytes from a MemoryPipe.');
+	}
+
 	protected function internal_pull($n): string {
-        return '';
+        throw new NotEnoughDataException('Cannot pull bytes from a MemoryPipe.');
 	}
 
 	protected function seek_outside_of_buffer(int $target_offset): void {
-        throw new ByteStreamException('Cannot seek past the available data. Call append_bytes() first.');
+        throw new NotEnoughDataException('Cannot seek past the available data. Call append_bytes() first.');
 	}
 
 	public function length(): ?int {

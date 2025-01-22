@@ -2,12 +2,12 @@
 
 namespace WordPress\HttpClient;
 
-use WordPress\ByteStream\Producer\RemoteFileProducer;
 use WordPress\ByteStream\Producer\ResourceProducer;
 use WordPress\ByteStream\Producer\TransformedProducer;
 use WordPress\ByteStream\Transformer\InflateTransformer;
 use WordPress\HttpClient\ByteStream\ChunkedDecoder;
 use WordPress\HttpClient\ByteStream\ChunkedEncoderTransformer;
+use WordPress\HttpClient\ByteStream\RequestReadStream;
 
 /**
  * An asynchronous HTTP client library.
@@ -122,10 +122,10 @@ class Client {
      *
      * @param Request $request The request to stream.
      *
-     * @return RemoteFileProducer
+     * @return RequestReadStream
      */
     public function fetch( $request ) {
-        return new RemoteFileProducer($request, [ 'client' => $this]);
+        return new RequestReadStream($request, [ 'client' => $this]);
     }
 
 	/**
@@ -574,7 +574,9 @@ class Client {
 
             $available_bytes = $request->upload_body_stream->pull(8192);
             if($available_bytes === 0) {
-                $this->set_error( $request, new HttpError( 'Failed to read from the request body stream' ) );
+                // Not all pull() calls must yield bytes, maybe we just need to wait for the next chunk.
+                // Let's continue and keep trying.
+                // @TODO: Implement a generic timeout mechanism for pull() calls.
                 continue;
             }
 

@@ -207,6 +207,13 @@ class GitProtocolReader {
                         }
                         break;
                     case '#object-hash':
+                        $this->delta_pipe->close_writing();
+                        while($this->delta_resolver->resolve_next_chunk()) {
+                            $this->new_object_write_stream->append_bytes(
+                                $this->delta_resolver->get_resolved_chunk()
+                            );
+                        }
+
                         if( $this->delta_resolver->is_paused_on_incomplete_input()) {
                             throw new GitException(sprintf(
                                 'Incomplete input while resolving delta. Target hash=%s, target type=%s, delta hash=%s',
@@ -223,7 +230,6 @@ class GitProtocolReader {
                         $this->resolved_deltas[$delta_oid] = $new_oid;
 
                         $this->base_object_reader->close();
-                        $this->delta_pipe->close();
                         $this->delta_resolver = null;
                         $this->base_object_reader = null;
                         return true;

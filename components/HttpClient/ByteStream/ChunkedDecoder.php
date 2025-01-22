@@ -7,6 +7,9 @@ use WordPress\ByteStream\Producer\ByteProducer;
 
 class ChunkedDecoder extends BaseByteProducer {
 
+    // const CONTEXT_SIZE_MIN = 0;
+    // const CONTEXT_SIZE_MAX = 0;
+
     private $state = self::SCAN_CHUNK_SIZE;
     const SCAN_CHUNK_SIZE = 'SCAN_CHUNK_SIZE';
     const SCAN_CHUNK_DATA = 'SCAN_CHUNK_DATA';

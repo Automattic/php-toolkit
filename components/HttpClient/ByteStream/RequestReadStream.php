@@ -1,14 +1,18 @@
 <?php
 
-namespace WordPress\ByteStream\Producer;
+namespace WordPress\HttpClient\ByteStream;
 
 use WordPress\ByteStream\ByteStreamException;
+use WordPress\ByteStream\Producer\BaseByteProducer;
 use WordPress\HttpClient\Request;
 
 /**
  * Streams bytes from a remote file.
  */
-class RemoteFileProducer extends BaseByteProducer {
+class RequestReadStream extends BaseByteProducer {
+
+    // const CONTEXT_SIZE_MIN = 0;
+    // const CONTEXT_SIZE_MAX = 0;
 
 	/**
 	 * @var \WordPress\HttpClient\Client
@@ -69,6 +73,9 @@ class RemoteFileProducer extends BaseByteProducer {
             'requests' => [ $this->request ]
         ] ) ) {
 			$request = $this->client->get_request();
+            if($request->error) {
+                throw new ByteStreamException('HTTP request failed: ' . $request->error->message);
+            }
 			$response = $request->response;
 			if ( ! $response ) {
 				continue;
@@ -124,6 +131,10 @@ class RemoteFileProducer extends BaseByteProducer {
             $this->pull_until_event([
                 'event' => \WordPress\HttpClient\Client::EVENT_GOT_HEADERS,
             ]);
+        }
+        if(!$this->response) {
+            var_dump($this->request);
+            throw new ByteStreamException('HTTP request failed');
         }
         return $this->response;
     }

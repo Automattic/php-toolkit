@@ -3,12 +3,10 @@
 namespace WordPress\Git\Protocol\Parser;
 
 use WordPress\ByteStream\NotEnoughDataException;
-use WordPress\ByteStream\Producer\BufferedProducer;
 use WordPress\ByteStream\Producer\ByteProducer;
 use WordPress\Git\GitException;
 
 class ProtocolDemultiplexer {
-
 
     const STREAM_CODE_SIDE_BAND = 'side_band';
     const STREAM_CODE_PROGRESS = 'progress';

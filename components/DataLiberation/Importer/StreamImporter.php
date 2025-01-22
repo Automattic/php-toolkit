@@ -2,12 +2,12 @@
 
 namespace WordPress\DataLiberation\Importer;
 
-use WordPress\ByteStream\Producer\RemoteFileProducer;
 use WordPress\ByteStream\Producer\ResourceProducer;
 use WordPress\DataLiberation\BlockMarkup\BlockMarkupUrlProcessor;
 use WordPress\DataLiberation\EntityReader\EntityReaderIterator;
 use WordPress\DataLiberation\EntityReader\WXREntityReader;
 use WordPress\DataLiberation\URL\WPURL;
+use WordPress\HttpClient\ByteStream\RequestReadStream;
 
 use function WordPress\DataLiberation\URL\is_child_url_of;
 
@@ -165,7 +165,7 @@ class StreamImporter {
 	public static function create_for_wxr_url( $wxr_url, $options = array(), $cursor = null ) {
 		return static::create(
 			function ( $cursor = null ) use ( $wxr_url ) {
-				return WXREntityReader::create( new RemoteFileProducer( $wxr_url ), $cursor );
+				return WXREntityReader::create( new RequestReadStream( $wxr_url ), $cursor );
 			},
 			$options,
 			$cursor

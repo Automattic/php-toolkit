@@ -54,13 +54,8 @@ class InflateProducer extends BaseByteProducer {
         }
 
         $n = max(200, $n);
-        $deflated = $this->upstream->peek($n);
-        if(!strlen($deflated)) {
-            $this->upstream->pull($n);
-            $deflated = $this->upstream->peek($n);
-        }
-        $this->upstream->consume(strlen($deflated));
-        $inflated = inflate_add($this->inflate_context, $deflated);
+        $available = $this->upstream->pull($n);
+        $inflated = inflate_add($this->inflate_context, $this->upstream->consume($available));
         if(false === $inflated) {
             throw new ByteStreamException('Inflate error: ' . $this->get_error_string());
         }
@@ -79,14 +74,18 @@ class InflateProducer extends BaseByteProducer {
         return $this->inflate_context === null && $this->upstream->reached_end_of_data();
     }
 
-    protected function seek_outside_of_buffer($target_offset): void {
+    public function seek($target_offset): void {
+        if(null !== $this->length() && $target_offset > $this->length()) {
+            throw new ByteStreamException('Cannot seek past the available data. Call append_bytes() first.');
+        }
+
         if($target_offset < $this->tell()) {
+            $this->upstream->seek($this->delegate_offset_0 ?? 0);
             $this->buffer = '';
             $this->bytes_already_forgotten = 0;
             $this->offset_in_current_buffer = 0;
 
             $this->inflate_init();
-            $this->upstream->seek($this->delegate_offset_0 ?? 0);
         }
 
         while($this->tell() < $target_offset) {

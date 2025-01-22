@@ -96,7 +96,7 @@ class WP_Static_Files_Editor_Plugin {
 
             // Only force pull at most once every 10 minutes
             $last_pull_time = get_transient('wp_git_last_pull_time');
-            if (!$last_pull_time) {
+            if (1||!$last_pull_time) {
                 self::$remote->force_pull([
                     'branch' => GIT_BRANCH,
                     // 'path' => GIT_DIRECTORY_ROOT,
@@ -573,8 +573,9 @@ class WP_Static_Files_Editor_Plugin {
         header('Content-Length: ' . $object->length());
         header('Cache-Control: no-cache');
 
-        while($object->pull()) {
-            echo $object->peek();
+        while(!$object->reached_end_of_data()) {
+            $bytes_available = $object->pull(8192);
+            echo $object->consume($bytes_available);
         }
     }
 

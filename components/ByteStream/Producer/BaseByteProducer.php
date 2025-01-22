@@ -9,8 +9,8 @@ abstract class BaseByteProducer implements ByteProducer {
 
     const CHUNK_SIZE = 8096;
 
-    const CONTEXT_SIZE_MIN = 1024;
-    const CONTEXT_SIZE_MAX = 2048;
+    protected $context_size_min = 1024;
+    protected $context_size_max = 2048;
 
 	protected $buffer = '';
 	protected $offset_in_current_buffer = 0;
@@ -51,15 +51,23 @@ abstract class BaseByteProducer implements ByteProducer {
         }
 
         if($mode === ByteProducer::PULL_NO_MORE_THAN) {
-            $chunk = $this->internal_pull( self::CHUNK_SIZE );
-            $this->buffer .= $chunk;
-            return min($n, $this->count_consumable_bytes());
+			return $this->pull_no_more_than($n);
         }
+		return $this->pull_exactly($n);
+	}
 
+	protected function pull_no_more_than( $n ): int {
+		$this->buffer .= $this->internal_pull( self::CHUNK_SIZE );
+		return min( $n, $this->count_consumable_bytes() );
+	}
+
+	protected function pull_exactly( $n ): int {
         $empty_pulls = 0;
         while(true) {
-            $chunk = $this->internal_pull( self::CHUNK_SIZE );
-            $this->buffer .= $chunk;
+	        $pulled = $this->pull_no_more_than($n);
+			if(0 === $pulled) {
+				++$empty_pulls;
+			}
 
             if( $n <= $this->count_consumable_bytes()) {
                 return $n;
@@ -68,11 +76,12 @@ abstract class BaseByteProducer implements ByteProducer {
             if($this->reached_end_of_data()) {
                 throw new NotEnoughDataException('End of data reached while pulling');
             }
-            if($empty_pulls > 10) {
-                throw new NotEnoughDataException('10 empty pulls in a row, we are probably at the end of the data');
+            if($empty_pulls > 4) {
+                throw new NotEnoughDataException( '4 empty pulls in a row, we are probably at the end of the data' );
             }
         }
-	}
+        return $n;
+    }
 
     public function consume_all(): string {
         $body = '';
@@ -85,7 +94,7 @@ abstract class BaseByteProducer implements ByteProducer {
         }
     }
 
-    private function count_consumable_bytes(): int {
+    protected function count_consumable_bytes(): int {
         return strlen($this->buffer) - $this->offset_in_current_buffer;
     }
 
@@ -97,12 +106,12 @@ abstract class BaseByteProducer implements ByteProducer {
 
 	public function consume($n): string {
 		if(strlen($this->buffer) < $this->offset_in_current_buffer + $n) {
-			throw new ByteStreamException('Cannot consume more bytes than available in the buffer.');
+			throw new NotEnoughDataException('Cannot consume more bytes than available in the buffer.');
 		}
 		$bytes = substr($this->buffer, $this->offset_in_current_buffer, $n);
 		$this->offset_in_current_buffer += $n;
-        if($this->offset_in_current_buffer > self::CONTEXT_SIZE_MAX) {
-            $overflow = $this->offset_in_current_buffer - self::CONTEXT_SIZE_MIN;
+        if($this->offset_in_current_buffer > $this->context_size_max) {
+            $overflow = $this->offset_in_current_buffer - $this->context_size_min;
             $this->offset_in_current_buffer -= $overflow;
             $this->bytes_already_forgotten += $overflow;
             $this->buffer = substr($this->buffer, $overflow);
@@ -112,12 +121,12 @@ abstract class BaseByteProducer implements ByteProducer {
 
     public function seek(int $target_offset): void {
         // We have that offset in the buffer, let's just update the pointer
-        if($target_offset >= $this->bytes_already_forgotten && $target_offset < $this->bytes_already_forgotten + strlen($this->buffer)) {
+        if($target_offset >= $this->bytes_already_forgotten && $target_offset <= $this->bytes_already_forgotten + strlen($this->buffer)) {
             $this->offset_in_current_buffer = $target_offset - $this->bytes_already_forgotten;
             return;
         }
         if(null !== $this->length() && $target_offset > $this->length()) {
-            throw new ByteStreamException('Cannot seek past the available data. Call append_bytes() first.');
+            throw new NotEnoughDataException('Cannot seek past the available data. Call append_bytes() first.');
         }
 
         // Seeking outside of buffer range, we need a producer-specific implementation
