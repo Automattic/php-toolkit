@@ -24,9 +24,25 @@ class GitObjectDecoder extends BaseByteProducer {
      */
     private $inflated_body_reader;
 
+    /**
+     * @var BytesProducer
+     */
+    private $body_source;
+
     public function __construct(ByteProducer $upstream) {
         $this->upstream = $upstream;
         $this->inflated_body_reader = new InflateProducer($upstream);
+        $this->body_source = $this->inflated_body_reader;
+    }
+
+    public function set_inflate_enabled($inflate_enabled) {
+        if($inflate_enabled) {
+            $this->body_source = $this->inflated_body_reader;
+            $this->expected_length = $this->uncompressed_length;
+        } else {
+            $this->body_source = $this->upstream;
+            $this->expected_length = $this->upstream->length() - strlen($this->object_header);
+        }
     }
 
     public function get_object_type_name() {
@@ -45,8 +61,8 @@ class GitObjectDecoder extends BaseByteProducer {
 
     public function internal_pull($n): string {
         $this->ensure_object_header();
-        $available = $this->inflated_body_reader->pull($n);
-        return $this->inflated_body_reader->consume($available);
+        $available = $this->body_source->pull($n);
+        return $this->body_source->consume($available);
     }
 
     public function as_commit() {
@@ -102,7 +118,7 @@ class GitObjectDecoder extends BaseByteProducer {
 
     protected function seek_outside_of_buffer(int $target_offset): void {
         $this->ensure_object_header();
-        $this->inflated_body_reader->seek($target_offset);
+        $this->body_source->seek($target_offset);
 
 	    $this->buffer = '';
 		$this->offset_in_current_buffer = 0;
@@ -110,11 +126,11 @@ class GitObjectDecoder extends BaseByteProducer {
     }
 
     protected function internal_reached_end_of_data(): bool {
-        return $this->inflated_body_reader->reached_end_of_data();
+        return $this->body_source->reached_end_of_data();
     }
 
     protected function internal_close(): void {
-        $this->inflated_body_reader->close();
+        $this->body_source->close();
     }
 
 }

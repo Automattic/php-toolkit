@@ -23,6 +23,7 @@ use WordPress\DataLiberation\EntityReader\FilesystemEntityReader;
 use WordPress\DataLiberation\Importer\ImportSession;
 use WordPress\DataLiberation\Importer\StreamImporter;
 use WordPress\DataLiberation\URL\WPURL;
+use WordPress\Filesystem\InMemoryFilesystem;
 use WordPress\Filesystem\LocalFilesystem;
 use WordPress\Filesystem\UploadedFilesystem;
 use WordPress\Filesystem\Visitor\FilesystemVisitor;
@@ -84,7 +85,6 @@ class WP_Static_Files_Editor_Plugin {
             if(!is_dir(WP_STATIC_PAGES_DIR)) {
                 mkdir(WP_STATIC_PAGES_DIR, 0777, true);
             }
-            // $local_fs = new WP_Local_Filesystem(WP_STATIC_PAGES_DIR);
             $local_fs = LocalFilesystem::create(WP_STATIC_PAGES_DIR);
             $repo = new GitRepository($local_fs);
             $repo->add_remote('origin', GIT_REPO_URL);
@@ -96,7 +96,7 @@ class WP_Static_Files_Editor_Plugin {
 
             // Only force pull at most once every 10 minutes
             $last_pull_time = get_transient('wp_git_last_pull_time');
-            if (1||!$last_pull_time) {
+            if (!$last_pull_time) {
                 self::$remote->force_pull([
                     'branch' => GIT_BRANCH,
                     // 'path' => GIT_DIRECTORY_ROOT,
@@ -104,6 +104,7 @@ class WP_Static_Files_Editor_Plugin {
                 ]);
                 set_transient('wp_git_last_pull_time', time(), 10 * MINUTE_IN_SECONDS);
             }
+
             self::$fs = GitFilesystem::create(
                 $repo,
                 [

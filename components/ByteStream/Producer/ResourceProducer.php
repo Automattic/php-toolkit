@@ -36,6 +36,16 @@ class ResourceProducer extends BaseByteProducer {
 
     protected function internal_pull($n): string {
         $bytes = fread($this->file_pointer, $n);
+        /**
+         * Workaround for a streaming bug in WordPress Playground.
+         *
+         * Without the feof() call, Playground doesn't notice when the stream reaches EOF.
+         * The feof() call in internal_reached_end_of_data() somehow does not trigger the
+         * EOF event. It must be here, right after fread().
+         * 
+         * @TODO: Improve the streaming support in WordPress Playground.
+         */
+        feof($this->file_pointer);
         if (false === $bytes) {
             throw new ByteStreamException('Failed to read from file');
         }

@@ -610,7 +610,7 @@ class Client {
 				}
 				$connection->response_buffer .= $header_byte;
 
-				$buffer_size = strlen( $connection->response_buffer );
+                $buffer_size = strlen( $connection->response_buffer );
 				if (
 					$buffer_size < 4 ||
 					$connection->response_buffer[ $buffer_size - 4 ] !== "\r" ||

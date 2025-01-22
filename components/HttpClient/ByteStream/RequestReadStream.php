@@ -68,7 +68,6 @@ class RequestReadStream extends BaseByteProducer {
 			$this->client->enqueue( $this->request );
 			$this->is_enqueued = true;
 		}
-
 		while ( $this->client->await_next_event([
             'requests' => [ $this->request ]
         ] ) ) {
@@ -133,7 +132,6 @@ class RequestReadStream extends BaseByteProducer {
             ]);
         }
         if(!$this->response) {
-            var_dump($this->request);
             throw new ByteStreamException('HTTP request failed');
         }
         return $this->response;
