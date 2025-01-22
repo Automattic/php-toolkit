@@ -52,7 +52,10 @@ class BlocksWithMetadata {
 	 *
 	 * @return array The metadata sourced from the input document.
 	 */
-	public function get_all_metadata() {
+	public function get_all_metadata(array $options = []) {
+        if(isset($options['first_value_only']) && $options['first_value_only']) {
+            return array_column($this->metadata, 0);
+        }
 		return $this->metadata;
 	}
 

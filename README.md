@@ -46,6 +46,15 @@ bash run.sh
 
 The UI build process is not configured yet so this won't get the static files editor UI right now. This part is TBD.
 
+You can also clone your local site as follows:
+
+```sh
+mkdir local-repo
+git init
+git remote add wp http://localhost:9400/wp-content/plugins/git-repo/git-repo.php\?
+git ls-remote wp
+```
+
 ### Development
 
 #### Testing

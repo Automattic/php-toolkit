@@ -5,6 +5,7 @@ namespace WordPress\Git\Protocol;
 use WordPress\Git\Protocol\PackfileEncoder;
 use WordPress\ByteStream\Producer\BaseByteProducer;
 use WordPress\Git\Model\Tree;
+use WordPress\Git\Protocol\Parser\PackParser;
 
 class GitProtocolEncoder extends BaseByteProducer {
 
@@ -22,7 +23,9 @@ class GitProtocolEncoder extends BaseByteProducer {
 
 	public static function encode_packet_line( string $payload, $channel_code = '' ): string {
 		if ( $payload === '0000' || $payload === '0001' || $payload === '0002' ) {
-			return $channel_code . $payload;
+			if ( ! $channel_code ) {
+                return $payload;
+            }
 		}
 
         if('' !== $channel_code) {
@@ -60,9 +63,10 @@ class GitProtocolEncoder extends BaseByteProducer {
 
         $operation = $this->operation;
         switch ($operation['type']) {
-            case 'progress':
-            case 'error':
-            case 'sideband':
+            case 'raw-bytes':
+                $this->operation = null;
+                return $operation['bytes'];
+
             case 'packet-line':
                 $this->operation = null;
                 return self::encode_packet_line($operation['chunk'], $operation['channel_code']);
@@ -81,7 +85,11 @@ class GitProtocolEncoder extends BaseByteProducer {
                     return '';
                 }
                 $available = $this->packfile_pipe->pull(8096);
-                return $this->packfile_pipe->consume($available);
+                $chunk = $this->packfile_pipe->consume($available);
+                if($operation['multiplex']) {
+                    return self::encode_packet_line($chunk, "\x01");
+                }
+                return $chunk;
             default:
                 return '';
         }
@@ -93,26 +101,32 @@ class GitProtocolEncoder extends BaseByteProducer {
 
     public function close_writing(): void {}
 
-    public function append_progress_chunk($chunk): void {
+    public function append_sideband_bytes($bytes): void {
         $this->operation_queue[] = [
-            'type' => 'progress',
+            'type' => 'raw-bytes',
+            'chunk' => self::encode_packet_lines($bytes, "\x01"),
+        ];
+    }
+
+    public function append_progress_packet_line($chunk): void {
+        $this->operation_queue[] = [
+            'type' => 'packet-line',
             'chunk' => $chunk,
             'channel_code' => "\x02"
         ];
     }
 
-    public function append_error_chunk($chunk): void {
+    public function append_error_packet_line($chunk): void {
         $this->operation_queue[] = [
-            'type' => 'error',
+            'type' => 'packet-line',
             'chunk' => $chunk,
             'channel_code' => "\x03"
         ];
     }
-
-    public function append_sideband_chunk($packet_line): void {
+    public function append_sideband_packet_line($packet_line): void {
         $this->operation_queue[] = [
-            'type' => 'sideband',
-            'chunk' => $packet_line,
+            'type' => 'packet-line',
+            'chunk' => self::encode_packet_line($packet_line),
             'channel_code' => "\x01"
         ];
     }
@@ -125,6 +139,13 @@ class GitProtocolEncoder extends BaseByteProducer {
         ];
     }
 
+    public function append_raw_bytes($bytes): void {
+        $this->operation_queue[] = [
+            'type' => 'raw-bytes',
+            'bytes' => $bytes,
+        ];
+    }
+
     public function append_packet_lines($lines, $channel_code = ''): void {
         $this->operation_queue[] = [
             'type' => 'packet-lines',
@@ -133,12 +154,13 @@ class GitProtocolEncoder extends BaseByteProducer {
         ];
     }
 
-    public function append_packfile($repository, $pack_objects): void {
+    public function append_packfile($repository, $pack_objects, $multiplex = false): void {
         $this->operation_queue[] = [
             'type' => 'packfile',
             'repository' => $repository,
             'pack_objects' => $pack_objects,
-            'object_index' => 0
+            'object_index' => 0,
+            'multiplex'    => $multiplex
         ];
     }
 

@@ -24,10 +24,11 @@ class GitEndpoint {
 	}
 
 	public function handle_request( $path, $request_bytes, ResponseConsumer $http_response ) {
-		error_log( 'Request: ' . $path );
-
-        $git_response = new GitProtocolEncoder($http_response);
+        $git_response = new GitProtocolEncoder();
 		switch ( $path ) {
+            case '/HEAD':
+                // $this->handle_head_request($request_bytes, $git_response);
+                break;
 			case '/info/refs?service=git-upload-pack':
 				$this->send_protocol_v2_headers( $http_response, 'git-upload-pack' );
 				$git_response->append_packet_lines([
@@ -74,11 +75,23 @@ class GitEndpoint {
 				$http_response->send_header( 'Content-Type', 'application/x-git-receive-pack-result' );
 				$http_response->send_header( 'Cache-Control', 'no-cache' );
 				$this->handle_push_request( $request_bytes, $git_response );
+                $git_response->close_writing();
 				break;
 			default:
 				throw new GitException( 'Unknown path: ' . $path );
 		}
-		$git_response->close();
+		$git_response->close_writing();
+
+        // @TODO: Simplify this with a method such as pipe_to() or
+        //        a pulling class such as GitHttpResponse
+        while(true) {
+            $available = $git_response->pull(8192);
+            if($available === 0 && $git_response->reached_end_of_data()) {
+                break;
+            }
+            $http_response->append_bytes($git_response->consume($available));
+        }
+        $http_response->close();
 	}
 
 	private function send_protocol_v2_headers( ResponseConsumer $response, $service ) {
@@ -291,7 +304,8 @@ class GitEndpoint {
 					break;
 				}
 
-				$commit_hash = $parsed_commit->parent;
+                // @TODO: Support multiple parents
+				$commit_hash = $parsed_commit->get_first_parent_hash();
 				if ( isset( $have_oids[ $commit_hash ] ) ) {
 					$common_parent_hash = $commit_hash;
 					break;
@@ -359,7 +373,7 @@ class GitEndpoint {
 		}
 
         $git_response->append_packet_line("packfile\n");
-        $git_response->append_packfile($this->repository, $pack_objects);
+        $git_response->append_packfile($this->repository, $pack_objects, $multiplex = true);
         $git_response->append_packet_line('0000');
 		return true;
 	}
@@ -379,8 +393,8 @@ class GitEndpoint {
         );
         $header = $this->parse_push_header($protocol_reader);
 		if ( ! $header || empty( $header['new_oid'] ) ) {
-			$git_response->append_error_chunk("error header is empty\n");
-			$git_response->append_error_chunk('0000');
+			$git_response->append_error_packet_line("error header is empty\n");
+			$git_response->append_error_packet_line('0000');
 			return false;
 		}
 
@@ -391,8 +405,8 @@ class GitEndpoint {
 
 		// Validate ref name
 		if ( ! preg_match( '|^refs/|', $ref_name ) ) {
-			$git_response->append_error_chunk("error invalid ref name: $ref_name\n");
-			$git_response->append_error_chunk('0000');
+			$git_response->append_error_packet_line("error invalid ref name: $ref_name\n");
+			$git_response->append_error_packet_line('0000');
 			// @TODO: Throw / catch?
 			return false;
 		}
@@ -400,10 +414,10 @@ class GitEndpoint {
 		// Handle deletion
 		if ( Commit::is_null_hash( $new_oid ) ) {
 			if ( $this->repository->delete_ref( $ref_name ) ) {
-				$git_response->append_sideband_chunk("ok $ref_name\n");
+				$git_response->append_packet_line("ok $ref_name\n");
 			} else {
-				$git_response->append_error_chunk("error $ref_name delete failed\n");
-                $git_response->append_error_chunk('0000');
+				$git_response->append_error_packet_line("error $ref_name delete failed\n");
+                $git_response->append_error_packet_line('0000');
 			}
 			return false;
 		}
@@ -417,25 +431,26 @@ class GitEndpoint {
                 }
             }
         } catch(GitException $e) {
-            $git_response->append_error_chunk("error unpack failed\n");
-            $git_response->append_error_chunk('0000');
+            $git_response->append_error_packet_line("error unpack failed\n");
+            $git_response->append_error_packet_line('0000');
             return false;
         }
 
-        $git_response->append_sideband_chunk("000eunpack ok\n");
+        $git_response->append_sideband_packet_line("unpack ok\n");
 
         try {
             $this->repository->read_object($new_oid);
             $this->repository->set_ref_head( $ref_name, $new_oid );
         } catch(GitException $e) {
-            $git_response->append_error_chunk("error processing pack: $new_oid\n");
-            $git_response->append_error_chunk('0000');
+            $git_response->append_error_packet_line("error processing pack: $new_oid\n");
+            $git_response->append_error_packet_line('0000');
             return false;
         }
-
-        $git_response->append_sideband_chunk("0017ok $ref_name\n");
-        $git_response->append_sideband_chunk("0000");
+        
+        $git_response->append_sideband_packet_line("ok $ref_name\n");
+        $git_response->append_sideband_packet_line("0000");
         $git_response->append_packet_line("0000");
+        
 		return true;
 	}
 
