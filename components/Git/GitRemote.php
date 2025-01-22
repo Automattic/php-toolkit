@@ -8,7 +8,7 @@ use WordPress\Filesystem\InMemoryFilesystem;
 use WordPress\Git\Model\Commit;
 use WordPress\Git\Model\TreeEntry;
 use WordPress\Git\Protocol\Parser\GitProtocolReader;
-use WordPress\Git\Protocol\GitProtocolProducer;
+use WordPress\Git\Protocol\GitProtocolEncoder;
 use WordPress\HttpClient\Client;
 use WordPress\HttpClient\Request;
 
@@ -35,7 +35,7 @@ class GitRemote {
 	public function ls_refs( $prefix='' ) {
 		$response = $this->http_request(
 			'/git-upload-pack',
-            GitProtocolProducer::encode_packet_lines( [
+            GitProtocolEncoder::encode_packet_lines( [
                 "command=ls-refs\n",
                 "agent=git/2.37.3\n",
                 "object-format=sha1\n",
@@ -106,7 +106,7 @@ class GitRemote {
 		// $delta = $this->repository->find_objects_added_in($push_commit, $parent_hash);
 		$delta = $this->repository->find_objects_added_in( $push_commit, $remote_commit );
 
-        $producer = new GitProtocolProducer();
+        $producer = new GitProtocolEncoder();
         $producer->append_packet_line("$remote_commit $push_commit refs/heads/$push_ref_name\0report-status force-update\n");
         $producer->append_packet_line('0000');
         $producer->append_packfile($this->repository, $delta);
@@ -174,7 +174,7 @@ class GitRemote {
     private function request_objects_list( $ref_hash ) {
         return $this->http_request(
             '/git-upload-pack',
-            GitProtocolProducer::encode_packet_lines([
+            GitProtocolEncoder::encode_packet_lines([
                 "want {$ref_hash} multi_ack_detailed no-done side-band thin-pack ofs-delta agent=git/2.37.3 filter\n",
                 "filter blob:none\n",
                 "shallow {$ref_hash}\n",
@@ -302,7 +302,7 @@ class GitRemote {
 
 		$response = $this->http_request(
 			'/git-upload-pack',
-			GitProtocolProducer::encode_packet_lines($packet_lines),
+			GitProtocolEncoder::encode_packet_lines($packet_lines),
 			array(
 				'Accept: application/x-git-upload-pack-advertisement',
 				'Content-Type: application/x-git-upload-pack-request',

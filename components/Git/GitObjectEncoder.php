@@ -7,7 +7,7 @@ use WordPress\ByteStream\Transformer\DeflateTransformer;
 use WordPress\ByteStream\Writer\ByteConsumer;
 use WordPress\ByteStream\Writer\TransformedConsumer;
 
-class GitObjectConsumer implements ByteConsumer {
+class GitObjectEncoder implements ByteConsumer {
 
     private $downstream;
     private $repository;

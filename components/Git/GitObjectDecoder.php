@@ -8,7 +8,7 @@ use WordPress\ByteStream\Producer\InflateProducer;
 use WordPress\Git\Protocol\Parser\CommitParser;
 use WordPress\Git\Protocol\Parser\TreeParser;
 
-class GitObjectProducer extends BaseByteProducer {
+class GitObjectDecoder extends BaseByteProducer {
 
     private $object_header;
     private $object_type_name;
@@ -23,8 +23,6 @@ class GitObjectProducer extends BaseByteProducer {
      * @var InflateProducer
      */
     private $inflated_body_reader;
-
-    protected $inflate_encoding = ZLIB_ENCODING_DEFLATE;
 
     public function __construct(ByteProducer $upstream) {
         $this->upstream = $upstream;
@@ -45,10 +43,10 @@ class GitObjectProducer extends BaseByteProducer {
         return $this->uncompressed_length;
     }
 
-    protected function internal_pull($n): string {
+    public function internal_pull($n): string {
         $this->ensure_object_header();
-        $this->inflated_body_reader->pull($n);
-        return $this->inflated_body_reader->peek($n);
+        $available = $this->inflated_body_reader->pull($n);
+        return $this->inflated_body_reader->consume($available);
     }
 
     public function as_commit() {
@@ -105,7 +103,7 @@ class GitObjectProducer extends BaseByteProducer {
     protected function seek_outside_of_buffer(int $target_offset): void {
         $this->ensure_object_header();
         $this->inflated_body_reader->seek($target_offset);
-        
+
 	    $this->buffer = '';
 		$this->offset_in_current_buffer = 0;
 		$this->bytes_already_forgotten = $target_offset;

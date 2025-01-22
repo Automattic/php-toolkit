@@ -10,7 +10,7 @@ use WordPress\ByteStream\Writer\TransformedConsumer;
 use WordPress\Git\Model\Tree;
 use WordPress\Git\Protocol\Parser\PackParser;
 
-class GitProtocolProducer extends BaseByteProducer {
+class GitProtocolEncoder extends BaseByteProducer {
 
     private $object_reader;
     private $packfile_pipe;

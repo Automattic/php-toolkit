@@ -11,7 +11,7 @@ use WordPress\Git\Model\Commit;
 use WordPress\Git\Model\Tree;
 use WordPress\Git\Model\TreeEntry;
 use WordPress\Git\Protocol\Parser\ProtocolDemultiplexer;
-use WordPress\Git\Protocol\GitProtocolProducer;
+use WordPress\Git\Protocol\GitProtocolEncoder;
 
 class ProtocolDemultiplexerTest extends \PHPUnit\Framework\TestCase {
 
@@ -21,7 +21,7 @@ class ProtocolDemultiplexerTest extends \PHPUnit\Framework\TestCase {
         $repo = new GitRepository(InMemoryFilesystem::create());
         $oid = $repo->add_object(
             'tree',
-            GitProtocolProducer::encode_tree_bytes(new Tree([
+            GitProtocolEncoder::encode_tree_bytes(new Tree([
                 new TreeEntry([
                     'mode' => '100644',
                     'name' => 'test.txt',
@@ -30,7 +30,7 @@ class ProtocolDemultiplexerTest extends \PHPUnit\Framework\TestCase {
             ]))
         );
 
-        $producer = new GitProtocolProducer();
+        $producer = new GitProtocolEncoder();
         $producer->append_packet_line(Commit::NULL_HASH . " " . Commit::NULL_HASH . " refs/heads/\0report-status force-update\n");
         $producer->append_packet_line("ef9fae98ba6dd17140b45bc657659b6c41a4ad10 HEAD\n");
         $producer->append_packet_line('0000');
@@ -65,8 +65,8 @@ class ProtocolDemultiplexerTest extends \PHPUnit\Framework\TestCase {
             array_slice($chunks, 0, 6)
         );
         $this->assertStringStartsWith('PACK', $chunks[6]);
-        $this->assertEquals(42, strlen($chunks[6]));
-        $this->assertEquals(4, strlen($chunks[7]));
+        $this->assertEquals(16, strlen($chunks[6]));
+        $this->assertEquals(69, strlen($chunks[7]));
     }
 
     public function test_parse_response_no_blobs() {

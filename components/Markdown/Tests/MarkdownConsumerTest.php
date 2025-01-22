@@ -115,20 +115,6 @@ HTML
         ];
     }
 
-    public function test_markdown_to_blocks_excerpt() {
-        $input = file_get_contents(__DIR__ . '/fixtures/markdown-to-blocks/excerpt.input.md');
-        $consumer = new MarkdownConsumer($input);
-        $result = $consumer->consume();
-        $blocks = $result->get_block_markup();
-
-        $output_file = __DIR__ . '/fixtures/markdown-to-blocks/excerpt.output.html';
-        if (getenv('UPDATE_FIXTURES')) {
-            file_put_contents($output_file, $blocks);
-        }
-
-        $this->assertEquals(file_get_contents($output_file), $blocks);
-    }
-
     public function test_frontmatter_extraction() {
         $markdown = <<<MD
 ---

@@ -6,7 +6,7 @@ use WordPress\ByteStream\MemoryPipe;
 use WordPress\Git\Model\Commit;
 use WordPress\Git\Protocol\Parser\GitProtocolReader;
 use WordPress\Git\Protocol\Parser\PacketParser;
-use WordPress\Git\Protocol\GitProtocolProducer;
+use WordPress\Git\Protocol\GitProtocolEncoder;
 use WordPress\HttpServer\ResponseWriter\ResponseConsumer;
 
 /**
@@ -26,7 +26,7 @@ class GitEndpoint {
 	public function handle_request( $path, $request_bytes, ResponseConsumer $http_response ) {
 		error_log( 'Request: ' . $path );
 
-        $git_response = new GitProtocolProducer($http_response);
+        $git_response = new GitProtocolEncoder($http_response);
 		switch ( $path ) {
 			case '/info/refs?service=git-upload-pack':
 				$this->send_protocol_v2_headers( $http_response, 'git-upload-pack' );
@@ -123,7 +123,7 @@ class GitEndpoint {
 	 * @param array $request_bytes The parsed request data
 	 * @return string The response in Git protocol v2 format
 	 */
-	public function handle_ls_refs_request( $request_bytes, GitProtocolProducer $git_response ) {
+	public function handle_ls_refs_request( $request_bytes, GitProtocolEncoder $git_response ) {
 		$parsed = $this->parse_message( $request_bytes );
 		if ( ! $parsed ) {
 			// return false;
@@ -138,7 +138,7 @@ class GitEndpoint {
 		);
 	}
 
-	private function respond_with_ls_refs( GitProtocolProducer $git_response, $options ) {
+	private function respond_with_ls_refs( GitProtocolEncoder $git_response, $options ) {
 		$ref_prefixes              = $options['ref-prefix'] ?? array( '' );
 		$capabilities_to_advertise = $options['capabilities'];
 
@@ -247,7 +247,7 @@ class GitEndpoint {
 	 * @param array $request_bytes The parsed request data
 	 * @return string The response in Git protocol v2 format containing the pack data
 	 */
-	public function handle_fetch_request( $request_bytes, GitProtocolProducer $git_response ) {
+	public function handle_fetch_request( $request_bytes, GitProtocolEncoder $git_response ) {
 		$parsed = $this->parse_message( $request_bytes );
 		if ( ! $parsed || empty( $parsed['arguments']['want'] ) ) {
 			return false;
@@ -339,8 +339,8 @@ class GitEndpoint {
 					if ( $filter['filter'] === 'none' ) {
 						continue; // Skip all blobs
 					} elseif ( $filter['filter'] === 'limit' ) {
-						$content = $reader->get_uncompressed_size();
-						if ( strlen( $content ) > $filter['size'] ) {
+						$size = $reader->get_uncompressed_size();
+						if ( $size > $filter['size'] ) {
 							continue; // Skip large blobs
 						}
 					}
@@ -358,6 +358,7 @@ class GitEndpoint {
 			throw new GitException( 'Deepen is not implemented yet' );
 		}
 
+        $git_response->append_packet_line("packfile\n");
         $git_response->append_packfile($this->repository, $pack_objects);
         $git_response->append_packet_line('0000');
 		return true;
@@ -371,13 +372,15 @@ class GitEndpoint {
 	 *
 	 * @return bool Success status
 	 */
-	public function handle_push_request( $request_bytes, GitProtocolProducer $git_response ) {
+	public function handle_push_request( $request_bytes, GitProtocolEncoder $git_response ) {
         $protocol_reader = new GitProtocolReader(
             new MemoryPipe($request_bytes),
             ['write_to_repository' => $this->repository]
         );
         $header = $this->parse_push_header($protocol_reader);
 		if ( ! $header || empty( $header['new_oid'] ) ) {
+			$git_response->append_error_chunk("error header is empty\n");
+			$git_response->append_error_chunk('0000');
 			return false;
 		}
 
@@ -445,9 +448,9 @@ class GitEndpoint {
 	private function parse_push_header( GitProtocolReader $protocol_reader ) {
         while($protocol_reader->next_token()) {
             switch($protocol_reader->get_token_type()) {
-                case '#packet':
+                case '#packet-footer':
                     $line = $protocol_reader->get_packet_body();
-                    if ( ! preg_match( '/^(?:([0-9a-f]{40}) )?([0-9a-f]{40}) (.+?)\0(.*?)$/', $line['payload'], $matches ) ) {
+                    if ( ! preg_match( '/^(?:([0-9a-f]{40}) )?([0-9a-f]{40}) (.+?)\0(.*?)$/', $line, $matches ) ) {
                         throw new GitException( 'Invalid push request' );
                     }
                     return array(

@@ -31,7 +31,6 @@ class InflateProducer extends BaseByteProducer {
     protected $buffer = '';
     protected $bytes_already_forgotten = 0;
     protected $offset_in_current_buffer = 0;
-    protected $inflated_offset = 0;
 
     public function __construct(ByteProducer $upstream, $encoding = ZLIB_ENCODING_DEFLATE) {
         $this->inflate_encoding = $encoding;

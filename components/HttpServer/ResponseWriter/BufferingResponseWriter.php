@@ -29,7 +29,6 @@ class BufferingResponseWriter implements ResponseConsumer {
     }
 
     public function close(): void {
-        $this->is_closed = true;
         http_response_code($this->http_code);
         foreach ($this->headers as $key => $value) {
             header($key . ': ' . $value);
