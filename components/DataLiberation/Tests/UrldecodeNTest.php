@@ -1,6 +1,7 @@
 <?php
 
 use PHPUnit\Framework\TestCase;
+
 use function WordPress\DataLiberation\URL\urldecode_n;
 
 class UrldecodeNTest extends TestCase {

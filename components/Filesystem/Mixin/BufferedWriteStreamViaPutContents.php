@@ -2,8 +2,8 @@
 
 namespace WordPress\Filesystem\Mixin;
 
-use WordPress\ByteStream\Writer\ByteConsumer;
 use WordPress\ByteStream\MemoryPipe;
+use WordPress\ByteStream\Writer\ByteConsumer;
 
 /**
  * Implements open_write_stream() as a buffered write stream that, upon closing,

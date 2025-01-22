@@ -4,9 +4,9 @@ namespace WordPress\Git;
 
 use WordPress\ByteStream\MemoryPipe;
 use WordPress\Git\Model\Commit;
+use WordPress\Git\Protocol\GitProtocolEncoder;
 use WordPress\Git\Protocol\Parser\GitProtocolReader;
 use WordPress\Git\Protocol\Parser\PacketParser;
-use WordPress\Git\Protocol\GitProtocolEncoder;
 use WordPress\HttpServer\ResponseWriter\ResponseConsumer;
 
 /**

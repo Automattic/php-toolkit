@@ -7,8 +7,8 @@ use WordPress\ByteStream\Producer\ProducerProducer;
 use WordPress\Filesystem\InMemoryFilesystem;
 use WordPress\Git\Model\Commit;
 use WordPress\Git\Model\TreeEntry;
-use WordPress\Git\Protocol\Parser\GitProtocolReader;
 use WordPress\Git\Protocol\GitProtocolEncoder;
+use WordPress\Git\Protocol\Parser\GitProtocolReader;
 use WordPress\HttpClient\Client;
 use WordPress\HttpClient\Request;
 

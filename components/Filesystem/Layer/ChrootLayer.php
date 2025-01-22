@@ -5,8 +5,9 @@ namespace WordPress\Filesystem\Layer;
 use WordPress\ByteStream\Producer\ByteProducer;
 use WordPress\ByteStream\Writer\ByteConsumer;
 use WordPress\Filesystem\Filesystem;
-use function WordPress\Filesystem\wp_join_paths;
+
 use function WordPress\Filesystem\wp_canonicalize_path;
+use function WordPress\Filesystem\wp_join_paths;
 
 /**
  * A filesystem wrapper that chroot's the filesystem to a specific path.

@@ -2,9 +2,9 @@
 
 namespace WordPress\DataLiberation\EntityReader;
 
-use WordPress\XML\XMLProcessor;
 use WordPress\DataLiberation\DataFormatConsumer\MarkupProcessorConsumer;
 use WordPress\Filesystem\Filesystem;
+use WordPress\XML\XMLProcessor;
 
 /**
  * https://www.w3.org/AudioVideo/ebook/

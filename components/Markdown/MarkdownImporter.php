@@ -2,10 +2,10 @@
 
 namespace WordPress\Markdown;
 
-use WordPress\Filesystem\LocalFilesystem;
-use WordPress\DataLiberation\Importer\StreamImporter;
-use WordPress\DataLiberation\EntityReader\FilesystemEntityReader;
 use WordPress\DataLiberation\BlockMarkup\BlockMarkupUrlProcessor;
+use WordPress\DataLiberation\EntityReader\FilesystemEntityReader;
+use WordPress\DataLiberation\Importer\StreamImporter;
+use WordPress\Filesystem\LocalFilesystem;
 
 class MarkdownImporter extends StreamImporter {
 

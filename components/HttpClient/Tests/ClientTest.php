@@ -2,11 +2,10 @@
 
 namespace WordPress\HttpClient\Tests;
 
-use WordPress\HttpClient\Client;
-use WordPress\HttpClient\Tests\TestClient;
-use WordPress\HttpClient\Request;
-use WordPress\HttpClient\HttpError;
 use WordPress\ByteStream\Producer\RemoteFileProducer;
+use WordPress\HttpClient\Client;
+use WordPress\HttpClient\HttpError;
+use WordPress\HttpClient\Request;
 
 class ClientTest extends \PHPUnit\Framework\TestCase {
 

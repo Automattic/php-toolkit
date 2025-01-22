@@ -2,24 +2,23 @@
 
 namespace WordPress\Markdown;
 
-use WordPress\DataLiberation\DataFormatConsumer\DataFormatConsumer;
-use WordPress\DataLiberation\DataFormatConsumer\BlocksWithMetadata;
-use WordPress\DataLiberation\BlockMarkup\BlockObject;
-use WordPress\DataLiberation\Importer\ImportUtils;
-use \WP_HTML_Tag_Processor;
-
 use League\CommonMark\Environment\Environment;
 use League\CommonMark\Extension\CommonMark\CommonMarkCoreExtension;
-use League\CommonMark\Extension\GithubFlavoredMarkdownExtension;
-use League\CommonMark\Parser\MarkdownParser;
 use League\CommonMark\Extension\CommonMark\Node\Block as ExtensionBlock;
 use League\CommonMark\Extension\CommonMark\Node\Inline as ExtensionInline;
-use League\CommonMark\Node\Block;
-use League\CommonMark\Node\Inline;
+use League\CommonMark\Extension\GithubFlavoredMarkdownExtension;
 use League\CommonMark\Extension\Table\Table;
 use League\CommonMark\Extension\Table\TableCell;
 use League\CommonMark\Extension\Table\TableRow;
 use League\CommonMark\Extension\Table\TableSection;
+use League\CommonMark\Node\Block;
+use League\CommonMark\Node\Inline;
+use League\CommonMark\Parser\MarkdownParser;
+use WordPress\DataLiberation\BlockMarkup\BlockObject;
+use WordPress\DataLiberation\DataFormatConsumer\BlocksWithMetadata;
+use WordPress\DataLiberation\DataFormatConsumer\DataFormatConsumer;
+use WordPress\DataLiberation\Importer\ImportUtils;
+use WP_HTML_Tag_Processor;
 
 /**
  * Transforms markdown with frontmatter into a block markup and metadata pair.

@@ -2,9 +2,10 @@
 
 namespace WordPress\XML;
 
-use \WP_HTML_Span;
-use \WP_HTML_Attribute_Token;
-use \WP_HTML_Text_Replacement;
+use WP_HTML_Attribute_Token;
+use WP_HTML_Span;
+use WP_HTML_Text_Replacement;
+
 use function WordPress\Encoding\utf8_codepoint_at;
 
 /**
@@ -3315,7 +3316,7 @@ class XMLProcessor {
 		$this->last_error   = self::ERROR_SYNTAX;
 		_doing_it_wrong( __METHOD__, $error_message, 'WP_VERSION' );
 	}
-    
+
 	/**
 	 * Returns context for why the parser aborted due to unsupported XML, if it did.
 	 *

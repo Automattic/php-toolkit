@@ -5,8 +5,6 @@ use WordPress\Filesystem\Filesystem;
 use WordPress\Filesystem\InMemoryFilesystem;
 use WordPress\Filesystem\UploadedFilesystem;
 
-use function WordPress\Filesystem\wp_join_paths;
-
 class UploadedFilesystemTest extends TestCase {
 
     protected function create_fs($tree, $files): Filesystem {
@@ -36,7 +34,7 @@ class UploadedFilesystemTest extends TestCase {
                 return $this->files;
             }
         };
-        
+
         return UploadedFilesystem::create(
             $request,
             'tree',

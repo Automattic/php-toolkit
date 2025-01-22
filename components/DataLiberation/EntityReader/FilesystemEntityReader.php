@@ -2,15 +2,16 @@
 
 namespace WordPress\DataLiberation\EntityReader;
 
+use WordPress\DataLiberation\DataFormatConsumer\BlocksWithMetadata;
+use WordPress\DataLiberation\DataFormatConsumer\MarkupProcessorConsumer;
+use WordPress\DataLiberation\Importer\ImportedEntity;
+use WordPress\DataLiberation\Importer\ImportUtils;
 use WordPress\Filesystem\Filesystem;
 use WordPress\Filesystem\Visitor\FilesystemVisitor;
 use WordPress\Markdown\MarkdownConsumer;
-use WordPress\DataLiberation\DataFormatConsumer\BlocksWithMetadata;
-use WordPress\DataLiberation\DataFormatConsumer\MarkupProcessorConsumer;
 use WordPress\XML\XMLProcessor;
-use \WP_HTML_Processor;
-use WordPress\DataLiberation\Importer\ImportUtils;
-use WordPress\DataLiberation\Importer\ImportedEntity;
+use WP_HTML_Processor;
+
 use function WordPress\Filesystem\wp_join_paths;
 
 /**
@@ -534,7 +535,7 @@ class FilesystemEntityReader implements EntityReader {
 
     /**
      * @TODO: Implement this
-     * 
+     *
      * @return string
      */
     public function get_reentrancy_cursor() {

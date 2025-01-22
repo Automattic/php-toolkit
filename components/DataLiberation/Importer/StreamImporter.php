@@ -2,8 +2,8 @@
 
 namespace WordPress\DataLiberation\Importer;
 
-use WordPress\ByteStream\Producer\ResourceProducer;
 use WordPress\ByteStream\Producer\RemoteFileProducer;
+use WordPress\ByteStream\Producer\ResourceProducer;
 use WordPress\DataLiberation\BlockMarkup\BlockMarkupUrlProcessor;
 use WordPress\DataLiberation\EntityReader\EntityReaderIterator;
 use WordPress\DataLiberation\EntityReader\WXREntityReader;

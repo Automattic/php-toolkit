@@ -1,8 +1,8 @@
 <?php
 
 use PHPUnit\Framework\TestCase;
-use WordPress\Filesystem\LocalFilesystem;
 use WordPress\Filesystem\FilesystemException;
+use WordPress\Filesystem\LocalFilesystem;
 
 class LocalFilesystemTest extends TestCase {
 

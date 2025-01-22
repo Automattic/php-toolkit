@@ -2,7 +2,6 @@
 
 use PHPUnit\Framework\TestCase;
 use WordPress\ByteStream\Producer\ResourceProducer;
-use WordPress\ByteStream\Producer\RemoteFileRangedProducer;
 use WordPress\DataLiberation\EntityReader\EPubEntityReader;
 use WordPress\Zip\ZipFilesystem;
 

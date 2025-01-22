@@ -5,6 +5,7 @@
  * @package WordPress
  * @subpackage XML-API
  */
+
 use PHPUnit\Framework\TestCase;
 use WordPress\XML\XMLProcessor;
 
@@ -564,7 +565,7 @@ class XMLProcessorTest extends TestCase {
 			public function __construct( $xml ) {
 				parent::__construct( $xml, self::CONSTRUCTOR_UNLOCK_CODE );
 			}
-			
+
 			/**
 			 * Returns the raw span of XML for the currently-matched
 			 * token, or null if not paused on any token.
@@ -1752,7 +1753,7 @@ class XMLProcessorTest extends TestCase {
 
 	/**
 	 * @ticket 61365
-	 * 
+	 *
 	 * @covers XMLProcessor::next_token
 	 */
 	public function test_doctype_parsing() {
@@ -1768,7 +1769,7 @@ class XMLProcessorTest extends TestCase {
 
 	/**
 	 * @ticket 61365
-	 * 
+	 *
 	 * @covers XMLProcessor::next_token
 	 */
 	public function test_unsupported_doctype_parsing() {

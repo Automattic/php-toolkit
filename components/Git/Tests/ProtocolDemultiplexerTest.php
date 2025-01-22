@@ -10,8 +10,8 @@ use WordPress\Git\GitRepository;
 use WordPress\Git\Model\Commit;
 use WordPress\Git\Model\Tree;
 use WordPress\Git\Model\TreeEntry;
-use WordPress\Git\Protocol\Parser\ProtocolDemultiplexer;
 use WordPress\Git\Protocol\GitProtocolEncoder;
+use WordPress\Git\Protocol\Parser\ProtocolDemultiplexer;
 
 class ProtocolDemultiplexerTest extends \PHPUnit\Framework\TestCase {
 

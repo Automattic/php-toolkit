@@ -1,7 +1,6 @@
 <?php
 
 use PHPUnit\Framework\TestCase;
-
 use WordPress\DataLiberation\URL\URLInTextProcessor;
 
 class URLInTextProcessorTest extends TestCase {
@@ -33,7 +32,7 @@ class URLInTextProcessorTest extends TestCase {
 			'127.0.0.1' => ['http://127.0.0.1', 'http://127.0.0.1/', 'Visit http://127.0.0.1'],
 			'Reserved TLD – example.internal' => ['http://example.internal', 'http://example.internal/', 'Visit http://example.internal'],
 			'Reserved TLD – example.test' => ['http://example.test', 'http://example.test/', 'Visit http://example.test'],
-            
+
             // Subdomains
             'Single Subdomain' => ['http://blog.example.com', 'http://blog.example.com/', 'Visit http://blog.example.com'],
             'Multiple Subdomains' => ['http://a.b.c.d.example.com', 'http://a.b.c.d.example.com/', 'Visit http://a.b.c.d.example.com'],
@@ -41,12 +40,12 @@ class URLInTextProcessorTest extends TestCase {
             'Multiple Subdomains with Port' => ['http://sub1.sub2.example.com:3000', 'http://sub1.sub2.example.com:3000/', 'Try this: http://sub1.sub2.example.com:3000'],
             'Subdomain with Query' => ['http://blog.example.com/?id=1', 'http://blog.example.com/?id=1', 'Visit http://blog.example.com/?id=1'],
             'Subdomain with Path and Query' => ['http://api.blog.example.com/v1/posts?sort=asc', 'http://api.blog.example.com/v1/posts?sort=asc', 'API link: http://api.blog.example.com/v1/posts?sort=asc'],
-            
+
             // Ports
             'With Port Number' => ['http://example.com:8080', 'http://example.com:8080/', 'Visit http://example.com:8080'],
             'HTTPS with Port' => ['https://example.com:443', 'https://example.com/', 'Secure link: https://example.com:443'],
             'Non-Standard Port' => ['https://example.com:12345', 'https://example.com:12345/', 'Check out https://example.com:12345'],
-            
+
             // Paths
             'Simple Path' => ['http://example.com/path', 'http://example.com/path', 'Visit http://example.com/path'],
             'Nested Paths' => ['http://example.com/path/to/resource', 'http://example.com/path/to/resource', 'Visit http://example.com/path/to/resource'],
@@ -58,7 +57,7 @@ class URLInTextProcessorTest extends TestCase {
             'Empty Path' => ['http://example.com/', 'http://example.com/', 'Link to root: http://example.com/'],
 			'Double Slash' => ['http://example.com//path//to/resource', 'http://example.com//path//to/resource', 'Visit http://example.com//path//to/resource'],
 			'Dot segments' => ['http://example.com/./path/../to/resource', 'http://example.com/to/resource', 'Check http://example.com/./path/../to/resource'],
-            
+
             // Query Parameters
             'Single Parameter' => ['http://example.com/?id=123', 'http://example.com/?id=123', 'Visit http://example.com/?id=123'],
             'Multiple Parameters' => ['http://example.com/?id=123&name=abc', 'http://example.com/?id=123&name=abc', 'Visit http://example.com/?id=123&name=abc'],
@@ -72,20 +71,20 @@ class URLInTextProcessorTest extends TestCase {
             'Does not ingest a trailing quote' => ['http://example.com/?param1=val1&param2=val@2', 'http://example.com/?param1=val1&param2=val@2', 'Params: "http://example.com/?param1=val1&param2=val@2"'],
             'Does not ingest a trailing parenthesis' => ['http://example.com/?param1=val1&param2=val@2', 'http://example.com/?param1=val1&param2=val@2', 'Params: (http://example.com/?param1=val1&param2=val@2)'],
             'Does not ingest a trailing dot' => ['http://example.com/?param1=val1&param2=val@2', 'http://example.com/?param1=val1&param2=val@2', 'Params: http://example.com/?param1=val1&param2=val@2.'],
-            
+
             // Fragments
             'Simple Fragment' => ['http://example.com/#section1', 'http://example.com/#section1', 'Visit http://example.com/#section1'],
             'Fragment with Special Characters' => ['http://example.com/#/path/to/section', 'http://example.com/#/path/to/section', 'Section link: http://example.com/#/path/to/section'],
             'Fragment with Numbers' => ['http://example.com/#123', 'http://example.com/#123', 'Navigate to http://example.com/#123'],
             'Fragment Only' => ['http://example.com#fragment', 'http://example.com/#fragment', 'Check http://example.com#fragment'],
             'Fragment with Query' => ['http://example.com/?id=1#section', 'http://example.com/?id=1#section', 'Link with fragment: http://example.com/?id=1#section'],
-            
+
             // Internationalized Domain Names (IDNs)
             'Unicode Domains' => ['http://例子.测试', 'http://xn--fsqu00a.xn--0zwm56d/', 'Visit http://例子.测试'],
             'Punycode Representation' => ['http://xn--fsqu00a.xn--0zwm56d', 'http://xn--fsqu00a.xn--0zwm56d/', 'Visit http://xn--fsqu00a.xn--0zwm56d'],
             'Unicode in Path' => ['http://example.com/über', 'http://example.com/%C3%BCber', 'Visit http://example.com/über'],
             'Unicode in Query' => ['http://example.com/?q=prüfung', 'http://example.com/?q=pr%C3%BCfung', 'Search at http://example.com/?q=prüfung'],
-            
+
             // IPv4 and IPv6
             'IPv4 Address' => ['http://192.168.0.1', 'http://192.168.0.1/', 'Visit http://192.168.0.1'],
             'IPv4 with Port' => ['http://192.168.0.1:8080', 'http://192.168.0.1:8080/', 'Access http://192.168.0.1:8080'],
@@ -157,7 +156,7 @@ class URLInTextProcessorTest extends TestCase {
 			// 'Mailto Protocol' => ['mailto:user@example.com'],
         ];
     }
-  
+
     public function test_set_url_returns_true_on_success() {
         $p = new URLInTextProcessor('Have you seen https://wordpress.org?');
         $p->next_url();

@@ -4,6 +4,7 @@ namespace WordPress\DataLiberation\Importer;
 
 use WordPress\HttpClient\Client;
 use WordPress\HttpClient\Request;
+
 use function WordPress\Filesystem\wp_join_paths;
 
 class AttachmentDownloader {

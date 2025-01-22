@@ -4,11 +4,9 @@ namespace WordPress\Git\Tests;
 
 use WordPress\ByteStream\MemoryPipe;
 use WordPress\ByteStream\Producer\ProducerProducer;
-use WordPress\Filesystem\InMemoryFilesystem;
 use WordPress\Git\GitObjectDecoder;
-use WordPress\Git\GitRepository;
-use WordPress\Git\Protocol\Parser\DeltaResolver;
 use WordPress\Git\Protocol\GitProtocolEncoder;
+use WordPress\Git\Protocol\Parser\DeltaResolver;
 
 class DeltaResolverTest extends \PHPUnit\Framework\TestCase {
 

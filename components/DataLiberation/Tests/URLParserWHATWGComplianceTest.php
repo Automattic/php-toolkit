@@ -1,7 +1,7 @@
 <?php
 
-use Rowbot\URL\URL;
 use PHPUnit\Framework\TestCase;
+use Rowbot\URL\URL;
 
 function load_test_examples() {
     $json = file_get_contents(__DIR__ . '/whatwg_url_test_data.json');

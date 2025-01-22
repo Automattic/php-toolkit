@@ -2,10 +2,10 @@
 
 namespace WordPress\Git\Tests;
 
-use WordPress\Git\GitRepository;
 use PHPUnit\Framework\TestCase;
 use WordPress\Filesystem\InMemoryFilesystem as FilesystemInMemoryFilesystem;
 use WordPress\Git\GitFilesystem;
+use WordPress\Git\GitRepository;
 use WordPress\Git\Model\Commit;
 
 class GitFilesystemTest extends TestCase {
@@ -35,7 +35,7 @@ class GitFilesystemTest extends TestCase {
             'subdirectory'
         ), $this->fs->ls('/'));
     }
-    
+
     public function test_ls_subdirectory() {
         $this->assertEquals(array(
             'hello-world.txt',

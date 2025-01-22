@@ -2,9 +2,9 @@
 
 namespace WordPress\DataLiberation\DataFormatConsumer;
 
+use WordPress\DataLiberation\BlockMarkup\BlockObject;
 use WordPress\DataLiberation\DataLiberationException;
 use WordPress\DataLiberation\Importer\ImportUtils;
-use WordPress\DataLiberation\BlockMarkup\BlockObject;
 use WordPress\XML\XMLProcessor;
 use WP_HTML_Processor;
 

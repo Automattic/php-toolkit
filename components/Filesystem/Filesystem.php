@@ -4,7 +4,6 @@ namespace WordPress\Filesystem;
 
 use WordPress\ByteStream\Producer\ByteProducer;
 use WordPress\ByteStream\Writer\ByteConsumer;
-use WordPress\Filesystem\FilesystemException;
 
 /**
  * Interface for filesystem implementations.

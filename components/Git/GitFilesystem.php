@@ -2,9 +2,9 @@
 
 namespace WordPress\Git;
 
-use WordPress\Filesystem\FilesystemException;
 use WordPress\ByteStream\Producer\ByteProducer;
 use WordPress\Filesystem\Filesystem;
+use WordPress\Filesystem\FilesystemException;
 use WordPress\Filesystem\Layer\ChrootLayer;
 use WordPress\Filesystem\Mixin\BufferedWriteStreamViaPutContents;
 use WordPress\Filesystem\Mixin\CopyRecursiveViaStreaming;

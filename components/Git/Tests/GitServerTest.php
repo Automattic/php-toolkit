@@ -9,8 +9,8 @@ use WordPress\Git\GitRepository;
 use WordPress\Git\Model\Commit;
 use WordPress\Git\Model\Tree;
 use WordPress\Git\Model\TreeEntry;
-use WordPress\Git\Protocol\Parser\GitProtocolReader;
 use WordPress\Git\Protocol\GitProtocolEncoder;
+use WordPress\Git\Protocol\Parser\GitProtocolReader;
 use WordPress\HttpServer\ResponseWriter\BufferingResponseWriter;
 
 class GitServerTest extends TestCase {

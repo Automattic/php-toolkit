@@ -3,6 +3,7 @@
 namespace WordPress\Filesystem\Mixin;
 
 use WordPress\Filesystem\FilesystemException;
+
 use function WordPress\Filesystem\wp_join_paths;
 
 /**

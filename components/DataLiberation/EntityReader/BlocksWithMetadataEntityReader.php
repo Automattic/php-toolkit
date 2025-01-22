@@ -2,9 +2,10 @@
 
 namespace WordPress\DataLiberation\EntityReader;
 
+use WordPress\DataLiberation\DataFormatConsumer\BlocksWithMetadata;
 use WordPress\DataLiberation\Importer\ImportedEntity;
 use WordPress\DataLiberation\Importer\ImportUtils;
-use WordPress\DataLiberation\DataFormatConsumer\BlocksWithMetadata;
+
 /**
  * Converts a WP_Blocks_With_Metadata object into a stream of WordPress post and post meta entities.
  *

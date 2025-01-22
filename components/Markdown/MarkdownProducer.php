@@ -2,8 +2,8 @@
 
 namespace WordPress\Markdown;
 
-use WordPress\DataLiberation\DataLiberationHTMLProcessor;
 use WordPress\DataLiberation\DataFormatProducer\DataFormatProducer;
+use WordPress\DataLiberation\DataLiberationHTMLProcessor;
 
 /**
  * Converts WordPress blocks and metadata to Markdown with frontmatter.

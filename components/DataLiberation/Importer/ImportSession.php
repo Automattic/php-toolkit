@@ -3,7 +3,7 @@
 namespace WordPress\DataLiberation\Importer;
 
 use WordPress\DataLiberation\DataLiberationException;
-use \WP_Query;
+use WP_Query;
 
 /**
  * Manages import session data in the WordPress database.
@@ -301,8 +301,8 @@ class ImportSession {
 		global $wpdb;
 		return (int) $wpdb->get_var(
 			$wpdb->prepare(
-				"SELECT COUNT(*) FROM $wpdb->posts 
-				 WHERE post_type = 'frontloading_placeholder' 
+				"SELECT COUNT(*) FROM $wpdb->posts
+				 WHERE post_type = 'frontloading_placeholder'
 				 AND post_parent = %d
 				 AND post_status = %s",
 				$this->post_id,
@@ -315,8 +315,8 @@ class ImportSession {
 		global $wpdb;
 		return (int) $wpdb->get_var(
 			$wpdb->prepare(
-				"SELECT COUNT(*) FROM $wpdb->posts 
-				 WHERE post_type = 'frontloading_placeholder' 
+				"SELECT COUNT(*) FROM $wpdb->posts
+				 WHERE post_type = 'frontloading_placeholder'
 				 AND post_parent = %d
 				 AND post_status != %s
 				 AND post_status != %s",
@@ -378,8 +378,8 @@ class ImportSession {
 		global $wpdb;
 		return (int) $wpdb->get_var(
 			$wpdb->prepare(
-				"SELECT COUNT(*) FROM $wpdb->posts 
-			WHERE post_type = 'frontloading_placeholder' 
+				"SELECT COUNT(*) FROM $wpdb->posts
+			WHERE post_type = 'frontloading_placeholder'
 			AND post_parent = %d",
 				$this->post_id
 			)
@@ -422,8 +422,8 @@ class ImportSession {
 			 */
 			$exists = $wpdb->get_var(
 				$wpdb->prepare(
-					"SELECT ID FROM $wpdb->posts 
-				WHERE post_type = 'frontloading_placeholder' 
+					"SELECT ID FROM $wpdb->posts
+				WHERE post_type = 'frontloading_placeholder'
 				AND post_parent = %d
 				AND guid = %s
 				LIMIT 1",
