@@ -4,7 +4,7 @@ namespace WordPress\Git\Tests;
 
 use WordPress\ByteStream\MemoryPipe;
 use WordPress\ByteStream\ReadStream\ProducerProducer;
-use WordPress\Git\GitObjectDecodeReadStream;
+use WordPress\Git\GitObjectDecoder;
 use WordPress\Git\Protocol\GitProtocolEncoderPipe;
 use WordPress\Git\Protocol\Parser\DeltaResolver;
 
@@ -17,7 +17,7 @@ class DeltaResolverTest extends \PHPUnit\Framework\TestCase {
             'blob ' . strlen($base_bytes) . "\000" .
             gzcompress($base_bytes, 9, ZLIB_ENCODING_DEFLATE)
         );
-        $base_reader = new GitObjectDecodeReadStream($object);
+        $base_reader = new GitObjectDecoder($object);
         $base_reader->read_header();
 
         $resolved_chunk = "World? Hello, I am changed!";

@@ -5,14 +5,14 @@ namespace WordPress\Git\Protocol\Parser;
 use WordPress\ByteStream\NotEnoughDataException;
 use WordPress\ByteStream\ReadStream\ByteReadStream;
 use WordPress\Git\GitException;
-use WordPress\Git\GitObjectDecodeReadStream;
+use WordPress\Git\GitObjectDecoder;
 
 class DeltaResolver {
 
     /**
      * Source repository
      *
-     * @var GitObjectDecodeReadStream
+     * @var GitObjectDecoder
      */
     private $base_object_reader;
 
@@ -28,7 +28,7 @@ class DeltaResolver {
     private $resolved_chunk = '';
     private $paused_on_incomplete_input = false;
 
-    public function __construct(GitObjectDecodeReadStream $base_object_reader, ByteReadStream $delta_reader) {
+    public function __construct(GitObjectDecoder $base_object_reader, ByteReadStream $delta_reader) {
         $this->base_object_reader    = $base_object_reader;
         $this->delta_reader          = $delta_reader;
     }

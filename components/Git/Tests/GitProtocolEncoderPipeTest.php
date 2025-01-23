@@ -5,7 +5,7 @@ namespace WordPress\Git\Tests;
 use WordPress\ByteStream\ReadStream\FileReadStream;
 use WordPress\Filesystem\InMemoryFilesystem;
 use WordPress\Git\GitRepository;
-use WordPress\Git\Protocol\Parser\GitProtocolReader;
+use WordPress\Git\Protocol\Parser\GitProtocolDecoder;
 
 class GitProtocolEncoderPipeTest extends \PHPUnit\Framework\TestCase {
 
@@ -13,7 +13,7 @@ class GitProtocolEncoderPipeTest extends \PHPUnit\Framework\TestCase {
         $repo = new GitRepository(InMemoryFilesystem::create());
 
         $upstream = FileReadStream::from_path( __DIR__ . '/fixtures/wordpress-develop-response-no-blobs.bin');
-        $reader = new GitProtocolReader(
+        $reader = new GitProtocolDecoder(
             $upstream,
             ['write_to_repository' => $repo]
         );

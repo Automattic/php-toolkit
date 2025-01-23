@@ -8,7 +8,7 @@ use WordPress\Filesystem\InMemoryFilesystem;
 use WordPress\Git\Model\Commit;
 use WordPress\Git\Model\TreeEntry;
 use WordPress\Git\Protocol\GitProtocolEncoderPipe;
-use WordPress\Git\Protocol\Parser\GitProtocolReader;
+use WordPress\Git\Protocol\Parser\GitProtocolDecoder;
 use WordPress\HttpClient\Client;
 use WordPress\HttpClient\Request;
 
@@ -52,7 +52,7 @@ class GitRemote {
 		);
 
 		$refs = array();
-        $protocol = new GitProtocolReader($response, ['will_process_pack' => false]);
+        $protocol = new GitProtocolDecoder($response, [ 'will_process_pack' => false]);
         while($protocol->next_token()) {
             switch($protocol->get_token_type()) {
                 case '#packet-footer':
@@ -127,7 +127,7 @@ class GitRemote {
 		);
 
         $data_packets = array();
-        $protocol = new GitProtocolReader(
+        $protocol = new GitProtocolDecoder(
             $response,
             ['will_process_pack' => false]
         );
@@ -165,7 +165,7 @@ class GitRemote {
 		$response = $this->request_objects_list($ref_hash);
         $tmp_repo = new GitRepository(InMemoryFilesystem::create());
         $tmp_repo->set_ref_head('HEAD', $ref_hash);
-        $protocol = new GitProtocolReader(
+        $protocol = new GitProtocolDecoder(
             $response,
             [
                 'write_to_repository' => $tmp_repo,
@@ -216,7 +216,7 @@ class GitRemote {
             }
 
             $response = $this->request_objects_list($remote_head);
-            $protocol = new GitProtocolReader(
+            $protocol = new GitProtocolDecoder(
                 $response,
                 [
                     'write_to_repository' => $this->repository,
@@ -314,7 +314,7 @@ class GitRemote {
 			)
 		);
 
-        $protocol = new GitProtocolReader(
+        $protocol = new GitProtocolDecoder(
             $response,
             [
                 'write_to_repository' => $this->repository,

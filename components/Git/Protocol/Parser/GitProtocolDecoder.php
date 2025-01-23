@@ -5,10 +5,10 @@ namespace WordPress\Git\Protocol\Parser;
 use WordPress\ByteStream\MemoryPipe;
 use WordPress\ByteStream\ReadStream\ByteReadStream;
 use WordPress\Git\GitException;
-use WordPress\Git\GitObjectDecodeReadStream;
+use WordPress\Git\GitObjectDecoder;
 use WordPress\Git\GitRepository;
 
-class GitProtocolReader {
+class GitProtocolDecoder {
 
     protected $write_to_repository;
     protected $resolve_deltas_from_repository;
@@ -26,7 +26,7 @@ class GitProtocolReader {
     private $resolved_deltas = [];
 
     /**
-     * @var GitObjectDecodeReadStream
+     * @var GitObjectDecoder
      */
     private $new_object_write_stream;
 

@@ -8,7 +8,7 @@ use WordPress\ByteStream\ReadStream\InflateReadStream;
 use WordPress\Git\Protocol\Parser\CommitParser;
 use WordPress\Git\Protocol\Parser\TreeParser;
 
-class GitObjectDecodeReadStream extends BaseByteReadStream {
+class GitObjectDecoder extends BaseByteReadStream {
 
     private $object_header;
     private $object_type_name;

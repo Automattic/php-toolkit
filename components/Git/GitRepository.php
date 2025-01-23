@@ -147,7 +147,7 @@ class GitRepository {
 			));
 		}
 
-		$peoducer = new GitObjectDecodeReadStream(
+		$peoducer = new GitObjectDecoder(
 			$this->fs->open_read_stream($this->get_storage_path($oid))
 		);
         $peoducer->read_header();

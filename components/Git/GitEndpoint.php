@@ -5,7 +5,7 @@ namespace WordPress\Git;
 use WordPress\ByteStream\MemoryPipe;
 use WordPress\Git\Model\Commit;
 use WordPress\Git\Protocol\GitProtocolEncoderPipe;
-use WordPress\Git\Protocol\Parser\GitProtocolReader;
+use WordPress\Git\Protocol\Parser\GitProtocolDecoder;
 use WordPress\Git\Protocol\Parser\PacketParser;
 use WordPress\HttpServer\ResponseWriter\ResponseWriteStream;
 
@@ -387,7 +387,7 @@ class GitEndpoint {
 	 * @return bool Success status
 	 */
 	public function handle_push_request( $request_bytes, GitProtocolEncoderPipe $git_response ) {
-        $protocol_reader = new GitProtocolReader(
+        $protocol_reader = new GitProtocolDecoder(
             new MemoryPipe($request_bytes),
             ['write_to_repository' => $this->repository]
         );
@@ -460,7 +460,7 @@ class GitEndpoint {
 	 * @param string $request_bytes Raw request bytes
 	 * @return array|false Parsed request data or false on error
 	 */
-	private function parse_push_header( GitProtocolReader $protocol_reader ) {
+	private function parse_push_header( GitProtocolDecoder $protocol_reader ) {
         while($protocol_reader->next_token()) {
             switch($protocol_reader->get_token_type()) {
                 case '#packet-footer':

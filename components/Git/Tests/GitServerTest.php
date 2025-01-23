@@ -10,7 +10,7 @@ use WordPress\Git\Model\Commit;
 use WordPress\Git\Model\Tree;
 use WordPress\Git\Model\TreeEntry;
 use WordPress\Git\Protocol\GitProtocolEncoderPipe;
-use WordPress\Git\Protocol\Parser\GitProtocolReader;
+use WordPress\Git\Protocol\Parser\GitProtocolDecoder;
 use WordPress\HttpServer\ResponseWriter\BufferingResponseWriter;
 
 class GitServerTest extends TestCase {
@@ -388,7 +388,7 @@ RESPONSE
             );
 
             $rest_of_response = substr($response, strlen($expected_response_start));
-            $reader = new GitProtocolReader(
+            $reader = new GitProtocolDecoder(
                 new MemoryPipe($rest_of_response),
                 [
                     'write_to_repository' => $this->repository,
