@@ -4,10 +4,10 @@ namespace WordPress\Git;
 
 use WordPress\ByteStream\MemoryPipe;
 use WordPress\Git\Model\Commit;
-use WordPress\Git\Protocol\GitProtocolEncoder;
+use WordPress\Git\Protocol\GitProtocolEncoderPipe;
 use WordPress\Git\Protocol\Parser\GitProtocolReader;
 use WordPress\Git\Protocol\Parser\PacketParser;
-use WordPress\HttpServer\ResponseWriter\ResponseConsumer;
+use WordPress\HttpServer\ResponseWriter\ResponseWriteStream;
 
 /**
  * Implement Git server protocol v2
@@ -23,8 +23,8 @@ class GitEndpoint {
 		$this->repository = $repository;
 	}
 
-	public function handle_request( $path, $request_bytes, ResponseConsumer $http_response ) {
-        $git_response = new GitProtocolEncoder();
+	public function handle_request( $path, $request_bytes, ResponseWriteStream $http_response ) {
+        $git_response = new GitProtocolEncoderPipe();
 		switch ( $path ) {
             case '/HEAD':
                 // $this->handle_head_request($request_bytes, $git_response);
@@ -91,10 +91,10 @@ class GitEndpoint {
             }
             $http_response->append_bytes($git_response->consume($available));
         }
-        $http_response->close();
+        $http_response->close_writing();
 	}
 
-	private function send_protocol_v2_headers( ResponseConsumer $response, $service ) {
+	private function send_protocol_v2_headers( ResponseWriteStream $response, $service ) {
 		$response->send_header( 'Content-Type', 'application/x-' . $service . '-advertisement' );
 		$response->send_header( 'Cache-Control', 'no-cache' );
 		$response->send_header( 'Git-Protocol', 'version=2' );
@@ -136,7 +136,7 @@ class GitEndpoint {
 	 * @param array $request_bytes The parsed request data
 	 * @return string The response in Git protocol v2 format
 	 */
-	public function handle_ls_refs_request( $request_bytes, GitProtocolEncoder $git_response ) {
+	public function handle_ls_refs_request( $request_bytes, GitProtocolEncoderPipe $git_response ) {
 		$parsed = $this->parse_message( $request_bytes );
 		if ( ! $parsed ) {
 			// return false;
@@ -151,7 +151,7 @@ class GitEndpoint {
 		);
 	}
 
-	private function respond_with_ls_refs( GitProtocolEncoder $git_response, $options ) {
+	private function respond_with_ls_refs( GitProtocolEncoderPipe $git_response, $options ) {
 		$ref_prefixes              = $options['ref-prefix'] ?? array( '' );
 		$capabilities_to_advertise = $options['capabilities'];
 
@@ -260,7 +260,7 @@ class GitEndpoint {
 	 * @param array $request_bytes The parsed request data
 	 * @return string The response in Git protocol v2 format containing the pack data
 	 */
-	public function handle_fetch_request( $request_bytes, GitProtocolEncoder $git_response ) {
+	public function handle_fetch_request( $request_bytes, GitProtocolEncoderPipe $git_response ) {
 		$parsed = $this->parse_message( $request_bytes );
 		if ( ! $parsed || empty( $parsed['arguments']['want'] ) ) {
 			return false;
@@ -382,11 +382,11 @@ class GitEndpoint {
 	 * Handle Git protocol v2 push command
 	 *
 	 * @param string $request_bytes Raw request bytes
-	 * @param ResponseConsumer  $response Response writer
+	 * @param ResponseWriteStream  $response Response writer
 	 *
 	 * @return bool Success status
 	 */
-	public function handle_push_request( $request_bytes, GitProtocolEncoder $git_response ) {
+	public function handle_push_request( $request_bytes, GitProtocolEncoderPipe $git_response ) {
         $protocol_reader = new GitProtocolReader(
             new MemoryPipe($request_bytes),
             ['write_to_repository' => $this->repository]
@@ -446,11 +446,11 @@ class GitEndpoint {
             $git_response->append_error_packet_line('0000');
             return false;
         }
-        
+
         $git_response->append_sideband_packet_line("ok $ref_name\n");
         $git_response->append_sideband_packet_line("0000");
         $git_response->append_packet_line("0000");
-        
+
 		return true;
 	}
 

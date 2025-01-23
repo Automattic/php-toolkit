@@ -2,7 +2,7 @@
 
 namespace WordPress\Filesystem\Mixin;
 
-use WordPress\ByteStream\Producer\ByteProducer;
+use WordPress\ByteStream\ReadStream\ByteReadStream;
 use WordPress\Filesystem\ByteStream\FilesystemReadStream;
 
 /**
@@ -22,7 +22,7 @@ trait InternalizeReadStream {
 	 *
 	 * @param string $path The path to the file.
 	 *
-	 * @return ByteProducer The stream.
+	 * @return ByteReadStream The stream.
      * @throws FilesystemException If the stream cannot be opened.
 	 *@example
 	 *
@@ -34,7 +34,7 @@ trait InternalizeReadStream {
 	 * $fs->close_read_stream();
 	 *
 	 */
-	public function open_read_stream($path): ByteProducer {
+	public function open_read_stream($path): ByteReadStream {
         $stream_id = $this->read_stream_internal_open($path);
         $this->read_streams[$stream_id] = new FilesystemReadStream($this, $stream_id);
         return $this->read_streams[$stream_id];

@@ -7,7 +7,7 @@ use WordPress\Git\GitRepository;
 use WordPress\Git\Model\Commit;
 use WordPress\Git\Model\Tree;
 use WordPress\Git\Model\TreeEntry;
-use WordPress\Git\Protocol\GitProtocolEncoder;
+use WordPress\Git\Protocol\GitProtocolEncoderPipe;
 
 use function WordPress\Git\get_all_descendant_oids_in_tree;
 
@@ -18,7 +18,7 @@ class GitRepositoryTest extends \PHPUnit\Framework\TestCase {
         $repo = new GitRepository(InMemoryFilesystem::create());
         $writer = $repo->new_object_open_write_stream('blob', strlen($blob_data));
         $writer->append_bytes($blob_data);
-        $writer->close();
+        $writer->close_writing();
 
         $oid = $writer->get_hash();
         $this->assertEquals('5dd01c177f5d7d1be5346a5bc18a569a7410c2ef', $oid);
@@ -33,7 +33,7 @@ class GitRepositoryTest extends \PHPUnit\Framework\TestCase {
         $repo = new GitRepository(InMemoryFilesystem::create());
         $writer = $repo->new_object_open_write_stream('blob', strlen($blob_data));
         $writer->append_bytes($blob_data);
-        $writer->close();
+        $writer->close_writing();
 
         $oid = $writer->get_hash();
         $reader = $repo->read_object($oid);
@@ -56,14 +56,14 @@ class GitRepositoryTest extends \PHPUnit\Framework\TestCase {
     public function test_find_hash_by_path() {
         $repo = new GitRepository(InMemoryFilesystem::create());
         $blob_oid = $repo->add_object('blob', 'Hello, world!');
-        $tree_oid = $repo->add_object('tree', GitProtocolEncoder::encode_tree_bytes(new Tree(array(
+        $tree_oid = $repo->add_object('tree', GitProtocolEncoderPipe::encode_tree_bytes(new Tree(array(
             new TreeEntry(array(
                 'mode' => TreeEntry::FILE_MODE_REGULAR_NON_EXECUTABLE,
                 'name' => 'hello-world.txt',
                 'hash' => $blob_oid,
             )),
         ))));
-        $root_tree_oid = $repo->add_object('tree', GitProtocolEncoder::encode_tree_bytes(new Tree(array(
+        $root_tree_oid = $repo->add_object('tree', GitProtocolEncoderPipe::encode_tree_bytes(new Tree(array(
             new TreeEntry(array(
                 'mode' => TreeEntry::FILE_MODE_DIRECTORY,
                 'name' => 'subdirectory',
@@ -76,14 +76,14 @@ class GitRepositoryTest extends \PHPUnit\Framework\TestCase {
     public function test_read_object_by_path() {
         $repo = new GitRepository(InMemoryFilesystem::create());
         $blob_oid = $repo->add_object('blob', 'Hello, world!');
-        $tree_oid = $repo->add_object('tree', GitProtocolEncoder::encode_tree_bytes(new Tree(array(
+        $tree_oid = $repo->add_object('tree', GitProtocolEncoderPipe::encode_tree_bytes(new Tree(array(
             new TreeEntry(array(
                 'mode' => TreeEntry::FILE_MODE_REGULAR_NON_EXECUTABLE,
                 'name' => 'hello-world.txt',
                 'hash' => $blob_oid,
             )),
         ))));
-        $root_tree_oid = $repo->add_object('tree', GitProtocolEncoder::encode_tree_bytes(new Tree(array(
+        $root_tree_oid = $repo->add_object('tree', GitProtocolEncoderPipe::encode_tree_bytes(new Tree(array(
             new TreeEntry(array(
                 'mode' => TreeEntry::FILE_MODE_DIRECTORY,
                 'name' => 'subdirectory',
@@ -140,7 +140,7 @@ class GitRepositoryTest extends \PHPUnit\Framework\TestCase {
 
         // Create first commit
         $blob1_oid = $repo->add_object('blob', 'First file');
-        $tree1_oid = $repo->add_object('tree', GitProtocolEncoder::encode_tree_bytes(new Tree(array(
+        $tree1_oid = $repo->add_object('tree', GitProtocolEncoderPipe::encode_tree_bytes(new Tree(array(
             new TreeEntry(array(
                 'mode' => TreeEntry::FILE_MODE_REGULAR_NON_EXECUTABLE,
                 'name' => 'file1.txt',
@@ -151,7 +151,7 @@ class GitRepositoryTest extends \PHPUnit\Framework\TestCase {
 
         // Create second commit
         $blob2_oid = $repo->add_object('blob', 'Second file');
-        $tree2_oid = $repo->add_object('tree', GitProtocolEncoder::encode_tree_bytes(new Tree(array(
+        $tree2_oid = $repo->add_object('tree', GitProtocolEncoderPipe::encode_tree_bytes(new Tree(array(
             new TreeEntry(array(
                 'mode' => TreeEntry::FILE_MODE_REGULAR_NON_EXECUTABLE,
                 'name' => 'file1.txt',

@@ -3,9 +3,9 @@
 namespace WordPress\Git\Tests;
 
 use WordPress\ByteStream\MemoryPipe;
-use WordPress\ByteStream\Producer\ProducerProducer;
-use WordPress\Git\GitObjectDecoder;
-use WordPress\Git\Protocol\GitProtocolEncoder;
+use WordPress\ByteStream\ReadStream\ProducerProducer;
+use WordPress\Git\GitObjectDecodeReadStream;
+use WordPress\Git\Protocol\GitProtocolEncoderPipe;
 use WordPress\Git\Protocol\Parser\DeltaResolver;
 
 class DeltaResolverTest extends \PHPUnit\Framework\TestCase {
@@ -17,13 +17,13 @@ class DeltaResolverTest extends \PHPUnit\Framework\TestCase {
             'blob ' . strlen($base_bytes) . "\000" .
             gzcompress($base_bytes, 9, ZLIB_ENCODING_DEFLATE)
         );
-        $base_reader = new GitObjectDecoder($object);
+        $base_reader = new GitObjectDecodeReadStream($object);
         $base_reader->read_header();
 
         $resolved_chunk = "World? Hello, I am changed!";
         $delta_bytes = implode('', [
-            GitProtocolEncoder::encode_variable_length(strlen($base_bytes)),
-            GitProtocolEncoder::encode_variable_length(strlen($resolved_chunk)),
+            GitProtocolEncoderPipe::encode_variable_length(strlen($base_bytes)),
+            GitProtocolEncoderPipe::encode_variable_length(strlen($resolved_chunk)),
             // The leftmost bit is 0 = we're consuming from the delta
             // The next 7 bits amount to 0b110 = we're consuming the next 6 bytes
             chr(0b00000110),

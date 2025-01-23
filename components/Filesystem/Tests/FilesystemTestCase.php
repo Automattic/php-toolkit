@@ -102,7 +102,7 @@ abstract class FilesystemTestCase extends TestCase {
     public function testOpenWriteStream() {
         $writer = $this->fs->open_write_stream('/test.txt');
         $writer->append_bytes('Hello World');
-        $writer->close();
+        $writer->close_writing();
 
         $this->assertEquals('Hello World', $this->fs->get_contents('/test.txt'));
     }
@@ -112,7 +112,7 @@ abstract class FilesystemTestCase extends TestCase {
 
         $reader = $this->fs->open_read_stream('/test.txt');
         $content = $reader->consume_all();
-        $reader->close();
+        $reader->close_writing();
 
         $this->assertEquals('Hello World', $content);
     }

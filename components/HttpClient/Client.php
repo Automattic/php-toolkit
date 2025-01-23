@@ -2,11 +2,11 @@
 
 namespace WordPress\HttpClient;
 
-use WordPress\ByteStream\Producer\ResourceProducer;
-use WordPress\ByteStream\Producer\TransformedProducer;
-use WordPress\ByteStream\Transformer\InflateTransformer;
-use WordPress\HttpClient\ByteStream\ChunkedDecoder;
-use WordPress\HttpClient\ByteStream\ChunkedEncoderTransformer;
+use WordPress\ByteStream\ReadStream\FileReadStream;
+use WordPress\ByteStream\ReadStream\TransformedReadStream;
+use WordPress\ByteStream\ByteTransformer\InflateTransformer;
+use WordPress\HttpClient\ByteStream\ChunkedDecoderReadStream;
+use WordPress\HttpClient\ByteStream\ChunkedEncoderByteTransformer;
 use WordPress\HttpClient\ByteStream\RequestReadStream;
 
 /**
@@ -396,7 +396,7 @@ class Client {
 			// Close the TCP socket
             if($this->connections[ $request->id ]->decoded_response_stream) {
                 $stream = $this->connections[ $request->id ]->decoded_response_stream;
-                $stream->close();
+                $stream->close_reading();
                 unset($this->connections[ $request->id ]->decoded_response_stream);
             } else {
                 @fclose( $socket );
@@ -469,7 +469,7 @@ class Client {
 			$transfer_encodings[] = $content_encoding;
 		}
 
-        $body_stream = ResourceProducer::from_resource_handle(
+        $body_stream = FileReadStream::from_resource(
             $this->connections[ $request->id ]->http_socket
         );
 
@@ -477,7 +477,7 @@ class Client {
 		foreach ( $transfer_encodings as $transfer_encoding ) {
 			switch ( $transfer_encoding ) {
 				case 'chunked':
-                    $body_stream = new ChunkedDecoder( $body_stream );
+                    $body_stream = new ChunkedDecoderReadStream( $body_stream );
 					break;
 				case 'gzip':
 					$transformers[] = new InflateTransformer(
@@ -494,7 +494,7 @@ class Client {
 			}
 		}
 
-		return new TransformedProducer(
+		return new TransformedReadStream(
 			$body_stream,
             $transformers
         );
@@ -547,9 +547,9 @@ class Client {
 				$request->state = Request::STATE_WILL_SEND_BODY;
 
                 if($request->get_header('transfer-encoding') === 'chunked') {
-                    $request->upload_body_stream = new TransformedProducer(
+                    $request->upload_body_stream = new TransformedReadStream(
                         $request->upload_body_stream,
-                        [new ChunkedEncoderTransformer()]
+                        [new ChunkedEncoderByteTransformer()]
                     );
                 }
 			} else {

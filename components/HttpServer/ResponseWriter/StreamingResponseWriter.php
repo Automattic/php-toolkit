@@ -2,7 +2,7 @@
 
 namespace WordPress\HttpServer\ResponseWriter;
 
-class StreamingResponseWriter implements ResponseConsumer {
+class StreamingResponseWriter implements ResponseWriteStream {
 
     public function send_http_code($code) {
         http_response_code($code);
@@ -16,7 +16,7 @@ class StreamingResponseWriter implements ResponseConsumer {
         echo $body;
     }
 
-    public function close(): void {
+    public function close_writing(): void {
         flush();
     }
 

@@ -2,7 +2,7 @@
 
 namespace WordPress\Filesystem\Mixin;
 
-use WordPress\ByteStream\Writer\ByteConsumer;
+use WordPress\ByteStream\WriteStream\ByteWriteStream;
 use WordPress\Filesystem\ByteStream\FilesystemWriteStream;
 
 trait InternalizeWriteStream {
@@ -12,7 +12,7 @@ trait InternalizeWriteStream {
 	 *
 	 * @param string $path The path to the file.
 	 *
-	 * @return ByteConsumer The stream.
+	 * @return ByteWriteStream The stream.
 	 *@example
 	 *
 	 * $fs->open_read_stream($path);
@@ -23,7 +23,7 @@ trait InternalizeWriteStream {
 	 * $fs->close_read_stream();
 	 *
 	 */
-	public function open_write_stream($path): ByteConsumer {
+	public function open_write_stream($path): ByteWriteStream {
         $stream_id = $this->write_stream_internal_open($path);
         return new FilesystemWriteStream($this, $stream_id);
     }

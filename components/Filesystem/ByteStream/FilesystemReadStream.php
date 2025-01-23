@@ -2,10 +2,10 @@
 
 namespace WordPress\Filesystem\ByteStream;
 
-use WordPress\ByteStream\Producer\ByteProducer;
+use WordPress\ByteStream\ReadStream\ByteReadStream;
 use WordPress\Filesystem\Mixin\Interfaces\InternalizedReadStream;
 
-class FilesystemReadStream implements ByteProducer {
+class FilesystemReadStream implements ByteReadStream {
 
     /**
      * @var InternalizedReadStream
@@ -46,7 +46,7 @@ class FilesystemReadStream implements ByteProducer {
         return $this->filesystem->read_stream_get_bytes($this->stream_id);
     }
 
-    public function close(): void {
+    public function close_reading(): void {
         $this->filesystem->read_stream_close($this->stream_id);
     }
 

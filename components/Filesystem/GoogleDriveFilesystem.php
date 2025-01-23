@@ -3,8 +3,8 @@
 namespace WordPress\Filesystem;
 
 use WordPress\ByteStream\MemoryPipe;
-use WordPress\ByteStream\Producer\ByteProducer;
-use WordPress\ByteStream\Writer\ByteConsumer;
+use WordPress\ByteStream\ReadStream\ByteReadStream;
+use WordPress\ByteStream\WriteStream\ByteWriteStream;
 use WordPress\Filesystem\Layer\ChrootLayer;
 use WordPress\Filesystem\Mixin\CopyFileViaStreaming;
 use WordPress\Filesystem\Mixin\GetContentsViaReadStream;
@@ -131,7 +131,7 @@ class GoogleDriveFilesystem implements Filesystem {
         return !!$this->path_to_id($path);
     }
 
-    public function open_read_stream($path): ByteProducer {
+    public function open_read_stream($path): ByteReadStream {
         $file_id = $this->path_to_id($path);
         $response = $this->make_api_request("files/$file_id", 'GET', [
             'alt' => 'media'
@@ -217,7 +217,7 @@ BODY;
         );
     }
 
-    public function open_write_stream($path): ByteConsumer {
+    public function open_write_stream($path): ByteWriteStream {
         throw new FilesystemException('Not implemented');
     }
 

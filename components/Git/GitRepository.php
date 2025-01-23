@@ -7,7 +7,7 @@ use WordPress\Git\Diff\MergeEngine;
 use WordPress\Git\Model\Commit;
 use WordPress\Git\Model\Tree;
 use WordPress\Git\Model\TreeEntry;
-use WordPress\Git\Protocol\GitProtocolEncoder;
+use WordPress\Git\Protocol\GitProtocolEncoderPipe;
 
 use function WordPress\Filesystem\wp_canonicalize_path;
 use function WordPress\Filesystem\wp_join_paths;
@@ -147,7 +147,7 @@ class GitRepository {
 			));
 		}
 
-		$peoducer = new GitObjectDecoder(
+		$peoducer = new GitObjectDecodeReadStream(
 			$this->fs->open_read_stream($this->get_storage_path($oid))
 		);
         $peoducer->read_header();
@@ -303,7 +303,7 @@ class GitRepository {
 	public function add_object( $type_name, $content ) {
 		$object_writer = $this->new_object_open_write_stream($type_name, strlen($content));
         $object_writer->append_bytes($content);
-		$object_writer->close();
+		$object_writer->close_writing();
 		return $object_writer->get_hash();
 	}
 
@@ -676,7 +676,7 @@ class GitRepository {
 		// Create new tree object
 		return $this->add_object(
 			'tree',
-			GitProtocolEncoder::encode_tree_bytes( new Tree( $tree_objects ) )
+			GitProtocolEncoderPipe::encode_tree_bytes( new Tree( $tree_objects ) )
 		);
 	}
 

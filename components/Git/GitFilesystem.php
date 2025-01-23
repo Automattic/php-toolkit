@@ -2,7 +2,7 @@
 
 namespace WordPress\Git;
 
-use WordPress\ByteStream\Producer\ByteProducer;
+use WordPress\ByteStream\ReadStream\ByteReadStream;
 use WordPress\Filesystem\Filesystem;
 use WordPress\Filesystem\FilesystemException;
 use WordPress\Filesystem\Layer\ChrootLayer;
@@ -91,7 +91,7 @@ class GitFilesystem implements Filesystem {
         return $this->open_read_stream($path)->consume_all();
     }
 
-	public function open_read_stream($path): ByteProducer {
+	public function open_read_stream($path): ByteReadStream {
         return $this->repo->read_object_by_path($path);
 	}
 

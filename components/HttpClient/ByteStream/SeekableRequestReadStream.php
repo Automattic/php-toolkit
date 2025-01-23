@@ -3,9 +3,9 @@
 namespace WordPress\HttpClient\ByteStream;
 
 use WordPress\ByteStream\ByteStreamException;
-use WordPress\ByteStream\Producer\BaseByteProducer;
-use WordPress\ByteStream\Producer\ByteProducer;
-use WordPress\ByteStream\Producer\ResourceProducer;
+use WordPress\ByteStream\ReadStream\BaseByteReadStream;
+use WordPress\ByteStream\ReadStream\ByteReadStream;
+use WordPress\ByteStream\ReadStream\FileReadStream;
 use WordPress\HttpClient\Request;
 
 /**
@@ -14,7 +14,7 @@ use WordPress\HttpClient\Request;
  *
  * @TODO: Abort in-progress requests when seeking to a new offset.
  */
-class SeekableRequestReadStream extends BaseByteProducer {
+class SeekableRequestReadStream extends BaseByteReadStream {
 
     // const CONTEXT_SIZE_MIN = 0;
     // const CONTEXT_SIZE_MAX = 0;
@@ -58,7 +58,7 @@ class SeekableRequestReadStream extends BaseByteProducer {
 		return self::redirect_output_to_disk( $remote_file_reader );
 	}
 
-	static private function redirect_output_to_disk( ByteProducer $reader ) {
+	static private function redirect_output_to_disk( ByteReadStream $reader ) {
 		$file_path = tempnam(sys_get_temp_dir(), 'wp-remote-file-reader-') . '.epub';
 		$file = fopen($file_path, 'w');
         if(false === $file) {
@@ -80,7 +80,7 @@ class SeekableRequestReadStream extends BaseByteProducer {
 		if(false === fclose($file)) {
 			throw new ByteStreamException('Failed to close file');
 		}
-		return ResourceProducer::from_local_file( $file_path );
+		return FileReadStream::from_path( $file_path );
 	}
 
 	public function __construct( $url ) {
@@ -156,7 +156,7 @@ class SeekableRequestReadStream extends BaseByteProducer {
 		$this->remote_file_length = $this->current_reader->length();
 	}
 
-	public function close(): void {
+	public function close_reading(): void {
 		if(null !== $this->current_reader) {
 			$this->current_reader->close();
 			$this->current_reader = null;

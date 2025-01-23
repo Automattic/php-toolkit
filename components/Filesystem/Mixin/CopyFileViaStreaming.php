@@ -32,10 +32,10 @@ trait CopyFileViaStreaming {
                     $to_stream->append_bytes('');
                 }
             } finally {
-                $from_stream->close();
+                $from_stream->close_reading();
             }
         } finally {
-            $to_stream->close();
+            $to_stream->close_writing();
         }
 	}
 

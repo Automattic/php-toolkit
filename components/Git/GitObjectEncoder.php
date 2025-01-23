@@ -2,12 +2,12 @@
 
 namespace WordPress\Git;
 
-use WordPress\ByteStream\Transformer\ChecksumTransformer;
-use WordPress\ByteStream\Transformer\DeflateTransformer;
-use WordPress\ByteStream\Writer\ByteConsumer;
-use WordPress\ByteStream\Writer\TransformedConsumer;
+use WordPress\ByteStream\ByteTransformer\ChecksumTransformer;
+use WordPress\ByteStream\ByteTransformer\DeflateTransformer;
+use WordPress\ByteStream\WriteStream\ByteWriteStream;
+use WordPress\ByteStream\WriteStream\TransformedWriteStream;
 
-class GitObjectEncoder implements ByteConsumer {
+class GitObjectEncoder implements ByteWriteStream {
 
     private $downstream;
     private $repository;
@@ -28,7 +28,7 @@ class GitObjectEncoder implements ByteConsumer {
         $this->repository = $repository;
 
         $header = "$object_type_name $object_length\x00";
-        $this->downstream = new TransformedConsumer(
+        $this->downstream = new TransformedWriteStream(
             $repository->get_object_storage_filesystem()->open_write_stream('objects/.tmp'),
             [
                 'checksum' => new ChecksumTransformer('sha1'),
@@ -46,10 +46,10 @@ class GitObjectEncoder implements ByteConsumer {
         return $this->downstream['checksum']->get_hash();
     }
 
-    public function close(): void {
-        $this->downstream->close();
+    public function close_writing(): void {
+        $this->downstream->close_writing();
         $hash = $this->downstream['checksum']->get_hash();
-        $this->downstream->get_downstream_writer()->close();
+        $this->downstream->get_downstream_writer()->close_writing();
         $target_path = $this->repository->get_storage_path($hash);
         $target_dir = dirname($target_path);
         $fs = $this->repository->get_object_storage_filesystem();

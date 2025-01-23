@@ -2,10 +2,10 @@
 
 namespace WordPress\ByteStream;
 
-use WordPress\ByteStream\Producer\BaseByteProducer;
-use WordPress\ByteStream\Writer\ByteConsumer;
+use WordPress\ByteStream\ReadStream\BaseByteReadStream;
+use WordPress\ByteStream\WriteStream\ByteWriteStream;
 
-class MemoryPipe extends BaseByteProducer implements ByteConsumer {
+class MemoryPipe extends BaseByteReadStream implements ByteWriteStream {
 
 	protected $is_writing_closed;
 

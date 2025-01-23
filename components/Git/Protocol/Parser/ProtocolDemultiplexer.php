@@ -3,7 +3,7 @@
 namespace WordPress\Git\Protocol\Parser;
 
 use WordPress\ByteStream\NotEnoughDataException;
-use WordPress\ByteStream\Producer\ByteProducer;
+use WordPress\ByteStream\ReadStream\ByteReadStream;
 use WordPress\Git\GitException;
 
 class ProtocolDemultiplexer {
@@ -20,7 +20,7 @@ class ProtocolDemultiplexer {
     ];
 
     /**
-     * @var ByteProducer
+     * @var ByteReadStream
      */
     protected $upstream = '';
     protected $is_paused_at_incomplete_input = false;
@@ -29,7 +29,7 @@ class ProtocolDemultiplexer {
     protected $stream_code;
     protected $seen_unmultiplexed_pack = false;
 
-    public function __construct(ByteProducer $upstream) {
+    public function __construct(ByteReadStream $upstream) {
         $this->upstream = $upstream;
     }
 
@@ -47,7 +47,7 @@ class ProtocolDemultiplexer {
         $this->chunk = '';
         $this->stream_code = 'unknown';
 
-        $this->upstream->pull(4, ByteProducer::PULL_EXACTLY);
+        $this->upstream->pull(4, ByteReadStream::PULL_EXACTLY);
         $length_hex = $this->upstream->consume(4);
         if($length_hex === 'PACK') {
             $this->seen_unmultiplexed_pack = true;
@@ -73,7 +73,7 @@ class ProtocolDemultiplexer {
 
         $stream_code = 'unknown';
         // Peek the next byte to determine the stream code.
-        $this->upstream->pull(1, ByteProducer::PULL_EXACTLY);
+        $this->upstream->pull(1, ByteReadStream::PULL_EXACTLY);
         $stream_code_byte = $this->upstream->peek(1);
         $potential_stream_code = ord($stream_code_byte);
         if(isset(self::STREAM_CODE_MAP[$potential_stream_code])) {
@@ -95,7 +95,7 @@ class ProtocolDemultiplexer {
 
         // Buffer the multiplexed chunk and yield it to the consumer.
         $length -= 4;
-        $this->upstream->pull($length, ByteProducer::PULL_EXACTLY);
+        $this->upstream->pull($length, ByteReadStream::PULL_EXACTLY);
         $chunk = $this->upstream->consume($length);
         $this->stream_code = $stream_code;
         if('unknown' === $this->stream_code) {

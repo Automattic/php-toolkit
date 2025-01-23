@@ -2,7 +2,7 @@
 
 namespace WordPress\Zip;
 
-use WordPress\ByteStream\Producer\ByteProducer;
+use WordPress\ByteStream\ReadStream\ByteReadStream;
 
 /**
  * Represents a file entry in a ZIP file.
@@ -98,7 +98,7 @@ class FileEntry {
 	public $extra;
 
     /**
-     * @var ByteProducer
+     * @var ByteReadStream
      */
     public $body_reader;
 

@@ -3,7 +3,7 @@
 namespace WordPress\Filesystem\Mixin;
 
 use WordPress\ByteStream\MemoryPipe;
-use WordPress\ByteStream\Writer\ByteConsumer;
+use WordPress\ByteStream\WriteStream\ByteWriteStream;
 
 /**
  * Implements open_write_stream() as a buffered write stream that, upon closing,
@@ -11,7 +11,7 @@ use WordPress\ByteStream\Writer\ByteConsumer;
  */
 trait BufferedWriteStreamViaPutContents {
 
-    public function open_write_stream($path): ByteConsumer {
+    public function open_write_stream($path): ByteWriteStream {
         $fs = $this;
         return new class($fs, $path) extends MemoryPipe {
             private $fs;
@@ -22,9 +22,9 @@ trait BufferedWriteStreamViaPutContents {
                 $this->path = $path;
             }
 
-            public function close(): void {
+            public function close_writing(): void {
                 $pipe_contents = $this->consume_all();
-                parent::close();
+                parent::close_reading();
                 $this->fs->put_contents($this->path, $pipe_contents);
             }
         };

@@ -2,9 +2,9 @@
 
 namespace WordPress\ByteStream;
 
-use WordPress\ByteStream\Producer\ByteProducer;
-use WordPress\ByteStream\Writer\ByteConsumer;
+use WordPress\ByteStream\ReadStream\ByteReadStream;
+use WordPress\ByteStream\WriteStream\ByteWriteStream;
 
-interface BytePipe extends ByteProducer, ByteConsumer {
+interface BytePipe extends ByteReadStream, ByteWriteStream {
 
 }

@@ -2,8 +2,8 @@
 
 namespace WordPress\Filesystem;
 
-use WordPress\ByteStream\Producer\ByteProducer;
-use WordPress\ByteStream\Writer\ByteConsumer;
+use WordPress\ByteStream\ReadStream\ByteReadStream;
+use WordPress\ByteStream\WriteStream\ByteWriteStream;
 
 /**
  * Interface for filesystem implementations.
@@ -81,7 +81,7 @@ interface Filesystem {
 	 *
 	 * @param string $path The path to the file.
 	 *
-	 * @return ByteProducer The stream identifier.
+	 * @return ByteReadStream The stream identifier.
      * @throws FilesystemException If the stream cannot be opened.
 	 *@example
 	 *
@@ -93,17 +93,17 @@ interface Filesystem {
 	 * $fs->close_read_stream();
 	 *
 	 */
-	public function open_read_stream($path): ByteProducer;
+	public function open_read_stream($path): ByteReadStream;
 
 	/**
 	 * Open a write stream to a file.
 	 *
 	 * @param string $path The path to write to.
 	 *
-	 * @return ByteConsumer The stream identifier.
+	 * @return ByteWriteStream The stream identifier.
      * @throws FilesystemException If the stream cannot be opened.
 	 */
-	public function open_write_stream($path ): ByteConsumer;
+	public function open_write_stream($path ): ByteWriteStream;
 
     /**
      * Write data to a file.

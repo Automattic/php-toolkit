@@ -2,7 +2,7 @@
 
 namespace WordPress\Zip;
 
-use WordPress\ByteStream\Producer\ByteProducer;
+use WordPress\ByteStream\ReadStream\ByteReadStream;
 use WordPress\Filesystem\Filesystem;
 use WordPress\Filesystem\FilesystemException;
 use WordPress\Filesystem\Layer\ChrootLayer;
@@ -39,15 +39,15 @@ class ZipFilesystem implements Filesystem {
 	 */
 	const MAX_CENTRAL_DIRECTORY_SIZE = 2 * 1024 * 1024;
 
-    static public function create(ByteProducer $byte_reader) {
+    static public function create(ByteReadStream $byte_reader) {
         return new ChrootLayer(
             new ZipFilesystem($byte_reader),
             '/'
         );
     }
 
-	private function __construct(ByteProducer $byte_reader) {
-		$this->zip = new ZipStreamReader($byte_reader);
+	private function __construct(ByteReadStream $byte_reader) {
+		$this->zip = new ZipDecoder($byte_reader);
 		$this->byte_reader = $byte_reader;
 	}
 
@@ -102,7 +102,7 @@ class ZipFilesystem implements Filesystem {
 		return $this->is_file($path) || $this->is_dir($path);
 	}
 
-	public function open_read_stream($path): ByteProducer {
+	public function open_read_stream($path): ByteReadStream {
         if($this->last_file_stream !== null && !$this->last_file_stream->reached_end_of_data()) {
             throw new FilesystemException(
                 'ZipFilesystem cannot open a read stream while another read stream is open'

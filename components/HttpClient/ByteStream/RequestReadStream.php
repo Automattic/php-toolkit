@@ -3,33 +3,28 @@
 namespace WordPress\HttpClient\ByteStream;
 
 use WordPress\ByteStream\ByteStreamException;
-use WordPress\ByteStream\Producer\BaseByteProducer;
+use WordPress\ByteStream\ReadStream\BaseByteReadStream;
+use WordPress\HttpClient\Client;
 use WordPress\HttpClient\Request;
+use WordPress\HttpClient\Response;
 
 /**
  * Streams bytes from a remote file.
  */
-class RequestReadStream extends BaseByteProducer {
-
-    // const CONTEXT_SIZE_MIN = 0;
-    // const CONTEXT_SIZE_MAX = 0;
+class RequestReadStream extends BaseByteReadStream {
 
 	/**
-	 * @var \WordPress\HttpClient\Client
+	 * @var Client
 	 */
 	private $client;
     /**
-     * @var \WordPress\HttpClient\Request
+     * @var Request
      */
 	private $request;
     /**
-     * @var \WordPress\HttpClient\Response
+     * @var Response
      */
     private $response;
-    /**
-     * @var string
-     */
-	private $last_error;
     /**
      * @var bool
      */
@@ -43,7 +38,7 @@ class RequestReadStream extends BaseByteProducer {
         if(is_string($request)) {
             $request = new Request($request);
         }
-		$this->client = $options['client'] ?? new \WordPress\HttpClient\Client();
+		$this->client = $options['client'] ?? new Client();
 		$this->request = $request;
 	}
 
@@ -57,12 +52,12 @@ class RequestReadStream extends BaseByteProducer {
 	protected function internal_pull($max_bytes = 8096): string {
         return $this->pull_until_event([
             'max_bytes' => $max_bytes,
-            'event' => \WordPress\HttpClient\Client::EVENT_BODY_CHUNK_AVAILABLE,
+            'event' => Client::EVENT_BODY_CHUNK_AVAILABLE,
         ]);
     }
 
 	private function pull_until_event($options = []) {
-        $stop_at_event = $options['event'] ?? \WordPress\HttpClient\Client::EVENT_BODY_CHUNK_AVAILABLE;
+        $stop_at_event = $options['event'] ?? Client::EVENT_BODY_CHUNK_AVAILABLE;
 
 		if ( ! $this->is_enqueued ) {
 			$this->client->enqueue( $this->request );
@@ -83,20 +78,20 @@ class RequestReadStream extends BaseByteProducer {
 				continue;
 			}
 			switch ( $this->client->get_event() ) {
-				case \WordPress\HttpClient\Client::EVENT_GOT_HEADERS:
+				case Client::EVENT_GOT_HEADERS:
                     $this->response = $response;
-                    if($stop_at_event === \WordPress\HttpClient\Client::EVENT_GOT_HEADERS) {
+                    if($stop_at_event === Client::EVENT_GOT_HEADERS) {
                         return true;
                     }
 					break;
-				case \WordPress\HttpClient\Client::EVENT_BODY_CHUNK_AVAILABLE:
-                    if($stop_at_event === \WordPress\HttpClient\Client::EVENT_BODY_CHUNK_AVAILABLE) {
+				case Client::EVENT_BODY_CHUNK_AVAILABLE:
+                    if($stop_at_event === Client::EVENT_BODY_CHUNK_AVAILABLE) {
                         return $this->client->get_response_body_chunk();
                     }
                     break;
-				case \WordPress\HttpClient\Client::EVENT_FINISHED:
+				case Client::EVENT_FINISHED:
 					return '';
-				case \WordPress\HttpClient\Client::EVENT_FAILED:
+				case Client::EVENT_FAILED:
 					// TODO: Think through error handling. Errors are expected when working with
 					//       the network. Should we auto retry? Make it easy for the caller to retry?
 					//       Something else?
@@ -114,7 +109,7 @@ class RequestReadStream extends BaseByteProducer {
 
         if(!$this->response) {
             $this->pull_until_event([
-                'event' => \WordPress\HttpClient\Client::EVENT_GOT_HEADERS,
+                'event' => Client::EVENT_GOT_HEADERS,
             ]);
         }
         $content_length = $this->response->get_header( 'Content-Length' );
@@ -128,7 +123,7 @@ class RequestReadStream extends BaseByteProducer {
     public function await_response() {
         if(!$this->response) {
             $this->pull_until_event([
-                'event' => \WordPress\HttpClient\Client::EVENT_GOT_HEADERS,
+                'event' => Client::EVENT_GOT_HEADERS,
             ]);
         }
         if(!$this->response) {
@@ -137,23 +132,15 @@ class RequestReadStream extends BaseByteProducer {
         return $this->response;
     }
 
-    public function get_request() {
-        return $this->request;
-    }
-
-	public function get_last_error(): ?string {
-		return $this->last_error;
-	}
-
 	protected function internal_reached_end_of_data(): bool {
 		return (
             Request::STATE_FINISHED === $this->request->latest_redirect()->state &&
-            ! $this->client->has_pending_event($this->request, \WordPress\HttpClient\Client::EVENT_BODY_CHUNK_AVAILABLE) &&
+            ! $this->client->has_pending_event($this->request, Client::EVENT_BODY_CHUNK_AVAILABLE) &&
             strlen($this->buffer) === $this->offset_in_current_buffer
         );
 	}
 
-	protected function internal_close(): void {
+	protected function internal_close_reading(): void {
         $latest_redirect = $this->request->latest_redirect();
         if(
             $latest_redirect &&

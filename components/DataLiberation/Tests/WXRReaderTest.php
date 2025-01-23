@@ -1,7 +1,7 @@
 <?php
 
 use PHPUnit\Framework\TestCase;
-use WordPress\ByteStream\Producer\ResourceProducer;
+use WordPress\ByteStream\ReadStream\FileReadStream;
 use WordPress\DataLiberation\EntityReader\WXREntityReader;
 
 class WXRReaderTest extends TestCase {
@@ -568,7 +568,7 @@ https://playground.internal/path-not-taken was the second best choice.
         ];
 
 		$wxr = WXREntityReader::create(
-            ResourceProducer::from_local_file( $xml_path )
+            FileReadStream::from_path( $xml_path )
         );
 
         for($i = 0; $i < 11; $i++) {
@@ -598,7 +598,7 @@ https://playground.internal/path-not-taken was the second best choice.
         ];
 
 		$wxr = WXREntityReader::create(
-            ResourceProducer::from_local_file( $xml_path )
+            FileReadStream::from_path( $xml_path )
         );
 
         for($i = 0; $i < 11; $i++) {
@@ -609,7 +609,7 @@ https://playground.internal/path-not-taken was the second best choice.
             );
             $cursor = $wxr->get_reentrancy_cursor();
             $wxr = WXREntityReader::create(
-                ResourceProducer::from_local_file( $xml_path ),
+                FileReadStream::from_path( $xml_path ),
                 $cursor
             );
             $this->assertTrue( $wxr->next_entity() );

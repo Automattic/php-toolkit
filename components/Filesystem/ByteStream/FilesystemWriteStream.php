@@ -2,10 +2,10 @@
 
 namespace WordPress\Filesystem\ByteStream;
 
-use WordPress\ByteStream\Writer\ByteConsumer;
+use WordPress\ByteStream\WriteStream\ByteWriteStream;
 use WordPress\Filesystem\Mixin\Interfaces\InternalizedWriteStream;
 
-class FilesystemWriteStream implements ByteConsumer {
+class FilesystemWriteStream implements ByteWriteStream {
 
     /**
      * @var InternalizedWriteStream
@@ -26,7 +26,7 @@ class FilesystemWriteStream implements ByteConsumer {
         $this->filesystem->write_stream_append_bytes($this->stream_id, $data);
     }
 
-    public function close(): void {
+    public function close_writing(): void {
         $this->filesystem->write_stream_close($this->stream_id);
     }
 

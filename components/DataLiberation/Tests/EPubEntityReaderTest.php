@@ -1,7 +1,7 @@
 <?php
 
 use PHPUnit\Framework\TestCase;
-use WordPress\ByteStream\Producer\ResourceProducer;
+use WordPress\ByteStream\ReadStream\FileReadStream;
 use WordPress\DataLiberation\EntityReader\EPubEntityReader;
 use WordPress\Zip\ZipFilesystem;
 
@@ -30,7 +30,7 @@ class EPubEntityReaderTest extends TestCase {
     static public function epub_byte_reader_data_provider() {
         return [
             'Local file' => [
-                ResourceProducer::from_local_file( __DIR__ . '/fixtures/epub-entity-reader/childrens-literature.epub' )
+                FileReadStream::from_path( __DIR__ . '/fixtures/epub-entity-reader/childrens-literature.epub' )
             ],
             // github.com does not support range requests
             // 'Remote file' => [

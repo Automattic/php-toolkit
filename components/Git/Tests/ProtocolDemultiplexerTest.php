@@ -3,14 +3,14 @@
 namespace WordPress\Git\Tests;
 
 use WordPress\ByteStream\MemoryPipe;
-use WordPress\ByteStream\Producer\ProducerProducer;
-use WordPress\ByteStream\Producer\ResourceProducer;
+use WordPress\ByteStream\ReadStream\ProducerProducer;
+use WordPress\ByteStream\ReadStream\FileReadStream;
 use WordPress\Filesystem\InMemoryFilesystem;
 use WordPress\Git\GitRepository;
 use WordPress\Git\Model\Commit;
 use WordPress\Git\Model\Tree;
 use WordPress\Git\Model\TreeEntry;
-use WordPress\Git\Protocol\GitProtocolEncoder;
+use WordPress\Git\Protocol\GitProtocolEncoderPipe;
 use WordPress\Git\Protocol\Parser\ProtocolDemultiplexer;
 
 class ProtocolDemultiplexerTest extends \PHPUnit\Framework\TestCase {
@@ -21,7 +21,7 @@ class ProtocolDemultiplexerTest extends \PHPUnit\Framework\TestCase {
         $repo = new GitRepository(InMemoryFilesystem::create());
         $oid = $repo->add_object(
             'tree',
-            GitProtocolEncoder::encode_tree_bytes(new Tree([
+            GitProtocolEncoderPipe::encode_tree_bytes(new Tree([
                 new TreeEntry([
                     'mode' => '100644',
                     'name' => 'test.txt',
@@ -30,7 +30,7 @@ class ProtocolDemultiplexerTest extends \PHPUnit\Framework\TestCase {
             ]))
         );
 
-        $producer = new GitProtocolEncoder();
+        $producer = new GitProtocolEncoderPipe();
         $producer->append_packet_line(Commit::NULL_HASH . " " . Commit::NULL_HASH . " refs/heads/\0report-status force-update\n");
         $producer->append_packet_line("ef9fae98ba6dd17140b45bc657659b6c41a4ad10 HEAD\n");
         $producer->append_packet_line('0000');
@@ -70,7 +70,7 @@ class ProtocolDemultiplexerTest extends \PHPUnit\Framework\TestCase {
     }
 
     public function test_parse_response_no_blobs() {
-        $reader = ResourceProducer::from_local_file( __DIR__ . '/fixtures/wordpress-develop-response-no-blobs.bin');
+        $reader = FileReadStream::from_path( __DIR__ . '/fixtures/wordpress-develop-response-no-blobs.bin');
         $demuxer = new ProtocolDemultiplexer($reader);
         $chunks_counts = [];
         while($demuxer->next_chunk()) {
@@ -79,7 +79,7 @@ class ProtocolDemultiplexerTest extends \PHPUnit\Framework\TestCase {
             }
             $chunks_counts[$demuxer->get_stream_code()]++;
         }
-        $reader->close();
+        $reader->close_reading();
         $this->assertEquals(
             array(
                 'unknown' => 3,
@@ -91,7 +91,7 @@ class ProtocolDemultiplexerTest extends \PHPUnit\Framework\TestCase {
     }
 
     public function test_parse_full_response() {
-        $reader = ResourceProducer::from_local_file( __DIR__ . '/fixtures/wordpress-develop-response-full.bin');
+        $reader = FileReadStream::from_path( __DIR__ . '/fixtures/wordpress-develop-response-full.bin');
         $demuxer = new ProtocolDemultiplexer($reader);
         $chunks_counts = [];
         while($demuxer->next_chunk()) {
@@ -100,7 +100,7 @@ class ProtocolDemultiplexerTest extends \PHPUnit\Framework\TestCase {
             }
             $chunks_counts[$demuxer->get_stream_code()]++;
         }
-        $reader->close();
+        $reader->close_reading();
         $this->assertEquals(
             array(
                 'unknown' => 3,

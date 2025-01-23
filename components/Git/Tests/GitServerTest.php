@@ -2,14 +2,14 @@
 
 use PHPUnit\Framework\TestCase;
 use WordPress\ByteStream\MemoryPipe;
-use WordPress\ByteStream\Producer\ProducerProducer;
+use WordPress\ByteStream\ReadStream\ProducerProducer;
 use WordPress\Filesystem\InMemoryFilesystem;
 use WordPress\Git\GitEndpoint;
 use WordPress\Git\GitRepository;
 use WordPress\Git\Model\Commit;
 use WordPress\Git\Model\Tree;
 use WordPress\Git\Model\TreeEntry;
-use WordPress\Git\Protocol\GitProtocolEncoder;
+use WordPress\Git\Protocol\GitProtocolEncoderPipe;
 use WordPress\Git\Protocol\Parser\GitProtocolReader;
 use WordPress\HttpServer\ResponseWriter\BufferingResponseWriter;
 
@@ -60,7 +60,7 @@ class GitServerTest extends TestCase {
     static public function provide_request_data() {
         return [
             'basic ls-refs request' => [
-                GitProtocolEncoder::encode_packet_lines([
+                GitProtocolEncoderPipe::encode_packet_lines([
                     "command=ls-refs\n",
                     "0000",
                 ]),
@@ -72,7 +72,7 @@ class GitServerTest extends TestCase {
                 ]
             ],
             'request with multiple capabilities' => [
-                GitProtocolEncoder::encode_packet_lines([
+                GitProtocolEncoderPipe::encode_packet_lines([
                     "command=ls-refs\n",
                     "agent=git/2.37.3\n",
                     "0000",
@@ -86,7 +86,7 @@ class GitServerTest extends TestCase {
                 ]
             ],
             'request with multiple arguments' => [
-                GitProtocolEncoder::encode_packet_lines([
+                GitProtocolEncoderPipe::encode_packet_lines([
                     "command=ls-refs\n",
                     "0001",
                     "peel\n",
@@ -104,7 +104,7 @@ class GitServerTest extends TestCase {
                 ]
             ],
             'basic want request' => [
-                GitProtocolEncoder::encode_packet_lines([
+                GitProtocolEncoderPipe::encode_packet_lines([
                     "command=fetch\n",
                     "agent=git/2.37.3\n",
                     "object-format=sha1\n",
@@ -126,7 +126,7 @@ class GitServerTest extends TestCase {
                 ]
             ],
             'want with have and filter' => [
-                GitProtocolEncoder::encode_packet_lines([
+                GitProtocolEncoderPipe::encode_packet_lines([
                     "command=fetch\n",
                     "agent=git/2.37.3\n",
                     "object-format=sha1\n",
@@ -152,7 +152,7 @@ class GitServerTest extends TestCase {
                 ]
             ],
             'want with deepen and blob size limit' => [
-                GitProtocolEncoder::encode_packet_lines([
+                GitProtocolEncoderPipe::encode_packet_lines([
                     "command=fetch\n",
                     "agent=git/2.37.3\n",
                     "object-format=sha1\n",
@@ -178,7 +178,7 @@ class GitServerTest extends TestCase {
                 ]
             ],
             'multiple want and have' => [
-                GitProtocolEncoder::encode_packet_lines([
+                GitProtocolEncoderPipe::encode_packet_lines([
                     "command=fetch\n",
                     "0000",
                     "want e0d02a851d0c461a7c725dc69eb2d53f57f666a6\n",
@@ -220,7 +220,7 @@ class GitServerTest extends TestCase {
             $expected_response
         );
         $buffer = new BufferingResponseWriter();
-        $git_encoder = new GitProtocolEncoder($buffer);
+        $git_encoder = new GitProtocolEncoderPipe($buffer);
         $this->server->handle_ls_refs_request($request, $git_encoder);
         $this->assertBinaryEquals($expected_response, $git_encoder->consume_all());
     }
@@ -228,7 +228,7 @@ class GitServerTest extends TestCase {
     static public function provide_ref_requests() {
         return [
             'all refs' => [
-                GitProtocolEncoder::encode_packet_lines([
+                GitProtocolEncoderPipe::encode_packet_lines([
                     "command=ls-refs\n",
                     "0000",
                 ]),
@@ -242,7 +242,7 @@ class GitServerTest extends TestCase {
 RESPONSE
             ],
             'specific branch' => [
-                GitProtocolEncoder::encode_packet_lines([
+                GitProtocolEncoderPipe::encode_packet_lines([
                     "command=ls-refs\n",
                     "0001",
                     "peel\n",
@@ -256,7 +256,7 @@ RESPONSE
 RESPONSE
             ],
             'HEAD ref' => [
-                GitProtocolEncoder::encode_packet_lines([
+                GitProtocolEncoderPipe::encode_packet_lines([
                     "command=ls-refs\n",
                     "0001",
                     "peel\n",
@@ -284,7 +284,7 @@ RESPONSE
 
         $tree_oid = $this->repository->add_object(
             'tree',
-            GitProtocolEncoder::encode_tree_bytes(new Tree([
+            GitProtocolEncoderPipe::encode_tree_bytes(new Tree([
                 new TreeEntry([
                     'mode' => TreeEntry::FILE_MODE_REGULAR_NON_EXECUTABLE,
                     'name' => 'README.md',
@@ -305,7 +305,7 @@ RESPONSE
 
         $test_cases = [
             'basic fetch' => [
-                'request' => GitProtocolEncoder::encode_packet_lines([
+                'request' => GitProtocolEncoderPipe::encode_packet_lines([
                     "command=fetch\n",
                     "0000",
                     "want $commit_oid\n",
@@ -320,7 +320,7 @@ RESPONSE
                 ],
             ],
             'fetch with blob:none filter' => [
-                'request' => GitProtocolEncoder::encode_packet_lines([
+                'request' => GitProtocolEncoderPipe::encode_packet_lines([
                     "command=fetch\n",
                     "0000",
                     "want $commit_oid\n",
@@ -334,7 +334,7 @@ RESPONSE
                 ],
             ],
             'fetch with blob size limit' => [
-                'request' => GitProtocolEncoder::encode_packet_lines([
+                'request' => GitProtocolEncoderPipe::encode_packet_lines([
                     "command=fetch\n",
                     "0000",
                     "want $commit_oid\n",
@@ -349,7 +349,7 @@ RESPONSE
                 ],
             ],
             'fetch with multiple wants' => [
-                'request' => GitProtocolEncoder::encode_packet_lines([
+                'request' => GitProtocolEncoderPipe::encode_packet_lines([
                     "command=fetch\n",
                     "0000",
                     "want $commit_oid\n",
@@ -370,14 +370,14 @@ RESPONSE
         foreach ($test_cases as $name => $test) {
             /** @var BufferingResponseWriter */
             $response = $this->getMockBuilder(BufferingResponseWriter::class)
-                ->onlyMethods(['close'])
+                ->onlyMethods([ 'close_writing' ])
                 ->getMock();
-            $git_encoder = new GitProtocolEncoder($response);
+            $git_encoder = new GitProtocolEncoderPipe($response);
             $this->server->handle_fetch_request($test['request'], $git_encoder);
 
             // Verify response format
             $response = $git_encoder->consume_all();
-            $expected_response_start = GitProtocolEncoder::encode_packet_lines([
+            $expected_response_start = GitProtocolEncoderPipe::encode_packet_lines([
                 "packfile\n",
             ]);
             $actual_response_start = substr($response, 0, strlen($expected_response_start));
@@ -452,7 +452,7 @@ RESPONSE
 
         $tree_oid = $this->repository->add_object(
             'tree',
-            GitProtocolEncoder::encode_tree_bytes(new Tree([
+            GitProtocolEncoderPipe::encode_tree_bytes(new Tree([
                 new TreeEntry([
                     'mode' => TreeEntry::FILE_MODE_REGULAR_NON_EXECUTABLE,
                     'name' => 'README.md',
@@ -468,7 +468,7 @@ RESPONSE
 
         $test_cases = [
             'basic push' => [
-                'request' => GitProtocolEncoder::encode_packet_lines([
+                'request' => GitProtocolEncoderPipe::encode_packet_lines([
                     "0000000000000000000000000000000000000000 $commit_oid refs/heads/main\0\n",
                     "0000"
                 ]),
@@ -476,7 +476,7 @@ RESPONSE
                 'expected_oid' => $commit_oid
             ],
             'delete ref' => [
-                'request' => GitProtocolEncoder::encode_packet_lines([
+                'request' => GitProtocolEncoderPipe::encode_packet_lines([
                     "$commit_oid 0000000000000000000000000000000000000000 refs/heads/main\0\n",
                     "0000"
                 ]),
@@ -488,10 +488,10 @@ RESPONSE
         foreach ($test_cases as $name => $test) {
             /** @var BufferingResponseWriter */
             $response = $this->getMockBuilder(BufferingResponseWriter::class)
-                ->onlyMethods(['close'])
+                ->onlyMethods([ 'close_writing' ])
                 ->getMock();
 
-            $git_encoder = new GitProtocolEncoder($response);
+            $git_encoder = new GitProtocolEncoderPipe($response);
             $this->server->handle_push_request($test['request'], $git_encoder);
 
             $response_body = $git_encoder->consume_all();

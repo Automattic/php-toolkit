@@ -2,7 +2,7 @@
 
 namespace WordPress\DataLiberation\Importer;
 
-use WordPress\ByteStream\Producer\ResourceProducer;
+use WordPress\ByteStream\ReadStream\FileReadStream;
 use WordPress\DataLiberation\BlockMarkup\BlockMarkupUrlProcessor;
 use WordPress\DataLiberation\EntityReader\EntityReaderIterator;
 use WordPress\DataLiberation\EntityReader\WXREntityReader;
@@ -155,7 +155,7 @@ class StreamImporter {
 	public static function create_for_wxr_file( $wxr_path, $options = array(), $cursor = null ) {
 		return static::create(
 			function ( $cursor = null ) use ( $wxr_path ) {
-				return WXREntityReader::create( ResourceProducer::from_local_file( $wxr_path ), $cursor );
+				return WXREntityReader::create( FileReadStream::from_path( $wxr_path ), $cursor );
 			},
 			$options,
 			$cursor

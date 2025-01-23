@@ -3,8 +3,9 @@
 namespace WordPress\Git\Protocol\Parser;
 
 use WordPress\ByteStream\MemoryPipe;
-use WordPress\ByteStream\Producer\ByteProducer;
+use WordPress\ByteStream\ReadStream\ByteReadStream;
 use WordPress\Git\GitException;
+use WordPress\Git\GitObjectDecodeReadStream;
 use WordPress\Git\GitRepository;
 
 class GitProtocolReader {
@@ -25,11 +26,11 @@ class GitProtocolReader {
     private $resolved_deltas = [];
 
     /**
-     * @var GitObjectWriter
+     * @var GitObjectDecodeReadStream
      */
     private $new_object_write_stream;
 
-    public function __construct(ByteProducer $upstream, $options = []) {
+    public function __construct(ByteReadStream $upstream, $options = []) {
         $this->write_to_repository = $options['write_to_repository'] ?? null;
         $this->resolve_deltas_from_repository = $options['resolve_deltas_from_repository'] ?? $options['write_to_repository'] ?? null;
         $this->will_process_pack = $options['will_process_pack'] ?? true;
@@ -248,7 +249,7 @@ class GitProtocolReader {
                         );
                         break;
                     case '#object-hash':
-                        $this->new_object_write_stream->close();
+                        $this->new_object_write_stream->close_writing();
                         return true;
                 }
             }

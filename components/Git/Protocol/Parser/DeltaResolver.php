@@ -3,23 +3,23 @@
 namespace WordPress\Git\Protocol\Parser;
 
 use WordPress\ByteStream\NotEnoughDataException;
-use WordPress\ByteStream\Producer\ByteProducer;
+use WordPress\ByteStream\ReadStream\ByteReadStream;
 use WordPress\Git\GitException;
-use WordPress\Git\GitObjectDecoder;
+use WordPress\Git\GitObjectDecodeReadStream;
 
 class DeltaResolver {
 
     /**
      * Source repository
      *
-     * @var GitObjectDecoder
+     * @var GitObjectDecodeReadStream
      */
     private $base_object_reader;
 
     /**
      * Delta reader
      *
-     * @var ByteProducer
+     * @var ByteReadStream
      */
     private $delta_reader;
 
@@ -28,7 +28,7 @@ class DeltaResolver {
     private $resolved_chunk = '';
     private $paused_on_incomplete_input = false;
 
-    public function __construct(GitObjectDecoder $base_object_reader, ByteProducer $delta_reader) {
+    public function __construct(GitObjectDecodeReadStream $base_object_reader, ByteReadStream $delta_reader) {
         $this->base_object_reader    = $base_object_reader;
         $this->delta_reader          = $delta_reader;
     }
@@ -107,7 +107,7 @@ class DeltaResolver {
             }
 
             $this->resolved_chunk = '';
-	        $this->delta_reader->pull(1, ByteProducer::PULL_EXACTLY);
+	        $this->delta_reader->pull(1, ByteReadStream::PULL_EXACTLY);
             $command_byte = ord( $this->delta_reader->consume(1) );
             if ( $command_byte & 0b10000000 ) {
                 $copyOffset = 0;
@@ -120,7 +120,7 @@ class DeltaResolver {
                     }
                 }
 
-                $this->delta_reader->pull($needed_bytes, ByteProducer::PULL_EXACTLY);
+                $this->delta_reader->pull($needed_bytes, ByteReadStream::PULL_EXACTLY);
 
                 $offset_bytes = $this->delta_reader->consume($needed_bytes);
                 $read_offset = 0;
@@ -149,10 +149,10 @@ class DeltaResolver {
                     $copySize = 0x10000;
                 }
                 $this->base_object_reader->seek($copyOffset);
-                $this->base_object_reader->pull($copySize, ByteProducer::PULL_EXACTLY);
+                $this->base_object_reader->pull($copySize, ByteReadStream::PULL_EXACTLY);
                 $this->resolved_chunk = $this->base_object_reader->consume($copySize);
             } else {
-                $this->delta_reader->pull($command_byte, ByteProducer::PULL_EXACTLY);
+                $this->delta_reader->pull($command_byte, ByteReadStream::PULL_EXACTLY);
                 $this->resolved_chunk = $this->delta_reader->consume($command_byte);
             }
             return true;

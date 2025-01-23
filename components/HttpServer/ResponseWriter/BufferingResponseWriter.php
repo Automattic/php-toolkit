@@ -2,7 +2,7 @@
 
 namespace WordPress\HttpServer\ResponseWriter;
 
-class BufferingResponseWriter implements ResponseConsumer {
+class BufferingResponseWriter implements ResponseWriteStream {
 
     private $http_code = 200;
     private $headers = [];
@@ -28,7 +28,7 @@ class BufferingResponseWriter implements ResponseConsumer {
         return $this->body;
     }
 
-    public function close(): void {
+    public function close_writing(): void {
         http_response_code($this->http_code);
         foreach ($this->headers as $key => $value) {
             header($key . ': ' . $value);

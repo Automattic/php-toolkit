@@ -2,7 +2,7 @@
 
 namespace WordPress\Filesystem\Mixin;
 
-use WordPress\ByteStream\Producer\ByteProducer;
+use WordPress\ByteStream\ReadStream\ByteReadStream;
 use WordPress\Filesystem\FilesystemException;
 
 /**
@@ -15,7 +15,7 @@ trait PutContentsViaWriteStream {
         try {
             if(is_string($data)) {
                 $stream->append_bytes($data);
-            } else if(is_object($data) && $data instanceof ByteProducer) {
+            } else if(is_object($data) && $data instanceof ByteReadStream) {
                 while($data->pull()) {
                     $stream->append_bytes($data->peek());
                 }
@@ -23,7 +23,7 @@ trait PutContentsViaWriteStream {
 				throw new FilesystemException( 'Invalid $data argument provided. Expected a string or a Byte_Reader instance. Received: ' . gettype($data) );
 			}
 		} finally {
-			$stream->close();
+			$stream->close_writing();
 		}
 	}
 

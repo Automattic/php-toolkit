@@ -3,7 +3,7 @@
 namespace WordPress\Filesystem;
 
 use WordPress\ByteStream\MemoryPipe;
-use WordPress\ByteStream\Producer\ByteProducer;
+use WordPress\ByteStream\ReadStream\ByteReadStream;
 use WordPress\Filesystem\Layer\ChrootLayer;
 use WordPress\Filesystem\Mixin\Interfaces\InternalizedWriteStream;
 
@@ -60,7 +60,7 @@ class InMemoryFilesystem implements Filesystem, InternalizedWriteStream {
 		return isset($this->files[$path]);
 	}
 
-	public function open_read_stream($path): ByteProducer {
+	public function open_read_stream($path): ByteReadStream {
 		if (!$this->is_file($path)) {
 			throw new FilesystemException(
 				sprintf('File not found: %s', $path),
