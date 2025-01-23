@@ -3,7 +3,7 @@
 namespace WordPress\DataLiberation\EntityReader;
 
 use WordPress\ByteStream\ReadStream\ByteReadStream;
-use WordPress\DataLiberation\Importer\ImportedEntity;
+use WordPress\DataLiberation\ImportEntity;
 use WordPress\XML\XMLProcessor;
 use WordPress\XML\XMLUnsupportedException;
 
@@ -435,12 +435,12 @@ class WXREntityReader implements EntityReader {
 	/**
 	 * Gets the data for the current entity.
 	 *
+	 * @return ImportEntity The entity.
 	 * @since WP_VERSION
 	 *
-	 * @return ImportedEntity The entity.
 	 */
-	public function get_entity(): ImportedEntity {
-		return new ImportedEntity(
+	public function get_entity(): ImportEntity {
+		return new ImportEntity(
 			$this->get_entity_type(),
 			$this->entity_data
 		);

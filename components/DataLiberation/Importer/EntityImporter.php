@@ -22,6 +22,7 @@
 namespace WordPress\DataLiberation\Importer;
 
 use WordPress\DataLiberation\DataLiberationException;
+use WordPress\DataLiberation\ImportEntity;
 
 class EntityImporter {
 
@@ -112,25 +113,25 @@ class EntityImporter {
 		);
 	}
 
-	public function import_entity( ImportedEntity $entity ) {
+	public function import_entity( ImportEntity $entity ) {
 		$type = $entity->get_type();
 		$data = $entity->get_data();
 		switch ( $entity->get_type() ) {
-			case ImportedEntity::TYPE_POST:
+			case ImportEntity::TYPE_POST:
 				return $this->import_post( $data );
-			case ImportedEntity::TYPE_POST_META:
+			case ImportEntity::TYPE_POST_META:
 				return $this->import_post_meta( $data, $data['post_id'] );
-			case ImportedEntity::TYPE_COMMENT:
+			case ImportEntity::TYPE_COMMENT:
 				return $this->import_comment( $data, $data['post_id'] );
-			case ImportedEntity::TYPE_COMMENT_META:
+			case ImportEntity::TYPE_COMMENT_META:
 				return $this->import_comment_meta( $data, $data['comment_id'] );
-			case ImportedEntity::TYPE_TERM:
-			case ImportedEntity::TYPE_TAG:
-			case ImportedEntity::TYPE_CATEGORY:
+			case ImportEntity::TYPE_TERM:
+			case ImportEntity::TYPE_TAG:
+			case ImportEntity::TYPE_CATEGORY:
 				return $this->import_term( $data );
-			case ImportedEntity::TYPE_USER:
+			case ImportEntity::TYPE_USER:
 				return $this->import_user( $data );
-			case ImportedEntity::TYPE_SITE_OPTION:
+			case ImportEntity::TYPE_SITE_OPTION:
 				return $this->import_site_option( $data );
 			default:
 				throw new \InvalidArgumentException( "Unknown entity type: $type" );

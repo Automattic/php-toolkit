@@ -1,12 +1,12 @@
 <?php
 
-namespace WordPress\DataLiberation\Importer;
+namespace WordPress\DataLiberation;
 
 /**
  * Represents a single entity, whether a WordPress post, post meta,
  * a single SQL record, or something entirely different.
  */
-class ImportedEntity {
+class ImportEntity {
 
 	const TYPE_POST         = 'post';
 	const TYPE_POST_META    = 'post_meta';

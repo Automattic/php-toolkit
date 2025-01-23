@@ -3,6 +3,8 @@
 
 namespace WordPress\DataLiberation\Importer;
 
+use WordPress\DataLiberation\ImportEntity;
+
 class RetryFrontloadingIterator implements \Iterator {
 	private $import_post_id;
 	private $last_id_on_page = null;
@@ -18,7 +20,7 @@ class RetryFrontloadingIterator implements \Iterator {
 		if ( ! $this->current ) {
 			return null;
 		}
-		return new ImportedEntity(
+		return new ImportEntity(
 			'asset_retry',
 			array(
 				'current_url' => $this->current->meta['current_url'],
@@ -75,7 +77,7 @@ class RetryFrontloadingIterator implements \Iterator {
 			"SELECT p.* FROM {$wpdb->posts} p
             INNER JOIN {$wpdb->postmeta} pm ON p.ID = pm.post_id
             WHERE {$where}
-            ORDER BY p.ID ASC 
+            ORDER BY p.ID ASC
             LIMIT 100"
 		);
 		$last_placeholder   = end( $this->placeholders );

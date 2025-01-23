@@ -4,7 +4,7 @@ namespace WordPress\DataLiberation\EntityReader;
 
 use WordPress\DataLiberation\DataFormatConsumer\BlocksWithMetadata;
 use WordPress\DataLiberation\DataFormatConsumer\MarkupProcessorConsumer;
-use WordPress\DataLiberation\Importer\ImportedEntity;
+use WordPress\DataLiberation\ImportEntity;
 use WordPress\DataLiberation\Importer\ImportUtils;
 use WordPress\Filesystem\Filesystem;
 use WordPress\Filesystem\Visitor\FilesystemVisitor;
@@ -69,7 +69,7 @@ class FilesystemEntityReader implements EntityReader {
 	/**
 	 * The current WordPress entity.
 	 *
-	 * @var ImportedEntity|null
+	 * @var ImportEntity|null
 	 */
 	private $current_entity;
 
@@ -198,7 +198,7 @@ class FilesystemEntityReader implements EntityReader {
 	/**
 	 * Get the current entity.
 	 *
-	 * @return ImportedEntity|null The current entity or null if none.
+	 * @return ImportEntity|null The current entity or null if none.
 	 */
 	public function get_entity() {
 		return $this->current_entity;
@@ -295,7 +295,7 @@ class FilesystemEntityReader implements EntityReader {
 					if ( ! $data['post_title'] ) {
 						$data['post_title'] = ImportUtils::slug_to_title( basename( $metadata['local_file_path'] ) );
 					}
-					$entity = new ImportedEntity( $entity->get_type(), $data );
+					$entity = new ImportEntity( $entity->get_type(), $data );
 				}
 				$this->entities[] = $entity;
 			}
@@ -305,7 +305,7 @@ class FilesystemEntityReader implements EntityReader {
 				'local_file_path' => $metadata['local_file_path'],
 			);
 			foreach ( $additional_meta as $key => $value ) {
-				$this->entities[] = new ImportedEntity(
+				$this->entities[] = new ImportEntity(
 					'post_meta',
 					array(
 						'post_id' => $post_tree_node['post_id'],

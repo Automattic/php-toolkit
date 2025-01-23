@@ -5,9 +5,6 @@ namespace WordPress\DataLiberation\EntityReader;
 /**
  * The Entity Reader ingests content from a source and breaks it down into
  * individual "entities" that WordPress understands - posts, comments, metadata, etc.
- *
- * The reader implements Iterator so you can easily loop through entities:
- * foreach ($reader as $entity) { ... }
  */
 interface EntityReader {
 

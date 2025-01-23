@@ -3,7 +3,7 @@
 namespace WordPress\DataLiberation\EntityReader;
 
 use WordPress\DataLiberation\DataFormatConsumer\BlocksWithMetadata;
-use WordPress\DataLiberation\Importer\ImportedEntity;
+use WordPress\DataLiberation\ImportEntity;
 use WordPress\DataLiberation\Importer\ImportUtils;
 
 /**
@@ -47,7 +47,7 @@ class BlocksWithMetadataEntityReader implements EntityReader {
 		$post_fields    = array();
 		$other_metadata = array();
 		foreach ( $all_metadata as $key => $values ) {
-			if ( in_array( $key, ImportedEntity::POST_FIELDS, true ) ) {
+			if ( in_array( $key, ImportEntity::POST_FIELDS, true ) ) {
 				$post_fields[ $key ] = $values[0];
 			} else {
 				$other_metadata[ $key ] = $values[0];
@@ -70,11 +70,11 @@ class BlocksWithMetadataEntityReader implements EntityReader {
 		}
 
 		// Yield the post entity.
-		$this->enqueued_entities[] = new ImportedEntity( 'post', $post_fields );
+		$this->enqueued_entities[] = new ImportEntity( 'post', $post_fields );
 
 		// Yield all the metadata that don't belong to the post entity.
 		foreach ( $other_metadata as $key => $value ) {
-			$this->enqueued_entities[] = new ImportedEntity(
+			$this->enqueued_entities[] = new ImportEntity(
 				'post_meta',
 				array(
 					'post_id' => $this->post_id,

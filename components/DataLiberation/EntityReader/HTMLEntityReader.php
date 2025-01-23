@@ -3,7 +3,7 @@
 namespace WordPress\DataLiberation\EntityReader;
 
 use WordPress\DataLiberation\DataFormatConsumer\BlocksWithMetadata;
-use WordPress\DataLiberation\Importer\ImportedEntity;
+use WordPress\DataLiberation\ImportEntity;
 
 /**
  * Converts a single HTML file into a stream of WordPress entities.
@@ -41,7 +41,7 @@ class HTMLEntityReader implements EntityReader {
 		$post_fields    = array();
 		$other_metadata = array();
 		foreach ( $this->metadata as $key => $values ) {
-			if ( in_array( $key, ImportedEntity::POST_FIELDS, true ) ) {
+			if ( in_array( $key, ImportEntity::POST_FIELDS, true ) ) {
 				$post_fields[ $key ] = $values[0];
 			} else {
 				$other_metadata[ $key ] = $values[0];
@@ -49,7 +49,7 @@ class HTMLEntityReader implements EntityReader {
 		}
 
 		// Yield the post entity.
-		$this->entities[] = new ImportedEntity(
+		$this->entities[] = new ImportEntity(
 			'post',
 			array_merge(
 				$post_fields,
@@ -62,7 +62,7 @@ class HTMLEntityReader implements EntityReader {
 
 		// Yield all the metadata that don't belong to the post entity.
 		foreach ( $other_metadata as $key => $value ) {
-			$this->entities[] = new ImportedEntity(
+			$this->entities[] = new ImportEntity(
 				'post_meta',
 				array(
 					'post_id' => $this->post_id,
@@ -77,7 +77,7 @@ class HTMLEntityReader implements EntityReader {
 	/**
 	 * Returns the current entity.
 	 *
-	 * @return ImportedEntity|false The current entity, or false if there are no entities left.
+	 * @return ImportEntity|false The current entity, or false if there are no entities left.
 	 */
 	public function get_entity() {
 		if ( $this->is_finished() ) {
