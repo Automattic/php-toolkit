@@ -4,22 +4,20 @@ namespace WordPress\DataLiberation\EntityReader;
 
 use WordPress\DataLiberation\ImportEntity;
 use PDO;
-use PDOException;
 use WordPress\DataLiberation\DataLiberationException;
 
 /**
- * Data Liberation API: DatabaseEntityReader class
- *
- * Reads WordPress database tables and emits entities like posts,
- * comments, users, and terms. Enables efficient processing of large database
- * tables without loading everything into memory.
+ * Reads the database rows, one table at a time, from the first row to the last row.
+ * Enables efficiently exporting large databases into an SQL file, but it's not useful
+ * for content dumps – the latter need to emit resources in a "topological content order,"
+ * e.g. post 1, post 1 meta, post 1 categories, post 1 comments, then post 2 (child of 1) etc.
  *
  * Note this is just a reader. It doesn't import any data into WordPress. It
- * only reads meaningful entities from the database.
+ * only reads rows from the database.
  *
  * @since WP_VERSION
  */
-class DatabaseEntityReader implements EntityReader {
+class DatabaseRowsEntityReader implements EntityReader {
 
 	/**
 	 * State constants for the finite state machine
@@ -104,7 +102,7 @@ class DatabaseEntityReader implements EntityReader {
 
     /**
      * The type of the database.
-     * 
+     *
      * One of: "sqlite", "mysql"
      *
      * @since WP_VERSION
@@ -113,7 +111,7 @@ class DatabaseEntityReader implements EntityReader {
     private $db_type;
 
 	public static function create( PDO $db, $options = array() ) {
-		return new DatabaseEntityReader( $db, $options );
+		return new DatabaseRowsEntityReader( $db, $options );
 	}
 
 	/**

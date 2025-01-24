@@ -1,7 +1,7 @@
 <?php
 
 use PHPUnit\Framework\TestCase;
-use WordPress\DataLiberation\EntityReader\DatabaseEntityReader;
+use WordPress\DataLiberation\EntityReader\DatabaseRowsEntityReader;
 use WordPress\DataLiberation\EntityWriter\MySQLDumpWriter;
 use WordPress\ByteStream\MemoryPipe;
 
@@ -21,7 +21,7 @@ class MySQLExportTest extends TestCase {
         // Set up export components
         $this->memory_pipe = new MemoryPipe();
         $this->writer = new MySQLDumpWriter($this->memory_pipe);
-        $this->reader = DatabaseEntityReader::create($this->db, [
+        $this->reader = DatabaseRowsEntityReader::create($this->db, [
             'tables_to_process' => ['posts']
         ]);
     }
@@ -43,14 +43,14 @@ class MySQLExportTest extends TestCase {
         // Verify exported SQL
         $expected = "INSERT INTO posts (ID, post_title) VALUES (1, 'First Post');\n" .
                    "INSERT INTO posts (ID, post_title) VALUES (2, 'Second Post');\n";
-        
+
         $this->assertEquals($expected, $this->memory_pipe->consume_all());
     }
 
     public function testExportEmptyTable(): void {
         // Clear the table
         $this->db->exec("DELETE FROM posts");
-        
+
         // Try export
         while ($this->reader->next_entity()) {
             $entity = $this->reader->get_entity();
@@ -65,7 +65,7 @@ class MySQLExportTest extends TestCase {
     public function testExportWithSpecialCharacters(): void {
         // Add a row with special characters
         $this->db->exec("INSERT INTO posts (post_title) VALUES ('It''s a \"special\" \\ post')");
-        
+
         // Export all entities
         while ($this->reader->next_entity()) {
             $entity = $this->reader->get_entity();
@@ -82,7 +82,7 @@ class MySQLExportTest extends TestCase {
         // Set up reader with create_table_query option
         $this->memory_pipe = new MemoryPipe();
         $this->writer = new MySQLDumpWriter($this->memory_pipe);
-        $this->reader = DatabaseEntityReader::create($this->db, [
+        $this->reader = DatabaseRowsEntityReader::create($this->db, [
             'tables_to_process' => ['posts'],
             'create_table_query' => true
         ]);
@@ -113,7 +113,7 @@ SQL, $output);
         $cursor = $this->reader->get_reentrancy_cursor();
 
         // Create new reader initialized from cursor
-        $resumed_reader = DatabaseEntityReader::create($this->db, [
+        $resumed_reader = DatabaseRowsEntityReader::create($this->db, [
             'tables_to_process' => ['posts'],
             'cursor' => $cursor
         ]);
@@ -122,13 +122,13 @@ SQL, $output);
         $resumed_reader->next_entity();
         $entity = $resumed_reader->get_entity();
         $this->writer->append_entity($entity);
-        
+
         $this->writer->close_writing();
 
         // Verify full export was completed
         $expected = "INSERT INTO posts (ID, post_title) VALUES (1, 'First Post');\n" .
                    "INSERT INTO posts (ID, post_title) VALUES (2, 'Second Post');\n";
-        
+
         $this->assertEquals($expected, $this->memory_pipe->consume_all());
     }
 }

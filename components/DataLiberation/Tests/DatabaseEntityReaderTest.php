@@ -1,7 +1,7 @@
 <?php
 
 use PHPUnit\Framework\TestCase;
-use WordPress\DataLiberation\EntityReader\DatabaseEntityReader;
+use WordPress\DataLiberation\EntityReader\DatabaseRowsEntityReader;
 use WordPress\DataLiberation\ImportEntity;
 
 class DatabaseEntityReaderTest extends TestCase {
@@ -21,7 +21,7 @@ class DatabaseEntityReaderTest extends TestCase {
     }
 
     public function testGetEntity() {
-        $reader = DatabaseEntityReader::create($this->db, ['tables_to_process' => ['posts']]);
+        $reader = DatabaseRowsEntityReader::create($this->db, [ 'tables_to_process' => ['posts']]);
         $reader->next_entity();
         $entity = $reader->get_entity();
         $this->assertInstanceOf(ImportEntity::class, $entity);
@@ -30,14 +30,14 @@ class DatabaseEntityReaderTest extends TestCase {
     }
 
     public function testNextEntity() {
-        $reader = DatabaseEntityReader::create($this->db, ['tables_to_process' => ['posts']]);
+        $reader = DatabaseRowsEntityReader::create($this->db, [ 'tables_to_process' => ['posts']]);
         $this->assertTrue($reader->next_entity());
         $this->assertTrue($reader->next_entity());
         $this->assertFalse($reader->next_entity());
     }
 
     public function testGetLastRecordId() {
-        $reader = DatabaseEntityReader::create($this->db, ['tables_to_process' => ['posts']]);
+        $reader = DatabaseRowsEntityReader::create($this->db, [ 'tables_to_process' => ['posts']]);
         $reader->next_entity();
         $this->assertEquals(1, $reader->get_last_record_id());
         $reader->next_entity();
@@ -45,7 +45,7 @@ class DatabaseEntityReaderTest extends TestCase {
     }
 
     public function testIsFinished() {
-        $reader = DatabaseEntityReader::create($this->db, ['tables_to_process' => ['posts']]);
+        $reader = DatabaseRowsEntityReader::create($this->db, [ 'tables_to_process' => ['posts']]);
         $this->assertFalse($reader->is_finished());
         $this->assertTrue($reader->next_entity());
         
