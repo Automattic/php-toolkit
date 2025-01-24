@@ -2,6 +2,8 @@
 
 namespace WordPress\DataLiberation\DataFormatConsumer;
 
+use WordPress\DataLiberation\DataLiberationException;
+
 /**
  * Represents the result of a {data format} -> block markup conversion.
  */
@@ -13,6 +15,11 @@ class BlocksWithMetadata {
 	public function __construct( $block_markup, $metadata = array() ) {
 		$this->block_markup = $block_markup;
 		$this->metadata     = $metadata;
+        foreach($this->metadata as $key => $values) {
+            if(!is_array($values)) {
+                throw new DataLiberationException('Metadata values for the key ' . $key . ' must be an array but was ' . gettype($values));
+            }
+        }
 	}
 
 	/**
@@ -54,7 +61,11 @@ class BlocksWithMetadata {
 	 */
 	public function get_all_metadata(array $options = []) {
         if(isset($options['first_value_only']) && $options['first_value_only']) {
-            return array_column($this->metadata, 0);
+            $meta = [];
+            foreach($this->metadata as $key => $values) {
+                $meta[$key] = $values[0];
+            }
+            return $meta;
         }
 		return $this->metadata;
 	}

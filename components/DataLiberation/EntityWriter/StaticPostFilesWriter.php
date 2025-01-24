@@ -6,19 +6,20 @@ use WordPress\DataLiberation\ImportEntity;
 use WordPress\DataLiberation\DataLiberationException;
 use WordPress\Filesystem\Filesystem;
 use WordPress\DataLiberation\DataFormatConsumer\BlocksWithMetadata;
-use WordPress\Markdown\MarkdownProducer;
 
 use function WordPress\Filesystem\wp_join_paths;
 
-class MarkdownWriter implements EntityWriter {
+class StaticPostFilesWriter implements EntityWriter {
 
     private $filesystem;
     private $state = self::STATE_WRITING;
     private $directory_scheme;
     private $parent_stack = [];
-    private $pending_parent_path;
+    private $pending_parent_path = '/';
     private $pending_post;
     private $pending_metadata;
+    private $static_content_producer_factory;
+    private $file_extension;
 
     const STATE_WRITING = 'writing';
     const STATE_FINALIZING = 'finalizing';
@@ -27,13 +28,25 @@ class MarkdownWriter implements EntityWriter {
     const SCHEME_DATE = 'date';
     const SCHEME_PARENT_TRAIL = 'parent_trail';
 
-    public function __construct(Filesystem $filesystem, $directory_scheme = self::SCHEME_DATE, $cursor = null) {
+    public function __construct(Filesystem $filesystem, $options = []) {
         $this->filesystem = $filesystem;
-        $this->directory_scheme = $directory_scheme;
-        if ($cursor) {
-            $this->restore_from_cursor($cursor);
+        $this->directory_scheme = $options['directory_scheme'] ?? self::SCHEME_DATE;
+        if($this->directory_scheme !== self::SCHEME_DATE && $this->directory_scheme !== self::SCHEME_PARENT_TRAIL) {
+            throw new DataLiberationException("Invalid directory scheme: " . $this->directory_scheme);
+        }
+        if(!isset($options['static_content_producer_factory'])) {
+            throw new DataLiberationException("static_content_producer_factory is required");
+        }
+        $this->static_content_producer_factory = $options['static_content_producer_factory'];
+        if(!isset($options['file_extension'])) {
+            throw new DataLiberationException("file_extension is required");
+        }
+        $this->file_extension = $options['file_extension'];
+        if (isset($options['cursor'])) {
+            $this->restore_from_cursor($options['cursor']);
         }
     }
+
     public function append_entity(ImportEntity $entity) {
         if ($this->state === self::STATE_CLOSED) {
             throw new DataLiberationException("Cannot write to a closed writer");
@@ -56,11 +69,11 @@ class MarkdownWriter implements EntityWriter {
 
                 if($this->pending_post) {
                     $this->finalize_pending_post($pending_post_was_a_parent);
-                    if ($this->directory_scheme === self::SCHEME_PARENT_TRAIL) {
-                        $this->pending_parent_path = $this->create_parent_trail_directory();
-                    } elseif ($this->directory_scheme === self::SCHEME_DATE) {
-                        $this->pending_parent_path = $this->create_date_based_directory();
-                    }
+                }
+                if ($this->directory_scheme === self::SCHEME_PARENT_TRAIL) {
+                    $this->pending_parent_path = $this->create_parent_trail_directory();
+                } elseif ($this->directory_scheme === self::SCHEME_DATE) {
+                    $this->pending_parent_path = $this->create_date_based_directory($post_data);
                 }
                 $this->pending_post = $post_data;
                 $this->pending_metadata = [];
@@ -70,7 +83,7 @@ class MarkdownWriter implements EntityWriter {
 
             case 'post_meta':
                 // Attach meta to the current pending post
-                $this->pending_metadata[$data['meta_key']] = $data['meta_value'];
+                $this->pending_metadata[$data['meta_key']] = [$data['meta_value']];
                 break;
         }
     }
@@ -81,35 +94,37 @@ class MarkdownWriter implements EntityWriter {
         }
 
         $path = $this->pending_parent_path;
+        $slug = $this->slugify($this->pending_post['post_title']);
         if ($this->directory_scheme === self::SCHEME_PARENT_TRAIL) {
-            $slug = $this->slugify($this->pending_post['post_title']);
             if ($pending_post_was_a_parent) {
-                $path = wp_join_paths($path, $slug, 'index.md');
+                $path = wp_join_paths($path, $slug, 'index.' . $this->file_extension);
             } else {
-                $path = wp_join_paths($path, $slug . '.md');
+                $path = wp_join_paths($path, $slug . '.' . $this->file_extension);
             }
+        } else {
+            $path = wp_join_paths($path, $slug . '.' . $this->file_extension);
         }
 
         $this->filesystem->mkdir(dirname($path), ['recursive' => true]);
 
         $content = new BlocksWithMetadata($this->pending_post['content'], $this->pending_metadata);
-        $markdown_producer = new MarkdownProducer($content->get_block_markup(), $content->get_all_metadata());
+        $markdown_producer = call_user_func($this->static_content_producer_factory, $content);
         $contents = $markdown_producer->produce();
 
         $this->filesystem->put_contents($path, $contents);
     }
 
     private function create_parent_trail_directory() {
-        $base_path_segments = [];
+        $base_path_segments = ['/'];
         foreach ($this->parent_stack as $parent_post) {
             $base_path_segments[] = $this->slugify($parent_post['post_title']);
         }
         return wp_join_paths(...$base_path_segments);
     }
 
-    private function create_date_based_directory() {
-        $path_parts = explode('-', substr($this->pending_post['post_date'], 0, 10));
-        return wp_join_paths(...$path_parts);
+    private function create_date_based_directory($post_data) {
+        $base_path_segments = explode('-', substr($post_data['post_date'], 0, 10));
+        return wp_join_paths(...$base_path_segments);
     }
 
     private function slugify($title) {

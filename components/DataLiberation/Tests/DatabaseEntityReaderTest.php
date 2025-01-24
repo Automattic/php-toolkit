@@ -48,7 +48,7 @@ class DatabaseEntityReaderTest extends TestCase {
         $reader = DatabaseRowsEntityReader::create($this->db, [ 'tables_to_process' => ['posts']]);
         $this->assertFalse($reader->is_finished());
         $this->assertTrue($reader->next_entity());
-        
+
         $this->assertTrue($reader->next_entity());
         $this->assertFalse($reader->is_finished());
 

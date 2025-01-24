@@ -47,15 +47,17 @@ class AnnotatedBlockMarkupProducer {
 	public function produce() {
 		if ( null === $this->result ) {
 			$this->result = '';
-			foreach ( $this->blocks_with_meta->get_all_metadata() as $key => $value ) {
-				$p = new \WP_HTML_Tag_Processor( '<meta>' );
-				$p->next_tag();
-				$p->set_attribute( 'name', $key );
-				if ( is_array( $value ) || is_object( $value ) ) {
-					$value = json_encode( $value );
+			foreach ( $this->blocks_with_meta->get_all_metadata() as $key => $values ) {
+				foreach($values as $value) {
+					$p = new \WP_HTML_Tag_Processor( '<meta>' );
+					$p->next_tag();
+					$p->set_attribute( 'name', $key );
+					if ( is_array( $value ) || is_object( $value ) ) {
+						$value = json_encode( $value );
+					}
+					$p->set_attribute( 'content', $value );
+					$this->result .= $p->get_updated_html() . "\n";
 				}
-				$p->set_attribute( 'content', $value );
-				$this->result .= $p->get_updated_html() . "\n";
 			}
 			$this->result .= $this->blocks_with_meta->get_block_markup();
 		}
