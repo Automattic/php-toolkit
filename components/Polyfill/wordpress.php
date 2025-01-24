@@ -10,6 +10,12 @@ if (
 	require_once __DIR__ . '/../HTML/html5-named-character-references.php';
 }
 
+if(file_exists(__DIR__ . '/../BlockParser/class-wp-block-parser.php')) {
+	require_once __DIR__ . '/../BlockParser/class-wp-block-parser-block.php';
+	require_once __DIR__ . '/../BlockParser/class-wp-block-parser-frame.php';
+	require_once __DIR__ . '/../BlockParser/class-wp-block-parser.php';
+}
+
 
 if ( ! function_exists( '_doing_it_wrong' ) ) {
 	$GLOBALS['_doing_it_wrong_messages'] = array();
@@ -109,5 +115,12 @@ if ( ! function_exists( 'do_action' ) ) {
 				call_user_func_array( $function['function'], array_slice( $args, 0, $function['accepted_args'] ) );
 			}
 		}
+	}
+}
+
+if ( ! function_exists( 'parse_blocks' ) ) {
+	function parse_blocks( $input ) {
+		$parser = new WP_Block_Parser();
+		return $parser->parse( $input );
 	}
 }
