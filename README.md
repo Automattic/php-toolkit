@@ -1,4 +1,4 @@
-## WordPress components and Data Liberation
+## WordPress PHP Libraries and Data Liberation
 
 Standalone libraries meant for eventual inclusion in WordPress core.
 
