@@ -18,12 +18,10 @@ use WordPress\DataLiberation\BlockMarkup\BlockMarkupUrlProcessor;
 use WordPress\DataLiberation\DataFormatConsumer\AnnotatedBlockMarkupConsumer;
 use WordPress\DataLiberation\DataFormatConsumer\BlocksWithMetadata;
 use WordPress\DataLiberation\DataFormatProducer\AnnotatedBlockMarkupProducer;
-use WordPress\DataLiberation\EntityReader\EntityReaderIterator;
 use WordPress\DataLiberation\EntityReader\FilesystemEntityReader;
 use WordPress\DataLiberation\Importer\ImportSession;
 use WordPress\DataLiberation\Importer\StreamImporter;
 use WordPress\DataLiberation\URL\WPURL;
-use WordPress\Filesystem\InMemoryFilesystem;
 use WordPress\Filesystem\LocalFilesystem;
 use WordPress\Filesystem\UploadedFilesystem;
 use WordPress\Filesystem\Visitor\FilesystemVisitor;
@@ -308,12 +306,6 @@ class WP_Static_Files_Editor_Plugin {
         });
 
         add_action('admin_enqueue_scripts', function($hook) {
-            $screen = get_current_screen();
-            $enqueue_script = $screen && $screen->base === 'post' && $screen->post_type === WP_LOCAL_FILE_POST_TYPE;
-            if (!$enqueue_script) {
-                return;
-            }
-
             wp_register_script(
                 'static-files-editor',
                 plugins_url('build/index.js', __FILE__),
@@ -334,6 +326,12 @@ class WP_Static_Files_Editor_Plugin {
                 array('wp-components', 'wp-block-editor', 'wp-edit-post'),
                 '1.0.0'
             );
+
+            $screen = get_current_screen();
+            $enqueue_script = $screen && $screen->base === 'post' && $screen->post_type === WP_LOCAL_FILE_POST_TYPE;
+            if (!$enqueue_script) {
+                return;
+            }
 
             wp_enqueue_script('static-files-editor');
             wp_enqueue_style('static-files-editor');

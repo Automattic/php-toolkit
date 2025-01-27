@@ -10,10 +10,11 @@ if (
 	require_once __DIR__ . '/../HTML/html5-named-character-references.php';
 }
 
-if(file_exists(__DIR__ . '/../BlockParser/class-wp-block-parser.php')) {
+if(
+    file_exists(__DIR__ . '/../BlockParser/class-wp-block-parser.php') &&
+    ! class_exists('WP_Block_Parser')
+) {
 	require_once __DIR__ . '/../BlockParser/class-wp-block-parser-block.php';
-	require_once __DIR__ . '/../BlockParser/class-wp-block-parser-frame.php';
-	require_once __DIR__ . '/../BlockParser/class-wp-block-parser.php';
 }
 
 

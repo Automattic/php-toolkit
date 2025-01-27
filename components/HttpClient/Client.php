@@ -566,7 +566,7 @@ class Client {
 	protected function send_request_body( array $requests ) {
 		foreach ( $this->stream_select( $requests, self::STREAM_SELECT_WRITE ) as $request ) {
             if($request->upload_body_stream->reached_end_of_data()) {
-                $request->upload_body_stream->close();
+                $request->upload_body_stream->close_writing();
                 $request->upload_body_stream = null;
                 $request->state	             = Request::STATE_RECEIVING_HEADERS;
                 continue;

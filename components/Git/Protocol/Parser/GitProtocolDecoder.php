@@ -26,7 +26,7 @@ class GitProtocolDecoder {
     private $resolved_deltas = [];
 
     /**
-     * @var GitObjectDecoder
+     * @var GitObjectEncoder
      */
     private $new_object_write_stream;
 
@@ -226,7 +226,7 @@ class GitProtocolDecoder {
 
                         $delta_oid = $this->pack_parser->get_object_hash();
 
-                        $this->new_object_write_stream->close();
+                        $this->new_object_write_stream->close_writing();
                         $new_oid = $this->new_object_write_stream->get_hash();
                         $this->resolved_deltas[$delta_oid] = $new_oid;
 

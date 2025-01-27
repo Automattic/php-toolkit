@@ -16,7 +16,6 @@ use WordPress\Filesystem\Visitor\FilesystemVisitor;
 use WordPress\Git\GitEndpoint;
 use WordPress\Git\GitFilesystem;
 use WordPress\Git\GitRepository;
-use WordPress\HttpServer\ResponseWriter\StreamingResponseWriter;
 
 use function WordPress\Filesystem\wp_canonicalize_path;
 
