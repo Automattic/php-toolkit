@@ -9,11 +9,11 @@ class MemoryPipe extends BaseByteReadStream implements ByteWriteStream {
 
 	protected $is_writing_closed;
 
-	public function __construct(string $string='', $expected_length = null) {
-		if(strlen($string) > 0 && null !== $expected_length) {
+	public function __construct(?string $string=null, $expected_length = null) {
+		if(null !== $string && strlen($string) > 0 && null !== $expected_length) {
 			throw new ByteStreamException('A MemoryPipe accepts either a non-empty string representing the entire data, or an expected length when the data is not available yet. It does not accept both arguments.');
 		}
-		if(strlen($string) > 0) {
+		if(null !== $string) {
 			$this->buffer = $string;
 			$this->expected_length = strlen($string);
             // If we have a full buffer, it's already in memory and we don't need
@@ -45,7 +45,7 @@ class MemoryPipe extends BaseByteReadStream implements ByteWriteStream {
 		if($this->count_consumable_bytes() > 0) {
 			return min($n, $this->count_consumable_bytes());
 		}
-		throw new NotEnoughDataException('Cannot pull bytes from a MemoryPipe.');
+		throw new NotEnoughDataException('Cannot pull bytes after exhausting the buffer from a MemoryPipe. You are likely missing a $pipe->reached_end_of_data() check before the pull() call.');
 	}
 
 	protected function pull_exactly( $n ): int {

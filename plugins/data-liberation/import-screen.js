@@ -26,6 +26,12 @@ const { state, actions } = store('dataLiberation', {
 	callbacks: {
 		/**
 		 * Fetches a fresh interactivity state from the server every second.
+		 *
+		 * @TODO: Get rid of the interactivity-state API endpoint.
+		 *        Let's use the iAPI router via data-wp-router-region and actions.navigate().
+		 *        If it's the same url you have to use actions.navigate(url, { force: true })
+		 *        to clear the cache.
+		 *        See https://github.com/WordPress/gutenberg/blob/trunk/packages/interactivity-router/README.md
 		 */
 		async startRefreshingProgress() {
 			while (true) {

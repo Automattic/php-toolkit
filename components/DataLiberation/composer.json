@@ -24,7 +24,8 @@
 		],
 		"psr-4": {
 			"WordPress\\DataLiberation\\": "",
-            "Rowbot\\": "vendor-patched/"
+            "Rowbot\\": "vendor-patched/",
+            "Brick\\": "vendor-patched/"
 		},
         "exclude-from-classmap": [
             "/Tests/"

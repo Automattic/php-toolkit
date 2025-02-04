@@ -182,7 +182,7 @@ class GitProtocolDecoder {
                         }
                         $this->base_object_reader = $delta_repository->read_object($target_oid);
                         $delta_uncompressed_size = $this->pack_parser->get_object_uncompressed_size();
-                        $this->delta_pipe = new MemoryPipe('', $delta_uncompressed_size);
+                        $this->delta_pipe = new MemoryPipe(null, $delta_uncompressed_size);
                         $this->delta_resolver = new DeltaResolver(
                             $this->base_object_reader,
                             $this->delta_pipe
@@ -230,7 +230,7 @@ class GitProtocolDecoder {
                         $new_oid = $this->new_object_write_stream->get_hash();
                         $this->resolved_deltas[$delta_oid] = $new_oid;
 
-                        $this->base_object_reader->close();
+                        $this->base_object_reader->close_reading();
                         $this->delta_resolver = null;
                         $this->base_object_reader = null;
                         return true;

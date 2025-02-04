@@ -1,0 +1,24 @@
+:global(#wpadminbar) {
+    display: none;
+}
+:global(.interface-interface-skeleton) {
+    top: 0;
+}
+:global(.editor-visual-editor.has-padding) {
+    padding: 0;
+}
+:global(.components-editor-notices__snackbar) {
+    /* Accommodate the mobile menu at the bottom of the screen */
+    bottom: 104px !important;
+}
+
+.file-picker-tree-container,
+.file-picker-tree-container > div {
+	flex-grow: 1;
+	display: flex;
+	flex-direction: column;
+}
+
+.file-picker-tree-container > div > div[role='application'] {
+	flex-grow: 1;
+}

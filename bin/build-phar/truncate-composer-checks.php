@@ -10,6 +10,8 @@
 $file = $argv[1];
 $phar = new Phar($file);
 $phar->startBuffering();
+$phar['.box/bin/check-requirements.php'] = '';
 $phar['vendor/composer/platform_check.php'] = ''; // Set to empty string to truncate
 $phar->stopBuffering();
+
 

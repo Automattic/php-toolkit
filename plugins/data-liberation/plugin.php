@@ -15,9 +15,16 @@
 use WordPress\DataLiberation\Importer\ImportSession;
 use WordPress\DataLiberation\Importer\RetryFrontloadingIterator;
 use WordPress\DataLiberation\Importer\StreamImporter;
+use WordPress\HttpClient\Request;
 use WordPress\Markdown\MarkdownImporter;
 
-require_once __DIR__ . '/../../vendor/autoload.php';
+if(file_exists(__DIR__ . '/wordpress-libraries.phar')) {
+    // Production – built and installed plugin
+	require_once __DIR__ . '/wordpress-libraries.phar';
+} else {
+	// Development – plugin mounted in WordPress via Playground CLI mounts
+	require_once __DIR__ . '/../../vendor/autoload.php';
+}
 
 
 /**
@@ -79,6 +86,23 @@ add_action(
 		);
 	}
 );
+
+/**
+ * In Playground, we need to explicitly allow passing the authorization header
+ * to the remote server via the CORS proxy. This is useful for cloning private
+ * Git repositories.
+ */
+add_filter('wp_http_client_request', function (Request $request) {
+    if(isset($request->headers['x-cors-proxy-allowed-request-headers'])) {
+        $prefix = $request->headers['x-cors-proxy-allowed-request-headers'] . ',';
+    } else {
+        $prefix = '';
+    }
+    if(str_contains($request->url, '.git/')) {
+        $request->headers['x-cors-proxy-allowed-request-headers'] = $prefix . 'Authorization';
+    }
+	return $request;
+});
 
 // Register admin menu
 add_action(

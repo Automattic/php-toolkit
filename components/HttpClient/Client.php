@@ -142,7 +142,7 @@ class Client {
 		}
 
 		foreach ( $requests as $request ) {
-			$this->requests[]                  = $request;
+			$this->requests[]                  = apply_filters('wp_http_client_request', $request);
 			$this->events[ $request->id ]      = [];
 			$this->connections[ $request->id ] = new Connection( $request );
 			$this->requests_started_at[ $request->id ] = microtime(true);
@@ -566,7 +566,7 @@ class Client {
 	protected function send_request_body( array $requests ) {
 		foreach ( $this->stream_select( $requests, self::STREAM_SELECT_WRITE ) as $request ) {
             if($request->upload_body_stream->reached_end_of_data()) {
-                $request->upload_body_stream->close_writing();
+                $request->upload_body_stream->close_reading();
                 $request->upload_body_stream = null;
                 $request->state	             = Request::STATE_RECEIVING_HEADERS;
                 continue;

@@ -27,6 +27,13 @@ class TreeEntry {
      */
     public $hash;
 
+    /**
+     * The content of the tree entry. Only used by the diff engine.
+     *
+     * @var string
+     */
+    public $content;
+
     public function __construct($data = array()) {
         foreach ($data as $key => $value) {
             if (!property_exists($this, $key)) {
@@ -63,5 +70,15 @@ class TreeEntry {
         self::FILE_MODE_SYMBOLIC_LINK => 'symbolic_link',
         self::FILE_MODE_COMMIT => 'commit',
     );
+
+    public function is_file() {
+        return $this->get_mode_bucket() === self::FILE_MODE_REGULAR_NON_EXECUTABLE || $this->get_mode_bucket() === self::FILE_MODE_REGULAR_EXECUTABLE;
+    }
+
+    public function is_tree() {
+        return $this->get_mode_bucket() === self::FILE_MODE_DIRECTORY;
+    }
+    
+    
 
 }

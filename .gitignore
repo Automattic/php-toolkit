@@ -17,6 +17,12 @@ new-wp
 test.txt
 secrets.php
 testing-grounds.php
-plugins/static-files-editor/src/
 plugins/git-repo/git-test-server-data
-
+*.secret.json
+plugins/static-files-editor/build
+plugins/static-files-editor/node_modules
+url-updater.sh
+buntest.php
+blueprint-url-updater.json
+components/DataLiberation/Tests/test-output-html/
+components/DataLiberation/Tests/test-output-md

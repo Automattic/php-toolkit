@@ -1,0 +1,47 @@
+name: Build and Release
+
+on:
+    push:
+        branches:
+            - trunk
+
+jobs:
+    build-and-release:
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v2
+
+            - name: Set up PHP
+              uses: shivammathur/setup-php@v2
+              with:
+                  php-version: '8.0' # Specify the PHP version you need
+
+            - name: Install Composer dependencies
+              run: composer install --no-dev --prefer-dist
+
+            - name: Zip files for release
+              run: |
+                  zip -r release.zip composer.json composer.lock LICENSE.md components
+
+            - name: Create GitHub Release
+              id: create_release
+              uses: actions/create-release@v1
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              with:
+                  tag_name: v${{ github.run_number }}
+                  release_name: Release ${{ github.run_number }}
+                  draft: false
+                  prerelease: false
+
+            - name: Upload Release Asset
+              uses: actions/upload-release-asset@v1
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              with:
+                  upload_url: ${{ steps.create_release.outputs.upload_url }}
+                  asset_path: ./release.zip
+                  asset_name: release.zip
+                  asset_content_type: application/zip

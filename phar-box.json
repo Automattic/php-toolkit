@@ -1,0 +1,30 @@
+{
+	"$schema": "https://raw.githubusercontent.com/box-project/box/refs/heads/main/res/schema.json",
+	"main": "bootstrap.php",
+	"output": "dist/wordpress-libraries.phar",
+	"force-autodiscovery": false,
+	"compactors": [
+		"KevinGH\\Box\\Compactor\\Php",
+		"DataLiberationBoxCompactor"
+	],
+    "check-requirements": false,
+	"annotations": false,
+    "shebang": false,
+    "finder": [
+          {
+            "notName": "/.*\\.md|.*\\.dist|Makefile|composer\\.json|composer\\.lock/",
+            "exclude": [
+                "Blueprints",
+                "test",
+                "test_old",
+                "tests",
+                "Tests",
+                "vendor-bin"
+            ],
+            "in": "components"
+        }
+    ],
+	"directories": [
+        "vendor/composer"
+	]
+}

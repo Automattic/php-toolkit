@@ -3,7 +3,6 @@
 namespace WordPress\Git;
 
 use WordPress\ByteStream\MemoryPipe;
-use WordPress\ByteStream\ReadStream\ProducerProducer;
 use WordPress\Filesystem\InMemoryFilesystem;
 use WordPress\Git\Model\Commit;
 use WordPress\Git\Model\TreeEntry;
@@ -207,10 +206,9 @@ class GitRemote {
         $remote_head = $remote_refs[ $key ];
 
         $shallow = $options['shallow'] ?? false;
-        $subpath = trim($options['path'] ?? '/', '/');
         $want_oids = [];
         $have_oids = [];
-        if($subpath) {
+        if(isset($options['path'])) {
             if(!$shallow) {
                 throw new GitException('When the "path" option is used, "shallow" option must also be true. Non-shallow path fetch is not supported yet.');
             }
@@ -226,6 +224,7 @@ class GitRemote {
             $protocol->consume_stream();
 
             $commit = $this->repository->read_object($remote_head)->as_commit();
+            $subpath = trim($options['path'], '/');
             $requested_tree_oid = $this->repository->find_hash_by_path($subpath, $commit->tree);
             $descentant_blobs_oids = get_all_descendant_oids_in_tree($this->repository, $requested_tree_oid, [
                 'object_types' => [
@@ -234,6 +233,7 @@ class GitRemote {
                 ],
             ]);
 
+            $want_oids[] = $remote_head;
             foreach($descentant_blobs_oids as $oid) {
                 if(!$this->repository->has_object($oid)) {
                     $want_oids[] = $oid;
@@ -241,7 +241,20 @@ class GitRemote {
             }
         } else {
             $want_oids[] = $remote_head;
-            $have_oids[] = $last_fetched_head_ref;
+            $local_head = $this->repository->get_ref_head( 'HEAD' );
+            for($i=0; $i<10; $i++) {
+                if($local_head === Commit::NULL_HASH) {
+                    break;
+                }
+                
+                try {
+                    $local_commit = $this->repository->read_object($local_head)->as_commit();
+                    $have_oids[] = $local_commit->hash;
+                    $local_head = $local_commit->get_first_parent_hash();
+                } catch (GitException $e) {
+                    break;
+                }
+            }
         }
 
         if(count($want_oids) === 0 || $want_oids === $have_oids) {
@@ -252,6 +265,15 @@ class GitRemote {
         $this->repository->set_ref_head( "refs/remotes/{$this->remote_name}/{$branch_name}", $remote_head );
         return $remote_head;
     }
+
+	public function pull( $options = [] ) {
+        $options['branch'] = $this->resolve_branch_name($options['branch'] ?? null);
+        // @TODO: Don't run in sparse mode.
+        $options['shallow'] = true;
+        $options['path'] = '/';
+        $remote_head = $this->fetch_branch($options);
+        return $this->repository->merge( $remote_head );
+	}
 
 	public function force_pull( $options = [] ) {
         $options['branch'] = $this->resolve_branch_name($options['branch'] ?? null);
@@ -290,7 +312,6 @@ class GitRemote {
             }
             $packet_lines[] = "have {$have_ref}\n";
         }
-
         $shallow = $options['shallow'] ?? false;
         if($shallow) {
             // @TODO: revisit this logic. We can only shallow fetch commits without a fatal error.
@@ -309,8 +330,8 @@ class GitRemote {
 			'/git-upload-pack',
 			GitProtocolEncoderPipe::encode_packet_lines($packet_lines),
 			array(
-				'Accept: application/x-git-upload-pack-advertisement',
-				'Content-Type: application/x-git-upload-pack-request',
+				'Accept' => 'application/x-git-upload-pack-advertisement',
+				'Content-Type' => 'application/x-git-upload-pack-request',
 			)
 		);
 
@@ -321,10 +342,6 @@ class GitRemote {
             ]
         );
         $protocol->consume_stream();
-
-        if($response->tell() === 0) {
-            throw new GitException('No objects received');
-        }
 	}
 
 	private function http_request( $path, $postData = null, $headers = array() ) {
@@ -334,6 +351,7 @@ class GitRemote {
 		}
 		$url = $remote['url'] . $path;
 
+        // @TODO: Make it configurable in Playground, maybe via a filter
 		$request_info = array(
             'headers' => $headers,
         );
@@ -349,6 +367,7 @@ class GitRemote {
         if($response->status_code > 299 || $response->status_code < 200) {
             throw new GitException('HTTP request failed with status code ' . $response->status_code . '. First 100 body bytes: ' . $reader->peek(100));
         }
+
         return $reader;
 	}
 

@@ -22,9 +22,11 @@ use WordPress\DataLiberation\EntityReader\FilesystemEntityReader;
 use WordPress\DataLiberation\Importer\ImportSession;
 use WordPress\DataLiberation\Importer\StreamImporter;
 use WordPress\DataLiberation\URL\WPURL;
+use WordPress\Filesystem\InMemoryFilesystem;
 use WordPress\Filesystem\LocalFilesystem;
 use WordPress\Filesystem\UploadedFilesystem;
 use WordPress\Filesystem\Visitor\FilesystemVisitor;
+use WordPress\Git\GitException;
 use WordPress\Git\GitRemote;
 use WordPress\Git\GitFilesystem;
 use WordPress\Git\GitRepository;
@@ -33,11 +35,13 @@ use WordPress\Markdown\MarkdownProducer;
 use WordPress\XML\XMLProcessor;
 
 use function WordPress\DataLiberation\URL\is_child_url_of;
+use function WordPress\Filesystem\ls_recursive;
 use function WordPress\Filesystem\wp_canonicalize_path;
 use function WordPress\Filesystem\wp_join_paths;
+use function WordPress\Filesystem\copy_between_filesystems;
 
 if ( ! defined( 'WP_STATIC_PAGES_DIR' ) ) {
-    define( 'WP_STATIC_PAGES_DIR', WP_CONTENT_DIR . '/uploads/static-pages' );
+    define( 'WP_STATIC_PAGES_DIR', WP_CONTENT_DIR . '/uploads/my-static-pages' );
 }
 
 if ( ! defined( 'WP_STATIC_MEDIA_DIR' ) ) {
@@ -62,9 +66,7 @@ if(isset($_GET['dump'])) {
     });
 }
 
-if(file_exists(__DIR__ . '/secrets.php')) {
-    require_once __DIR__ . '/secrets.php';
-}
+require_once __DIR__ . '/data-source-page.php';
 
 class WP_Static_Files_Editor_Plugin {
 
@@ -83,30 +85,31 @@ class WP_Static_Files_Editor_Plugin {
             if(!is_dir(WP_STATIC_PAGES_DIR)) {
                 mkdir(WP_STATIC_PAGES_DIR, 0777, true);
             }
+            $config = static::get_settings();
+            if(!$config['gitRepo']) {
+                return;
+            }
+
             $local_fs = LocalFilesystem::create(WP_STATIC_PAGES_DIR);
             $repo = new GitRepository($local_fs);
-            $repo->add_remote('origin', GIT_REPO_URL);
-            $repo->set_ref_head('HEAD', 'ref: refs/heads/' . GIT_BRANCH);
-            $repo->set_config_value('user.name', GIT_USER_NAME);
-            $repo->set_config_value('user.email', GIT_USER_EMAIL);
+            $repo->add_remote('origin', $config['gitRepo']);
+            $repo->set_ref_head('HEAD', 'ref: refs/heads/' . $config['selectedBranch']);
+            $repo->set_config_value('user.name', $config['gitUserName']);
+            $repo->set_config_value('user.email', $config['gitUserEmail']);
 
             self::$remote = new GitRemote($repo, 'origin');
 
             // Only force pull at most once every 10 minutes
             $last_pull_time = get_transient('wp_git_last_pull_time');
             if (!$last_pull_time) {
-                self::$remote->force_pull([
-                    'branch' => GIT_BRANCH,
-                    // 'path' => GIT_DIRECTORY_ROOT,
-                    // 'shallow' => true,
-                ]);
                 set_transient('wp_git_last_pull_time', time(), 10 * MINUTE_IN_SECONDS);
+                // self::force_pull();
             }
 
             self::$fs = GitFilesystem::create(
                 $repo,
                 [
-                    'root' => GIT_DIRECTORY_ROOT,
+                    'root' => $config['pathToSync'],
                     'auto_push' => true,
                     'remote' => self::$remote,
                 ]
@@ -120,6 +123,20 @@ class WP_Static_Files_Editor_Plugin {
         return self::$fs;
     }
 
+    static public function force_pull() {
+        $config = static::get_settings();
+        if(!$config['gitRepo']) {
+            return false;
+        }
+        self::get_fs();
+        self::$remote->force_pull([
+            'branch' => $config['selectedBranch'],
+            'path' => $config['pathToSync'],
+            'shallow' => true,
+        ]);
+        return true;
+    }
+
     static public function menu_item_callback() {
         // Get first post or create new one
         $posts = get_posts(array(
@@ -131,20 +148,16 @@ class WP_Static_Files_Editor_Plugin {
 
         if (empty($posts)) {
             try {
-                if(!self::acquire_synchronization_lock()) {
-                    die('There are no local files yet and we could not acquire a synchronization lock to create one.');
+                if(!self::force_pull()) {
+                    throw new GitException('Failed to pull from remote');
                 }
-                // Create a new draft post if none exists
-                $post_id = wp_insert_post(array(
-                    'post_title' => 'My first note',
-                    'post_type' => WP_LOCAL_FILE_POST_TYPE,
-                    'post_status' => 'publish',
-                    'meta_input' => array(
-                        'local_file_path' => '/my-first-note.md',
-                    ),
-                ));
-            } finally {
-                self::release_synchronization_lock();
+                wp_redirect(admin_url('post-new.php?post_type=' . WP_LOCAL_FILE_POST_TYPE));
+                exit;
+            } catch (GitException $e) {
+                // There are more ways to get here than just the new GitException above.
+                // @TODO: Don't return false in self::force_pull() but throw instead.
+                wp_redirect(admin_url('admin.php?page=static_files_editor-data-source&error=no_data_source'));
+                exit('Please configure a data source in the settings page before continuing.');
             }
         } else {
             // Look for the first post that's not the default "my-first-note.md"
@@ -160,16 +173,22 @@ class WP_Static_Files_Editor_Plugin {
             if ($post_id === null) {
                 $post_id = $posts[0]->ID;
             }
-        }
 
-        $edit_url = admin_url('post.php?post=' . $post_id . '&action=edit');
-        wp_redirect($edit_url);
-        exit;
+            $edit_url = admin_url('post.php?post=' . $post_id . '&action=edit');
+            wp_redirect($edit_url);
+            exit;
+        }
     }
 
     static public function initialize() {
         // Register hooks
         register_activation_hook( __FILE__, array(self::class, 'import_static_pages') );
+        register_activation_hook( __FILE__, function() {
+            update_option('wp_page_for_privacy_policy', 0);
+            update_option('show_on_front', 'posts');
+            update_option('wp_editor_fullscreen_default', true);
+            update_option('site_editor_fullscreen_default', true);
+        } );
 
         add_action('init', function() {
             self::get_fs();
@@ -179,6 +198,14 @@ class WP_Static_Files_Editor_Plugin {
             global $pagenow;
             if ($pagenow === 'admin.php' && isset($_GET['page']) && $_GET['page'] === 'static_files_editor') {
                 self::menu_item_callback();
+            }
+        });
+
+        add_action('wp', function() {
+            // Redirect homepage to static files editor
+            if (is_home()) {
+                wp_redirect(admin_url('admin.php?page=static_files_editor'));
+                exit;
             }
         });
 
@@ -222,8 +249,11 @@ class WP_Static_Files_Editor_Plugin {
                 update_post_meta($attachment_id, 'local_file_path', $target_path);
 
                 // Copy the file to the static media directory
-                $local_fs->copy($file_name, $target_path, [
-                    'to_fs' => $main_fs,
+                copy_between_filesystems([
+                    'source_filesystem' => $local_fs,
+                    'source_path' => $file_name,
+                    'target_filesystem' => $main_fs,
+                    'target_path' => $target_path,
                 ]);
 
                 return $metadata;
@@ -265,8 +295,11 @@ class WP_Static_Files_Editor_Plugin {
                 }
 
                 // Copy the updated file to the static media directory
-                $local_fs->copy($file_name, $local_file_path, [
-                    'to_fs' => $main_fs,
+                copy_between_filesystems([
+                    'source_filesystem' => $local_fs,
+                    'source_path' => $file_name,
+                    'target_filesystem' => $main_fs,
+                    'target_path' => $target_path,
                 ]);
 
                 return $metadata;
@@ -288,22 +321,6 @@ class WP_Static_Files_Editor_Plugin {
             }
             return $url;
         }, 10, 2);
-
-        // Register the admin page
-        add_action('admin_menu', function() {
-            add_menu_page(
-                'Static Files Editor',
-                'Static Files Editor',
-                'manage_options',
-                'static_files_editor',
-                function() {
-                    // No callback needed, we're handling this in the init hook
-                    // to redirect before any HTML is output.
-                },
-                'dashicons-media-text',
-                30
-            );
-        });
 
         add_action('admin_enqueue_scripts', function($hook) {
             wp_register_script(
@@ -333,53 +350,86 @@ class WP_Static_Files_Editor_Plugin {
                 return;
             }
 
+            add_filter('show_admin_bar', '__return_false');
+
             wp_enqueue_script('static-files-editor');
             wp_enqueue_style('static-files-editor');
 
             // Preload the initial files tree
             wp_add_inline_script('wp-api-fetch', 'wp.apiFetch.use(wp.apiFetch.createPreloadingMiddleware({
-                "/static-files-editor/v1/get-files-tree": {
-                    body: '.json_encode(WP_Static_Files_Editor_Plugin::get_files_tree_endpoint()).',
+                "/static-files-editor/v1/files?per_page=-1": {
+                    body: '.json_encode(WP_Static_Files_Editor_Plugin::get_files_list_endpoint()).',
                 }
             }));', 'after');
         });
 
         add_action('rest_api_init', function() {
+            register_rest_route('static-files-editor/v1', '/git/branches', array(
+                'methods' => 'POST',
+                'callback' => array(self::class, 'get_git_branches_endpoint'),
+                'permission_callback' => function() {
+                    return current_user_can('edit_posts');
+                },
+            ));
+
+            register_rest_route('static-files-editor/v1', '/git/files', array(
+                'methods' => 'POST',
+                'callback' => array(self::class, 'get_git_files_endpoint'),
+                'permission_callback' => function() {
+                    return current_user_can('edit_posts');
+                },
+            ));
+
+            register_rest_route('static-files-editor/v1', '/git/force-pull', array(
+                'methods' => 'POST',
+                'callback' => array(self::class, 'git_force_pull_endpoint'),
+                'permission_callback' => function() {
+                    return current_user_can('edit_posts');
+                },
+            ));
+
             register_rest_route('static-files-editor/v1', '/get-or-create-post-for-file', array(
                 'methods' => 'POST',
-                'callback' => array(self::class, 'get_or_create_post_for_file'),
+                'callback' => array(self::class, 'get_or_create_post_for_file_endpoint'),
                 'permission_callback' => function() {
                     return current_user_can('edit_posts');
                 },
             ));
 
-            register_rest_route('static-files-editor/v1', '/get-files-tree', array(
+            register_rest_route('static-files-editor/v1', '/files', array(
                 'methods' => 'GET',
-                'callback' => array(self::class, 'get_files_tree_endpoint'),
+                'callback' => array(self::class, 'get_files_list_endpoint'),
                 'permission_callback' => function() {
                     return current_user_can('edit_posts');
                 },
             ));
 
-            register_rest_route('static-files-editor/v1', '/move-file', array(
-                'methods' => 'POST',
-                'callback' => array(self::class, 'move_file_endpoint'),
+            register_rest_route('static-files-editor/v1', '/files/(?P<id>.*)', array(
+                'methods' => 'PUT',
+                'callback' => array(self::class, 'update_file_endpoint'),
                 'permission_callback' => function() {
                     return current_user_can('edit_posts');
                 },
             ));
 
-            register_rest_route('static-files-editor/v1', '/create-files', array(
+            register_rest_route('static-files-editor/v1', '/files/batch', array(
                 'methods' => 'POST',
-                'callback' => array(self::class, 'create_files_endpoint'),
+                'callback' => array(self::class, 'create_files_batch_endpoint'),
+                'permission_callback' => function() {
+                    return current_user_can('edit_posts');
+                },
+            ));
+            register_rest_route('static-files-editor/v1', '/files', array(
+                'methods' => 'POST',
+                'callback' => array(self::class, 'create_file_endpoint'),
                 'permission_callback' => function() {
                     return current_user_can('edit_posts');
                 },
             ));
 
-            register_rest_route('static-files-editor/v1', '/delete-path', array(
-                'methods' => 'POST',
-                'callback' => array(self::class, 'delete_path_endpoint'),
+            register_rest_route('static-files-editor/v1', '/files/(?P<id>.*)', array(
+                'methods' => 'DELETE',
+                'callback' => array(self::class, 'delete_file_endpoint'),
                 'permission_callback' => function() {
                     return current_user_can('edit_posts');
                 },
@@ -404,6 +454,14 @@ class WP_Static_Files_Editor_Plugin {
                         }
                     )
                 )
+            ));
+
+            register_rest_route('static-files-editor/v1', '/save-settings', array(
+                'methods' => 'POST',
+                'callback' => array(self::class, 'save_settings_endpoint'),
+                'permission_callback' => function() {
+                    return current_user_can('manage_options');
+                },
             ));
         });
 
@@ -463,6 +521,9 @@ class WP_Static_Files_Editor_Plugin {
 
                 $fs = self::get_fs();
                 $path = get_post_meta($post_id, 'local_file_path', true);
+                if(!$path) {
+                    return;
+                }
                 $fs->put_contents($path, $content, [
                     'message' => 'User saved ' . $post->post_title,
                 ]);
@@ -576,6 +637,7 @@ class WP_Static_Files_Editor_Plugin {
             $bytes_available = $object->pull(8192);
             echo $object->consume($bytes_available);
         }
+        die();
     }
 
     static private $synchronizing = 0;
@@ -586,6 +648,10 @@ class WP_Static_Files_Editor_Plugin {
         }
 
         if (defined('WP_IMPORTING') && WP_IMPORTING) {
+            return false;
+        }
+
+        if(!self::get_fs()) {
             return false;
         }
 
@@ -638,14 +704,13 @@ class WP_Static_Files_Editor_Plugin {
             $new_content = self::wordpressify_static_assets_urls(
                 $converter->get_block_markup()
             );
-            $metadata = array_column($converter->get_all_metadata(), 0);
             $updated = wp_update_post(array(
                 'ID' => $post_id,
                 'post_content' => $new_content,
-                'post_title' => $metadata['post_title'] ?? '',
-                'post_date_gmt' => $metadata['post_date_gmt'] ?? '',
-                'menu_order' => $metadata['menu_order'] ?? '',
-                // 'meta_input' => $metadata,
+                'post_title' => $converter->get_first_meta_value('post_title') ?? '',
+                'post_date_gmt' => $converter->get_first_meta_value('post_date_gmt') ?? '',
+                'menu_order' => $converter->get_first_meta_value('menu_order') ?? '',
+                // 'meta_input' => $converter->get_all_metadata(),
             ));
             if(is_wp_error($updated)) {
                 return $updated;
@@ -691,35 +756,38 @@ class WP_Static_Files_Editor_Plugin {
 
         $metadata = [];
         foreach(['post_date_gmt', 'post_title', 'menu_order'] as $key) {
-            $metadata[$key] = get_post_field($key, $post->ID);
+            $metadata[$key] = [get_post_field($key, $post->ID)];
         }
         // @TODO: Also include actual post_meta. Which ones? All? The
         //        ones explicitly set by the user in the editor?
 
         return self::convert_post_data_to_string(
-            $post->post_content,
-            $metadata,
+            new BlocksWithMetadata(
+                $post->post_content,
+                $metadata
+            ),
             $format
         );
     }
 
-    static private function convert_post_data_to_string($block_markup, $metadata, $format) {
-        $content = self::unwordpressify_static_assets_urls(
-            $block_markup
+    static private function convert_post_data_to_string(BlocksWithMetadata $blocks_with_metadata, $format) {
+        $blocks_with_metadata = new BlocksWithMetadata(
+            self::unwordpressify_static_assets_urls(
+                $blocks_with_metadata->get_block_markup()
+            ),
+            $blocks_with_metadata->get_all_metadata()
         );
 
         switch($format) {
             case 'md':
-                $producer = new MarkdownProducer( $content, $metadata );
+                $producer = new MarkdownProducer( $blocks_with_metadata );
                 break;
             case 'xhtml':
                 // @TODO: Add proper support for XHTML – perhaps via the serialize() method?
                 throw new Exception('Serializing to XHTML is not supported yet');
             case 'html':
             default:
-                $producer = new AnnotatedBlockMarkupProducer(
-                    new BlocksWithMetadata($content, $metadata )
-                );
+                $producer = new AnnotatedBlockMarkupProducer( $blocks_with_metadata );
                 break;
         }
         return $producer->produce();
@@ -731,12 +799,13 @@ class WP_Static_Files_Editor_Plugin {
      * in the local filesystem.
      */
     static private function unwordpressify_static_assets_urls($content) {
-        $site_url = WPURL::parse(get_site_url());
+        $site_url_raw = rtrim(get_site_url(), '/') . '/';
+        $site_url = WPURL::parse($site_url_raw);
         $expected_endpoint_path = '/wp-json/static-files-editor/v1/download-file';
         $p = new BlockMarkupUrlProcessor($content, $site_url);
         while($p->next_url()) {
             $url = $p->get_parsed_url();
-            if(!is_child_url_of($url, get_site_url())) {
+            if(!is_child_url_of($url, $site_url_raw)) {
                 continue;
             }
 
@@ -774,12 +843,15 @@ class WP_Static_Files_Editor_Plugin {
      * @TODO: Plug in the attachment IDs into image blocks
      */
     static private function wordpressify_static_assets_urls($content) {
-        $site_url = WPURL::parse(get_site_url());
-        $expected_endpoint_path = '/wp-json/static-files-editor/v1/download-file';
-        $p = new BlockMarkupUrlProcessor($content, $site_url);
+        $parsed_site_url = WPURL::parse(rtrim(get_site_url(), '/') . '/');
+        $expected_endpoint_path = wp_join_paths(
+            $parsed_site_url->pathname,
+            'wp-json/static-files-editor/v1/download-file'
+        );
+        $p = new BlockMarkupUrlProcessor($content, $parsed_site_url);
         while($p->next_url()) {
             $url = $p->get_parsed_url();
-            if(!is_child_url_of($url, get_site_url())) {
+            if(!is_child_url_of($url, $parsed_site_url)) {
                 continue;
             }
 
@@ -789,7 +861,7 @@ class WP_Static_Files_Editor_Plugin {
                 continue;
             }
 
-            $new_url = WPURL::parse($url->pathname, $site_url);
+            $new_url = WPURL::parse($url->pathname, $parsed_site_url);
             $new_url->pathname = $expected_endpoint_path;
             $new_url->searchParams->set('path', $p->get_raw_url());
             $p->set_raw_url($new_url->__toString());
@@ -798,9 +870,12 @@ class WP_Static_Files_Editor_Plugin {
         return $p->get_updated_html();
     }
 
-    static public function get_local_files_tree($subdirectory = '') {
-        $tree = [];
+    static public function get_local_files_list($subdirectory = '') {
+        $list = [];
         $fs = self::get_fs();
+        if(!$fs) {
+            return $list;
+        }
 
         // Get all file paths and post IDs in one query
         $file_posts = get_posts(array(
@@ -831,12 +906,19 @@ class WP_Static_Files_Editor_Plugin {
         }
 
         $base_dir = $subdirectory ? $subdirectory : '/';
-        self::build_local_file_tree_recursive($fs, $base_dir, $tree, $path_to_post);
+        self::build_local_file_list($fs, $base_dir, $list, $path_to_post);
 
-        return $tree;
+        $keyed_list = [];
+        foreach($list as $item) {
+            $item['id'] = $item['path'];
+            
+            $keyed_list[$item['path']] = $item;
+        }
+
+        return $keyed_list;
     }
 
-    static private function build_local_file_tree_recursive($fs, $dir, &$tree, $path_to_post) {
+    static private function build_local_file_list($fs, $dir, &$list, $path_to_post) {
         $items = $fs->ls($dir);
         if ($items === false) {
             return;
@@ -858,19 +940,20 @@ class WP_Static_Files_Editor_Plugin {
 
             if ($fs->is_dir($path)) {
                 $node = array(
-                    'type' => 'folder',
-                    'name' => $item,
+                    'type' => 'directory',
+                    'path' => $path,
+                    'id' => $path,
                     'children' => []
                 );
-                $tree[] = $node;
+                $list[] = $node;
 
                 // Recursively build children
-                $last_index = count($tree) - 1;
-                self::build_local_file_tree_recursive($fs, $path, $tree[$last_index]['children'], $path_to_post);
+                self::build_local_file_list($fs, $path, $list, $path_to_post);
             } else {
                 $node = array(
                     'type' => 'file',
-                    'name' => $item,
+                    'path' => $path,
+                    'id' => $path,
                 );
 
                 if (isset($path_to_post[$path])) {
@@ -878,7 +961,7 @@ class WP_Static_Files_Editor_Plugin {
                     $node['post_type'] = $path_to_post[$path]->post_type;
                 }
 
-                $tree[] = $node;
+                $list[] = $node;
             }
         }
     }
@@ -900,6 +983,10 @@ class WP_Static_Files_Editor_Plugin {
 
         // Prevent ID conflicts
         self::reset_db_data();
+
+        if(!self::get_fs()) {
+            return;
+        }
 
         return self::do_import_static_pages([
             'from_filesystem' => self::get_fs(),
@@ -950,7 +1037,7 @@ class WP_Static_Files_Editor_Plugin {
             ),
             'public' => true,
             'show_ui' => true,
-            'show_in_menu' => true,
+            'show_in_menu' => false,
             'hierarchical' => true,
             'supports' => array(
                 'title',
@@ -991,7 +1078,7 @@ class WP_Static_Files_Editor_Plugin {
         $GLOBALS['@pdo']->query("UPDATE SQLITE_SEQUENCE SET SEQ=0 WHERE NAME='wp_commentmeta'");
     }
 
-    static public function get_or_create_post_for_file($request) {
+    static public function get_or_create_post_for_file_endpoint($request) {
         try {
             if(!self::acquire_synchronization_lock()) {
                 return new WP_Error('synchronization_lock_failed', 'Failed to acquire synchronization lock');
@@ -1004,42 +1091,7 @@ class WP_Static_Files_Editor_Plugin {
                 return new WP_Error('missing_path', 'File path is required');
             }
 
-            // Create the file if requested and it doesn't exist
-            $fs = self::get_fs();
-            if ($create_file) {
-                if (!$fs->put_contents($file_path, '')) {
-                    return new WP_Error('file_creation_failed', 'Failed to create file');
-                }
-            }
-
-            // Check if a post already exists for this file path
-            $existing_posts = get_posts(array(
-                'post_type' => WP_LOCAL_FILE_POST_TYPE,
-                'meta_key' => 'local_file_path',
-                'meta_value' => $file_path,
-                'posts_per_page' => 1
-            ));
-
-            if (!empty($existing_posts)) {
-                // Update existing post
-                $post_data = array(
-                    'ID' => $existing_posts[0]->ID,
-                    'post_content' => ''
-                );
-                $post_id = wp_update_post($post_data);
-            } else {
-                // Create new post
-                $post_data = array(
-                    'post_title' => basename($file_path),
-                    'post_type' => WP_LOCAL_FILE_POST_TYPE,
-                    'post_status' => 'publish',
-                    'post_content' => '',
-                    'meta_input' => array(
-                        'local_file_path' => $file_path
-                    )
-                );
-                $post_id = wp_insert_post($post_data);
-            }
+            $post_id = self::get_or_create_post_for_file($file_path, $create_file);
 
             if (is_wp_error($post_id)) {
                 return $post_id;
@@ -1059,17 +1111,66 @@ class WP_Static_Files_Editor_Plugin {
         );
     }
 
-    static public function get_files_tree_endpoint() {
-        return self::get_local_files_tree();
+    static private function get_or_create_post_for_file($file_path, $create_file = false) {
+        $fs = self::get_fs();
+        if($create_file && !$fs->is_file($file_path)) {
+            $fs->put_contents($file_path, '');
+        }
+        $existing_posts = get_posts(array(
+            'post_type' => WP_LOCAL_FILE_POST_TYPE,
+            'meta_key' => 'local_file_path',
+            'meta_value' => $file_path,
+            'posts_per_page' => 1
+        ));
+        if(!empty($existing_posts)) {
+            return $existing_posts[0]->ID;
+        }
+        $post_data = array(
+            'post_title' => basename($file_path),
+            'post_type' => WP_LOCAL_FILE_POST_TYPE,
+            'post_status' => 'publish',
+            'post_content' => '',
+        );
+        $post_id = wp_insert_post($post_data);
+        if(is_wp_error($post_id)) {
+            return $post_id;
+        }
+        if(false === update_post_meta($post_id, 'local_file_path', $file_path)) {
+            return new WP_Error('failed_to_update_local_file_path', 'Failed to update local file path');
+        }
+        return $post_id;
     }
 
-    static public function move_file_endpoint($request) {
+    static public function get_files_list_endpoint() {
+        return self::get_local_files_list();
+    }
+
+    static public function create_file_endpoint($request) {
         try {
             if(!self::acquire_synchronization_lock()) {
                 return;
             }
-            $from_path = wp_canonicalize_path($request->get_param('fromPath'));
-            $to_path = wp_canonicalize_path($request->get_param('toPath'));
+            $path = wp_canonicalize_path($request->get_param('path'));
+            $content = $request->get_param('content');
+            $fs = self::get_fs();
+            if(!$fs->is_dir(dirname($path))) {
+                $fs->mkdir(dirname($path), ['recursive' => true]);
+            }
+            $fs->put_contents($path, $content);
+            $post_id = self::get_or_create_post_for_file($path, false);
+            return array( 'id' => $path, 'post_id' => $post_id, 'path' => $path );
+        } finally {
+            self::release_synchronization_lock();
+        }
+    }
+
+    static public function update_file_endpoint($request) {
+        try {
+            if(!self::acquire_synchronization_lock()) {
+                return;
+            }
+            $from_path = wp_canonicalize_path($request->get_param('id'));
+            $to_path = $request->get_param('path');
 
             if (!$from_path || !$to_path) {
                 return new WP_Error('missing_path', 'Both source and target paths are required');
@@ -1102,8 +1203,7 @@ class WP_Static_Files_Editor_Plugin {
                         $previous_extension
                     );
                     $new_content = self::convert_post_data_to_string(
-                        $parsed->get_block_markup(),
-                        array_column($parsed->get_all_metadata(), 0),
+                        $parsed,
                         $new_extension
                     );
                     $fs->put_contents(
@@ -1142,19 +1242,21 @@ class WP_Static_Files_Editor_Plugin {
      *        and one in the WordPress uploads directory. Perhaps this is the way to go,
      *        but let's have a discussion about it.
      */
-    static public function create_files_endpoint($request) {
+    static public function create_files_batch_endpoint($request) {
         try {
             if(!self::acquire_synchronization_lock()) {
                 return;
             }
-            $uploaded_fs = new UploadedFilesystem($request, 'nodes');
+            $uploaded_fs = UploadedFilesystem::create($request, 'content');
 
             // Copy the uploaded files to the main filesystem
             $main_fs = self::get_fs();
             $create_in_dir = wp_canonicalize_path($request->get_param('path'));
-            $uploaded_fs->copy('/', $create_in_dir, [
-                'recursive' => true,
-                'to_fs' => $main_fs,
+            copy_between_filesystems([
+                'source_filesystem' => $uploaded_fs,
+                'source_path' => '/',
+                'target_filesystem' => $main_fs,
+                'target_path' => $create_in_dir,
             ]);
 
             // Import the uploaded files into WordPress
@@ -1195,17 +1297,28 @@ class WP_Static_Files_Editor_Plugin {
                 if(!$event->is_entering()) {
                     continue;
                 }
-                foreach($event->files as $file) {
-                    $created_path = wp_join_paths($create_in_dir, $event->dir, $file);
-                    $created_post = get_posts(array(
-                        'post_type' => WP_LOCAL_FILE_POST_TYPE,
-                        'meta_key' => 'local_file_path',
-                        'meta_value' => $created_path,
-                        'posts_per_page' => 1
-                    ));
+                $paths = $event->files;
+                if($visitor->get_current_depth() === 1) {
+                    // Make sure we save the top-level directories
+                    $paths = array_merge([$event->dir], $event->files);
+                }
+                foreach($paths as $path) {
+                    $type = $uploaded_fs->is_dir($path) ? 'directory' : 'file';
+                    $post_id = null;
+                    $created_path = wp_join_paths($create_in_dir, $path);
+                    if($type === 'post') {
+                        $created_post = get_posts(array(
+                            'post_type' => WP_LOCAL_FILE_POST_TYPE,
+                            'meta_key' => 'local_file_path',
+                            'meta_value' => $created_path,
+                            'posts_per_page' => 1
+                        ));
+                        $post_id = $created_post ? $created_post[0]->ID : null;
+                    }
                     $created_files[] = array(
                         'path' => $created_path,
-                        'post_id' => $created_post ? $created_post[0]->ID : null
+                        'post_id' => $post_id,
+                        'type' => $type,
                     );
                 }
             }
@@ -1218,8 +1331,60 @@ class WP_Static_Files_Editor_Plugin {
         }
     }
 
-    static public function delete_path_endpoint($request) {
-        $path = wp_canonicalize_path($request->get_param('path'));
+    static public function get_git_branches($git_repo_url) {
+        $repo = new GitRepository(InMemoryFilesystem::create());
+        $repo->add_remote('origin', $git_repo_url);
+        $remote = new GitRemote($repo, 'origin');
+        $refs = $remote->ls_refs('refs/heads/');
+        $head_ref = $remote->ls_refs('HEAD');
+        
+        $by_hash = array_flip($refs);
+        $default_branch_full_name = $by_hash[$head_ref['HEAD']];
+        unset($refs[$default_branch_full_name]);
+
+        $default_branch_nice_name = substr($default_branch_full_name, strlen('refs/heads/')) . ' (default)';
+        $refs_names = [
+            ['fullName' => $default_branch_full_name, 'niceName' => $default_branch_nice_name]
+        ];
+        foreach($refs as $ref => $hash) {
+            $refs_names[] = ['fullName' => $ref, 'niceName' => substr($ref, strlen('refs/heads/'))];
+        }
+
+        return array("default_branch" => $default_branch_full_name, "refs" => $refs_names);
+    }
+
+    static public function get_git_branches_endpoint($request) {
+        $git_repo_url = $request->get_param('gitRepo');
+        if(!str_ends_with($git_repo_url, '.git')) {
+            $git_repo_url .= '.git';
+        }
+        return self::get_git_branches($git_repo_url);
+    }
+
+    static public function get_git_files_endpoint($request) {
+        $git_repo_url = $request->get_param('gitRepo');
+        $branch = $request->get_param('branch');
+        if(!str_ends_with($git_repo_url, '.git')) {
+            $git_repo_url .= '.git';
+        }
+        $repo = new GitRepository(InMemoryFilesystem::create());
+        $repo->add_remote('origin', $git_repo_url);
+        $remote = new GitRemote($repo, 'origin');
+        
+        $refs = $remote->ls_refs('refs/heads/');
+        if(!isset($refs[$branch])) {
+            return new WP_Error('branch_not_found', 'Branch "' . $branch . '" not found');
+        }
+        $branch_tip = $refs[$branch];
+
+        $objects_index = $remote->list_objects($branch_tip);
+        $fs = GitFilesystem::create($objects_index);
+
+        return array("files" => ls_recursive($fs));
+    }
+
+    static public function delete_file_endpoint($request) {
+        $path = wp_canonicalize_path($request->get_param('id'));
         if (!$path) {
             return new WP_Error('missing_path', 'File path is required');
         }
@@ -1256,6 +1421,56 @@ class WP_Static_Files_Editor_Plugin {
         } finally {
             self::release_synchronization_lock();
         }
+    }
+
+    static public function save_settings_endpoint(WP_REST_Request $request) {
+        $gitRepo = $request->get_param('gitRepo');
+        $selectedBranch = $request->get_param('selectedBranch');
+        $pathToSync = $request->get_param('pathToSync');
+
+        $new_settings = array(
+            'gitRepo' => $gitRepo,
+            'selectedBranch' => $selectedBranch,
+            'pathToSync' => $pathToSync,
+        );
+        update_option('static_files_editor_settings', $new_settings);
+
+        return new WP_REST_Response('Settings saved successfully', 200);
+    }
+
+    static public function git_force_pull_endpoint($request) {
+        try {
+            if(!self::acquire_synchronization_lock()) {
+                return new WP_REST_Response('Failed to acquire synchronization lock', 500);
+            }
+            if(!self::force_pull()) {
+                return new WP_REST_Response('Force pull failed', 500);
+            }
+            return new WP_REST_Response('Force pull completed', 200);
+        } finally {
+            self::release_synchronization_lock();
+        }
+    }
+
+    static public function get_settings() {
+        $user = wp_get_current_user();
+        $uploads_dir = wp_upload_dir();
+
+        $settings = get_option('static_files_editor_settings') ?: [];
+        $settings = array_merge(array(
+            'gitRepo' => '',
+            'selectedBranch' => '',
+            'pathToSync' => '/',
+            'localRepoPath' => $uploads_dir['basedir'] . '/static-files-editor',
+            'gitUserName' => $user->display_name ?? 'WordPress User',
+            'gitUserEmail' => $user->user_email ?? 'wordpress.admin@localhost',
+        ), array_filter($settings));
+
+        if(str_starts_with($settings['selectedBranch'], 'refs/heads/')) {
+            $settings['selectedBranch'] = substr($settings['selectedBranch'], strlen('refs/heads/'));
+        }
+
+        return $settings;
     }
 
 }

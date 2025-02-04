@@ -44,6 +44,78 @@ class UploadedFilesystemTest extends TestCase {
         );
     }
 
+    public function testIsFile() {
+        $fs = $this->create_fs([
+            [
+                'type' => 'file',
+                'name' => 'README.md',
+                'content' => '@file:file1',
+            ]
+        ], [
+            'file1' => [
+                'name' => 'README.md',
+                'contents' => '## This is WordPress readme',
+                'tmp_name' => '/tmp/file_892378.txt',
+                'error' => UPLOAD_ERR_OK,
+            ]
+        ]);
+
+        $this->assertTrue($fs->is_file('/README.md'));
+        $this->assertFalse($fs->is_file('/nonexistent.txt'));
+    }
+
+    public function testIsDir() {
+        $fs = $this->create_fs([
+            [
+                'type' => 'directory',
+                'name' => 'src',
+                'children' => []
+            ]
+        ], []);
+
+        $this->assertTrue($fs->is_dir('/src'));
+        $this->assertFalse($fs->is_dir('/nonexistent'));
+    }
+
+    public function testExists() {
+        $fs = $this->create_fs([
+            [
+                'type' => 'file',
+                'name' => 'README.md',
+                'content' => '@file:file1',
+            ],
+            [
+                'type' => 'directory',
+                'name' => 'src',
+                'children' => [
+                    [
+                        'type' => 'file',
+                        'name' => 'index.php',
+                        'content' => '@file:file2',
+                    ]
+                ]
+            ]
+        ], [
+            'file1' => [
+                'name' => 'README.md',
+                'contents' => '## This is WordPress readme',
+                'tmp_name' => '/tmp/file_892378.txt',
+                'error' => UPLOAD_ERR_OK,
+            ],
+            'file2' => [
+                'name' => 'index.php',
+                'contents' => '<?php echo "Hello World"; ?>',
+                'tmp_name' => '/tmp/file_892379.txt',
+                'error' => UPLOAD_ERR_OK,
+            ]
+        ]);
+
+        $this->assertTrue($fs->exists('/README.md'));
+        $this->assertTrue($fs->exists('/src'));
+        $this->assertTrue($fs->exists('/src/index.php'));
+        $this->assertFalse($fs->exists('/nonexistent'));
+    }
+
     public function testGetContents() {
         $fs = $this->create_fs([
             [

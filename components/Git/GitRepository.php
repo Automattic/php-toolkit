@@ -311,6 +311,116 @@ class GitRepository {
 		return 'objects/' . $oid[0] . $oid[1] . '/' . substr( $oid, 2 );
 	}
 
+    /**
+     * Merge two branches.
+     * 
+     * @TODO: Implement a streaming merge. The current implementation buffers
+     *        everything into memory and will fail for large merges.
+     * @TODO: Do not change the HEAD ref.
+     *
+     * @param string $ref The branch to merge.
+     * @return string The hash of the merge commit.
+     */
+    public function merge( $ref ) {
+        $commit_hash1 = $this->get_ref_head( 'HEAD' );
+        $commit_hash2 = $this->get_ref_head( $ref );
+
+        $common_ancestor_commit_hash = $this->find_first_common_ancestor( $commit_hash1, $commit_hash2 );
+        $common_ancestor_tree = $this->read_object( $common_ancestor_commit_hash )->as_commit()->tree;
+        $current_branch_diff_root = $this->diff_commits( $commit_hash1, $common_ancestor_commit_hash );
+        $merged_branch_diff_root = $this->diff_commits( $commit_hash2, $common_ancestor_commit_hash );
+
+        $tree_stack = [[$merged_branch_diff_root, $current_branch_diff_root, '/']];
+        $updates = [];
+        $deletes = [];
+        while(!empty($tree_stack)) {
+            list($merged_branch_diff, $current_branch_diff, $parent_path) = array_pop($tree_stack);
+            foreach($merged_branch_diff as $name => $merged_entry) {
+                $path = wp_join_paths($parent_path, $name);
+                if($merged_entry === self::DELETE_PLACEHOLDER) {
+                    $deletes[] = $path;
+                    continue;
+                }
+                $current_entry = $current_branch_diff[$name] ?? null;
+                $is_text_diff = is_array($merged_entry->content) && isset($merged_entry->content['type']) && $merged_entry->content['type'] === 'text_diff';
+                if($is_text_diff) {
+                    $current_content = $this->read_object_by_path($path, $common_ancestor_tree)->consume_all();
+                    if(!$current_entry) {
+                        $updates[$path] = $this->diff_engine->apply_text_diff(
+                            $current_content,
+                            $merged_entry->content['diff']
+                        );
+                        continue;
+                    }
+                    $text_diffs = $this->diff_engine->three_way_merge_blob(
+                        $current_entry->content['diff'],
+                        $merged_entry->content['diff']
+                    );
+                    $merged_content = $this->diff_engine->apply_text_diff(
+                        $current_content,
+                        $text_diffs
+                    );
+                    $updates[$path] = $merged_content;
+                } else if(is_array($merged_entry->content)) {
+                    $tree_stack[] = [
+                        $merged_entry->content,
+                        $current_entry !== null ? $current_entry->content : [],
+                        $path
+                    ];
+                }
+            }
+        }
+
+        return $this->commit( array(
+            'message' => 'Merge commit ' . $commit_hash2 . ' into ' . $commit_hash1,
+            'updates' => $updates,
+            'deletes' => $deletes,
+            // @TODO: Store the second parent hash
+        ) );
+    }
+
+    /**
+     * Find the common ancestor of two references.
+     *
+     * TODO: Support commits with multiple parents.
+     *
+     * @param string $ref1 The first reference.
+     * @param string $ref2 The second reference.
+     * @return string|false The common ancestor hash, or false if no common ancestor is found.
+     */
+    public function find_first_common_ancestor( $commit_hash1, $commit_hash2 ) {
+        // If both refs point to the same commit, return it immediately.
+        if ( $commit_hash1 === $commit_hash2 ) {
+            return $commit_hash1;
+        }
+
+        // Use two pointers to traverse the commit history of both refs.
+        $visited = [];
+        while ( ! Commit::is_null_hash( $commit_hash1 ) || ! Commit::is_null_hash( $commit_hash2 ) ) {
+            if ( ! Commit::is_null_hash( $commit_hash1 ) ) {
+                if ( isset( $visited[ $commit_hash1 ] ) ) {
+                    return $commit_hash1;
+                }
+                $visited[ $commit_hash1 ] = true;
+                $commit1 = $this->read_object( $commit_hash1 )->as_commit();
+                $commit_hash1 = $commit1->get_first_parent_hash();
+            }
+
+            if ( ! Commit::is_null_hash( $commit_hash2 ) ) {
+                if ( isset( $visited[ $commit_hash2 ] ) ) {
+                    return $commit_hash2;
+                }
+                $visited[ $commit_hash2 ] = true;
+                $commit2 = $this->read_object( $commit_hash2 )->as_commit();
+                $commit_hash2 = $commit2->get_first_parent_hash();
+            }
+        }
+
+        // No common ancestor found.
+        throw new GitException('No common ancestor found for ' . $commit_hash1 . ' and ' . $commit_hash2);
+    }
+    
+
 	/**
 	 * @TODO: Don't commit without a "force" option if the
 	 *        changeset didn't actually change the root tree oid.
@@ -331,8 +441,12 @@ class GitRepository {
 			$path     = '/' . ltrim( $path, '/' );
 			$blob_oid = $this->add_object( 'blob', $content );
 			$this->mark_tree_path_changed( $changed_trees, dirname( $path ) );
+            $basename = basename($path);
+            if($basename === '') {
+                throw new GitException('Cannot commit a file with an empty filename');
+            }
 			$changed_trees[ dirname( $path ) ]->entries[ basename( $path ) ] = new TreeEntry(array(
-				'name' => basename( $path ),
+				'name' => $basename,
 				'mode' => TreeEntry::FILE_MODE_REGULAR_NON_EXECUTABLE,
 				'hash' => $blob_oid,
 			));
@@ -361,8 +475,12 @@ class GitRepository {
 			$this->mark_tree_path_changed( $changed_trees, dirname( $new_path ) );
 
 			$changed_trees[ dirname( $old_path ) ]->entries[ basename( $old_path ) ] = self::DELETE_PLACEHOLDER;
-			$changed_trees[ dirname( $new_path ) ]->entries[ basename( $new_path ) ] = new TreeEntry(array(
-				'name' => basename( $new_path ),
+            $new_basename = basename($new_path);
+            if($new_basename === '') {
+                throw new GitException('Cannot rename a file to an empty filename');
+            }
+			$changed_trees[ dirname( $new_path ) ]->entries[ $new_basename ] = new TreeEntry(array(
+				'name' => $new_basename,
 				'mode' => TreeEntry::FILE_MODE_DIRECTORY,
 				'hash' => $this->find_hash_by_path( $old_path ),
 			));
@@ -414,7 +532,7 @@ class GitRepository {
 		return $commit_oid;
 	}
 
-	public function diff_commits( $current_oid, $previous_oid ) {
+	public function diff_commits( $previous_oid, $current_oid ) {
 		if ( false === $this->read_object( $current_oid ) ) {
 			return false;
 		}
@@ -462,9 +580,9 @@ class GitRepository {
 			));
 
 			if ( $current_entry->mode === TreeEntry::FILE_MODE_DIRECTORY ) {
-				$diff[ $name ]['diff'] = $this->diff_trees( $current_entry->hash, $previous_entry->hash );
+				$diff[ $name ]->content = $this->diff_trees( $current_entry->hash, $previous_entry->hash );
 			} else {
-				$diff[ $name ]['diff'] = $this->diff_blobs(
+				$diff[ $name ]->content = $this->diff_blobs(
 					$current_entry,
 					$previous_entry
 				);
@@ -481,11 +599,13 @@ class GitRepository {
 
 	public function diff_blobs( $current_blob_entry, $previous_blob_entry ) {
 		// @TODO: Support streaming diffs for large files
-		$current_blob           = $this->read_object( $current_blob_entry->hash )->consume_all();
-		$current_blob_is_binary = $this->guess_if_binary_blob( $current_blob_entry, $current_blob );
+		$current_blob           = $this->read_object( $current_blob_entry->hash );
+        $current_blob_contents = $current_blob->consume_all();
+		$current_blob_is_binary = $this->guess_if_binary_blob( $current_blob_entry->name, $current_blob_contents );
 
-		$previous_blob           = $this->read_object( $previous_blob_entry->hash )->consume_all();
-		$previous_blob_is_binary = $this->guess_if_binary_blob( $previous_blob_entry, $previous_blob );
+		$previous_blob           = $this->read_object( $previous_blob_entry->hash );
+        $previous_blob_contents = $previous_blob->consume_all();
+		$previous_blob_is_binary = $this->guess_if_binary_blob( $previous_blob_entry->name, $previous_blob_contents );
 
 		if ( $current_blob_is_binary && $previous_blob_is_binary ) {
 			return array( 'type' => 'binary' );
@@ -494,14 +614,13 @@ class GitRepository {
 		} else {
 			return array(
 				'type' => 'text_diff',
-				'diff' => $this->diff_engine->diff( $current_blob, $previous_blob ),
+				'diff' => $this->diff_engine->diff( $current_blob_contents, $previous_blob_contents ),
 			);
 		}
 	}
 
-	private static function guess_if_binary_blob( $blob_entry, $blob_contents ) {
-		$name      = $blob_entry['name'];
-		$extension = pathinfo( $name, PATHINFO_EXTENSION );
+	private static function guess_if_binary_blob( $blob_name, $blob_contents ) {
+		$extension = pathinfo( $blob_name, PATHINFO_EXTENSION );
 		if ( in_array( $extension, array( 'png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'ico', 'bmp', 'tiff', 'tif', 'raw', 'heic', 'heif', 'avif' ) ) ) {
 			return true;
 		}

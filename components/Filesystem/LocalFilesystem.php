@@ -17,7 +17,7 @@ class LocalFilesystem implements Filesystem {
         Mixin\GetContentsViaReadStream,
         Mixin\RmdirRecursive,
         Mixin\MkdirRecursive,
-        Mixin\CopyRecursiveViaStreaming;
+        Mixin\CopyDirectoryRecursive;
 
     private $root;
 
@@ -84,6 +84,14 @@ class LocalFilesystem implements Filesystem {
 			$new_path
 		);
 	}
+
+    public function copy_file($from_path, $to_path, $options) {
+        if(false === copy($from_path, $to_path)) {
+            throw new FilesystemException(
+                sprintf('Failed to copy file: %s to %s', $from_path, $to_path),
+            );
+        }
+    }
 
 	protected function mkdir_single($path, $options = []) {
         if($this->exists($path)) {

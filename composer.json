@@ -20,11 +20,13 @@
     ],
     "require": {
         "php": ">=7.2",
-        "ext-json": "*"
+        "ext-json": "*",
+        "wikimedia/composer-merge-plugin": "v2.x-dev"
     },
     "require-dev": {
         "yoast/phpunit-polyfills": "2.0.0",
-        "phpunit/phpunit": "^9.5"
+        "phpunit/phpunit": "^9.5",
+        "rector/rector": "dev-main"
     },
     "autoload": {
         "exclude-from-classmap": [
@@ -34,13 +36,11 @@
         ],
         "classmap": [
             "components/DataLiberation/vendor-patched/",
-            "components/Blueprints/src/",
             "components/Markdown/vendor-patched",
             "components/HTML/./"
         ],
         "files": [
             "components/DataLiberation/URL/functions.php",
-            "components/Blueprints/src/WordPress/Blueprints/functions.php",
             "components/Encoding/utf8_decoder.php",
             "components/Filesystem/functions.php",
             "components/Polyfill/wordpress.php",
@@ -50,6 +50,7 @@
         "psr-4": {
             "WordPress\\DataLiberation\\": "components/DataLiberation/",
             "Rowbot\\": "components/DataLiberation/vendor-patched/",
+            "Brick\\": "components/DataLiberation/vendor-patched/",
             "WordPress\\HttpClient\\": "components/HttpClient/",
             "WordPress\\": "components/Blueprints/src/WordPress",
             "Pimple\\": "components/Blueprints/src/pimple/pimple/src/Pimple",
@@ -87,5 +88,10 @@
             }
         }
     ],
-    "minimum-stability": "dev"
+    "minimum-stability": "dev",
+    "config": {
+        "allow-plugins": {
+            "wikimedia/composer-merge-plugin": false
+        }
+    }
 }

@@ -55,6 +55,7 @@ class InflateReadStream extends BaseByteReadStream {
 
         $n = max(200, $n);
         $available = $this->upstream->pull($n);
+
         $inflated = inflate_add($this->inflate_context, $this->upstream->consume($available));
         if(false === $inflated) {
             throw new ByteStreamException('Inflate error: ' . $this->get_error_string());

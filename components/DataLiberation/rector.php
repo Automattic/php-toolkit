@@ -8,7 +8,7 @@ use Rector\Set\ValueObject\DowngradeLevelSetList;
 return RectorConfig::configure()
 	->withPaths(
 		array(
-			__DIR__ . '/vendor/rowbot/url',
+			__DIR__ . '/vendor-patched/brick',
 		)
 	)
 	->withDowngradeSets(

@@ -3,6 +3,7 @@
 namespace WordPress\Git\Tests;
 
 use WordPress\Filesystem\InMemoryFilesystem;
+use WordPress\Git\GitException;
 use WordPress\Git\GitRepository;
 use WordPress\Git\Model\Commit;
 use WordPress\Git\Model\Tree;
@@ -171,6 +172,74 @@ class GitRepositoryTest extends \PHPUnit\Framework\TestCase {
         $this->assertContains($commit2_oid, $new_objects);
         $this->assertContains($tree2_oid, $new_objects);
         $this->assertContains($blob2_oid, $new_objects);
+    }
+
+    public function test_merge_no_conflicts() {
+        $repo = new GitRepository(InMemoryFilesystem::create());
+        $initial_hash = $repo->commit(array(
+            'updates' => array(
+                'dir1/file1.txt' => 'Initial content of file1',
+                'dir2/file2.txt' => 'Initial content of file2',
+            ),
+        ));
+
+        $branch_a_hash = $repo->commit(array(
+            'updates' => array(
+                'dir1/file1.txt' => 'Updated content of file1 in branch A',
+                'dir1/subdir1/file3.txt' => 'New content of file3 in branch A',
+            ),
+        ));
+
+        $repo->set_ref_head('refs/heads/branch_b', $initial_hash);
+        $repo->set_ref_head('HEAD', 'ref: refs/heads/branch_b');
+
+        $branch_b_hash = $repo->commit(array(
+            'updates' => array(
+                'dir2/file2.txt' => 'Updated content of file2 in branch B',
+                'dir2/subdir2/file4.txt' => 'New content of file4 in branch B',
+            ),
+        ));
+        
+        $repo->set_ref_head('HEAD', 'ref: refs/heads/trunk');
+
+        $merge_oid = $repo->merge('refs/heads/branch_b');
+        
+        $this->assertEquals('Updated content of file2 in branch B', $repo->read_object_by_path('/dir2/file2.txt')->consume_all());
+        $this->assertEquals('Updated content of file1 in branch A', $repo->read_object_by_path('/dir1/file1.txt')->consume_all());
+        $this->assertEquals('New content of file3 in branch A', $repo->read_object_by_path('/dir1/subdir1/file3.txt')->consume_all());
+    }
+
+
+    public function test_merge_conflicts() {
+        $repo = new GitRepository(InMemoryFilesystem::create());
+        $initial_hash = $repo->commit(array(
+            'updates' => array(
+                'dir1/file1.txt' => 'Initial content of file1',
+                'dir2/file2.txt' => 'Initial content of file2',
+            ),
+        ));
+
+        $branch_a_hash = $repo->commit(array(
+            'updates' => array(
+                'dir1/file1.txt' => 'Updated content of file1 in branch A',
+                'dir1/subdir1/file3.txt' => 'New content of file3 in branch A',
+            ),
+        ));
+
+        $repo->set_ref_head('refs/heads/branch_b', $initial_hash);
+        $repo->set_ref_head('HEAD', 'ref: refs/heads/branch_b');
+
+        $branch_b_hash = $repo->commit(array(
+            'updates' => array(
+                'dir1/file1.txt' => 'Updated content of file1 in branch B',
+                'dir2/file2.txt' => 'Updated content of file2 in branch B',
+            ),
+        ));
+        
+        $repo->set_ref_head('HEAD', 'ref: refs/heads/trunk');
+
+        $this->expectException(GitException::class);
+        $repo->merge('refs/heads/branch_b');
     }
 
 }

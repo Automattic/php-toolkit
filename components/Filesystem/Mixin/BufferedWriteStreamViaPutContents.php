@@ -23,6 +23,7 @@ trait BufferedWriteStreamViaPutContents {
             }
 
             public function close_writing(): void {
+                parent::close_writing();
                 $pipe_contents = $this->consume_all();
                 parent::close_reading();
                 $this->fs->put_contents($this->path, $pipe_contents);

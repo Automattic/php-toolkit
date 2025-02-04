@@ -10,4 +10,4 @@ npx @wp-playground/cli@latest \
     --mount=`pwd`/plugins/static-files-editor:/wordpress/wp-content/plugins/static-files-editor \
     --mount=`pwd`/plugins/git-repo:/wordpress/wp-content/plugins/git-repo \
     --mount=`pwd`/.my-notes-git:/wordpress/wp-content/uploads \
-    --blueprint=./blueprint.json
+    --blueprint=./blueprint-dev.json

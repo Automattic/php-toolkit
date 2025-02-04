@@ -24,7 +24,7 @@ class BlockMarkupUrlProcessor extends BlockMarkupProcessor {
 	private $url_in_text_node_updated;
 	private $inspected_url_attribute_idx = - 1;
 
-	public function __construct( $html, $base_url_string = null ) {
+	public function __construct( $html, ?string $base_url_string = null ) {
 		parent::__construct( $html );
 		$this->base_url_string = $base_url_string;
 		$this->base_url_object = $base_url_string ? WPURL::parse( $base_url_string ) : null;
@@ -137,6 +137,7 @@ class BlockMarkupUrlProcessor extends BlockMarkupProcessor {
 			 * be correctly recognized as a URL.
 			 * Without a base URL, this Processor would incorrectly skip it.
 			 */
+
 			if ( is_string( $url_maybe ) ) {
 				$parsed_url = WPURL::parse( $url_maybe, $this->base_url_string );
 				if ( false === $parsed_url ) {

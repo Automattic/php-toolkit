@@ -2,27 +2,47 @@
 
 namespace WordPress\Git\Tests;
 
-use WordPress\ByteStream\ReadStream\FileReadStream;
+use WordPress\ByteStream\MemoryPipe;
 use WordPress\Filesystem\InMemoryFilesystem;
 use WordPress\Git\GitRepository;
+use WordPress\Git\Protocol\GitProtocolEncoderPipe;
 use WordPress\Git\Protocol\Parser\GitProtocolDecoder;
 
 class GitProtocolEncoderPipeTest extends \PHPUnit\Framework\TestCase {
 
-    public function test_protocol_reader_wordpress_develop() {
-        $repo = new GitRepository(InMemoryFilesystem::create());
+    public function test_encode_empty_file_and_a_text_file() {
+        $fs = InMemoryFilesystem::create();
+        $repository = new GitRepository($fs);
 
-        $upstream = FileReadStream::from_path( __DIR__ . '/fixtures/wordpress-develop-response-no-blobs.bin');
+        $data1 = 'This is a test file';
+        $stream = $repository->new_object_open_write_stream('blob', strlen($data1));
+        $stream->append_bytes($data1);
+        $stream->close_writing();
+        $oid1 = $stream->get_hash();
+
+        $data2 = '';
+        $stream = $repository->new_object_open_write_stream('blob', strlen($data2));
+        $stream->append_bytes($data2);
+        $stream->close_writing();
+        $oid2 = $stream->get_hash();
+
+        $encoder = new GitProtocolEncoderPipe();
+        $encoder->append_packfile($repository, [
+            $oid1,
+            $oid2,
+        ]);
+
+        $result = $encoder->consume_all();
+
+        $write_repo = new GitRepository(InMemoryFilesystem::create());
         $reader = new GitProtocolDecoder(
-            $upstream,
-            ['write_to_repository' => $repo]
+            new MemoryPipe($result),
+            ['write_to_repository' => $write_repo]
         );
 
         while($reader->next_token()) {
-            $reader->get_token_type();
+            // twiddle our thumbs
         }
-
-        $upstream->close_reading();
 
         // We just want to see there are no exceptions thrown
         $this->assertTrue(true);
