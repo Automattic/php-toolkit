@@ -32,9 +32,6 @@ jobs:
               with:
                   node-version: '22'
 
-            - name: Install npm dependencies
-              run: npm install
-
             - name: Install npm dependencies for static-files-editor
               run: |
                 cd plugins/static-files-editor
