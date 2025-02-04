@@ -24,9 +24,8 @@ jobs:
             - name: Install Composer dependencies
               run: composer install --no-dev --prefer-dist
 
-            - name: Zip files for release
-              run: |
-                  zip -r release.zip composer.json composer.lock LICENSE.md components
+            - name: Build all components
+              run: bash bin/build-all.sh
 
             - name: Create GitHub Release
               id: create_release
@@ -45,6 +44,6 @@ jobs:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               with:
                   upload_url: ${{ steps.create_release.outputs.upload_url }}
-                  asset_path: ./release.zip
-                  asset_name: release.zip
+                  asset_path: ./dist/plugins/data-liberation.zip
+                  asset_name: data-liberation.zip
                   asset_content_type: application/zip

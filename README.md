@@ -18,6 +18,51 @@ This project aims to modernize WordPress's data handling capabilities and power
 the Data Liberation project. See [the rationale](RATIONALE.md) and [the plan](PLAN.md)
 for more details.
 
+### Consuming the libraries
+
+#### In WordPress
+
+The [Data Liberation WordPress plugin](https://github.a8c.com/Automattic/wordpress-components/releases/) ships the libraries from this repository. Include it as a dependency in your plugin to use the PHP libraries safely.
+
+Why not just ship the libraries with your plugin? Imagine two plugins doing that. They would conflict, trigger a PHP fatal error on every page load, and break the site.
+
+#### Outside of WordPress
+
+Use composer to install the libraries in a non-WordPress project.
+
+This is the minimal composer.json file you need to consume the libraries:
+
+```json
+{
+	"name": "my-namespace/my-package",
+	"require": {
+		"wordpress/php-libraries": "dev-trunk"
+	},
+	"repositories": [
+		{
+			"type": "github",
+			"url": "https://github.com/adamziel/wordpress-components"
+		}
+	]
+}
+```
+
+You can also lock it in to a specific commit or tag:
+
+```json
+{
+    "require": {
+        "wordpress/php-libraries": "dev-trunk#122b547"
+    }
+}
+```
+
+For now, there is no way to cherry-pick just the one library you need. It's all or nothing.
+
+Note that the composer.json example above downloads more files than the required minimum, e.g. markdowns, unit tests, the `plugins` directory, etc. That's about 50MB of code in total and, most likely, it's not a big deal for your project.
+
+If you'd like to install just a single library, you'll need to contribute a PR to distribute each library as a separate package. Most likely, though, you don't really need that. If you have doubts, open a new issue and we'll figure it out together.
+
 ### Play with it
 
 Here's a very rough process you can use to start WordPress with a plugin that
