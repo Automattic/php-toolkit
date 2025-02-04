@@ -20,8 +20,7 @@
     ],
     "require": {
         "php": ">=7.2",
-        "ext-json": "*",
-        "wikimedia/composer-merge-plugin": "v2.x-dev"
+        "ext-json": "*"
     },
     "require-dev": {
         "yoast/phpunit-polyfills": "2.0.0",
