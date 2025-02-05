@@ -42,5 +42,4 @@ interface EntityReader {
 	 * @return string Position marker for resuming later
 	 */
 	public function get_reentrancy_cursor();
-
 }

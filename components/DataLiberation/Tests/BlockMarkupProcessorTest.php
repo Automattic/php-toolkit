@@ -17,28 +17,34 @@ class BlockMarkupProcessorTest extends TestCase {
 		$this->assertEquals( $block_attributes, $p->get_block_attributes(), 'Failed to identify the block attributes' );
 	}
 
-	static public function provider_test_finds_block_openers() {
-		return [
-			'Opener without attributes'                        => [ '<!-- wp:paragraph -->', 'wp:paragraph', [] ],
-			'Opener without the trailing whitespace'           => [ '<!--wp:paragraph-->', 'wp:paragraph', [] ],
-			'Opener with a lot of trailing whitespace'         => [ '<!--    wp:paragraph          -->', 'wp:paragraph', [] ],
-			'Opener with attributes'                           => [
+	public static function provider_test_finds_block_openers() {
+		return array(
+			'Opener without attributes'                        => array( '<!-- wp:paragraph -->', 'wp:paragraph', array() ),
+			'Opener without the trailing whitespace'           => array( '<!--wp:paragraph-->', 'wp:paragraph', array() ),
+			'Opener with a lot of trailing whitespace'         => array( '<!--    wp:paragraph          -->', 'wp:paragraph', array() ),
+			'Opener with attributes'                           => array(
 				'<!-- wp:paragraph {"class": "wp-bold"} -->',
 				'wp:paragraph',
-				[ 'class' => 'wp-bold' ],
-			],
-			'Opener with empty attributes'                     => [ '<!-- wp:paragraph {} -->', 'wp:paragraph', [] ],
-			'Opener with lots of whitespace around attributes' => [
+				array( 'class' => 'wp-bold' ),
+			),
+			'Opener with empty attributes'                     => array( '<!-- wp:paragraph {} -->', 'wp:paragraph', array() ),
+			'Opener with lots of whitespace around attributes' => array(
 				'<!-- wp:paragraph   {    "class":   "wp-bold"  }   -->',
 				'wp:paragraph',
-				[ 'class' => 'wp-bold' ],
-			],
-			'Opener with object and array attributes'          => [
+				array( 'class' => 'wp-bold' ),
+			),
+			'Opener with object and array attributes'          => array(
 				'<!-- wp:code { "meta": { "language": "php", "highlightedLines": [14, 22] }, "class": "dark" } -->',
 				'wp:code',
-				[ 'meta' => [ 'language' => 'php', 'highlightedLines' => [ 14, 22 ] ], 'class' => 'dark' ],
-			],
-		];
+				array(
+					'meta' => array(
+						'language' => 'php',
+						'highlightedLines' => array( 14, 22 ),
+					),
+					'class' => 'dark',
+				),
+			),
+		);
 	}
 
 	/**
@@ -54,19 +60,19 @@ class BlockMarkupProcessorTest extends TestCase {
 		$this->assertTrue( $p->is_self_closing_block(), 'Failed to identify the self-closing block status' );
 	}
 
-	static public function provider_test_finds_self_closing_blocks() {
-		return [
-			'Self-closing block without attributes' => [ 
-				'<!-- wp:spacer /-->', 
-				'wp:spacer', 
-				[] 
-			],
-			'Self-closing block with attributes' => [ 
-				'<!-- wp:spacer {"height":"20px"} /-->', 
-				'wp:spacer', 
-				[ 'height' => '20px' ] 
-			],
-		];
+	public static function provider_test_finds_self_closing_blocks() {
+		return array(
+			'Self-closing block without attributes' => array(
+				'<!-- wp:spacer /-->',
+				'wp:spacer',
+				array(),
+			),
+			'Self-closing block with attributes' => array(
+				'<!-- wp:spacer {"height":"20px"} /-->',
+				'wp:spacer',
+				array( 'height' => '20px' ),
+			),
+		);
 	}
 
 	/**
@@ -81,12 +87,12 @@ class BlockMarkupProcessorTest extends TestCase {
 		$this->assertTrue( $p->is_block_closer(), 'Failed to identify the block closer status' );
 	}
 
-	static public function provider_test_finds_block_closers() {
-		return [
-			'Closer without attributes'                => [ '<!-- /wp:paragraph -->', 'wp:paragraph' ],
-			'Closer without the trailing whitespace'   => [ '<!--/wp:paragraph-->', 'wp:paragraph' ],
-			'Closer with a lot of trailing whitespace' => [ '<!--    /wp:paragraph          -->', 'wp:paragraph' ],
-		];
+	public static function provider_test_finds_block_closers() {
+		return array(
+			'Closer without attributes'                => array( '<!-- /wp:paragraph -->', 'wp:paragraph' ),
+			'Closer without the trailing whitespace'   => array( '<!--/wp:paragraph-->', 'wp:paragraph' ),
+			'Closer with a lot of trailing whitespace' => array( '<!--    /wp:paragraph          -->', 'wp:paragraph' ),
+		);
 	}
 
 	/**
@@ -101,15 +107,15 @@ class BlockMarkupProcessorTest extends TestCase {
 		$this->assertFalse( $p->get_block_attributes(), 'The block attributes weren\'t false' );
 	}
 
-	static public function provider_test_treat_invalid_block_openers_as_comments() {
-		return [
-			'Opener with a line break before whitespace' => [ "<!-- \nwp:paragraph -->", ],
-			'Block name including !'                     => [ '<!-- wp:pa!ragraph -->', ],
-			'Block name including a whitespace'          => [ '<!-- wp: paragraph -->', ],
-			'No namespace in the block name'             => [ '<!-- paragraph -->', ],
-			'Non-object attributes'                      => [ '<!-- wp:paragraph "attrs" -->', ],
-			'Invalid JSON as attributes – Double }} '    => [ '<!-- wp:paragraph {"class":"wp-block"}} -->', ],
-		];
+	public static function provider_test_treat_invalid_block_openers_as_comments() {
+		return array(
+			'Opener with a line break before whitespace' => array( "<!-- \nwp:paragraph -->" ),
+			'Block name including !'                     => array( '<!-- wp:pa!ragraph -->' ),
+			'Block name including a whitespace'          => array( '<!-- wp: paragraph -->' ),
+			'No namespace in the block name'             => array( '<!-- paragraph -->' ),
+			'Non-object attributes'                      => array( '<!-- wp:paragraph "attrs" -->' ),
+			'Invalid JSON as attributes – Double }} '    => array( '<!-- wp:paragraph {"class":"wp-block"}} -->' ),
+		);
 	}
 
 	/**
@@ -124,12 +130,12 @@ class BlockMarkupProcessorTest extends TestCase {
 		$this->assertFalse( $p->get_block_attributes(), 'The block attributes weren\'t false' );
 	}
 
-	static public function provider_test_treat_invalid_block_closers_as_comments() {
-		return [
-			'Closer with a line break before whitespace'         => [ "<!-- \n/wp:paragraph -->", ],
-			'Closer with attributes'                             => [ '<!-- /wp:paragraph {"class": "block"} -->', ],
-			'Closer with solidus at the end (before whitespace)' => [ '<!-- wp:paragraph/ -->', ],
-		];
+	public static function provider_test_treat_invalid_block_closers_as_comments() {
+		return array(
+			'Closer with a line break before whitespace'         => array( "<!-- \n/wp:paragraph -->" ),
+			'Closer with attributes'                             => array( '<!-- /wp:paragraph {"class": "block"} -->' ),
+			'Closer with solidus at the end (before whitespace)' => array( '<!-- wp:paragraph/ -->' ),
+		);
 	}
 
 	/**
@@ -137,38 +143,38 @@ class BlockMarkupProcessorTest extends TestCase {
 	 */
 	public function test_set_modifiable_text( $markup, $new_text, $new_markup, $which_token = 1 ) {
 		$p = new BlockMarkupProcessor( $markup );
-		for ( $i = 0; $i < $which_token; $i ++ ) {
+		for ( $i = 0; $i < $which_token; $i++ ) {
 			$p->next_token();
 		}
 		$this->assertTrue( $p->set_modifiable_text( $new_text ), 'Failed to set the modifiable text.' );
 		$this->assertEquals( $new_markup, $p->get_updated_html(), 'Failed to set the modifiable text.' );
 	}
 
-	static public function provider_test_set_modifiable_text() {
-		return [
-			'Changing the text of a block comment'      => [
+	public static function provider_test_set_modifiable_text() {
+		return array(
+			'Changing the text of a block comment'      => array(
 				'<!-- wp:paragraph -->',
 				' wp:paragraph {"class": "wp-bold"} ',
 				'<!-- wp:paragraph {"class": "wp-bold"} -->',
-			],
-			'Changing the text of a text node'          => [
+			),
+			'Changing the text of a text node'          => array(
 				'Hello, there',
 				'I am a new text',
 				'I am a new text',
-			],
-			'Changing the text of a text node in a tag' => [
+			),
+			'Changing the text of a text node in a tag' => array(
 				'<p>Hello, there</p>',
 				'I am a new text',
 				'<p>I am a new text</p>',
 				2,
-			],
-			'Escapes the text in a text node' => [
+			),
+			'Escapes the text in a text node' => array(
 				'<p>Hello, there</p>',
 				'The <div> tag is my favorite one',
 				'<p>The &lt;div&gt; tag is my favorite one</p>',
 				2,
-			],
-		];
+			),
+		);
 	}
 
 	/**
@@ -181,12 +187,12 @@ class BlockMarkupProcessorTest extends TestCase {
 	}
 
 
-	static public function provider_test_set_modifiable_text_invalid_nodes() {
-		return [
-			'Tag' => ['<a href="">'],
-			'DOCTYPE' => ['<!DOCTYPE html>'],
-			'Funky comment' => ['</1I am a comment>'],
-		];
+	public static function provider_test_set_modifiable_text_invalid_nodes() {
+		return array(
+			'Tag' => array( '<a href="">' ),
+			'DOCTYPE' => array( '<!DOCTYPE html>' ),
+			'Funky comment' => array( '</1I am a comment>' ),
+		);
 	}
 
 	public function test_set_modifiable_text_can_be_called_twice() {
@@ -299,8 +305,11 @@ class BlockMarkupProcessorTest extends TestCase {
 		$this->assertTrue( $p->next_block_attribute(), 'Failed to find the first block attribute' );
 
 		$p->set_block_attribute_value( 'wp-italics' );
-		$this->assertEquals( '<!-- wp:image {"class":"wp-italics"} -->', $p->get_updated_html(),
-			'Failed to update the block attribute value' );
+		$this->assertEquals(
+			'<!-- wp:image {"class":"wp-italics"} -->',
+			$p->get_updated_html(),
+			'Failed to update the block attribute value'
+		);
 	}
 
 	public function test_set_block_attribute_value_updates_affects_get_block_attribute_value() {
@@ -325,8 +334,11 @@ class BlockMarkupProcessorTest extends TestCase {
 
 		$p->set_block_attribute_value( 'medium.png' );
 		$this->assertEquals( 'medium.png', $p->get_block_attribute_value(), 'Failed to find the block attribute value' );
-		$this->assertEquals( '<!-- wp:image {"sources":{"lowres":"small.png","hires":"medium.png"}} -->', $p->get_updated_html(),
-			'Failed to update the block attribute value' );
+		$this->assertEquals(
+			'<!-- wp:image {"sources":{"lowres":"small.png","hires":"medium.png"}} -->',
+			$p->get_updated_html(),
+			'Failed to update the block attribute value'
+		);
 	}
 
 	public function test_set_block_attribute_value_updates_a_list_value() {
@@ -340,8 +352,11 @@ class BlockMarkupProcessorTest extends TestCase {
 
 		$p->set_block_attribute_value( 'medium.png' );
 		$this->assertEquals( 'medium.png', $p->get_block_attribute_value(), 'Failed to find the block attribute value' );
-		$this->assertEquals( '<!-- wp:image {"sources":["small.png","medium.png"]} -->', $p->get_updated_html(),
-			'Failed to update the block attribute value' );
+		$this->assertEquals(
+			'<!-- wp:image {"sources":["small.png","medium.png"]} -->',
+			$p->get_updated_html(),
+			'Failed to update the block attribute value'
+		);
 	}
 
 	public function test_set_block_attribute_can_be_called_multiple_times() {
@@ -355,8 +370,11 @@ class BlockMarkupProcessorTest extends TestCase {
 
 		$p->set_block_attribute_value( 'medium.png' );
 		$p->set_block_attribute_value( 'oh-completely-different-image.png' );
-		$this->assertEquals( 'oh-completely-different-image.png', $p->get_block_attribute_value(),
-			'Failed to find the block attribute value' );
+		$this->assertEquals(
+			'oh-completely-different-image.png',
+			$p->get_block_attribute_value(),
+			'Failed to find the block attribute value'
+		);
 		$this->assertEquals(
 			'<!-- wp:image {"sources":{"lowres":"small.png","hires":"oh-completely-different-image.png"}} -->',
 			$p->get_updated_html(),

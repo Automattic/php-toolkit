@@ -20,7 +20,7 @@ class XMLProcessorTest extends TestCase {
 	const XML_MALFORMED    = '<wp:content><wp:text wp:post-type="d-md-none" Notifications</wp:text><wp:text wp:post-type="d-none d-md-inline">Back to notifications</wp:text></wp:content>';
 
 	public function beforeEach() {
-		$GLOBALS['_doing_it_wrong_messages'] = [];
+		$GLOBALS['_doing_it_wrong_messages'] = array();
 	}
 
 	/**
@@ -66,7 +66,7 @@ class XMLProcessorTest extends TestCase {
 	 * @dataProvider data_is_empty_element
 	 *
 	 * @param string $xml Input XML whose first tag might contain the self-closing flag `/`.
-	 * @param bool $flag_is_set Whether the input XML's first tag contains the self-closing flag.
+	 * @param bool   $flag_is_set Whether the input XML's first tag contains the self-closing flag.
 	 */
 	public function test_is_empty_element_matches_input_xml( $xml, $flag_is_set ) {
 		$processor = XMLProcessor::create_from_string( $xml );
@@ -202,7 +202,7 @@ class XMLProcessorTest extends TestCase {
 		$processor = XMLProcessor::create_from_string( '<wp:content enabled="WordPress & WordPress">Test</wp:content>' );
 
 		$this->assertTrue( $processor->next_tag(), 'Querying a tag did not return true' );
-        $this->assertEquals('WordPress & WordPress', $processor->get_attribute('enabled'));
+		$this->assertEquals( 'WordPress & WordPress', $processor->get_attribute( 'enabled' ) );
 	}
 
 	/**
@@ -215,7 +215,7 @@ class XMLProcessorTest extends TestCase {
 		$processor = XMLProcessor::create_from_string( '<wp:content enabled="&#x94">Test</wp:content>' );
 
 		$this->assertTrue( $processor->next_tag(), 'Querying a tag did not return true' );
-		$this->assertEquals('&#x94', $processor->get_attribute('enabled'));
+		$this->assertEquals( '&#x94', $processor->get_attribute( 'enabled' ) );
 	}
 
 	/**
@@ -1133,7 +1133,7 @@ class XMLProcessorTest extends TestCase {
 
 		$this->assertFalse(
 			$processor->is_paused_at_incomplete_input(),
-			"Should not have indicated that the parser found an incomplete token but it did."
+			'Should not have indicated that the parser found an incomplete token but it did.'
 		);
 
 		$this->assertNotEmpty(
@@ -1727,7 +1727,7 @@ class XMLProcessorTest extends TestCase {
 	 * @covers XMLProcessor::resume
 	 */
 	public function test_pause_and_resume() {
-		$xml = <<<XML
+		$xml       = <<<XML
 			<root>
 				<first_child>Hello there</first_child>
 				<second_child>I am a second child</second_child>
@@ -1739,7 +1739,7 @@ class XMLProcessorTest extends TestCase {
 		$this->assertEquals( 'first_child', $processor->get_tag(), 'Did not find a tag.' );
 
 		$entity_offset = $processor->get_token_byte_offset_in_the_input_stream();
-		$cursor = $processor->get_reentrancy_cursor();
+		$cursor        = $processor->get_reentrancy_cursor();
 
 		$resumed = XMLProcessor::create_for_streaming(
 			substr( $xml, $entity_offset ),
@@ -1792,5 +1792,4 @@ class XMLProcessorTest extends TestCase {
 		$this->assertFalse( $processor->next_token(), 'Did not reject DOCTYPE in tag content' );
 		$this->assertEquals( 'unsupported', $processor->get_last_error(), 'Did not set syntax error' );
 	}
-
 }

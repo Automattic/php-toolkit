@@ -4,8 +4,8 @@ namespace WordPress\ByteStream\WriteStream;
 
 use WordPress\ByteStream\ByteStreamException;
 
-class FileWriteStream implements ByteWriteStream
-{
+class FileWriteStream implements ByteWriteStream {
+
 	private $fileHandle;
 
 	/**
@@ -17,20 +17,19 @@ class FileWriteStream implements ByteWriteStream
 	 * @return FileWriteStream
 	 * @throws ByteStreamException If the file cannot be opened for writing.
 	 */
-	public static function from_path(string $path, string $mode = 'append'): self
-	{
-		$fileMode = match ($mode) {
+	public static function from_path( string $path, string $mode = 'append' ): self {
+		$fileMode = match ( $mode ) {
 			'truncate' => 'wb', // Write mode: truncates the file.
 			'append'   => 'ab', // Append mode: appends to the file.
-			default    => throw new ByteStreamException("Invalid mode: $mode. Use 'truncate' or 'append'.")
+			default    => throw new ByteStreamException( "Invalid mode: $mode. Use 'truncate' or 'append'." )
 		};
 
-		$fileHandle = fopen($path, $fileMode);
-		if ($fileHandle === false) {
-			throw new ByteStreamException("Failed to open file at path: $path");
+		$fileHandle = fopen( $path, $fileMode );
+		if ( $fileHandle === false ) {
+			throw new ByteStreamException( "Failed to open file at path: $path" );
 		}
 
-		return new self($fileHandle);
+		return new self( $fileHandle );
 	}
 
 	/**
@@ -41,9 +40,8 @@ class FileWriteStream implements ByteWriteStream
 	 * @return FileWriteStream
 	 * @throws ByteStreamException If the file handle is invalid.
 	 */
-	public static function from_resource_handle($fileHandle): self
-	{
-		return new self($fileHandle);
+	public static function from_resource_handle( $fileHandle ): self {
+		return new self( $fileHandle );
 	}
 
 	/**
@@ -51,10 +49,9 @@ class FileWriteStream implements ByteWriteStream
 	 *
 	 * @param resource $fileHandle
 	 */
-	public function __construct($fileHandle)
-	{
-		if (!is_resource($fileHandle) || get_resource_type($fileHandle) !== 'stream') {
-			throw new ByteStreamException("Invalid file handle provided.");
+	public function __construct( $fileHandle ) {
+		if ( ! is_resource( $fileHandle ) || get_resource_type( $fileHandle ) !== 'stream' ) {
+			throw new ByteStreamException( 'Invalid file handle provided.' );
 		}
 		$this->fileHandle = $fileHandle;
 	}
@@ -66,10 +63,9 @@ class FileWriteStream implements ByteWriteStream
 	 * @return void
 	 * @throws ByteStreamException If the write operation fails.
 	 */
-	public function append_bytes(string $bytes): void
-	{
-		if (fwrite($this->fileHandle, $bytes) === false) {
-			throw new ByteStreamException("Failed to write bytes to file.");
+	public function append_bytes( string $bytes ): void {
+		if ( fwrite( $this->fileHandle, $bytes ) === false ) {
+			throw new ByteStreamException( 'Failed to write bytes to file.' );
 		}
 	}
 
@@ -79,14 +75,12 @@ class FileWriteStream implements ByteWriteStream
 	 * @return void
 	 * @throws ByteStreamException If the file handle is already closed.
 	 */
-	public function close_writing(): void
-	{
-		if ($this->fileHandle === null) {
-			throw new ByteStreamException("File handle is already closed.");
+	public function close_writing(): void {
+		if ( $this->fileHandle === null ) {
+			throw new ByteStreamException( 'File handle is already closed.' );
 		}
 
-		fclose($this->fileHandle);
+		fclose( $this->fileHandle );
 		$this->fileHandle = null;
 	}
-
 }

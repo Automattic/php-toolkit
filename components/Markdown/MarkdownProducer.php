@@ -22,7 +22,7 @@ class MarkdownProducer implements DataFormatProducer {
 			'indent' => array(),
 			'listStyle' => array(),
 		);
-		$this->metadata     = $blocks_with_meta->get_all_metadata([ 'first_value_only' => true ]);
+		$this->metadata     = $blocks_with_meta->get_all_metadata( array( 'first_value_only' => true ) );
 	}
 
 	public function produce() {

@@ -22,11 +22,11 @@ class DatabaseRowsEntityReader implements EntityReader {
 	/**
 	 * State constants for the finite state machine
 	 */
-	const STATE_INIT = 'init';
-	const STATE_NEXT_ROW = 'next_row';
-	const STATE_NEXT_TABLE = 'next_table';
+	const STATE_INIT         = 'init';
+	const STATE_NEXT_ROW     = 'next_row';
+	const STATE_NEXT_TABLE   = 'next_table';
 	const STATE_CREATE_TABLE = 'create_table';
-	const STATE_FINISHED = 'finished';
+	const STATE_FINISHED     = 'finished';
 
 	/**
 	 * The database connection used to fetch records.
@@ -100,15 +100,15 @@ class DatabaseRowsEntityReader implements EntityReader {
 	 */
 	private $state = self::STATE_INIT;
 
-    /**
-     * The type of the database.
-     *
-     * One of: "sqlite", "mysql"
-     *
-     * @since WP_VERSION
-     * @var string
-     */
-    private $db_type;
+	/**
+	 * The type of the database.
+	 *
+	 * One of: "sqlite", "mysql"
+	 *
+	 * @since WP_VERSION
+	 * @var string
+	 */
+	private $db_type;
 
 	public static function create( PDO $db, $options = array() ) {
 		return new DatabaseRowsEntityReader( $db, $options );
@@ -119,17 +119,17 @@ class DatabaseRowsEntityReader implements EntityReader {
 	 *
 	 * @since WP_VERSION
 	 *
-	 * @param PDO $db The database connection to use.
+	 * @param PDO   $db The database connection to use.
 	 * @param array $options The options to configure the reader.
 	 */
 	public function __construct( PDO $db, $options = array() ) {
-		$this->db = $db;
-		$this->tables_to_process = $options['tables_to_process'] ?? null;
+		$this->db                 = $db;
+		$this->tables_to_process  = $options['tables_to_process'] ?? null;
 		$this->create_table_query = $options['create_table_query'] ?? false;
-		$this->db_type = $db->getAttribute(PDO::ATTR_DRIVER_NAME);
-        if(!in_array($this->db_type, array('sqlite', 'mysql'))) {
-            throw new DataLiberationException('Unsupported database type: ' . $this->db_type);
-        }
+		$this->db_type            = $db->getAttribute( PDO::ATTR_DRIVER_NAME );
+		if ( ! in_array( $this->db_type, array( 'sqlite', 'mysql' ) ) ) {
+			throw new DataLiberationException( 'Unsupported database type: ' . $this->db_type );
+		}
 		if ( isset( $options['cursor'] ) ) {
 			$this->initialize_from_cursor( $options['cursor'] );
 		}
@@ -140,7 +140,6 @@ class DatabaseRowsEntityReader implements EntityReader {
 	 *
 	 * @return ImportEntity The entity.
 	 * @since WP_VERSION
-	 *
 	 */
 	public function get_entity(): ImportEntity {
 		return $this->current_entity;
@@ -169,44 +168,44 @@ class DatabaseRowsEntityReader implements EntityReader {
 	 * @return bool Whether another entity was found.
 	 */
 	public function next_entity() {
-        if($this->is_finished()) {
-            return false;
-        }
+		if ( $this->is_finished() ) {
+			return false;
+		}
 
-		if ($this->state === self::STATE_INIT) {
-			if (null === $this->tables_to_process) {
+		if ( $this->state === self::STATE_INIT ) {
+			if ( null === $this->tables_to_process ) {
 				$this->initialize_tables_to_process();
 			}
 			$this->state = self::STATE_NEXT_TABLE;
 		}
 
-        while(true) {
-            switch ($this->state) {
-                case self::STATE_NEXT_TABLE:
-                    if ($this->move_to_next_table()) {
-                        $this->state = $this->create_table_query ? self::STATE_CREATE_TABLE : self::STATE_NEXT_ROW;
-                    } else {
-                        $this->state = self::STATE_FINISHED;
-                        return false;
-                    }
-                    break;
+		while ( true ) {
+			switch ( $this->state ) {
+				case self::STATE_NEXT_TABLE:
+					if ( $this->move_to_next_table() ) {
+						$this->state = $this->create_table_query ? self::STATE_CREATE_TABLE : self::STATE_NEXT_ROW;
+					} else {
+						$this->state = self::STATE_FINISHED;
+						return false;
+					}
+					break;
 
-                case self::STATE_CREATE_TABLE:
-                    $this->export_create_table_query();
-                    $this->state = self::STATE_NEXT_ROW;
-                    return true;
+				case self::STATE_CREATE_TABLE:
+					$this->export_create_table_query();
+					$this->state = self::STATE_NEXT_ROW;
+					return true;
 
-                case self::STATE_NEXT_ROW:
-                    if ($this->read_next_entity()) {
-                        return true;
-                    }
-                    $this->state = self::STATE_NEXT_TABLE;
-                    return $this->next_entity();
+				case self::STATE_NEXT_ROW:
+					if ( $this->read_next_entity() ) {
+						return true;
+					}
+					$this->state = self::STATE_NEXT_TABLE;
+					return $this->next_entity();
 
-                case self::STATE_FINISHED:
-                    return false;
-            }
-        }
+				case self::STATE_FINISHED:
+					return false;
+			}
+		}
 
 		return false;
 	}
@@ -223,16 +222,19 @@ class DatabaseRowsEntityReader implements EntityReader {
 			$this->current_result_set = $this->db->query( "SELECT * FROM {$this->current_table} WHERE ID > {$this->last_record_id}" );
 		}
 
-		$record = $this->current_result_set->fetch(\PDO::FETCH_ASSOC);
+		$record = $this->current_result_set->fetch( \PDO::FETCH_ASSOC );
 		if ( ! $record ) {
-            $this->current_result_set = null;
+			$this->current_result_set = null;
 			return false;
 		}
 
-		$this->current_entity = new ImportEntity('database_row', [
-			'table' => $this->current_table,
-			'record' => $record,
-		]);
+		$this->current_entity = new ImportEntity(
+			'database_row',
+			array(
+				'table' => $this->current_table,
+				'record' => $record,
+			)
+		);
 		$this->last_record_id = $record['ID'] ?? null;
 		++$this->entities_read_so_far;
 		return true;
@@ -247,12 +249,12 @@ class DatabaseRowsEntityReader implements EntityReader {
 	 */
 	private function move_to_next_table() {
 		if ( ! $this->current_table ) {
-			$this->current_table = reset($this->tables_to_process);
+			$this->current_table = reset( $this->tables_to_process );
 		} else {
-			$this->current_table = next($this->tables_to_process);
+			$this->current_table = next( $this->tables_to_process );
 		}
-        $this->last_record_id = 0;
-        return !! $this->current_table;
+		$this->last_record_id = 0;
+		return (bool) $this->current_table;
 	}
 
 	/**
@@ -261,21 +263,21 @@ class DatabaseRowsEntityReader implements EntityReader {
 	 * @since WP_VERSION
 	 */
 	private function export_create_table_query() {
-        switch($this->db_type) {
-            case 'sqlite':
-                $result = $this->db->query("SELECT sql FROM sqlite_master WHERE type='table' AND name='{$this->current_table}'");
-                $row = $result->fetch(\PDO::FETCH_ASSOC);
-                $sql = $row ? $row['sql'].";" : null;
-                break;
-            case 'mysql':
-                $result = $this->db->query( "SHOW CREATE TABLE {$this->current_table}" );
-                $row = $result->fetch(\PDO::FETCH_ASSOC);
-                $sql = $row ? $row['Create Table'] : null;
-                break;
-        }
+		switch ( $this->db_type ) {
+			case 'sqlite':
+				$result = $this->db->query( "SELECT sql FROM sqlite_master WHERE type='table' AND name='{$this->current_table}'" );
+				$row    = $result->fetch( \PDO::FETCH_ASSOC );
+				$sql    = $row ? $row['sql'] . ';' : null;
+				break;
+			case 'mysql':
+				$result = $this->db->query( "SHOW CREATE TABLE {$this->current_table}" );
+				$row    = $result->fetch( \PDO::FETCH_ASSOC );
+				$sql    = $row ? $row['Create Table'] : null;
+				break;
+		}
 
-        $this->current_entity = new ImportEntity('sql_query', $sql);
-        ++$this->entities_read_so_far;
+		$this->current_entity = new ImportEntity( 'sql_query', $sql );
+		++$this->entities_read_so_far;
 	}
 
 	/**
@@ -286,11 +288,11 @@ class DatabaseRowsEntityReader implements EntityReader {
 	 */
 	private function initialize_tables_to_process() {
 		$this->tables_to_process = array();
-		$result = $this->db->query("SHOW TABLES");
-		while ($row = $result->fetch(\PDO::FETCH_NUM)) {
+		$result                  = $this->db->query( 'SHOW TABLES' );
+		while ( $row = $result->fetch( \PDO::FETCH_NUM ) ) {
 			$this->tables_to_process[] = $row[0];
 		}
-		sort($this->tables_to_process);
+		sort( $this->tables_to_process );
 	}
 
 	public function get_reentrancy_cursor() {
@@ -298,7 +300,7 @@ class DatabaseRowsEntityReader implements EntityReader {
 			array(
 				'last_record_id' => $this->last_record_id,
 				'current_table' => $this->current_table,
-				'state' => $this->state
+				'state' => $this->state,
 			)
 		);
 	}
@@ -314,8 +316,8 @@ class DatabaseRowsEntityReader implements EntityReader {
 		$cursor_data = json_decode( $cursor, true );
 		if ( $cursor_data ) {
 			$this->last_record_id = $cursor_data['last_record_id'] ?? null;
-			$this->current_table = $cursor_data['current_table'] ?? null;
-			$this->state = $cursor_data['state'] ?? self::STATE_INIT;
+			$this->current_table  = $cursor_data['current_table'] ?? null;
+			$this->state          = $cursor_data['state'] ?? self::STATE_INIT;
 		}
 	}
 }

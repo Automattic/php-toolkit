@@ -41,14 +41,14 @@ class GitRepository {
 	) {
 		$this->fs          = $fs;
 		$this->diff_engine = $options['diff_engine'] ?? new MergeEngine();
-		$this->initialize_filesystem($options);
+		$this->initialize_filesystem( $options );
 	}
 
-    public function get_object_storage_filesystem() {
-        return $this->fs;
-    }
+	public function get_object_storage_filesystem() {
+		return $this->fs;
+	}
 
-	private function initialize_filesystem($options=[]) {
+	private function initialize_filesystem( $options = array() ) {
 		$paths = array(
 			'objects',
 			'refs',
@@ -60,20 +60,20 @@ class GitRepository {
 				$this->fs->mkdir( $path );
 			}
 		}
-        if ( ! $this->fs->is_file( 'HEAD' ) ) {
-            // Initialize the repository with a default branch
-            $default_branch = $options['default_branch'] ?? 'trunk';
-            $this->set_ref_head('HEAD', "ref: refs/heads/{$default_branch}\n");
-            $this->set_ref_head("refs/heads/{$default_branch}", Commit::NULL_HASH);
-        }
+		if ( ! $this->fs->is_file( 'HEAD' ) ) {
+			// Initialize the repository with a default branch
+			$default_branch = $options['default_branch'] ?? 'trunk';
+			$this->set_ref_head( 'HEAD', "ref: refs/heads/{$default_branch}\n" );
+			$this->set_ref_head( "refs/heads/{$default_branch}", Commit::NULL_HASH );
+		}
 	}
 
 	public function add_remote( $name, $url ) {
 		$this->set_config_value( array( 'remote', $name, 'url' ), $url );
-        $path = wp_join_paths('refs/remotes', $name);
-        if ( ! $this->fs->is_dir( $path ) ) {
-            $this->fs->mkdir( $path );
-        }
+		$path = wp_join_paths( 'refs/remotes', $name );
+		if ( ! $this->fs->is_dir( $path ) ) {
+			$this->fs->mkdir( $path );
+		}
 		// @TODO: support fetch option
 		// $this->set_config_value(['remote', $name, 'fetch'], '+refs/heads/*:refs/remotes/' . $name . '/*');
 	}
@@ -141,17 +141,19 @@ class GitRepository {
 	public function read_object( $oid ) {
 		$object_path = $this->get_storage_path( $oid );
 		if ( ! $this->fs->is_file( $object_path ) ) {
-			throw new GitException(sprintf(
-				'Object %s not found',
-				$oid
-			));
+			throw new GitException(
+				sprintf(
+					'Object %s not found',
+					$oid
+				)
+			);
 		}
 
 		$peoducer = new GitObjectDecoder(
-			$this->fs->open_read_stream($this->get_storage_path($oid))
+			$this->fs->open_read_stream( $this->get_storage_path( $oid ) )
 		);
-        $peoducer->read_header();
-        return $peoducer;
+		$peoducer->read_header();
+		return $peoducer;
 	}
 
 	public function read_object_by_path( $path, $root_tree_oid = null ) {
@@ -162,49 +164,49 @@ class GitRepository {
 	public function find_hash_by_path( $path, $root_tree_oid = null ) {
 		if ( $root_tree_oid === null ) {
 			$head_oid = $this->get_ref_head( 'HEAD' );
-            if(!$this->has_object($head_oid)) {
-                throw new GitPathDoesNotExistException(sprintf( 'HEAD commit not found: %s', $head_oid));
-            }
-            $commit = $this->read_object( $head_oid )->as_commit();
+			if ( ! $this->has_object( $head_oid ) ) {
+				throw new GitPathDoesNotExistException( sprintf( 'HEAD commit not found: %s', $head_oid ) );
+			}
+			$commit        = $this->read_object( $head_oid )->as_commit();
 			$root_tree_oid = $commit->tree;
 		}
 
 		if ( $root_tree_oid === null ) {
-            throw new GitPathDoesNotExistException(sprintf( 'Could not resolve root tree to lookup path: %s', $path));
+			throw new GitPathDoesNotExistException( sprintf( 'Could not resolve root tree to lookup path: %s', $path ) );
 		}
 
-		$path = trim( $path, '/' );
-        $next_oid = $root_tree_oid;
+		$path     = trim( $path, '/' );
+		$next_oid = $root_tree_oid;
 
-        if(!empty($path)) {
-            $path_segments = explode( '/', $path );
-            foreach ( $path_segments as $segment ) {
-                $tree = $this->read_object( $next_oid )->as_tree();
-                if ( ! $tree->has_entry( $segment ) ) {
-                    throw new GitPathDoesNotExistException(sprintf( 'Path not found: %s', $path ));
-                }
-                $next_oid = $tree->get_entry( $segment )->hash;
-            }
-        }
+		if ( ! empty( $path ) ) {
+			$path_segments = explode( '/', $path );
+			foreach ( $path_segments as $segment ) {
+				$tree = $this->read_object( $next_oid )->as_tree();
+				if ( ! $tree->has_entry( $segment ) ) {
+					throw new GitPathDoesNotExistException( sprintf( 'Path not found: %s', $path ) );
+				}
+				$next_oid = $tree->get_entry( $segment )->hash;
+			}
+		}
 
-        return $next_oid;
+		return $next_oid;
 	}
 
-    public function new_object_open_write_stream($object_type_name, $object_length) {
-        return new GitObjectEncoder($this, $object_type_name, $object_length);
-    }
+	public function new_object_open_write_stream( $object_type_name, $object_length ) {
+		return new GitObjectEncoder( $this, $object_type_name, $object_length );
+	}
 
 	public function has_object( $oid ) {
 		return $this->fs->is_file( $this->get_storage_path( $oid ) );
 	}
 
 	public function find_objects_added_in( $new_commit_hash, $old_commit_hash = Commit::NULL_HASH, $options = array() ) {
-		$new_commit = $this->read_object( $new_commit_hash )->as_commit();
+		$new_commit       = $this->read_object( $new_commit_hash )->as_commit();
 		$old_tree_hash    = Commit::NULL_HASH;
 		$old_objects_oids = array();
 		if ( ! Commit::is_null_hash( $old_commit_hash ) ) {
-			$old_commit_repository = $options['old_commit_repository'] ?? $this;
-			$old_commit = $old_commit_repository->read_object( $old_commit_hash )->as_commit();
+			$old_commit_repository                = $options['old_commit_repository'] ?? $this;
+			$old_commit                           = $old_commit_repository->read_object( $old_commit_hash )->as_commit();
 			$old_tree_hash                        = $old_commit->tree;
 			$old_objects_oids                     = array_flip(
 				get_all_descendant_oids_in_tree( $old_commit_repository, $old_tree_hash )
@@ -217,7 +219,7 @@ class GitRepository {
 		$processed_trees = array();
 
 		while ( $new_commit_hash !== $old_commit_hash && ! Commit::is_null_hash( $new_commit_hash ) ) {
-			$new_commit = $this->read_object( $new_commit_hash )->as_commit();
+			$new_commit                           = $this->read_object( $new_commit_hash )->as_commit();
 			$new_objects_oids[ $new_commit_hash ] = true;
 			$tree_oid                             = $new_commit->tree;
 			$new_objects_oids[ $tree_oid ]        = true;
@@ -246,30 +248,30 @@ class GitRepository {
 	}
 
 	public function get_ref_head( $ref = 'HEAD', $options = array() ) {
-        while(true) {
-            if ( $this->has_object( $ref ) ) {
-                return $ref;
-            }
-            $path = $this->resolve_ref_file_path( $ref );
-            if ( ! $path ) {
-                throw new GitException( 'Failed to resolve ref file path: ' . $ref );
-            }
-            if ( ! $this->fs->is_file( $path ) ) {
-                throw new GitException( 'Ref file not found: ' . $path );
-            }
-            $ref = trim( $this->fs->get_contents( $path ) );
-            if ( str_starts_with( $ref, 'ref: ' ) && ($options['follow_symrefs'] ?? true) ) {
-                continue;
-            }
-            return $ref;
-        };
+		while ( true ) {
+			if ( $this->has_object( $ref ) ) {
+				return $ref;
+			}
+			$path = $this->resolve_ref_file_path( $ref );
+			if ( ! $path ) {
+				throw new GitException( 'Failed to resolve ref file path: ' . $ref );
+			}
+			if ( ! $this->fs->is_file( $path ) ) {
+				throw new GitException( 'Ref file not found: ' . $path );
+			}
+			$ref = trim( $this->fs->get_contents( $path ) );
+			if ( str_starts_with( $ref, 'ref: ' ) && ( $options['follow_symrefs'] ?? true ) ) {
+				continue;
+			}
+			return $ref;
+		}
 	}
 
 	private function resolve_ref_file_path( $ref ) {
 		$ref = trim( $ref );
-        if ( str_starts_with( $ref, 'ref: ' ) ) {
-            $ref = trim( substr( $ref, 5 ) );
-        }
+		if ( str_starts_with( $ref, 'ref: ' ) ) {
+			$ref = trim( substr( $ref, 5 ) );
+		}
 		if (
 			str_contains( $ref, '/' ) &&
 			! str_starts_with( $ref, 'refs/heads/' ) &&
@@ -284,10 +286,10 @@ class GitRepository {
 		}
 
 		// Make sure all the directories leading up to the ref exist
-        $parent_path = dirname( $ref );
-        if ( ! $this->fs->exists( $parent_path ) ) {
-            $this->fs->mkdir( $parent_path, ['recursive' => true] );
-        }
+		$parent_path = dirname( $ref );
+		if ( ! $this->fs->exists( $parent_path ) ) {
+			$this->fs->mkdir( $parent_path, array( 'recursive' => true ) );
+		}
 
 		return $ref;
 	}
@@ -297,12 +299,12 @@ class GitRepository {
 		return $path && $this->fs->is_file( $path );
 	}
 
-    /**
-     * Shorthand for adding an object to the repository.
-     */
+	/**
+	 * Shorthand for adding an object to the repository.
+	 */
 	public function add_object( $type_name, $content ) {
-		$object_writer = $this->new_object_open_write_stream($type_name, strlen($content));
-        $object_writer->append_bytes($content);
+		$object_writer = $this->new_object_open_write_stream( $type_name, strlen( $content ) );
+		$object_writer->append_bytes( $content );
 		$object_writer->close_writing();
 		return $object_writer->get_hash();
 	}
@@ -311,115 +313,117 @@ class GitRepository {
 		return 'objects/' . $oid[0] . $oid[1] . '/' . substr( $oid, 2 );
 	}
 
-    /**
-     * Merge two branches.
-     * 
-     * @TODO: Implement a streaming merge. The current implementation buffers
-     *        everything into memory and will fail for large merges.
-     * @TODO: Do not change the HEAD ref.
-     *
-     * @param string $ref The branch to merge.
-     * @return string The hash of the merge commit.
-     */
-    public function merge( $ref ) {
-        $commit_hash1 = $this->get_ref_head( 'HEAD' );
-        $commit_hash2 = $this->get_ref_head( $ref );
+	/**
+	 * Merge two branches.
+	 *
+	 * @TODO: Implement a streaming merge. The current implementation buffers
+	 *        everything into memory and will fail for large merges.
+	 * @TODO: Do not change the HEAD ref.
+	 *
+	 * @param string $ref The branch to merge.
+	 * @return string The hash of the merge commit.
+	 */
+	public function merge( $ref ) {
+		$commit_hash1 = $this->get_ref_head( 'HEAD' );
+		$commit_hash2 = $this->get_ref_head( $ref );
 
-        $common_ancestor_commit_hash = $this->find_first_common_ancestor( $commit_hash1, $commit_hash2 );
-        $common_ancestor_tree = $this->read_object( $common_ancestor_commit_hash )->as_commit()->tree;
-        $current_branch_diff_root = $this->diff_commits( $commit_hash1, $common_ancestor_commit_hash );
-        $merged_branch_diff_root = $this->diff_commits( $commit_hash2, $common_ancestor_commit_hash );
+		$common_ancestor_commit_hash = $this->find_first_common_ancestor( $commit_hash1, $commit_hash2 );
+		$common_ancestor_tree        = $this->read_object( $common_ancestor_commit_hash )->as_commit()->tree;
+		$current_branch_diff_root    = $this->diff_commits( $commit_hash1, $common_ancestor_commit_hash );
+		$merged_branch_diff_root     = $this->diff_commits( $commit_hash2, $common_ancestor_commit_hash );
 
-        $tree_stack = [[$merged_branch_diff_root, $current_branch_diff_root, '/']];
-        $updates = [];
-        $deletes = [];
-        while(!empty($tree_stack)) {
-            list($merged_branch_diff, $current_branch_diff, $parent_path) = array_pop($tree_stack);
-            foreach($merged_branch_diff as $name => $merged_entry) {
-                $path = wp_join_paths($parent_path, $name);
-                if($merged_entry === self::DELETE_PLACEHOLDER) {
-                    $deletes[] = $path;
-                    continue;
-                }
-                $current_entry = $current_branch_diff[$name] ?? null;
-                $is_text_diff = is_array($merged_entry->content) && isset($merged_entry->content['type']) && $merged_entry->content['type'] === 'text_diff';
-                if($is_text_diff) {
-                    $current_content = $this->read_object_by_path($path, $common_ancestor_tree)->consume_all();
-                    if(!$current_entry) {
-                        $updates[$path] = $this->diff_engine->apply_text_diff(
-                            $current_content,
-                            $merged_entry->content['diff']
-                        );
-                        continue;
-                    }
-                    $text_diffs = $this->diff_engine->three_way_merge_blob(
-                        $current_entry->content['diff'],
-                        $merged_entry->content['diff']
-                    );
-                    $merged_content = $this->diff_engine->apply_text_diff(
-                        $current_content,
-                        $text_diffs
-                    );
-                    $updates[$path] = $merged_content;
-                } else if(is_array($merged_entry->content)) {
-                    $tree_stack[] = [
-                        $merged_entry->content,
-                        $current_entry !== null ? $current_entry->content : [],
-                        $path
-                    ];
-                }
-            }
-        }
+		$tree_stack = array( array( $merged_branch_diff_root, $current_branch_diff_root, '/' ) );
+		$updates    = array();
+		$deletes    = array();
+		while ( ! empty( $tree_stack ) ) {
+			list($merged_branch_diff, $current_branch_diff, $parent_path) = array_pop( $tree_stack );
+			foreach ( $merged_branch_diff as $name => $merged_entry ) {
+				$path = wp_join_paths( $parent_path, $name );
+				if ( $merged_entry === self::DELETE_PLACEHOLDER ) {
+					$deletes[] = $path;
+					continue;
+				}
+				$current_entry = $current_branch_diff[ $name ] ?? null;
+				$is_text_diff  = is_array( $merged_entry->content ) && isset( $merged_entry->content['type'] ) && $merged_entry->content['type'] === 'text_diff';
+				if ( $is_text_diff ) {
+					$current_content = $this->read_object_by_path( $path, $common_ancestor_tree )->consume_all();
+					if ( ! $current_entry ) {
+						$updates[ $path ] = $this->diff_engine->apply_text_diff(
+							$current_content,
+							$merged_entry->content['diff']
+						);
+						continue;
+					}
+					$text_diffs       = $this->diff_engine->three_way_merge_blob(
+						$current_entry->content['diff'],
+						$merged_entry->content['diff']
+					);
+					$merged_content   = $this->diff_engine->apply_text_diff(
+						$current_content,
+						$text_diffs
+					);
+					$updates[ $path ] = $merged_content;
+				} elseif ( is_array( $merged_entry->content ) ) {
+					$tree_stack[] = array(
+						$merged_entry->content,
+						$current_entry !== null ? $current_entry->content : array(),
+						$path,
+					);
+				}
+			}
+		}
 
-        return $this->commit( array(
-            'message' => 'Merge commit ' . $commit_hash2 . ' into ' . $commit_hash1,
-            'updates' => $updates,
-            'deletes' => $deletes,
-            // @TODO: Store the second parent hash
-        ) );
-    }
+		return $this->commit(
+			array(
+				'message' => 'Merge commit ' . $commit_hash2 . ' into ' . $commit_hash1,
+				'updates' => $updates,
+				'deletes' => $deletes,
+			// @TODO: Store the second parent hash
+			)
+		);
+	}
 
-    /**
-     * Find the common ancestor of two references.
-     *
-     * TODO: Support commits with multiple parents.
-     *
-     * @param string $ref1 The first reference.
-     * @param string $ref2 The second reference.
-     * @return string|false The common ancestor hash, or false if no common ancestor is found.
-     */
-    public function find_first_common_ancestor( $commit_hash1, $commit_hash2 ) {
-        // If both refs point to the same commit, return it immediately.
-        if ( $commit_hash1 === $commit_hash2 ) {
-            return $commit_hash1;
-        }
+	/**
+	 * Find the common ancestor of two references.
+	 *
+	 * TODO: Support commits with multiple parents.
+	 *
+	 * @param string $ref1 The first reference.
+	 * @param string $ref2 The second reference.
+	 * @return string|false The common ancestor hash, or false if no common ancestor is found.
+	 */
+	public function find_first_common_ancestor( $commit_hash1, $commit_hash2 ) {
+		// If both refs point to the same commit, return it immediately.
+		if ( $commit_hash1 === $commit_hash2 ) {
+			return $commit_hash1;
+		}
 
-        // Use two pointers to traverse the commit history of both refs.
-        $visited = [];
-        while ( ! Commit::is_null_hash( $commit_hash1 ) || ! Commit::is_null_hash( $commit_hash2 ) ) {
-            if ( ! Commit::is_null_hash( $commit_hash1 ) ) {
-                if ( isset( $visited[ $commit_hash1 ] ) ) {
-                    return $commit_hash1;
-                }
-                $visited[ $commit_hash1 ] = true;
-                $commit1 = $this->read_object( $commit_hash1 )->as_commit();
-                $commit_hash1 = $commit1->get_first_parent_hash();
-            }
+		// Use two pointers to traverse the commit history of both refs.
+		$visited = array();
+		while ( ! Commit::is_null_hash( $commit_hash1 ) || ! Commit::is_null_hash( $commit_hash2 ) ) {
+			if ( ! Commit::is_null_hash( $commit_hash1 ) ) {
+				if ( isset( $visited[ $commit_hash1 ] ) ) {
+					return $commit_hash1;
+				}
+				$visited[ $commit_hash1 ] = true;
+				$commit1                  = $this->read_object( $commit_hash1 )->as_commit();
+				$commit_hash1             = $commit1->get_first_parent_hash();
+			}
 
-            if ( ! Commit::is_null_hash( $commit_hash2 ) ) {
-                if ( isset( $visited[ $commit_hash2 ] ) ) {
-                    return $commit_hash2;
-                }
-                $visited[ $commit_hash2 ] = true;
-                $commit2 = $this->read_object( $commit_hash2 )->as_commit();
-                $commit_hash2 = $commit2->get_first_parent_hash();
-            }
-        }
+			if ( ! Commit::is_null_hash( $commit_hash2 ) ) {
+				if ( isset( $visited[ $commit_hash2 ] ) ) {
+					return $commit_hash2;
+				}
+				$visited[ $commit_hash2 ] = true;
+				$commit2                  = $this->read_object( $commit_hash2 )->as_commit();
+				$commit_hash2             = $commit2->get_first_parent_hash();
+			}
+		}
 
-        // No common ancestor found.
-        throw new GitException('No common ancestor found for ' . $commit_hash1 . ' and ' . $commit_hash2);
-    }
-    
+		// No common ancestor found.
+		throw new GitException( 'No common ancestor found for ' . $commit_hash1 . ' and ' . $commit_hash2 );
+	}
+
 
 	/**
 	 * @TODO: Don't commit without a "force" option if the
@@ -441,15 +445,17 @@ class GitRepository {
 			$path     = '/' . ltrim( $path, '/' );
 			$blob_oid = $this->add_object( 'blob', $content );
 			$this->mark_tree_path_changed( $changed_trees, dirname( $path ) );
-            $basename = basename($path);
-            if($basename === '') {
-                throw new GitException('Cannot commit a file with an empty filename');
-            }
-			$changed_trees[ dirname( $path ) ]->entries[ basename( $path ) ] = new TreeEntry(array(
-				'name' => $basename,
-				'mode' => TreeEntry::FILE_MODE_REGULAR_NON_EXECUTABLE,
-				'hash' => $blob_oid,
-			));
+			$basename = basename( $path );
+			if ( $basename === '' ) {
+				throw new GitException( 'Cannot commit a file with an empty filename' );
+			}
+			$changed_trees[ dirname( $path ) ]->entries[ basename( $path ) ] = new TreeEntry(
+				array(
+					'name' => $basename,
+					'mode' => TreeEntry::FILE_MODE_REGULAR_NON_EXECUTABLE,
+					'hash' => $blob_oid,
+				)
+			);
 		}
 
 		// Process deletes
@@ -475,28 +481,30 @@ class GitRepository {
 			$this->mark_tree_path_changed( $changed_trees, dirname( $new_path ) );
 
 			$changed_trees[ dirname( $old_path ) ]->entries[ basename( $old_path ) ] = self::DELETE_PLACEHOLDER;
-            $new_basename = basename($new_path);
-            if($new_basename === '') {
-                throw new GitException('Cannot rename a file to an empty filename');
-            }
-			$changed_trees[ dirname( $new_path ) ]->entries[ $new_basename ] = new TreeEntry(array(
-				'name' => $new_basename,
-				'mode' => TreeEntry::FILE_MODE_DIRECTORY,
-				'hash' => $this->find_hash_by_path( $old_path ),
-			));
+			$new_basename = basename( $new_path );
+			if ( $new_basename === '' ) {
+				throw new GitException( 'Cannot rename a file to an empty filename' );
+			}
+			$changed_trees[ dirname( $new_path ) ]->entries[ $new_basename ] = new TreeEntry(
+				array(
+					'name' => $new_basename,
+					'mode' => TreeEntry::FILE_MODE_DIRECTORY,
+					'hash' => $this->find_hash_by_path( $old_path ),
+				)
+			);
 		}
 
 		$is_amend = isset( $options['amend'] ) && $options['amend'];
 
 		// Process trees bottom-up recursively
 		$root_tree_oid = $this->commit_tree( '/', $changed_trees );
-        $head = $this->get_ref_head( 'HEAD' );
-        if($this->has_object($head)) {
-            $current_commit = $this->read_object($head)->as_commit();
-            $old_tree_hash = $current_commit->tree;
-        } else {
-            $old_tree_hash = Commit::NULL_HASH;
-        }
+		$head          = $this->get_ref_head( 'HEAD' );
+		if ( $this->has_object( $head ) ) {
+			$current_commit = $this->read_object( $head )->as_commit();
+			$old_tree_hash  = $current_commit->tree;
+		} else {
+			$old_tree_hash = Commit::NULL_HASH;
+		}
 
 		if (
 			$root_tree_oid === $old_tree_hash &&
@@ -549,7 +557,7 @@ class GitRepository {
 	}
 
 	public function diff_trees( $current_oid, $previous_oid ) {
-		$current_tree = $this->read_object( $current_oid )->as_tree();
+		$current_tree  = $this->read_object( $current_oid )->as_tree();
 		$previous_tree = $this->read_object( $previous_oid )->as_tree();
 
 		$diff = array();
@@ -573,11 +581,13 @@ class GitRepository {
 				continue;
 			}
 
-			$diff[ $name ] = new TreeEntry(array(
-				'name' => $name,
-				'mode' => 'diff',
-				'hash' => $current_entry->hash,
-			));
+			$diff[ $name ] = new TreeEntry(
+				array(
+					'name' => $name,
+					'mode' => 'diff',
+					'hash' => $current_entry->hash,
+				)
+			);
 
 			if ( $current_entry->mode === TreeEntry::FILE_MODE_DIRECTORY ) {
 				$diff[ $name ]->content = $this->diff_trees( $current_entry->hash, $previous_entry->hash );
@@ -600,11 +610,11 @@ class GitRepository {
 	public function diff_blobs( $current_blob_entry, $previous_blob_entry ) {
 		// @TODO: Support streaming diffs for large files
 		$current_blob           = $this->read_object( $current_blob_entry->hash );
-        $current_blob_contents = $current_blob->consume_all();
+		$current_blob_contents  = $current_blob->consume_all();
 		$current_blob_is_binary = $this->guess_if_binary_blob( $current_blob_entry->name, $current_blob_contents );
 
 		$previous_blob           = $this->read_object( $previous_blob_entry->hash );
-        $previous_blob_contents = $previous_blob->consume_all();
+		$previous_blob_contents  = $previous_blob->consume_all();
 		$previous_blob_is_binary = $this->guess_if_binary_blob( $previous_blob_entry->name, $previous_blob_contents );
 
 		if ( $current_blob_is_binary && $previous_blob_is_binary ) {
@@ -659,19 +669,19 @@ class GitRepository {
 	 */
 	public function reparent_commit_range( $head_oid, $last_ancestor_oid, $new_base_oid ) {
 		// @TODO: Error handling. Exceptions would make it very convenient – maybe let's
-		//        use them internally?
+		// use them internally?
 		$commits_to_rebase = array();
 		$moving_head       = $head_oid;
 		while ( true ) {
-            $hash = $this->find_hash_by_path( $moving_head );
+			$hash                = $this->find_hash_by_path( $moving_head );
 			$commits_to_rebase[] = $hash;
 			if ( $hash === $last_ancestor_oid ) {
 				break;
 			}
 			$parent = $this->read_object( $moving_head )->as_commit()->get_first_parent_hash();
 			if ( Commit::is_null_hash( $parent ) ) {
-                throw new GitException(
-                    '$last_ancestor_oid must be an ancestor of $head_oid for reparenting to work, but ' . $last_ancestor_oid . ' is not an ancestor of ' . $hash . '.',
+				throw new GitException(
+					'$last_ancestor_oid must be an ancestor of $head_oid for reparenting to work, but ' . $last_ancestor_oid . ' is not an ancestor of ' . $hash . '.',
 				);
 			}
 			$moving_head = $parent;
@@ -759,11 +769,11 @@ class GitRepository {
 		$tree_objects = array();
 
 		// Load existing tree if it exists
-        try {
-            $tree_objects = $this->read_object_by_path( $path )->as_tree()->entries;
-        } catch (GitException $e) {
-            // It's fine if the tree doesn't exist
-        }
+		try {
+			$tree_objects = $this->read_object_by_path( $path )->as_tree()->entries;
+		} catch ( GitException $e ) {
+			// It's fine if the tree doesn't exist
+		}
 
 		// Apply any changes to this tree
 		if ( isset( $changed_trees[ $path ]->entries ) ) {
@@ -780,11 +790,13 @@ class GitRepository {
 		foreach ( $changed_trees as $child_path => $child_tree ) {
 			if ( dirname( $child_path ) === $path && $child_path !== '/' ) {
 				$child_oid                               = $this->commit_tree( $child_path, $changed_trees );
-				$tree_objects[ basename( $child_path ) ] = new TreeEntry(array(
-					'name' => basename( $child_path ),
-					'mode' => TreeEntry::FILE_MODE_DIRECTORY,
-					'hash' => $child_oid,
-				));
+				$tree_objects[ basename( $child_path ) ] = new TreeEntry(
+					array(
+						'name' => basename( $child_path ),
+						'mode' => TreeEntry::FILE_MODE_DIRECTORY,
+						'hash' => $child_oid,
+					)
+				);
 			}
 		}
 
@@ -852,4 +864,3 @@ class GitRepository {
 		return $refs;
 	}
 }
-

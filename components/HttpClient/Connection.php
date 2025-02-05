@@ -22,5 +22,4 @@ class Connection {
 
 		return $buffer;
 	}
-
 }

@@ -23,31 +23,29 @@ class TestClient extends Client {
 		return $this->requests;
 	}
 
-	public function simulateEvent($event, $request) {
-		$this->events[$request->id][$event] = true;
+	public function simulateEvent( $event, $request ) {
+		$this->events[ $request->id ][ $event ] = true;
 	}
 
-	public function simulateError($request, $error) {
-		$this->set_error($request, $error);
+	public function simulateError( $request, $error ) {
+		$this->set_error( $request, $error );
 	}
 
-	public function simulateRedirect($request, $url) {
-        $request->response = new Response($request);
-        $request->response->status_code = 301;
-        $request->response->headers = [
-            'location' => $url,
-        ];
-		$this->handle_redirects([$request]);
+	public function simulateRedirect( $request, $url ) {
+		$request->response              = new Response( $request );
+		$request->response->status_code = 301;
+		$request->response->headers     = array(
+			'location' => $url,
+		);
+		$this->handle_redirects( array( $request ) );
 	}
 
-	public function getRedirectCount($request) {
+	public function getRedirectCount( $request ) {
 		$count = 0;
-		while ($request->redirected_to) {
-			$count++;
+		while ( $request->redirected_to ) {
+			++$count;
 			$request = $request->redirected_to;
 		}
 		return $count;
 	}
-
 }
-

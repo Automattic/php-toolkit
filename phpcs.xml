@@ -4,9 +4,8 @@
     <exclude-pattern>vendor/*</exclude-pattern>
     <exclude-pattern>vendor-patched/*</exclude-pattern>
     <rule ref="PHPCompatibility">
-        <exclude name="PHPCompatibility.Keywords.ForbiddenNamesAsDeclared"/>
     </rule>
-	<rule ref="WordPress-Core">
+	<rule ref="WordPress">
         <exclude name="Generic.Commenting.DocComment.MissingShort"/>
         <exclude name="Generic.PHP.DiscourageGoto.Found"/>
         <exclude name="Generic.CodeAnalysis.EmptyStatement.DetectedIf"/>

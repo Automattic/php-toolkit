@@ -2,108 +2,113 @@
 
 namespace WordPress\Filesystem;
 
-function ls_recursive(Filesystem $filesystem, $path = '/') {
-    $tree = [];
-    foreach($filesystem->ls($path) as $item) {
-        if($filesystem->is_dir($item)) {
-            $tree[] = array(
-                'name' => $item,
-                'type' => 'dir',
-                'children' => ls_recursive($filesystem, $item),
-            );
-        } else {
-            $tree[] = array(
-                'name' => $item,
-                'type' => 'file',
-            );
-        }
-    }
-    return $tree;
+function ls_recursive( Filesystem $filesystem, $path = '/' ) {
+	$tree = array();
+	foreach ( $filesystem->ls( $path ) as $item ) {
+		if ( $filesystem->is_dir( $item ) ) {
+			$tree[] = array(
+				'name' => $item,
+				'type' => 'dir',
+				'children' => ls_recursive( $filesystem, $item ),
+			);
+		} else {
+			$tree[] = array(
+				'name' => $item,
+				'type' => 'file',
+			);
+		}
+	}
+	return $tree;
 }
 
-function copy_between_filesystems(array $args) {
-    /**
-     * @var Filesystem $source
-     * @var Filesystem $destination
-     */
-    $source = $args['source_filesystem'];
-    $source_path = $args['source_path'] ?? '/';
-    $destination = $args['target_filesystem'];
-    $destination_path = $args['target_path'] ?? '/';
-    $recursive = $args['recursive'] ?? true;
+function copy_between_filesystems( array $args ) {
+	/**
+	 * @var Filesystem $source
+	 * @var Filesystem $destination
+	 */
+	$source           = $args['source_filesystem'];
+	$source_path      = $args['source_path'] ?? '/';
+	$destination      = $args['target_filesystem'];
+	$destination_path = $args['target_path'] ?? '/';
+	$recursive        = $args['recursive'] ?? true;
 
-    if($source->is_file($source_path)) {
-        $to_stream = $destination->open_write_stream($destination_path);
-        try {
-            $from_stream = $source->open_read_stream($source_path);
-            try {
-                $chunks_written = 0;
-                while(!$from_stream->reached_end_of_data()) {
-                    $available = $from_stream->pull(8192);
-                    $to_stream->append_bytes($from_stream->consume($available), $to_stream);
-                    $chunks_written++;
-                }
-                if($chunks_written === 0) {
-                    // Make sure the file receives at least one chunk
-                    // so we can be sure it gets created in case the
-                    // destination filesystem is lazy.
-                    $to_stream->append_bytes('');
-                }
-            } finally {
-                $from_stream->close_reading();
-            }
-        } finally {
-            $to_stream->close_writing();
-        }
-    } else if($source->is_dir($source_path)) {
-        if(!$recursive) {
-            throw new FilesystemException( 'Cannot copy a directory. Set the option `recursive` to true to copy directories recursively.' );
-        }
-        if(!$destination->is_dir($destination_path)) {
-            $destination->mkdir($destination_path, [
-                'recursive' => true,
-            ]);
-        }
-        foreach($source->ls($source_path) as $item) {
-            copy_between_filesystems([
-                'source_filesystem' => $source,
-                'source_path' => wp_join_paths($source_path, $item),
-                'target_filesystem' => $destination,
-                'target_path' => wp_join_paths($destination_path, $item)
-            ]);
-        }
-    } else {
-        throw new FilesystemException('Path does not exist in the source filesystem: ' . $source_path);
-    }
+	if ( $source->is_file( $source_path ) ) {
+		$to_stream = $destination->open_write_stream( $destination_path );
+		try {
+			$from_stream = $source->open_read_stream( $source_path );
+			try {
+				$chunks_written = 0;
+				while ( ! $from_stream->reached_end_of_data() ) {
+					$available = $from_stream->pull( 8192 );
+					$to_stream->append_bytes( $from_stream->consume( $available ), $to_stream );
+					++$chunks_written;
+				}
+				if ( $chunks_written === 0 ) {
+					// Make sure the file receives at least one chunk
+					// so we can be sure it gets created in case the
+					// destination filesystem is lazy.
+					$to_stream->append_bytes( '' );
+				}
+			} finally {
+				$from_stream->close_reading();
+			}
+		} finally {
+			$to_stream->close_writing();
+		}
+	} elseif ( $source->is_dir( $source_path ) ) {
+		if ( ! $recursive ) {
+			throw new FilesystemException( 'Cannot copy a directory. Set the option `recursive` to true to copy directories recursively.' );
+		}
+		if ( ! $destination->is_dir( $destination_path ) ) {
+			$destination->mkdir(
+				$destination_path,
+				array(
+					'recursive' => true,
+				)
+			);
+		}
+		foreach ( $source->ls( $source_path ) as $item ) {
+			copy_between_filesystems(
+				array(
+					'source_filesystem' => $source,
+					'source_path' => wp_join_paths( $source_path, $item ),
+					'target_filesystem' => $destination,
+					'target_path' => wp_join_paths( $destination_path, $item ),
+				)
+			);
+		}
+	} else {
+		throw new FilesystemException( 'Path does not exist in the source filesystem: ' . $source_path );
+	}
 }
 
-function wp_path_segments($path) {
-    $canonicalized = wp_canonicalize_path($path);
-    $without_slashes = trim($canonicalized, '/');
-    return explode('/', $without_slashes);
+function wp_path_segments( $path ) {
+	$canonicalized   = wp_canonicalize_path( $path );
+	$without_slashes = trim( $canonicalized, '/' );
+	return explode( '/', $without_slashes );
 }
 
-function wp_parent_paths($path, $options = []) {
-    $include_self = $options['include_self'] ?? false;
-    $path = '/' . trim($path, '/');
-    $segments = wp_path_segments($path);
-    $paths = ['/'];
-    yield '/';
-    for($i = 0; $i < count($segments) - 1; $i++) {
-        $paths[] = $segments[$i];
-        yield wp_join_paths(...$paths);
-    }
-    if($include_self) {
-        yield $path;
-    }
+function wp_parent_paths( $path, $options = array() ) {
+	$include_self = $options['include_self'] ?? false;
+	$path         = '/' . trim( $path, '/' );
+	$segments     = wp_path_segments( $path );
+	$paths        = array( '/' );
+	yield '/';
+	for ( $i = 0; $i < count( $segments ) - 1; $i++ ) {
+		$paths[] = $segments[ $i ];
+		yield wp_join_paths( ...$paths );
+	}
+	if ( $include_self ) {
+		yield $path;
+	}
 }
 
 /**
  * Joins multiple path segments together into a single path.
- * 
+ *
  * Removes any double slashes between path segments.
  */
-function wp_join_paths(...$path_segments) {
+function wp_join_paths( ...$path_segments ) {
 	$paths = array();
 	foreach ( $path_segments as $path_segment ) {
 		if ( $path_segment !== '' ) {
@@ -117,13 +122,13 @@ function wp_join_paths(...$path_segments) {
 
 /**
  * Cleans up a file path.
- * 
+ *
  * - Ensures it starts with a forward slash
  * - Removes the /./ segments
  * - Flattens the /../ segments
- * 
+ *
  * Example:
- * 
+ *
  * wp_canonicalize_path( 'foo/bar/../baz' ) => '/foo/baz'
  *
  * @param string $path The file path that needs cleaning up

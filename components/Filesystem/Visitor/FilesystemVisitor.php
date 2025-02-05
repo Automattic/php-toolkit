@@ -13,11 +13,11 @@ class FilesystemVisitor {
 	private $current_iterator;
 	private $depth = -1;
 
-    public function __construct( Filesystem $filesystem ) {
-		$this->filesystem = $filesystem;
+	public function __construct( Filesystem $filesystem ) {
+		$this->filesystem       = $filesystem;
 		$this->iterator_stack[] = $this->create_iterator();
 	}
-	
+
 	public function get_current_depth() {
 		return $this->depth;
 	}
@@ -61,12 +61,12 @@ class FilesystemVisitor {
 		$this->files       = array();
 
 		$filesystem = $this->filesystem;
-		$children = $filesystem->ls($dir);
+		$children   = $filesystem->ls( $dir );
 		if ( $children === false ) {
 			return new \ArrayIterator( array() );
 		}
 
-		foreach($children as $child) {
+		foreach ( $children as $child ) {
 			if ( $filesystem->is_dir( $dir . '/' . $child ) ) {
 				$this->directories[] = $child;
 				continue;
@@ -74,14 +74,13 @@ class FilesystemVisitor {
 			$this->files[] = $child;
 		}
 
-		$events = array();
+		$events   = array();
 		$events[] = new FileVisitorEvent( FileVisitorEvent::EVENT_ENTER, $dir, $this->files );
-		$prefix = $dir === '/' ? '' : $dir;
+		$prefix   = $dir === '/' ? '' : $dir;
 		foreach ( $this->directories as $directory ) {
 			$events[] = $prefix . '/' . $directory; // Placeholder for recursion
 		}
 		$events[] = new FileVisitorEvent( FileVisitorEvent::EVENT_EXIT, $dir );
 		return new \ArrayIterator( $events );
 	}
-
 }

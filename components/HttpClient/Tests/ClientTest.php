@@ -9,27 +9,31 @@ use WordPress\HttpClient\Request;
 
 class ClientTest extends \PHPUnit\Framework\TestCase {
 
-    public function testInitialization() {
-        $client = new TestClient();
-        $this->assertEquals(10, $client->getConcurrency());
-        $this->assertEquals(3, $client->getMaxRedirects());
-        $this->assertEquals(10, $client->getTimeout());
-    }
+	public function testInitialization() {
+		$client = new TestClient();
+		$this->assertEquals( 10, $client->getConcurrency() );
+		$this->assertEquals( 3, $client->getMaxRedirects() );
+		$this->assertEquals( 10, $client->getTimeout() );
+	}
 
-    /**
-     * @dataProvider gzip_provider
-     */
-    public function test_streaming_body_with_chunked_encoding($use_gzip) {
-        $this->withDevServer(function($address) use ($use_gzip) {
-            $client = new TestClient();
-            $request = new Request($address, [
-                'headers' => [
-                    'Accept-Encoding' => 'identity' // $use_gzip ? 'gzip' : 'identity'
-                ],
-            ]);
-            $body = $client->fetch($request);
-            $entire_body = $body->consume_all();
-            $expected_body = <<<BODY
+	/**
+	 * @dataProvider gzip_provider
+	 */
+	public function test_streaming_body_with_chunked_encoding( $use_gzip ) {
+		$this->withDevServer(
+			function ( $address ) use ( $use_gzip ) {
+				$client        = new TestClient();
+				$request       = new Request(
+					$address,
+					array(
+						'headers' => array(
+							'Accept-Encoding' => 'identity', // $use_gzip ? 'gzip' : 'identity'
+						),
+					)
+				);
+				$body          = $client->fetch( $request );
+				$entire_body   = $body->consume_all();
+				$expected_body = <<<BODY
             <!DOCTYPE html>
             <html lang=en>
             <head>
@@ -43,77 +47,82 @@ class ClientTest extends \PHPUnit\Framework\TestCase {
             </html>
 
             BODY;
-            $this->assertEquals($expected_body, $entire_body);
-            $this->assertTrue($body->reached_end_of_data());
-        });
-    }
+				$this->assertEquals( $expected_body, $entire_body );
+				$this->assertTrue( $body->reached_end_of_data() );
+			}
+		);
+	}
 
-    public function gzip_provider() {
-        return [
-            'without gzip' => [false],
-            'with gzip' => [true]
-        ];
-    }
+	public function gzip_provider() {
+		return array(
+			'without gzip' => array( false ),
+			'with gzip' => array( true ),
+		);
+	}
 
-    private function withDevServer(callable $callback) {
-        $result = $this->start_dev_server();
-        $server = $result['server'];
-        $address = $result['address'];
-        try {
-            $callback($address);
-        } finally {
-            proc_terminate($server);
-        }
-    }
+	private function withDevServer( callable $callback ) {
+		$result  = $this->start_dev_server();
+		$server  = $result['server'];
+		$address = $result['address'];
+		try {
+			$callback( $address );
+		} finally {
+			proc_terminate( $server );
+		}
+	}
 
-    private function start_dev_server() {
-        $server = proc_open('node ' . dirname(__DIR__) . '/chunked_encoding_server.js', [
-            0 => ['pipe', 'r'],
-            1 => ['pipe', 'w'],
-            2 => ['pipe', 'w']
-        ], $pipes);
+	private function start_dev_server() {
+		$server = proc_open(
+			'node ' . dirname( __DIR__ ) . '/chunked_encoding_server.js',
+			array(
+				0 => array( 'pipe', 'r' ),
+				1 => array( 'pipe', 'w' ),
+				2 => array( 'pipe', 'w' ),
+			),
+			$pipes
+		);
 
-        stream_set_blocking($pipes[1], false);
-        stream_set_blocking($pipes[2], false);
+		stream_set_blocking( $pipes[1], false );
+		stream_set_blocking( $pipes[2], false );
 
-        $output = '';
-        $start_time = microtime(true);
-        while (true) {
-            if (microtime(true) - $start_time > 2) {
-                break;
-            }
-            if(!is_resource($server)) {
-                $this->fail('Failed to start chunked encoding test server');
-            }
-            $errors = fread($pipes[2], 8192);
-            if($errors) {
-                $this->fail('Failed to start chunked encoding dev server: ' . $errors);
-            }
-            if(feof($pipes[1])) {
-                $this->fail('Failed to start chunked encoding dev server');
-            }
-            $output .= fread($pipes[1], 8192);
-            if (str_contains($output, 'Server is listening on')) {
-                break;
-            }
-        }
+		$output     = '';
+		$start_time = microtime( true );
+		while ( true ) {
+			if ( microtime( true ) - $start_time > 2 ) {
+				break;
+			}
+			if ( ! is_resource( $server ) ) {
+				$this->fail( 'Failed to start chunked encoding test server' );
+			}
+			$errors = fread( $pipes[2], 8192 );
+			if ( $errors ) {
+				$this->fail( 'Failed to start chunked encoding dev server: ' . $errors );
+			}
+			if ( feof( $pipes[1] ) ) {
+				$this->fail( 'Failed to start chunked encoding dev server' );
+			}
+			$output .= fread( $pipes[1], 8192 );
+			if ( str_contains( $output, 'Server is listening on' ) ) {
+				break;
+			}
+		}
 
-        if (!str_contains($output, 'Server is listening on')) {
-            $this->fail('Failed to start chunked encoding dev server');
-        }
+		if ( ! str_contains( $output, 'Server is listening on' ) ) {
+			$this->fail( 'Failed to start chunked encoding dev server' );
+		}
 
-        $port = explode('http://127.0.0.1:', $output)[1];
-        $port = substr($port, 0, strpos($port, "\n"));
-        $address = 'http://127.0.0.1:' . $port;
+		$port    = explode( 'http://127.0.0.1:', $output )[1];
+		$port    = substr( $port, 0, strpos( $port, "\n" ) );
+		$address = 'http://127.0.0.1:' . $port;
 
-        return [
-            'server' => $server,
-            'address' => $address,
-        ];
-    }
+		return array(
+			'server' => $server,
+			'address' => $address,
+		);
+	}
 
-    public function test_streaming_body() {
-        $reference = <<<PYGMALION
+	public function test_streaming_body() {
+		$reference = <<<PYGMALION
         PREFACE TO PYGMALION.
 
         A Professor of Phonetics.
@@ -165,83 +174,82 @@ class ClientTest extends \PHPUnit\Framework\TestCase {
         would not suffer fools gladly.
         PYGMALION;
 
-        // @TODO: Use a local dev server instead of relying on an external service
-        $pygmalion_url = 'https://gist.githubusercontent.com/adamziel/f6cdffb3b4a8a8ccfd10e72cde1f9078/raw/cfbf4bf236dcf13fed5eb4e8babf40ae791326eb/pygmalion.md';
-        $client = new TestClient();
-        $request = new Request($pygmalion_url);
-        $body = $client->fetch($request);
+		// @TODO: Use a local dev server instead of relying on an external service
+		$pygmalion_url = 'https://gist.githubusercontent.com/adamziel/f6cdffb3b4a8a8ccfd10e72cde1f9078/raw/cfbf4bf236dcf13fed5eb4e8babf40ae791326eb/pygmalion.md';
+		$client        = new TestClient();
+		$request       = new Request( $pygmalion_url );
+		$body          = $client->fetch( $request );
 
-        $accumulated = '';
+		$accumulated = '';
 
-        // Get a 100 bytes and confirm they're what we expect
-        $body->pull(100);
-        $accumulated .= $body->consume(100);
-        $this->assertEquals(100, strlen($accumulated));
+		// Get a 100 bytes and confirm they're what we expect
+		$body->pull( 100 );
+		$accumulated .= $body->consume( 100 );
+		$this->assertEquals( 100, strlen( $accumulated ) );
 
-        // Get another 100 bytes and confirm they're what we expect
-        $body->pull(100);
-        $accumulated .= $body->consume(100);
-        $this->assertEquals(200, strlen($accumulated));
+		// Get another 100 bytes and confirm they're what we expect
+		$body->pull( 100 );
+		$accumulated .= $body->consume( 100 );
+		$this->assertEquals( 200, strlen( $accumulated ) );
 
-        // Get the rest of the data and confirm that it all matches the
-        // expected Pygmalion fragment.
-        $accumulated .= $body->consume_all();
-        $this->assertEquals(3108, strlen($accumulated));
+		// Get the rest of the data and confirm that it all matches the
+		// expected Pygmalion fragment.
+		$accumulated .= $body->consume_all();
+		$this->assertEquals( 3108, strlen( $accumulated ) );
 
-        $this->assertEquals($reference, $accumulated);
-        $this->assertTrue($body->reached_end_of_data());
-    }
+		$this->assertEquals( $reference, $accumulated );
+		$this->assertTrue( $body->reached_end_of_data() );
+	}
 
-    public function testEnqueueRequests() {
-        $client = new TestClient();
-        $request = new Request('https://wordpress.org');
-        $client->enqueue($request);
+	public function testEnqueueRequests() {
+		$client  = new TestClient();
+		$request = new Request( 'https://wordpress.org' );
+		$client->enqueue( $request );
 
-        $this->assertCount(1, $client->getRequests());
-    }
+		$this->assertCount( 1, $client->getRequests() );
+	}
 
-    public function testFetchMethod() {
-        $client = new TestClient();
-        $request = new Request('https://wordpress.org');
-        $reader = $client->fetch($request);
+	public function testFetchMethod() {
+		$client  = new TestClient();
+		$request = new Request( 'https://wordpress.org' );
+		$reader  = $client->fetch( $request );
 
-        $this->assertInstanceOf(RequestReadStream::class, $reader);
-    }
+		$this->assertInstanceOf( RequestReadStream::class, $reader );
+	}
 
-    public function testAwaitNextEvent() {
-        $client = new TestClient();
-        $request = new Request('https://wordpress.org');
-        $client->enqueue($request);
+	public function testAwaitNextEvent() {
+		$client  = new TestClient();
+		$request = new Request( 'https://wordpress.org' );
+		$client->enqueue( $request );
 
-        // Simulate an event
-        $client->simulateEvent(Client::EVENT_GOT_HEADERS, $request);
+		// Simulate an event
+		$client->simulateEvent( Client::EVENT_GOT_HEADERS, $request );
 
-        $this->assertTrue($client->await_next_event());
-        $this->assertEquals(Client::EVENT_GOT_HEADERS, $client->get_event());
-    }
+		$this->assertTrue( $client->await_next_event() );
+		$this->assertEquals( Client::EVENT_GOT_HEADERS, $client->get_event() );
+	}
 
-    public function testErrorHandling() {
-        $client = new TestClient();
-        $request = new Request('https://no-such-site.wordpress.org/');
-        $client->enqueue($request);
+	public function testErrorHandling() {
+		$client  = new TestClient();
+		$request = new Request( 'https://no-such-site.wordpress.org/' );
+		$client->enqueue( $request );
 
-        // Simulate an error
-        $client->simulateError($request, new HttpError('Test error'));
-        $this->assertTrue($client->await_next_event());
+		// Simulate an error
+		$client->simulateError( $request, new HttpError( 'Test error' ) );
+		$this->assertTrue( $client->await_next_event() );
 
-        $this->assertEquals(Request::STATE_FAILED, $request->state);
-    }
+		$this->assertEquals( Request::STATE_FAILED, $request->state );
+	}
 
-    public function testRedirectHandling() {
-        $client = new TestClient(['max_redirects' => 2]);
-        $request = new Request('https://wordpress.org');
-        $client->enqueue($request);
+	public function testRedirectHandling() {
+		$client  = new TestClient( array( 'max_redirects' => 2 ) );
+		$request = new Request( 'https://wordpress.org' );
+		$client->enqueue( $request );
 
-        // Simulate a redirect
-        $client->simulateRedirect($request, 'https://redirected.com');
-        $client->await_next_event();
+		// Simulate a redirect
+		$client->simulateRedirect( $request, 'https://redirected.com' );
+		$client->await_next_event();
 
-        $this->assertEquals(1, $client->getRedirectCount($request));
-    }
-
+		$this->assertEquals( 1, $client->getRedirectCount( $request ) );
+	}
 }

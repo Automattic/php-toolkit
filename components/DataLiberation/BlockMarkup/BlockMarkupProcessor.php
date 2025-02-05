@@ -73,6 +73,7 @@ class BlockMarkupProcessor extends WP_HTML_Tag_Processor {
 
 	/**
 	 * Iterator for traversing nested block attributes
+	 *
 	 * @var \RecursiveIteratorIterator
 	 */
 	private $block_attributes_iterator;

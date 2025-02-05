@@ -41,49 +41,48 @@ class CentralDirectoryEntry {
 	const HEADER_SIZE = 42;
 
 	public $firstByteAt;
-	public $versionCreated = 2;
-	public $versionNeeded = 2;
-	public $generalPurpose = 0;
+	public $versionCreated    = 2;
+	public $versionNeeded     = 2;
+	public $generalPurpose    = 0;
 	public $compressionMethod = 0;
-	public $lastModifiedTime = 0;
-	public $lastModifiedDate = 0;
+	public $lastModifiedTime  = 0;
+	public $lastModifiedDate  = 0;
 	public $crc;
 	public $compressedSize;
 	public $uncompressedSize;
-	public $diskNumber = 0;
+	public $diskNumber         = 0;
 	public $internalAttributes = 0;
 	public $externalAttributes = 0;
-    public $pathLength;
-    public $extraLength;
-    public $fileCommentLength;
+	public $pathLength;
+	public $extraLength;
+	public $fileCommentLength;
 	public $path;
 	public $extra;
 	public $fileComment;
 
-	public function __construct($header_fields) {
-		$valid_properties = array_keys(get_object_vars($this));
-        foreach($header_fields as $key => $value) {
-            if(!in_array($key, $valid_properties)) {
-                throw new \InvalidArgumentException("Invalid property: $key. Expected one of: " . implode(', ', $valid_properties));
-            }
-            $this->$key = $value;
-        }
+	public function __construct( $header_fields ) {
+		$valid_properties = array_keys( get_object_vars( $this ) );
+		foreach ( $header_fields as $key => $value ) {
+			if ( ! in_array( $key, $valid_properties ) ) {
+				throw new \InvalidArgumentException( "Invalid property: $key. Expected one of: " . implode( ', ', $valid_properties ) );
+			}
+			$this->$key = $value;
+		}
 
-        if(null !== $this->path) {
-            $this->pathLength = strlen($this->path);
-        }
+		if ( null !== $this->path ) {
+			$this->pathLength = strlen( $this->path );
+		}
 
-        if(null !== $this->extra) {
-            $this->extraLength = strlen($this->extra);
-        }
+		if ( null !== $this->extra ) {
+			$this->extraLength = strlen( $this->extra );
+		}
 
-        if(null !== $this->fileComment) {
-            $this->fileCommentLength = strlen($this->fileComment);
-        }
+		if ( null !== $this->fileComment ) {
+			$this->fileCommentLength = strlen( $this->fileComment );
+		}
 	}
 
-    public function is_directory() {
-        return str_ends_with($this->path, '/');
-    }
-
+	public function is_directory() {
+		return str_ends_with( $this->path, '/' );
+	}
 }

@@ -258,7 +258,7 @@ class BlockMarkupUrlProcessor extends BlockMarkupProcessor {
 		}
 		if ( ! $new_raw_url ) {
 			// @TODO: When does this happen? Let's add the test coverage and
-			//        doubly verify the logic.
+			// doubly verify the logic.
 			return false;
 		}
 
@@ -266,8 +266,8 @@ class BlockMarkupUrlProcessor extends BlockMarkupProcessor {
 			// The URL-rewriting specific logic. We make an assumption that only
 			// absolute URLs are detected in text nodes.
 			// @TODO: Verify this assumption, evaluate whether this is the right
-			//        place to place this logic. Perhaps this *method* could be
-			//        decoupled into two separate *functions*?
+			// place to place this logic. Perhaps this *method* could be
+			// decoupled into two separate *functions*?
 			$this->get_token_type() !== '#text' &&
 			! str_starts_with( $this->get_raw_url(), 'http://' ) &&
 			! str_starts_with( $this->get_raw_url(), 'https://' )

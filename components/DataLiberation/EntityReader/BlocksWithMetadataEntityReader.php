@@ -99,11 +99,11 @@ class BlocksWithMetadataEntityReader implements EntityReader {
 		return $this->finished;
 	}
 
-    /**
-     * @TODO: Implement this
-     * @return string
-     */
-    public function get_reentrancy_cursor() {
-        return '';
-    }
+	/**
+	 * @TODO: Implement this
+	 * @return string
+	 */
+	public function get_reentrancy_cursor() {
+		return '';
+	}
 }

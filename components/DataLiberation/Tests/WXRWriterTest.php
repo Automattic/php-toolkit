@@ -7,40 +7,43 @@ use WordPress\DataLiberation\ImportEntity;
 
 class WXRWriterTest extends TestCase {
 
-    private $wxr_writer;
-    private $memory_pipe;
+	private $wxr_writer;
+	private $memory_pipe;
 
-    protected function setUp(): void {
-        $this->memory_pipe = new MemoryPipe();
-        $this->wxr_writer = new WXRWriter($this->memory_pipe);
-    }
+	protected function setUp(): void {
+		$this->memory_pipe = new MemoryPipe();
+		$this->wxr_writer  = new WXRWriter( $this->memory_pipe );
+	}
 
-    public function testAppendEntityPost() {
-        $entity = new ImportEntity('post', [
-            'post_title' => 'Test Post',
-            'post_date' => '2023-10-01',
-            'guid' => '12345',
-            'description' => 'Test Description',
-            'content' => 'Test Content',
-            'excerpt' => 'Test Excerpt',
-            'post_id' => '1',
-            'post_date_gmt' => '2023-10-01T00:00:00',
-            'comment_status' => 'open',
-            'ping_status' => 'open',
-            'post_name' => 'test-post',
-            'status' => 'publish',
-            'post_parent' => '0',
-            'menu_order' => '0',
-            'post_type' => 'post',
-            'post_password' => '',
-            'is_sticky' => '0'
-        ]);
-        $this->wxr_writer->append_entity($entity);
-        $this->wxr_writer->finalize();
-        $this->wxr_writer->close_writing();
-        $this->memory_pipe->close_writing();
+	public function testAppendEntityPost() {
+		$entity = new ImportEntity(
+			'post',
+			array(
+				'post_title' => 'Test Post',
+				'post_date' => '2023-10-01',
+				'guid' => '12345',
+				'description' => 'Test Description',
+				'content' => 'Test Content',
+				'excerpt' => 'Test Excerpt',
+				'post_id' => '1',
+				'post_date_gmt' => '2023-10-01T00:00:00',
+				'comment_status' => 'open',
+				'ping_status' => 'open',
+				'post_name' => 'test-post',
+				'status' => 'publish',
+				'post_parent' => '0',
+				'menu_order' => '0',
+				'post_type' => 'post',
+				'post_password' => '',
+				'is_sticky' => '0',
+			)
+		);
+		$this->wxr_writer->append_entity( $entity );
+		$this->wxr_writer->finalize();
+		$this->wxr_writer->close_writing();
+		$this->memory_pipe->close_writing();
 
-        $expected = <<<XML
+		$expected = <<<XML
 <?xml version="1.0" encoding="UTF-8" ?>
 <rss version="2.0" xmlns:excerpt="http://wordpress.org/export/1.2/excerpt/" xmlns:content="http://purl.org/rss/1.0/modules/content/" xmlns:wfw="http://wellformedweb.org/CommentAPI/" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:wp="http://wordpress.org/export/1.2/">
 <channel>
@@ -68,58 +71,78 @@ class WXRWriterTest extends TestCase {
 </rss>
 
 XML;
-        $this->assertEquals($expected, $this->memory_pipe->consume_all());
-    }
+		$this->assertEquals( $expected, $this->memory_pipe->consume_all() );
+	}
 
-    public function testAppendEntityPostWithMetaTermsComments() {
-        $post = new ImportEntity('post', [
-            'post_title' => 'Test Post',
-            'post_date' => '2023-10-01',
-            'guid' => '12345',
-            'description' => 'Test Description',
-            'content' => 'Test Content',
-            'excerpt' => 'Test Excerpt',
-            'post_id' => '1',
-            'post_date_gmt' => '2023-10-01T00:00:00',
-            'comment_status' => 'open',
-            'ping_status' => 'open',
-            'post_name' => 'test-post',
-            'status' => 'publish',
-            'post_parent' => '0',
-            'menu_order' => '0',
-            'post_type' => 'post',
-            'post_password' => '',
-            'is_sticky' => '0'
-        ]);
-        $this->wxr_writer->append_entity($post);
+	public function testAppendEntityPostWithMetaTermsComments() {
+		$post = new ImportEntity(
+			'post',
+			array(
+				'post_title' => 'Test Post',
+				'post_date' => '2023-10-01',
+				'guid' => '12345',
+				'description' => 'Test Description',
+				'content' => 'Test Content',
+				'excerpt' => 'Test Excerpt',
+				'post_id' => '1',
+				'post_date_gmt' => '2023-10-01T00:00:00',
+				'comment_status' => 'open',
+				'ping_status' => 'open',
+				'post_name' => 'test-post',
+				'status' => 'publish',
+				'post_parent' => '0',
+				'menu_order' => '0',
+				'post_type' => 'post',
+				'post_password' => '',
+				'is_sticky' => '0',
+			)
+		);
+		$this->wxr_writer->append_entity( $post );
 
-        $post_meta = new ImportEntity('post_meta', ['meta_key' => 'key', 'meta_value' => 'value']);
-        $this->wxr_writer->append_entity($post_meta);
+		$post_meta = new ImportEntity(
+			'post_meta',
+			array(
+				'meta_key' => 'key',
+				'meta_value' => 'value',
+			)
+		);
+		$this->wxr_writer->append_entity( $post_meta );
 
-        $term = new ImportEntity('term', ['term_id' => '1', 'taxonomy' => 'category', 'slug' => 'test-term', 'parent' => '0']);
-        $this->wxr_writer->append_entity($term);
+		$term = new ImportEntity(
+			'term',
+			array(
+				'term_id' => '1',
+				'taxonomy' => 'category',
+				'slug' => 'test-term',
+				'parent' => '0',
+			)
+		);
+		$this->wxr_writer->append_entity( $term );
 
-        $comment = new ImportEntity('comment', [
-            'comment_id' => '1',
-            'comment_author' => 'Author',
-            'comment_author_email' => 'author@example.com',
-            'comment_author_url' => 'http://example.com',
-            'comment_author_IP' => '127.0.0.1',
-            'comment_date' => '2023-10-01',
-            'comment_date_gmt' => '2023-10-01T00:00:00',
-            'comment_content' => 'Content',
-            'comment_approved' => '1',
-            'comment_type' => '',
-            'comment_parent' => '0',
-            'comment_user_id' => '1'
-        ]);
-        $this->wxr_writer->append_entity($comment);
+		$comment = new ImportEntity(
+			'comment',
+			array(
+				'comment_id' => '1',
+				'comment_author' => 'Author',
+				'comment_author_email' => 'author@example.com',
+				'comment_author_url' => 'http://example.com',
+				'comment_author_IP' => '127.0.0.1',
+				'comment_date' => '2023-10-01',
+				'comment_date_gmt' => '2023-10-01T00:00:00',
+				'comment_content' => 'Content',
+				'comment_approved' => '1',
+				'comment_type' => '',
+				'comment_parent' => '0',
+				'comment_user_id' => '1',
+			)
+		);
+		$this->wxr_writer->append_entity( $comment );
 
-        $this->wxr_writer->finalize();
-        $this->wxr_writer->close_writing();
-        $this->memory_pipe->close_writing();
+		$this->wxr_writer->finalize();
+		$this->wxr_writer->close_writing();
+		$this->memory_pipe->close_writing();
 
-        $expected = <<<XML
+		$expected = <<<XML
 <?xml version="1.0" encoding="UTF-8" ?>
 <rss version="2.0" xmlns:excerpt="http://wordpress.org/export/1.2/excerpt/" xmlns:content="http://purl.org/rss/1.0/modules/content/" xmlns:wfw="http://wellformedweb.org/CommentAPI/" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:wp="http://wordpress.org/export/1.2/">
 <channel>
@@ -173,142 +196,163 @@ XML;
 </rss>
 
 XML;
-        $this->assertEquals($expected, $this->memory_pipe->consume_all());
-    }
+		$this->assertEquals( $expected, $this->memory_pipe->consume_all() );
+	}
 
-    public function testAppendMultiplePostsWithComments() {
-        $post1 = new ImportEntity('post', [
-            'post_title' => 'Post 1',
-            'post_date' => '2023-10-01',
-            'guid' => '12345',
-            'description' => 'Description 1',
-            'content' => 'Content 1',
-            'excerpt' => 'Excerpt 1',
-            'post_id' => '1',
-            'post_date_gmt' => '2023-10-01T00:00:00',
-            'comment_status' => 'open',
-            'ping_status' => 'open',
-            'post_name' => 'post-1',
-            'status' => 'publish',
-            'post_parent' => '0',
-            'menu_order' => '0',
-            'post_type' => 'post',
-            'post_password' => '',
-            'is_sticky' => '0'
-        ]);
-        $this->wxr_writer->append_entity($post1);
+	public function testAppendMultiplePostsWithComments() {
+		$post1 = new ImportEntity(
+			'post',
+			array(
+				'post_title' => 'Post 1',
+				'post_date' => '2023-10-01',
+				'guid' => '12345',
+				'description' => 'Description 1',
+				'content' => 'Content 1',
+				'excerpt' => 'Excerpt 1',
+				'post_id' => '1',
+				'post_date_gmt' => '2023-10-01T00:00:00',
+				'comment_status' => 'open',
+				'ping_status' => 'open',
+				'post_name' => 'post-1',
+				'status' => 'publish',
+				'post_parent' => '0',
+				'menu_order' => '0',
+				'post_type' => 'post',
+				'post_password' => '',
+				'is_sticky' => '0',
+			)
+		);
+		$this->wxr_writer->append_entity( $post1 );
 
-        $post2 = new ImportEntity('post', [
-            'post_title' => 'Post 2',
-            'post_date' => '2023-10-02',
-            'guid' => '12346',
-            'description' => 'Description 2',
-            'content' => 'Content 2',
-            'excerpt' => 'Excerpt 2',
-            'post_id' => '2',
-            'post_date_gmt' => '2023-10-02T00:00:00',
-            'comment_status' => 'open',
-            'ping_status' => 'open',
-            'post_name' => 'post-2',
-            'status' => 'publish',
-            'post_parent' => '0',
-            'menu_order' => '0',
-            'post_type' => 'post',
-            'post_password' => '',
-            'is_sticky' => '0'
-        ]);
-        $this->wxr_writer->append_entity($post2);
+		$post2 = new ImportEntity(
+			'post',
+			array(
+				'post_title' => 'Post 2',
+				'post_date' => '2023-10-02',
+				'guid' => '12346',
+				'description' => 'Description 2',
+				'content' => 'Content 2',
+				'excerpt' => 'Excerpt 2',
+				'post_id' => '2',
+				'post_date_gmt' => '2023-10-02T00:00:00',
+				'comment_status' => 'open',
+				'ping_status' => 'open',
+				'post_name' => 'post-2',
+				'status' => 'publish',
+				'post_parent' => '0',
+				'menu_order' => '0',
+				'post_type' => 'post',
+				'post_password' => '',
+				'is_sticky' => '0',
+			)
+		);
+		$this->wxr_writer->append_entity( $post2 );
 
-        $comment1 = new ImportEntity('comment', [
-            'comment_id' => '1',
-            'comment_author' => 'Author 1',
-            'comment_author_email' => 'author1@example.com',
-            'comment_author_url' => 'http://example.com',
-            'comment_author_IP' => '127.0.0.1',
-            'comment_date' => '2023-10-02',
-            'comment_date_gmt' => '2023-10-02T00:00:00',
-            'comment_content' => 'Content 1',
-            'comment_approved' => '1',
-            'comment_type' => '',
-            'comment_parent' => '0',
-            'comment_user_id' => '1'
-        ]);
-        $this->wxr_writer->append_entity($comment1);
+		$comment1 = new ImportEntity(
+			'comment',
+			array(
+				'comment_id' => '1',
+				'comment_author' => 'Author 1',
+				'comment_author_email' => 'author1@example.com',
+				'comment_author_url' => 'http://example.com',
+				'comment_author_IP' => '127.0.0.1',
+				'comment_date' => '2023-10-02',
+				'comment_date_gmt' => '2023-10-02T00:00:00',
+				'comment_content' => 'Content 1',
+				'comment_approved' => '1',
+				'comment_type' => '',
+				'comment_parent' => '0',
+				'comment_user_id' => '1',
+			)
+		);
+		$this->wxr_writer->append_entity( $comment1 );
 
-        $comment2 = new ImportEntity('comment', [
-            'comment_id' => '2',
-            'comment_author' => 'Author 2',
-            'comment_author_email' => 'author2@example.com',
-            'comment_author_url' => 'http://example.com',
-            'comment_author_IP' => '127.0.0.1',
-            'comment_date' => '2023-10-02',
-            'comment_date_gmt' => '2023-10-02T00:00:00',
-            'comment_content' => 'Content 2',
-            'comment_approved' => '1',
-            'comment_type' => '',
-            'comment_parent' => '0',
-            'comment_user_id' => '1'
-        ]);
-        $this->wxr_writer->append_entity($comment2);
+		$comment2 = new ImportEntity(
+			'comment',
+			array(
+				'comment_id' => '2',
+				'comment_author' => 'Author 2',
+				'comment_author_email' => 'author2@example.com',
+				'comment_author_url' => 'http://example.com',
+				'comment_author_IP' => '127.0.0.1',
+				'comment_date' => '2023-10-02',
+				'comment_date_gmt' => '2023-10-02T00:00:00',
+				'comment_content' => 'Content 2',
+				'comment_approved' => '1',
+				'comment_type' => '',
+				'comment_parent' => '0',
+				'comment_user_id' => '1',
+			)
+		);
+		$this->wxr_writer->append_entity( $comment2 );
 
-        $comment3 = new ImportEntity('comment', [
-            'comment_id' => '3',
-            'comment_author' => 'Author 3',
-            'comment_author_email' => 'author3@example.com',
-            'comment_author_url' => 'http://example.com',
-            'comment_author_IP' => '127.0.0.1',
-            'comment_date' => '2023-10-02',
-            'comment_date_gmt' => '2023-10-02T00:00:00',
-            'comment_content' => 'Content 3',
-            'comment_approved' => '1',
-            'comment_type' => '',
-            'comment_parent' => '0',
-            'comment_user_id' => '1'
-        ]);
-        $this->wxr_writer->append_entity($comment3);
+		$comment3 = new ImportEntity(
+			'comment',
+			array(
+				'comment_id' => '3',
+				'comment_author' => 'Author 3',
+				'comment_author_email' => 'author3@example.com',
+				'comment_author_url' => 'http://example.com',
+				'comment_author_IP' => '127.0.0.1',
+				'comment_date' => '2023-10-02',
+				'comment_date_gmt' => '2023-10-02T00:00:00',
+				'comment_content' => 'Content 3',
+				'comment_approved' => '1',
+				'comment_type' => '',
+				'comment_parent' => '0',
+				'comment_user_id' => '1',
+			)
+		);
+		$this->wxr_writer->append_entity( $comment3 );
 
-        $post3 = new ImportEntity('post', [
-            'post_title' => 'Post 3',
-            'post_date' => '2023-10-03',
-            'guid' => '12347',
-            'description' => 'Description 3',
-            'content' => 'Content 3',
-            'excerpt' => 'Excerpt 3',
-            'post_id' => '3',
-            'post_date_gmt' => '2023-10-03T00:00:00',
-            'comment_status' => 'open',
-            'ping_status' => 'open',
-            'post_name' => 'post-3',
-            'status' => 'publish',
-            'post_parent' => '0',
-            'menu_order' => '0',
-            'post_type' => 'post',
-            'post_password' => '',
-            'is_sticky' => '0'
-        ]);
-        $this->wxr_writer->append_entity($post3);
+		$post3 = new ImportEntity(
+			'post',
+			array(
+				'post_title' => 'Post 3',
+				'post_date' => '2023-10-03',
+				'guid' => '12347',
+				'description' => 'Description 3',
+				'content' => 'Content 3',
+				'excerpt' => 'Excerpt 3',
+				'post_id' => '3',
+				'post_date_gmt' => '2023-10-03T00:00:00',
+				'comment_status' => 'open',
+				'ping_status' => 'open',
+				'post_name' => 'post-3',
+				'status' => 'publish',
+				'post_parent' => '0',
+				'menu_order' => '0',
+				'post_type' => 'post',
+				'post_password' => '',
+				'is_sticky' => '0',
+			)
+		);
+		$this->wxr_writer->append_entity( $post3 );
 
-        $comment4 = new ImportEntity('comment', [
-            'comment_id' => '4',
-            'comment_author' => 'Author 4',
-            'comment_author_email' => 'author4@example.com',
-            'comment_author_url' => 'http://example.com',
-            'comment_author_IP' => '127.0.0.1',
-            'comment_date' => '2023-10-03',
-            'comment_date_gmt' => '2023-10-03T00:00:00',
-            'comment_content' => 'Content 4',
-            'comment_approved' => '1',
-            'comment_type' => '',
-            'comment_parent' => '0',
-            'comment_user_id' => '1'
-        ]);
-        $this->wxr_writer->append_entity($comment4);
+		$comment4 = new ImportEntity(
+			'comment',
+			array(
+				'comment_id' => '4',
+				'comment_author' => 'Author 4',
+				'comment_author_email' => 'author4@example.com',
+				'comment_author_url' => 'http://example.com',
+				'comment_author_IP' => '127.0.0.1',
+				'comment_date' => '2023-10-03',
+				'comment_date_gmt' => '2023-10-03T00:00:00',
+				'comment_content' => 'Content 4',
+				'comment_approved' => '1',
+				'comment_type' => '',
+				'comment_parent' => '0',
+				'comment_user_id' => '1',
+			)
+		);
+		$this->wxr_writer->append_entity( $comment4 );
 
-        $this->wxr_writer->finalize();
-        $this->wxr_writer->close_writing();
-        $this->memory_pipe->close_writing();
+		$this->wxr_writer->finalize();
+		$this->wxr_writer->close_writing();
+		$this->memory_pipe->close_writing();
 
-        $expected = <<<XML
+		$expected = <<<XML
 <?xml version="1.0" encoding="UTF-8" ?>
 <rss version="2.0" xmlns:excerpt="http://wordpress.org/export/1.2/excerpt/" xmlns:content="http://purl.org/rss/1.0/modules/content/" xmlns:wfw="http://wellformedweb.org/CommentAPI/" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:wp="http://wordpress.org/export/1.2/">
 <channel>
@@ -436,15 +480,15 @@ XML;
 </rss>
 
 XML;
-        $this->assertEquals($expected, $this->memory_pipe->consume_all());
-    }
+		$this->assertEquals( $expected, $this->memory_pipe->consume_all() );
+	}
 
-    public function testCloseWriting() {
-        $this->wxr_writer->finalize();
-        $this->wxr_writer->close_writing();
-        $this->memory_pipe->close_writing();
+	public function testCloseWriting() {
+		$this->wxr_writer->finalize();
+		$this->wxr_writer->close_writing();
+		$this->memory_pipe->close_writing();
 
-        $expected = <<<XML
+		$expected = <<<XML
 <?xml version="1.0" encoding="UTF-8" ?>
 <rss version="2.0" xmlns:excerpt="http://wordpress.org/export/1.2/excerpt/" xmlns:content="http://purl.org/rss/1.0/modules/content/" xmlns:wfw="http://wellformedweb.org/CommentAPI/" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:wp="http://wordpress.org/export/1.2/">
 <channel>
@@ -452,78 +496,84 @@ XML;
 </rss>
 
 XML;
-        $this->assertEquals($expected, $this->memory_pipe->consume_all());
-    }
+		$this->assertEquals( $expected, $this->memory_pipe->consume_all() );
+	}
 
-    public function testGetReentrancyCursor() {
-        $entity = new ImportEntity('post', ['post_title' => 'Test Post']);
-        $this->wxr_writer->append_entity($entity);
-        $cursor = $this->wxr_writer->get_reentrancy_cursor();
-        $this->assertJson($cursor);
-        $this->assertEquals(json_encode(['open_tags' => ['item']]), $cursor);
-    }
+	public function testGetReentrancyCursor() {
+		$entity = new ImportEntity( 'post', array( 'post_title' => 'Test Post' ) );
+		$this->wxr_writer->append_entity( $entity );
+		$cursor = $this->wxr_writer->get_reentrancy_cursor();
+		$this->assertJson( $cursor );
+		$this->assertEquals( json_encode( array( 'open_tags' => array( 'item' ) ) ), $cursor );
+	}
 
-    public function testPauseAndResumeWritingWithReentrancyCursor() {
-        // Start writing the first post
-        $post1 = new ImportEntity('post', [
-            'post_title' => 'Post 1',
-            'post_date' => '2023-10-01',
-            'guid' => '12345',
-            'description' => 'Description 1',
-            'content' => 'Content 1',
-            'excerpt' => 'Excerpt 1',
-            'post_id' => '1',
-            'post_date_gmt' => '2023-10-01T00:00:00',
-            'comment_status' => 'open',
-            'ping_status' => 'open',
-            'post_name' => 'post-1',
-            'status' => 'publish',
-            'post_parent' => '0',
-            'menu_order' => '0',
-            'post_type' => 'post',
-            'post_password' => '',
-            'is_sticky' => '0'
-        ]);
-        $this->wxr_writer->append_entity($post1);
+	public function testPauseAndResumeWritingWithReentrancyCursor() {
+		// Start writing the first post
+		$post1 = new ImportEntity(
+			'post',
+			array(
+				'post_title' => 'Post 1',
+				'post_date' => '2023-10-01',
+				'guid' => '12345',
+				'description' => 'Description 1',
+				'content' => 'Content 1',
+				'excerpt' => 'Excerpt 1',
+				'post_id' => '1',
+				'post_date_gmt' => '2023-10-01T00:00:00',
+				'comment_status' => 'open',
+				'ping_status' => 'open',
+				'post_name' => 'post-1',
+				'status' => 'publish',
+				'post_parent' => '0',
+				'menu_order' => '0',
+				'post_type' => 'post',
+				'post_password' => '',
+				'is_sticky' => '0',
+			)
+		);
+		$this->wxr_writer->append_entity( $post1 );
 
-        // Get the reentrancy cursor
-        $cursor = $this->wxr_writer->get_reentrancy_cursor();
+		// Get the reentrancy cursor
+		$cursor = $this->wxr_writer->get_reentrancy_cursor();
 
-        // Close the current writer
-        $this->wxr_writer->close_writing();
+		// Close the current writer
+		$this->wxr_writer->close_writing();
 
-        // Create a new writer with the same memory pipe and resume from the cursor
-        $this->wxr_writer = new WXRWriter($this->memory_pipe, $cursor);
+		// Create a new writer with the same memory pipe and resume from the cursor
+		$this->wxr_writer = new WXRWriter( $this->memory_pipe, $cursor );
 
-        // Append a second post
-        $post2 = new ImportEntity('post', [
-            'post_title' => 'Post 2',
-            'post_date' => '2023-10-02',
-            'guid' => '12346',
-            'description' => 'Description 2',
-            'content' => 'Content 2',
-            'excerpt' => 'Excerpt 2',
-            'post_id' => '2',
-            'post_date_gmt' => '2023-10-02T00:00:00',
-            'comment_status' => 'open',
-            'ping_status' => 'open',
-            'post_name' => 'post-2',
-            'status' => 'publish',
-            'post_parent' => '0',
-            'menu_order' => '0',
-            'post_type' => 'post',
-            'post_password' => '',
-            'is_sticky' => '0'
-        ]);
-        $this->wxr_writer->append_entity($post2);
+		// Append a second post
+		$post2 = new ImportEntity(
+			'post',
+			array(
+				'post_title' => 'Post 2',
+				'post_date' => '2023-10-02',
+				'guid' => '12346',
+				'description' => 'Description 2',
+				'content' => 'Content 2',
+				'excerpt' => 'Excerpt 2',
+				'post_id' => '2',
+				'post_date_gmt' => '2023-10-02T00:00:00',
+				'comment_status' => 'open',
+				'ping_status' => 'open',
+				'post_name' => 'post-2',
+				'status' => 'publish',
+				'post_parent' => '0',
+				'menu_order' => '0',
+				'post_type' => 'post',
+				'post_password' => '',
+				'is_sticky' => '0',
+			)
+		);
+		$this->wxr_writer->append_entity( $post2 );
 
-        // Close writing
-        $this->wxr_writer->finalize();
-        $this->wxr_writer->close_writing();
-        $this->memory_pipe->close_writing();
+		// Close writing
+		$this->wxr_writer->finalize();
+		$this->wxr_writer->close_writing();
+		$this->memory_pipe->close_writing();
 
-        // Expected XML output
-        $expected = <<<XML
+		// Expected XML output
+		$expected = <<<XML
 <?xml version="1.0" encoding="UTF-8" ?>
 <rss version="2.0" xmlns:excerpt="http://wordpress.org/export/1.2/excerpt/" xmlns:content="http://purl.org/rss/1.0/modules/content/" xmlns:wfw="http://wellformedweb.org/CommentAPI/" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:wp="http://wordpress.org/export/1.2/">
 <channel>
@@ -571,6 +621,6 @@ XML;
 </rss>
 
 XML;
-        $this->assertEquals($expected, $this->memory_pipe->consume_all());
-    }
+		$this->assertEquals( $expected, $this->memory_pipe->consume_all() );
+	}
 }

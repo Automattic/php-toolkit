@@ -12,182 +12,182 @@ use WordPress\Filesystem\Mixin\Interfaces\InternalizedWriteStream;
  */
 class InMemoryFilesystem implements Filesystem, InternalizedWriteStream {
 
-    use Mixin\InternalizeWriteStream,
-        Mixin\GetContentsViaReadStream,
-        Mixin\MkdirRecursive,
-        Mixin\CopyRecursiveViaStreaming;
+	use Mixin\InternalizeWriteStream;
+	use Mixin\GetContentsViaReadStream;
+	use Mixin\MkdirRecursive;
+	use Mixin\CopyRecursiveViaStreaming;
 
-    private $last_write_stream_id = 0;
-    private $write_streams = [];
-	private $files = [];
+	private $last_write_stream_id = 0;
+	private $write_streams        = array();
+	private $files                = array();
 
-    static public function create() {
-        return new ChrootLayer(
-            new InMemoryFilesystem(),
-            '/'
-        );
-    }
+	public static function create() {
+		return new ChrootLayer(
+			new InMemoryFilesystem(),
+			'/'
+		);
+	}
 
 	private function __construct() {
-		$this->files['/'] = [
+		$this->files['/'] = array(
 			'type' => 'dir',
-			'contents' => []
-		];
+			'contents' => array(),
+		);
 	}
 
-    protected function get_root(): string {
-        return '/';
-    }
+	protected function get_root(): string {
+		return '/';
+	}
 
-	public function ls($parent = '/') {
-		if (!isset($this->files[$parent]) || $this->files[$parent]['type'] !== 'dir') {
+	public function ls( $parent = '/' ) {
+		if ( ! isset( $this->files[ $parent ] ) || $this->files[ $parent ]['type'] !== 'dir' ) {
 			throw new FilesystemException(
-				sprintf('Directory not found: %s', $parent),
+				sprintf( 'Directory not found: %s', $parent ),
 			);
 		}
-		return array_keys($this->files[$parent]['contents']);
+		return array_keys( $this->files[ $parent ]['contents'] );
 	}
 
-	public function is_dir($path) {
-		return isset($this->files[$path]) && $this->files[$path]['type'] === 'dir';
+	public function is_dir( $path ) {
+		return isset( $this->files[ $path ] ) && $this->files[ $path ]['type'] === 'dir';
 	}
 
-	public function is_file($path) {
-		return isset($this->files[$path]) && $this->files[$path]['type'] === 'file';
+	public function is_file( $path ) {
+		return isset( $this->files[ $path ] ) && $this->files[ $path ]['type'] === 'file';
 	}
 
-	public function exists($path) {
-		return isset($this->files[$path]);
+	public function exists( $path ) {
+		return isset( $this->files[ $path ] );
 	}
 
-	public function open_read_stream($path): ByteReadStream {
-		if (!$this->is_file($path)) {
+	public function open_read_stream( $path ): ByteReadStream {
+		if ( ! $this->is_file( $path ) ) {
 			throw new FilesystemException(
-				sprintf('File not found: %s', $path),
+				sprintf( 'File not found: %s', $path ),
 			);
 		}
-        return new MemoryPipe($this->files[$path]['contents']);
+		return new MemoryPipe( $this->files[ $path ]['contents'] );
 	}
 
-	public function rename($old_path, $new_path, $options = []) {
-		if (!$this->exists($old_path)) {
+	public function rename( $old_path, $new_path, $options = array() ) {
+		if ( ! $this->exists( $old_path ) ) {
 			throw new FilesystemException(
-				sprintf('File not found: %s', $old_path),
-			);
-		}
-
-		$parent = dirname($new_path);
-		if (!$this->is_dir($parent)) {
-			throw new FilesystemException(
-				sprintf('Parent directory not found: %s', $parent),
+				sprintf( 'File not found: %s', $old_path ),
 			);
 		}
 
-		$this->files[$new_path] = $this->files[$old_path];
-		unset($this->files[$old_path]);
+		$parent = dirname( $new_path );
+		if ( ! $this->is_dir( $parent ) ) {
+			throw new FilesystemException(
+				sprintf( 'Parent directory not found: %s', $parent ),
+			);
+		}
+
+		$this->files[ $new_path ] = $this->files[ $old_path ];
+		unset( $this->files[ $old_path ] );
 		return true;
 	}
 
-	public function mkdir_single($path, $options = []) {
-		if ($this->exists($path)) {
+	public function mkdir_single( $path, $options = array() ) {
+		if ( $this->exists( $path ) ) {
 			throw new FilesystemException(
-				sprintf('Directory already exists: %s', $path),
+				sprintf( 'Directory already exists: %s', $path ),
 			);
 		}
 
-		$parent = dirname($path);
-		if (!$this->is_dir($parent)) {
+		$parent = dirname( $path );
+		if ( ! $this->is_dir( $parent ) ) {
 			throw new FilesystemException(
-				sprintf('Parent directory not found: %s', $parent),
+				sprintf( 'Parent directory not found: %s', $parent ),
 			);
 		}
 
-		$this->files[$path] = [
+		$this->files[ $path ]                                    = array(
 			'type' => 'dir',
-			'contents' => []
-		];
-		$this->files[$parent]['contents'][basename($path)] = true;
+			'contents' => array(),
+		);
+		$this->files[ $parent ]['contents'][ basename( $path ) ] = true;
 		return true;
 	}
 
-	public function rm($path) {
-		if (!$this->is_file($path)) {
+	public function rm( $path ) {
+		if ( ! $this->is_file( $path ) ) {
 			throw new FilesystemException(
-				sprintf('File not found: %s', $path),
+				sprintf( 'File not found: %s', $path ),
 			);
 		}
 
-		$parent = dirname($path);
-		unset($this->files[$parent]['contents'][basename($path)]);
-		unset($this->files[$path]);
+		$parent = dirname( $path );
+		unset( $this->files[ $parent ]['contents'][ basename( $path ) ] );
+		unset( $this->files[ $path ] );
 		return true;
 	}
 
-	public function rmdir($path, $options = []) {
+	public function rmdir( $path, $options = array() ) {
 		$recursive = $options['recursive'] ?? false;
-		if (!$this->is_dir($path)) {
+		if ( ! $this->is_dir( $path ) ) {
 			throw new FilesystemException(
-				sprintf('Directory not found: %s', $path),
+				sprintf( 'Directory not found: %s', $path ),
 			);
 		}
 
-		if ($recursive) {
-			$path = rtrim($path, '/');
-			foreach($this->ls($path) as $child) {
-				if($this->is_dir($path . '/' . $child)) {
-					$this->rmdir($path . '/' . $child, $options);
+		if ( $recursive ) {
+			$path = rtrim( $path, '/' );
+			foreach ( $this->ls( $path ) as $child ) {
+				if ( $this->is_dir( $path . '/' . $child ) ) {
+					$this->rmdir( $path . '/' . $child, $options );
 				} else {
-					$this->rm($path . '/' . $child);
+					$this->rm( $path . '/' . $child );
 				}
 			}
 		}
 
-		$parent = dirname($path);
-		unset($this->files[$parent]['contents'][basename($path)]);
-		unset($this->files[$path]);
+		$parent = dirname( $path );
+		unset( $this->files[ $parent ]['contents'][ basename( $path ) ] );
+		unset( $this->files[ $path ] );
 		return true;
 	}
 
-	public function put_contents($path, $data, $options = []) {
-		$parent = dirname($path);
-		if (!$this->is_dir($parent)) {
+	public function put_contents( $path, $data, $options = array() ) {
+		$parent = dirname( $path );
+		if ( ! $this->is_dir( $parent ) ) {
 			throw new FilesystemException(
-				sprintf('Parent directory not found: %s', $parent),
+				sprintf( 'Parent directory not found: %s', $parent ),
 			);
 		}
 
-		$this->files[$path] = [
+		$this->files[ $path ]                                    = array(
 			'type' => 'file',
-			'contents' => $data
-		];
-		$this->files[$parent]['contents'][basename($path)] = true;
+			'contents' => $data,
+		);
+		$this->files[ $parent ]['contents'][ basename( $path ) ] = true;
 		return true;
 	}
 
-    protected function write_stream_internal_open(string $path): int {
-        $this->put_contents($path, '');
-        $stream_id = $this->last_write_stream_id++;
-        $this->write_streams[$stream_id] = $path;
-        return $stream_id;
-    }
+	protected function write_stream_internal_open( string $path ): int {
+		$this->put_contents( $path, '' );
+		$stream_id                         = $this->last_write_stream_id++;
+		$this->write_streams[ $stream_id ] = $path;
+		return $stream_id;
+	}
 
-    public function write_stream_append_bytes(int $stream_id, $data): bool {
-        if(!isset($this->write_streams[$stream_id])) {
-            throw new FilesystemException(
-				sprintf('Cannot append bytes to a write stream that is not open'),
+	public function write_stream_append_bytes( int $stream_id, $data ): bool {
+		if ( ! isset( $this->write_streams[ $stream_id ] ) ) {
+			throw new FilesystemException(
+				sprintf( 'Cannot append bytes to a write stream that is not open' ),
 			);
-        }
-        $path = $this->write_streams[$stream_id];
-        $this->files[$path]['contents'] .= $data;
-        return true;
-    }
+		}
+		$path                              = $this->write_streams[ $stream_id ];
+		$this->files[ $path ]['contents'] .= $data;
+		return true;
+	}
 
-    public function write_stream_close(int $stream_id): void {
-        if(!isset($this->write_streams[$stream_id])) {
-            throw new FilesystemException(
-				sprintf('Cannot close a write stream that is not open'),
+	public function write_stream_close( int $stream_id ): void {
+		if ( ! isset( $this->write_streams[ $stream_id ] ) ) {
+			throw new FilesystemException(
+				sprintf( 'Cannot close a write stream that is not open' ),
 			);
-        }
-        unset($this->write_streams[$stream_id]);
-    }
+		}
+		unset( $this->write_streams[ $stream_id ] );
+	}
 }

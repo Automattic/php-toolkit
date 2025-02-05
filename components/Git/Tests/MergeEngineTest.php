@@ -6,9 +6,9 @@ use WordPress\Git\Diff\MergeEngine;
 
 class MergeEngineTest extends \PHPUnit\Framework\TestCase {
 
-    public function test_apply_text_diff() {
-        $merge_engine = new MergeEngine();
-        $base = <<<EOT
+	public function test_apply_text_diff() {
+		$merge_engine = new MergeEngine();
+		$base         = <<<EOT
         Line 1: The quick brown fox
         Line 2: jumps over the lazy dog.
         Line 3: Lorem ipsum dolor sit amet,
@@ -26,7 +26,7 @@ class MergeEngineTest extends \PHPUnit\Framework\TestCase {
         Line 15: id est laborum.
         EOT;
 
-        $updated = <<<EOT
+		$updated = <<<EOT
         Line 1: The quick brown fox
         Line 2: jumps over the lazy cat.
         Line 3: Lorem ipsum dolor sit amet,
@@ -45,8 +45,7 @@ class MergeEngineTest extends \PHPUnit\Framework\TestCase {
         Line 16: This is a new line added.
         EOT;
 
-        $diff = $merge_engine->diff($base, $updated);
-        $this->assertEquals($updated, $merge_engine->apply_text_diff($base, $diff));
-    }
-
+		$diff = $merge_engine->diff( $base, $updated );
+		$this->assertEquals( $updated, $merge_engine->apply_text_diff( $base, $diff ) );
+	}
 }

@@ -19,4 +19,3 @@ $phar->setStub( $stub );
 $phar->stopBuffering();
 
 echo "Phar created at $phar_file\n";
-

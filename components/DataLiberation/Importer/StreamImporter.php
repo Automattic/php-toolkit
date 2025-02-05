@@ -104,6 +104,7 @@ class StreamImporter {
 
 	/**
 	 * The current state of the import process.
+	 *
 	 * @var string
 	 */
 	protected $stage = self::STAGE_INITIAL;
@@ -114,6 +115,7 @@ class StreamImporter {
 	 * This mechanism gives the consumer a chance to handle any failures
 	 * from the current stage, e.g. backfilling the image assets that
 	 * failed to download.
+	 *
 	 * @var string
 	 */
 	protected $next_stage;
@@ -124,21 +126,21 @@ class StreamImporter {
 	protected $entity_iterator;
 	protected $resume_at_entity;
 
-    /**
-     * Is this the first time we're creating an iterator? If so,
-     * we'll assume there was some activity before and we need to
-     * resume from the reentrancy cursor. Otherwise, we'll assume
-     * we've just transitioned to the next stage and we don't need
-     * to resume from the reentrancy cursor.
-     *
-     * @TODO: This logic is flawed. Let's get rid of these implicit
-     * assumptions and handle the reentrancy cursor explicitly. Perhaps
-     * emit the cursor from this StreamImporter class and encode the
-     * "stage" in it, then use the cursor to resume only if the cursor
-     * stage matches the current stage.
-     *
-     * @var bool
-     */
+	/**
+	 * Is this the first time we're creating an iterator? If so,
+	 * we'll assume there was some activity before and we need to
+	 * resume from the reentrancy cursor. Otherwise, we'll assume
+	 * we've just transitioned to the next stage and we don't need
+	 * to resume from the reentrancy cursor.
+	 *
+	 * @TODO: This logic is flawed. Let's get rid of these implicit
+	 * assumptions and handle the reentrancy cursor explicitly. Perhaps
+	 * emit the cursor from this StreamImporter class and encode the
+	 * "stage" in it, then use the cursor to resume only if the cursor
+	 * stage matches the current stage.
+	 *
+	 * @var bool
+	 */
 	protected $first_iterator = true;
 
 	/**
@@ -286,7 +288,7 @@ class StreamImporter {
 		$options = array()
 	) {
 		$this->entity_reader_factory = $entity_reader_factory;
-		$this->options                 = $options;
+		$this->options               = $options;
 		if ( isset( $options['default_source_site_url'] ) ) {
 			$this->set_source_site_url( $options['default_source_site_url'] );
 		}
@@ -299,6 +301,7 @@ class StreamImporter {
 
 	/**
 	 * The WordPress entity importer instance.
+	 *
 	 * @TODO: Consider inlining the importer code into this class.
 	 *
 	 * @var WP_Entity_Importer
@@ -318,8 +321,8 @@ class StreamImporter {
 				return false;
 			case self::STAGE_TOPOLOGICAL_SORT:
 				// @TODO: Different modes:
-                //        1. skip, reprocess
-                //        2. sort topologically
+				// 1. skip, reprocess
+				// 2. sort topologically
 				$this->next_stage = self::STAGE_FRONTLOAD_ASSETS;
 				return false;
 			case self::STAGE_FRONTLOAD_ASSETS:
@@ -673,7 +676,7 @@ class StreamImporter {
 			return false;
 		}
 
-		$entity      = $this->entity_iterator->current();
+		$entity = $this->entity_iterator->current();
 
 		$attachments = array();
 		// Rewrite the URLs in the post.
@@ -899,10 +902,10 @@ class StreamImporter {
 
 	protected function create_entity_iterator() {
 		$factory = $this->entity_reader_factory;
-        $cursor = null;
+		$cursor  = null;
 		if ( $this->first_iterator ) {
 			$this->first_iterator = false;
-            $cursor = $this->resume_at_entity;
+			$cursor               = $this->resume_at_entity;
 		}
 		return new EntityReaderIterator( $factory( $cursor ) );
 	}

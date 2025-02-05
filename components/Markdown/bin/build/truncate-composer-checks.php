@@ -1,7 +1,7 @@
 <?php
 
 $file = $argv[1];
-$phar = new Phar($file);
+$phar = new Phar( $file );
 $phar->startBuffering();
 
 
@@ -14,24 +14,24 @@ $phar->startBuffering();
  *
  * Therefore, we're giving all the HumbugBox classes a unique suffix.
  */
-$autoloadSuffix = substr(md5(__FILE__), 0, 8);
-foreach (new RecursiveIteratorIterator($phar) as $file) {
-    if(!$file->isFile()) {
-        continue;
-    }
-    $relativePath = $file->getPathname();
-    $relativePath = str_replace('phar://', '', $relativePath);
-    $relativePath = str_replace($phar->getPath().'/', '', $relativePath);
-    $contents = $file->getContent();
-    $updated_contents = $contents;
-    foreach([
-        'InitHumbugBox',
-    ] as $class) {
-        $updated_contents = str_replace($class, $class . $autoloadSuffix, $updated_contents);
-    }
-    if($updated_contents !== $contents) {
-        $phar[$relativePath] = $updated_contents;
-    }
+$autoloadSuffix = substr( md5( __FILE__ ), 0, 8 );
+foreach ( new RecursiveIteratorIterator( $phar ) as $file ) {
+	if ( ! $file->isFile() ) {
+		continue;
+	}
+	$relativePath     = $file->getPathname();
+	$relativePath     = str_replace( 'phar://', '', $relativePath );
+	$relativePath     = str_replace( $phar->getPath() . '/', '', $relativePath );
+	$contents         = $file->getContent();
+	$updated_contents = $contents;
+	foreach ( array(
+		'InitHumbugBox',
+	) as $class ) {
+		$updated_contents = str_replace( $class, $class . $autoloadSuffix, $updated_contents );
+	}
+	if ( $updated_contents !== $contents ) {
+		$phar[ $relativePath ] = $updated_contents;
+	}
 }
 
 /**
@@ -41,6 +41,5 @@ foreach (new RecursiveIteratorIterator($phar) as $file) {
  * platform_check.php file, so let's just truncate it.
  */
 $phar['vendor/composer/platform_check.php'] = '';
-$phar['.box/bin/check-requirements.php'] = '';
+$phar['.box/bin/check-requirements.php']    = '';
 $phar->stopBuffering();
-

@@ -24,31 +24,35 @@ class GitEndpoint {
 	}
 
 	public function handle_request( $path, $request_bytes, ResponseWriteStream $http_response ) {
-        $git_response = new GitProtocolEncoderPipe();
+		$git_response = new GitProtocolEncoderPipe();
 		switch ( $path ) {
-            case '/HEAD':
-                // $this->handle_head_request($request_bytes, $git_response);
-                break;
+			case '/HEAD':
+				// $this->handle_head_request($request_bytes, $git_response);
+				break;
 			case '/info/refs?service=git-upload-pack':
 				$this->send_protocol_v2_headers( $http_response, 'git-upload-pack' );
-				$git_response->append_packet_lines([
-                    "# service=git-upload-pack\n",
-                    '0000',
-                    "version 2\n",
-                    "agent=git/github-395dce4f6ecf\n",
-                    "ls-refs=unborn\n",
-                    "fetch=shallow wait-for-done filter\n",
-                    "server-option\n",
-                    "object-format=sha1\n",
-                    '0000'
-                ]);
+				$git_response->append_packet_lines(
+					array(
+						"# service=git-upload-pack\n",
+						'0000',
+						"version 2\n",
+						"agent=git/github-395dce4f6ecf\n",
+						"ls-refs=unborn\n",
+						"fetch=shallow wait-for-done filter\n",
+						"server-option\n",
+						"object-format=sha1\n",
+						'0000',
+					)
+				);
 				break;
 			case '/info/refs?service=git-receive-pack':
 				$this->send_protocol_v2_headers( $http_response, 'git-receive-pack' );
-				$git_response->append_packet_lines([
-                    "# service=git-receive-pack\n",
-                    '0000'
-                ]);
+				$git_response->append_packet_lines(
+					array(
+						"# service=git-receive-pack\n",
+						'0000',
+					)
+				);
 				$this->respond_with_ls_refs(
 					$git_response,
 					array(
@@ -75,23 +79,23 @@ class GitEndpoint {
 				$http_response->send_header( 'Content-Type', 'application/x-git-receive-pack-result' );
 				$http_response->send_header( 'Cache-Control', 'no-cache' );
 				$this->handle_push_request( $request_bytes, $git_response );
-                $git_response->close_writing();
+				$git_response->close_writing();
 				break;
 			default:
 				throw new GitException( 'Unknown path: ' . $path );
 		}
 		$git_response->close_writing();
 
-        // @TODO: Simplify this with a method such as pipe_to() or
-        //        a pulling class such as GitHttpResponse
-        while(true) {
-            $available = $git_response->pull(8192);
-            if($available === 0 && $git_response->reached_end_of_data()) {
-                break;
-            }
-            $http_response->append_bytes($git_response->consume($available));
-        }
-        $http_response->close_writing();
+		// @TODO: Simplify this with a method such as pipe_to() or
+		// a pulling class such as GitHttpResponse
+		while ( true ) {
+			$available = $git_response->pull( 8192 );
+			if ( $available === 0 && $git_response->reached_end_of_data() ) {
+				break;
+			}
+			$http_response->append_bytes( $git_response->consume( $available ) );
+		}
+		$http_response->close_writing();
 	}
 
 	private function send_protocol_v2_headers( ResponseWriteStream $response, $service ) {
@@ -168,7 +172,7 @@ class GitEndpoint {
 			);
 		}
 		// End the response with 0000
-		$git_response->append_packet_line('0000');
+		$git_response->append_packet_line( '0000' );
 	}
 
 	/**
@@ -198,56 +202,56 @@ class GitEndpoint {
 	 */
 	public function capability_advertise() {
 		return "version 2\n" .
-		       "agent=git/2.37.3\n" .
-		       '0000';
+				"agent=git/2.37.3\n" .
+				'0000';
 	}
 
 	public function parse_message( $request_bytes_bytes ) {
-        $packet_parser = new PacketParser();
-        $packet_parser->append_bytes($request_bytes_bytes);
-        $modes = array('capabilities', 'arguments', 'done');
-        $mode = array_shift($modes);
+		$packet_parser = new PacketParser();
+		$packet_parser->append_bytes( $request_bytes_bytes );
+		$modes = array( 'capabilities', 'arguments', 'done' );
+		$mode  = array_shift( $modes );
 
 		$capabilities = array();
-        $arguments = array();
-        // @TODO: Fix PacketParser to avoid emiting duplicate packets
-        while($packet_parser->next_token()) {
-            if($packet_parser->get_packet_type() !== '#packet') {
-                $mode = array_shift($modes);
-                continue;
-            }
-            if($packet_parser->get_token_type() !== '#packet-body') {
-                continue;
-            }
-            $packet = $packet_parser->get_body_chunk();
-            switch($mode) {
-                case 'capabilities':
-                    if(str_contains($packet, '=')) {
-                        list($key, $value)    = explode( '=', $packet );
-                        $capabilities[ $key ] = $value;
-                    } else {
-                        $capabilities[ $packet ] = true;
-                    }
-                    break;
-                case 'arguments':
-                    $space_at = strpos( $packet, ' ' );
-                    if ( $space_at === false ) {
-                        $key   = $packet;
-                        $value = true;
-                    } else {
-                        $key   = substr( $packet, 0, $space_at );
-                        $value = substr( $packet, $space_at + 1 );
-                    }
+		$arguments    = array();
+		// @TODO: Fix PacketParser to avoid emiting duplicate packets
+		while ( $packet_parser->next_token() ) {
+			if ( $packet_parser->get_packet_type() !== '#packet' ) {
+				$mode = array_shift( $modes );
+				continue;
+			}
+			if ( $packet_parser->get_token_type() !== '#packet-body' ) {
+				continue;
+			}
+			$packet = $packet_parser->get_body_chunk();
+			switch ( $mode ) {
+				case 'capabilities':
+					if ( str_contains( $packet, '=' ) ) {
+						list($key, $value)    = explode( '=', $packet );
+						$capabilities[ $key ] = $value;
+					} else {
+						$capabilities[ $packet ] = true;
+					}
+					break;
+				case 'arguments':
+					$space_at = strpos( $packet, ' ' );
+					if ( $space_at === false ) {
+						$key   = $packet;
+						$value = true;
+					} else {
+						$key   = substr( $packet, 0, $space_at );
+						$value = substr( $packet, $space_at + 1 );
+					}
 
-                    if ( ! array_key_exists( $key, $arguments ) ) {
-                        $arguments[ $key ] = array();
-                    }
-                    $arguments[ $key ][] = $value;
-                    break;
-                case 'done':
-                    break 2;
-            }
-        }
+					if ( ! array_key_exists( $key, $arguments ) ) {
+						$arguments[ $key ] = array();
+					}
+					$arguments[ $key ][] = $value;
+					break;
+				case 'done':
+					break 2;
+			}
+		}
 		return array(
 			'capabilities' => $capabilities,
 			'arguments' => $arguments,
@@ -290,7 +294,7 @@ class GitEndpoint {
 			$common_parent_hash = Commit::NULL_HASH;
 			$commit_hash        = $want_hash;
 			while ( true ) {
-                $reader = $this->repository->read_object( $commit_hash );
+				$reader            = $this->repository->read_object( $commit_hash );
 				$objects_to_send[] = $commit_hash;
 				if ( $reader->get_object_type_name() !== 'commit' ) {
 					// Just send non-commit objects as they are. It would be lovely to
@@ -304,7 +308,7 @@ class GitEndpoint {
 					break;
 				}
 
-                // @TODO: Support multiple parents
+				// @TODO: Support multiple parents
 				$commit_hash = $parsed_commit->get_first_parent_hash();
 				if ( isset( $have_oids[ $commit_hash ] ) ) {
 					$common_parent_hash = $commit_hash;
@@ -345,7 +349,7 @@ class GitEndpoint {
 		$objects_to_send = array_unique( $objects_to_send );
 		$pack_objects    = array();
 		foreach ( $objects_to_send as $oid ) {
-            $reader = $this->repository->read_object($oid);
+			$reader = $this->repository->read_object( $oid );
 
 			// Apply blob filters if specified
 			if ( $reader->get_object_type_name() === 'blob' ) {
@@ -372,29 +376,29 @@ class GitEndpoint {
 			throw new GitException( 'Deepen is not implemented yet' );
 		}
 
-        $git_response->append_packet_line("packfile\n");
-        $git_response->append_packfile($this->repository, $pack_objects, $multiplex = true);
-        $git_response->append_packet_line('0000');
+		$git_response->append_packet_line( "packfile\n" );
+		$git_response->append_packfile( $this->repository, $pack_objects, $multiplex = true );
+		$git_response->append_packet_line( '0000' );
 		return true;
 	}
 
 	/**
 	 * Handle Git protocol v2 push command
 	 *
-	 * @param string $request_bytes Raw request bytes
-	 * @param ResponseWriteStream  $response Response writer
+	 * @param string              $request_bytes Raw request bytes
+	 * @param ResponseWriteStream $response Response writer
 	 *
 	 * @return bool Success status
 	 */
 	public function handle_push_request( $request_bytes, GitProtocolEncoderPipe $git_response ) {
-        $protocol_reader = new GitProtocolDecoder(
-            new MemoryPipe($request_bytes),
-            ['write_to_repository' => $this->repository]
-        );
-        $header = $this->parse_push_header($protocol_reader);
+		$protocol_reader = new GitProtocolDecoder(
+			new MemoryPipe( $request_bytes ),
+			array( 'write_to_repository' => $this->repository )
+		);
+		$header          = $this->parse_push_header( $protocol_reader );
 		if ( ! $header || empty( $header['new_oid'] ) ) {
-			$git_response->append_error_packet_line("error header is empty\n");
-			$git_response->append_error_packet_line('0000');
+			$git_response->append_error_packet_line( "error header is empty\n" );
+			$git_response->append_error_packet_line( '0000' );
 			return false;
 		}
 
@@ -405,8 +409,8 @@ class GitEndpoint {
 
 		// Validate ref name
 		if ( ! preg_match( '|^refs/|', $ref_name ) ) {
-			$git_response->append_error_packet_line("error invalid ref name: $ref_name\n");
-			$git_response->append_error_packet_line('0000');
+			$git_response->append_error_packet_line( "error invalid ref name: $ref_name\n" );
+			$git_response->append_error_packet_line( '0000' );
 			// @TODO: Throw / catch?
 			return false;
 		}
@@ -414,42 +418,42 @@ class GitEndpoint {
 		// Handle deletion
 		if ( Commit::is_null_hash( $new_oid ) ) {
 			if ( $this->repository->delete_ref( $ref_name ) ) {
-				$git_response->append_packet_line("ok $ref_name\n");
+				$git_response->append_packet_line( "ok $ref_name\n" );
 			} else {
-				$git_response->append_error_packet_line("error $ref_name delete failed\n");
-                $git_response->append_error_packet_line('0000');
+				$git_response->append_error_packet_line( "error $ref_name delete failed\n" );
+				$git_response->append_error_packet_line( '0000' );
 			}
 			return false;
 		}
 
-        // Process the incoming pack
-        try {
-            $had_pack = false;
-            while($protocol_reader->next_token()) {
-                if($protocol_reader->get_token_type() === '#pack') {
-                    $had_pack = true;
-                }
-            }
-        } catch(GitException $e) {
-            $git_response->append_error_packet_line("error unpack failed\n");
-            $git_response->append_error_packet_line('0000');
-            return false;
-        }
+		// Process the incoming pack
+		try {
+			$had_pack = false;
+			while ( $protocol_reader->next_token() ) {
+				if ( $protocol_reader->get_token_type() === '#pack' ) {
+					$had_pack = true;
+				}
+			}
+		} catch ( GitException $e ) {
+			$git_response->append_error_packet_line( "error unpack failed\n" );
+			$git_response->append_error_packet_line( '0000' );
+			return false;
+		}
 
-        $git_response->append_sideband_packet_line("unpack ok\n");
+		$git_response->append_sideband_packet_line( "unpack ok\n" );
 
-        try {
-            $this->repository->read_object($new_oid);
-            $this->repository->set_ref_head( $ref_name, $new_oid );
-        } catch(GitException $e) {
-            $git_response->append_error_packet_line("error processing pack: $new_oid\n");
-            $git_response->append_error_packet_line('0000');
-            return false;
-        }
+		try {
+			$this->repository->read_object( $new_oid );
+			$this->repository->set_ref_head( $ref_name, $new_oid );
+		} catch ( GitException $e ) {
+			$git_response->append_error_packet_line( "error processing pack: $new_oid\n" );
+			$git_response->append_error_packet_line( '0000' );
+			return false;
+		}
 
-        $git_response->append_sideband_packet_line("ok $ref_name\n");
-        $git_response->append_sideband_packet_line("0000");
-        $git_response->append_packet_line("0000");
+		$git_response->append_sideband_packet_line( "ok $ref_name\n" );
+		$git_response->append_sideband_packet_line( '0000' );
+		$git_response->append_packet_line( '0000' );
 
 		return true;
 	}
@@ -461,21 +465,21 @@ class GitEndpoint {
 	 * @return array|false Parsed request data or false on error
 	 */
 	private function parse_push_header( GitProtocolDecoder $protocol_reader ) {
-        while($protocol_reader->next_token()) {
-            switch($protocol_reader->get_token_type()) {
-                case '#packet-footer':
-                    $line = $protocol_reader->get_packet_body();
-                    if ( ! preg_match( '/^(?:([0-9a-f]{40}) )?([0-9a-f]{40}) (.+?)\0(.*?)$/', $line, $matches ) ) {
-                        throw new GitException( 'Invalid push request' );
-                    }
-                    return array(
-                        'old_oid'      => $matches[1],
-                        'new_oid'      => $matches[2],
-                        'ref_name'     => $matches[3],
-                        'capabilities' => explode( ' ', trim( $matches[4] ) ),
-                    );
-            }
-        }
+		while ( $protocol_reader->next_token() ) {
+			switch ( $protocol_reader->get_token_type() ) {
+				case '#packet-footer':
+					$line = $protocol_reader->get_packet_body();
+					if ( ! preg_match( '/^(?:([0-9a-f]{40}) )?([0-9a-f]{40}) (.+?)\0(.*?)$/', $line, $matches ) ) {
+						throw new GitException( 'Invalid push request' );
+					}
+					return array(
+						'old_oid'      => $matches[1],
+						'new_oid'      => $matches[2],
+						'ref_name'     => $matches[3],
+						'capabilities' => explode( ' ', trim( $matches[4] ) ),
+					);
+			}
+		}
 	}
 
 	private function parse_filter( $filter ) {

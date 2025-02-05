@@ -26,7 +26,9 @@
         "yoast/phpunit-polyfills": "2.0.0",
         "phpunit/phpunit": "^9.5",
         "rector/rector": "dev-main",
-        "squizlabs/php_codesniffer": "4.0.x-dev"
+        "squizlabs/php_codesniffer": "3.10.0",
+        "phpcompatibility/php-compatibility": "10.x-dev",
+        "wp-coding-standards/wpcs": "^3.0"
     },
     "autoload": {
         "exclude-from-classmap": [
@@ -91,7 +93,8 @@
     "minimum-stability": "dev",
     "config": {
         "allow-plugins": {
-            "wikimedia/composer-merge-plugin": false
+            "wikimedia/composer-merge-plugin": false,
+            "dealerdirect/phpcodesniffer-composer-installer": true
         }
     }
 }

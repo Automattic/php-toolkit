@@ -58,7 +58,7 @@ function wp_rewrite_urls( $options ) {
 /**
  * Check if a given URL matches the current site URL.
  *
- * @param URL $parent The URL to check.
+ * @param URL    $parent The URL to check.
  * @param string $child The current site URL to compare against.
  * @return bool Whether the URL matches the current site URL.
  */
@@ -88,7 +88,7 @@ function is_child_url_of( $child, $parent_url ) {
  * '"is 6 %3C 6?%22 – asked Achilles' because only the first encoded byte is decoded.
  *
  * @param string $string The string to decode.
- * @param int $decode_n The number of bytes to decode in $input
+ * @param int    $decode_n The number of bytes to decode in $input
  * @return string The decoded string.
  */
 function urldecode_n( $input, $decode_n ) {

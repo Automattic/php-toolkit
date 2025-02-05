@@ -48,7 +48,7 @@ class AnnotatedBlockMarkupProducer {
 		if ( null === $this->result ) {
 			$this->result = '';
 			foreach ( $this->blocks_with_meta->get_all_metadata() as $key => $values ) {
-				foreach($values as $value) {
+				foreach ( $values as $value ) {
 					$p = new \WP_HTML_Tag_Processor( '<meta>' );
 					$p->next_tag();
 					$p->set_attribute( 'name', $key );

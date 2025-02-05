@@ -28,13 +28,13 @@ class BlueprintMapperTest extends PHPUnitTestCase {
 	public function testMapsEmptyBlueprint() {
 		$raw_blueprint = '{}';
 
-		$parsed_json = json_decode($raw_blueprint, false);
+		$parsed_json = json_decode( $raw_blueprint, false );
 
-		$result = $this->blueprint_mapper->map($parsed_json);
+		$result = $this->blueprint_mapper->map( $parsed_json );
 
 		$expected = new Blueprint();
 
-		$this->assertEquals($expected, $result);
+		$this->assertEquals( $expected, $result );
 	}
 
 	public function testMapsWordPressVersion() {
@@ -43,14 +43,14 @@ class BlueprintMapperTest extends PHPUnitTestCase {
 				"WordPressVersion":"https://wordpress.org/latest.zip"
 			}';
 
-		$parsed_json = json_decode($raw_blueprint, false);
+		$parsed_json = json_decode( $raw_blueprint, false );
 
-		$result = $this->blueprint_mapper->map($parsed_json);
+		$result = $this->blueprint_mapper->map( $parsed_json );
 
-		$expected = new Blueprint();
+		$expected                   = new Blueprint();
 		$expected->WordPressVersion = 'https://wordpress.org/latest.zip';
 
-		$this->assertEquals($expected, $result);
+		$this->assertEquals( $expected, $result );
 	}
 
 	public function testMapsMultiplePlugins() {
@@ -64,18 +64,18 @@ class BlueprintMapperTest extends PHPUnitTestCase {
 					]
 			}';
 
-		$parsed_json = json_decode($raw_blueprint, false);
+		$parsed_json = json_decode( $raw_blueprint, false );
 
-		$result = $this->blueprint_mapper->map($parsed_json);
+		$result = $this->blueprint_mapper->map( $parsed_json );
 
-		$expected = new Blueprint();
-		$expected->plugins = [
+		$expected          = new Blueprint();
+		$expected->plugins = array(
 			'https://downloads.wordpress.org/plugin/wordpress-importer.zip',
 			'https://downloads.wordpress.org/plugin/hello-dolly.zip',
 			'https://downloads.wordpress.org/plugin/gutenberg.17.7.0.zip',
-		];
+		);
 
-		$this->assertEquals($expected, $result);
+		$this->assertEquals( $expected, $result );
 	}
 
 	public function testMapsPluginsWithDifferentDataTypes() {
@@ -87,17 +87,17 @@ class BlueprintMapperTest extends PHPUnitTestCase {
 				]
 			}';
 
-		$parsed_json = json_decode($raw_blueprint, false);
+		$parsed_json = json_decode( $raw_blueprint, false );
 
-		$result = $this->blueprint_mapper->map($parsed_json);
+		$result = $this->blueprint_mapper->map( $parsed_json );
 
-		$expected = new Blueprint();
-		$expected->plugins = [
+		$expected          = new Blueprint();
+		$expected->plugins = array(
 			'https://downloads.wordpress.org/plugin/wordpress-importer.zip',
-			(new UrlResource())->setUrl('https://mysite.com'),
-		];
+			( new UrlResource() )->setUrl( 'https://mysite.com' ),
+		);
 
-		$this->assertEquals($expected, $result);
+		$this->assertEquals( $expected, $result );
 	}
 
 	public function testFailsWhenPluginsWithInvalidDataTypes() {

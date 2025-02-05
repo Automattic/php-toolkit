@@ -59,24 +59,23 @@ class EndCentralDirectoryEntry {
 	 */
 	public $centralDirectoryOffset;
 
-    /**
-     * @var int
-     */
-    public $commentLength = 0;
+	/**
+	 * @var int
+	 */
+	public $commentLength = 0;
 
 	/**
 	 * @var string
 	 */
 	public $comment;
 
-	public function __construct($header_fields) {
-        $valid_properties = array_keys(get_object_vars($this));
-        foreach($header_fields as $key => $value) {
-            if(!in_array($key, $valid_properties)) {
-                throw new \InvalidArgumentException("Invalid property: $key. Expected one of: " . implode(', ', $valid_properties));
-            }
-            $this->$key = $value;
-        }
+	public function __construct( $header_fields ) {
+		$valid_properties = array_keys( get_object_vars( $this ) );
+		foreach ( $header_fields as $key => $value ) {
+			if ( ! in_array( $key, $valid_properties ) ) {
+				throw new \InvalidArgumentException( "Invalid property: $key. Expected one of: " . implode( ', ', $valid_properties ) );
+			}
+			$this->$key = $value;
+		}
 	}
-
 }

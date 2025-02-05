@@ -45,7 +45,7 @@ class UnzipStepRunnerTest extends PHPUnitTestCase {
 	 */
 	public function before() {
 		$this->document_root = Path::makeAbsolute( 'test', sys_get_temp_dir() );
-		$this->runtime = new Runtime( $this->document_root );
+		$this->runtime       = new Runtime( $this->document_root );
 
 		$this->resource_manager = $this->createMock( ResourceManager::class );
 
@@ -65,7 +65,7 @@ class UnzipStepRunnerTest extends PHPUnitTestCase {
 
 	public function testUnzipFileWhenUsingAbsolutePath() {
 		// TODO: Remove once UnzipStep is implemented
-		$this->markTestSkipped('UnzipStep not yet implemented.');
+		$this->markTestSkipped( 'UnzipStep not yet implemented.' );
 
 		$zip = __DIR__ . '/resources/test_zip.zip';
 		$this->resource_manager->method( 'getStream' )
@@ -82,7 +82,7 @@ class UnzipStepRunnerTest extends PHPUnitTestCase {
 
 	public function testUnzipFileWhenUsingRelativePath() {
 		// TODO: Remove once UnzipStep is implemented
-		$this->markTestSkipped('UnzipStep not yet implemented.');
+		$this->markTestSkipped( 'UnzipStep not yet implemented.' );
 
 		$zip = __DIR__ . '/resources/test_zip.zip';
 		$this->resource_manager->method( 'getStream' )

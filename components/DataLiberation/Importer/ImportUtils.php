@@ -17,7 +17,7 @@ class ImportUtils {
 	 * Generates a block opener comment with given attributes.
 	 *
 	 * @param string $block_name The name of the block.
-	 * @param array $attrs The attributes of the block.
+	 * @param array  $attrs The attributes of the block.
 	 * @return string The block opener.
 	 */
 	public static function block_opener( $block_name, $attrs = array() ) {

@@ -35,8 +35,8 @@ class MkdirStepRunnerTest extends PHPUnitTestCase {
 	 * @before
 	 */
 	public function before() {
-		$this->document_root = Path::makeAbsolute( "test", sys_get_temp_dir() );
-		$this->runtime = new Runtime( $this->document_root );
+		$this->document_root = Path::makeAbsolute( 'test', sys_get_temp_dir() );
+		$this->runtime       = new Runtime( $this->document_root );
 
 		$this->step_runner = new MkdirStepRunner();
 		$this->step_runner->setRuntime( $this->runtime );
@@ -99,7 +99,7 @@ class MkdirStepRunnerTest extends PHPUnitTestCase {
 	}
 
 	public function testThrowExceptionWhenCreatingDirectoryAndItAlreadyExists() {
-		$path = 'dir';
+		$path          = 'dir';
 		$resolved_path = $this->runtime->resolvePath( $path );
 		$this->filesystem->mkdir( $resolved_path );
 

@@ -236,12 +236,12 @@ class WXREntityReader implements EntityReader {
 	 */
 	private $upstream;
 
-    /**
-     * Whether the reader has finished processing the input stream.
-     *
-     * @var bool
-     */
-    private $is_finished = false;
+	/**
+	 * Whether the reader has finished processing the input stream.
+	 *
+	 * @var bool
+	 */
+	private $is_finished = false;
 
 	/**
 	 * Mapping of WXR tags representing site options to their WordPress options names.
@@ -379,7 +379,7 @@ class WXREntityReader implements EntityReader {
 		}
 
 		$xml    = XMLProcessor::create_for_streaming( '', $xml_cursor );
-        $reader = new WXREntityReader( $xml );
+		$reader = new WXREntityReader( $xml );
 		if ( null !== $cursor ) {
 			$reader->last_post_id    = $cursor['last_post_id'];
 			$reader->last_comment_id = $cursor['last_comment_id'];
@@ -437,7 +437,6 @@ class WXREntityReader implements EntityReader {
 	 *
 	 * @return ImportEntity The entity.
 	 * @since WP_VERSION
-	 *
 	 */
 	public function get_entity(): ImportEntity {
 		return new ImportEntity(
@@ -541,9 +540,9 @@ class WXREntityReader implements EntityReader {
 		return $this->xml->get_last_error();
 	}
 
-    public function get_xml_exception(): ?XMLUnsupportedException {
-        return $this->xml->get_exception();
-    }
+	public function get_xml_exception(): ?XMLUnsupportedException {
+		return $this->xml->get_exception();
+	}
 
 	/**
 	 * Advances to the next entity in the WXR file.
@@ -553,9 +552,9 @@ class WXREntityReader implements EntityReader {
 	 * @return bool Whether another entity was found.
 	 */
 	public function next_entity() {
-        if ($this->is_finished) {
-            return false;
-        }
+		if ( $this->is_finished ) {
+			return false;
+		}
 		while ( true ) {
 			if ( $this->read_next_entity() ) {
 				return true;
@@ -563,16 +562,16 @@ class WXREntityReader implements EntityReader {
 			// If the read failed because of incomplete input data,
 			// try pulling more bytes from upstream before giving up.
 			if ( $this->is_paused_at_incomplete_input() ) {
-                if($this->pull_upstream_bytes()) {
-                    continue;
-                } else {
-                    break;
-                }
+				if ( $this->pull_upstream_bytes() ) {
+					continue;
+				} else {
+					break;
+				}
 			}
-            $this->is_finished = true;
-            break;
+			$this->is_finished = true;
+			break;
 		}
-        return false;
+		return false;
 	}
 
 	/**
@@ -652,6 +651,7 @@ class WXREntityReader implements EntityReader {
 			/**
 			 * Custom adjustment: the Accessibility WXR file uses a non-standard
 			 * wp:wp_author tag.
+			 *
 			 * @TODO: Should WP_WXR_Entity_Reader care about such non-standard tags when
 			 *        the regular WXR importer would ignore them? Perhaps a warning
 			 *        and an upstream PR would be a better solution.
@@ -864,14 +864,14 @@ class WXREntityReader implements EntityReader {
 		if ( ! $this->upstream ) {
 			return false;
 		}
-        if ( $this->upstream->reached_end_of_data() ) {
-            $this->input_finished();
-            return false;
-        }
+		if ( $this->upstream->reached_end_of_data() ) {
+			$this->input_finished();
+			return false;
+		}
 
-        $available_bytes = $this->upstream->pull(8192);
-        $this->append_bytes($this->upstream->consume($available_bytes));
-        return true;
+		$available_bytes = $this->upstream->pull( 8192 );
+		$this->append_bytes( $this->upstream->consume( $available_bytes ) );
+		return true;
 	}
 
 	/**
@@ -926,5 +926,4 @@ class WXREntityReader implements EntityReader {
 		$this->text_buffer            = '';
 		$this->last_opener_attributes = array();
 	}
-
 }

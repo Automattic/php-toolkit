@@ -14,27 +14,28 @@ use WordPress\Filesystem\Mixin\MkdirRecursive;
  */
 class SQLiteFilesystem implements Filesystem {
 
-    use BufferedWriteStreamViaPutContents,
-        MkdirRecursive,
-        CopyRecursiveViaStreaming;
+	use BufferedWriteStreamViaPutContents;
+	use MkdirRecursive;
+	use CopyRecursiveViaStreaming;
 
 	private $db;
-    private $transaction_level = 0;
+	private $transaction_level = 0;
 
-    static public function create($db_path = ':memory:') {
-        return new ChrootLayer(
-            new SQLiteFilesystem($db_path),
-            '/'
-        );
-    }
+	public static function create( $db_path = ':memory:' ) {
+		return new ChrootLayer(
+			new SQLiteFilesystem( $db_path ),
+			'/'
+		);
+	}
 
-    public function get_root(): string {
-        return '/';
-    }
+	public function get_root(): string {
+		return '/';
+	}
 
-	private function __construct($db_path) {
-		$this->db = new \SQLite3($db_path);
-		$this->db->exec('
+	private function __construct( $db_path ) {
+		$this->db = new \SQLite3( $db_path );
+		$this->db->exec(
+			'
 			CREATE TABLE IF NOT EXISTS files (
 				path TEXT PRIMARY KEY,
 				type TEXT NOT NULL,
@@ -45,325 +46,350 @@ class SQLiteFilesystem implements Filesystem {
 				name TEXT,
 				PRIMARY KEY (parent_path, name)
 			);
-		');
+		'
+		);
 
 		// Create root directory if it doesn't exist
-		$stmt = $this->db->prepare('INSERT OR IGNORE INTO files (path, type) VALUES (?, ?)');
-		$stmt->bindValue(1, '/', SQLITE3_TEXT);
-		$stmt->bindValue(2, 'dir', SQLITE3_TEXT);
+		$stmt = $this->db->prepare( 'INSERT OR IGNORE INTO files (path, type) VALUES (?, ?)' );
+		$stmt->bindValue( 1, '/', SQLITE3_TEXT );
+		$stmt->bindValue( 2, 'dir', SQLITE3_TEXT );
 		$stmt->execute();
 	}
 
-	public function ls($path = '/') {
-		$stmt = $this->db->prepare('
+	public function ls( $path = '/' ) {
+		$stmt = $this->db->prepare(
+			'
 			SELECT name FROM directory_entries
 			WHERE parent_path = ?
-		');
-		$stmt->bindValue(1, $path, SQLITE3_TEXT);
+		'
+		);
+		$stmt->bindValue( 1, $path, SQLITE3_TEXT );
 		$result = $stmt->execute();
 
-		$entries = [];
-		while ($row = $result->fetchArray(SQLITE3_ASSOC)) {
+		$entries = array();
+		while ( $row = $result->fetchArray( SQLITE3_ASSOC ) ) {
 			$entries[] = $row['name'];
 		}
 		return $entries;
 	}
 
-	public function is_dir($path) {
-		$stmt = $this->db->prepare('
+	public function is_dir( $path ) {
+		$stmt = $this->db->prepare(
+			'
 			SELECT type FROM files
 			WHERE path = ? AND type = ?
-		');
-		$stmt->bindValue(1, $path, SQLITE3_TEXT);
-		$stmt->bindValue(2, 'dir', SQLITE3_TEXT);
+		'
+		);
+		$stmt->bindValue( 1, $path, SQLITE3_TEXT );
+		$stmt->bindValue( 2, 'dir', SQLITE3_TEXT );
 		$result = $stmt->execute();
 		return $result->fetchArray() !== false;
 	}
 
-	public function is_file($path) {
-		$stmt = $this->db->prepare('
+	public function is_file( $path ) {
+		$stmt = $this->db->prepare(
+			'
 			SELECT type FROM files
 			WHERE path = ? AND type = ?
-		');
-		$stmt->bindValue(1, $path, SQLITE3_TEXT);
-		$stmt->bindValue(2, 'file', SQLITE3_TEXT);
+		'
+		);
+		$stmt->bindValue( 1, $path, SQLITE3_TEXT );
+		$stmt->bindValue( 2, 'file', SQLITE3_TEXT );
 		$result = $stmt->execute();
 		return $result->fetchArray() !== false;
 	}
 
-	public function exists($path) {
-		$stmt = $this->db->prepare('
+	public function exists( $path ) {
+		$stmt = $this->db->prepare(
+			'
 			SELECT 1 FROM files
 			WHERE path = ?
-		');
-		$stmt->bindValue(1, $path, SQLITE3_TEXT);
+		'
+		);
+		$stmt->bindValue( 1, $path, SQLITE3_TEXT );
 		$result = $stmt->execute();
 		return $result->fetchArray() !== false;
 	}
 
-	public function open_read_stream($path): ByteReadStream {
-		return new MemoryPipe($this->get_contents($path));
+	public function open_read_stream( $path ): ByteReadStream {
+		return new MemoryPipe( $this->get_contents( $path ) );
 	}
 
-    public function get_contents($path) {
-		if (!$this->is_file($path)) {
+	public function get_contents( $path ) {
+		if ( ! $this->is_file( $path ) ) {
 			throw new FilesystemException(
-				sprintf('File not found: %s', $path),
+				sprintf( 'File not found: %s', $path ),
 			);
 		}
-		$stmt = $this->db->prepare('SELECT contents FROM files WHERE path = ?');
-		$stmt->bindValue(1, $path, SQLITE3_TEXT);
+		$stmt = $this->db->prepare( 'SELECT contents FROM files WHERE path = ?' );
+		$stmt->bindValue( 1, $path, SQLITE3_TEXT );
 		$result = $stmt->execute();
-		$row = $result->fetchArray(SQLITE3_ASSOC);
+		$row    = $result->fetchArray( SQLITE3_ASSOC );
 		return $row['contents'];
-    }
+	}
 
-	public function rename($from_path, $to_path, $options=[]) {
-		if (!$this->exists($from_path)) {
+	public function rename( $from_path, $to_path, $options = array() ) {
+		if ( ! $this->exists( $from_path ) ) {
 			throw new FilesystemException(
-				sprintf('File not found: %s', $from_path),
+				sprintf( 'File not found: %s', $from_path ),
 			);
 		}
 
-		$parent = dirname($to_path);
-		if (!$this->is_dir($parent)) {
+		$parent = dirname( $to_path );
+		if ( ! $this->is_dir( $parent ) ) {
 			throw new FilesystemException(
-				sprintf('Parent directory not found: %s', $parent),
+				sprintf( 'Parent directory not found: %s', $parent ),
 			);
 		}
 
 		try {
-            $this->in_transaction(
-                function() use ($from_path, $to_path) {
-                    // Update the file path
-                    $stmt = $this->db->prepare('UPDATE files SET path = ? WHERE path = ?');
-                    $stmt->bindValue(1, $to_path, SQLITE3_TEXT);
-                    $stmt->bindValue(2, $from_path, SQLITE3_TEXT);
-                    $stmt->execute();
+			$this->in_transaction(
+				function () use ( $from_path, $to_path ) {
+					// Update the file path
+					$stmt = $this->db->prepare( 'UPDATE files SET path = ? WHERE path = ?' );
+					$stmt->bindValue( 1, $to_path, SQLITE3_TEXT );
+					$stmt->bindValue( 2, $from_path, SQLITE3_TEXT );
+					$stmt->execute();
 
-                    // Update directory entries
-                    $old_parent = dirname($from_path);
-                    $parent = dirname($to_path);
+					// Update directory entries
+					$old_parent = dirname( $from_path );
+					$parent     = dirname( $to_path );
 
-                    $stmt = $this->db->prepare('
+					$stmt = $this->db->prepare(
+						'
                         DELETE FROM directory_entries
                         WHERE parent_path = ? AND name = ?
-                    ');
-                    $stmt->bindValue(1, $old_parent, SQLITE3_TEXT);
-                    $stmt->bindValue(2, basename($from_path), SQLITE3_TEXT);
-                    $stmt->execute();
+                    '
+					);
+					$stmt->bindValue( 1, $old_parent, SQLITE3_TEXT );
+					$stmt->bindValue( 2, basename( $from_path ), SQLITE3_TEXT );
+					$stmt->execute();
 
-                    $stmt = $this->db->prepare('
+					$stmt = $this->db->prepare(
+						'
                         INSERT INTO directory_entries (parent_path, name)
                         VALUES (?, ?)
-                    ');
-                    $stmt->bindValue(1, $parent, SQLITE3_TEXT);
-                    $stmt->bindValue(2, basename($to_path), SQLITE3_TEXT);
-                    $stmt->execute();
-                }
-            );
-            return true;
-		} catch (\Exception $e) {
+                    '
+					);
+					$stmt->bindValue( 1, $parent, SQLITE3_TEXT );
+					$stmt->bindValue( 2, basename( $to_path ), SQLITE3_TEXT );
+					$stmt->execute();
+				}
+			);
+			return true;
+		} catch ( \Exception $e ) {
 			throw new FilesystemException(
-				sprintf('Failed to rename file: %s to %s', $from_path, $to_path),
-                0,
-                $e
+				sprintf( 'Failed to rename file: %s to %s', $from_path, $to_path ),
+				0,
+				$e
 			);
 		}
 	}
 
-	public function mkdir_single($path, $options = []) {
-		if ($this->exists($path)) {
+	public function mkdir_single( $path, $options = array() ) {
+		if ( $this->exists( $path ) ) {
 			throw new FilesystemException(
-				sprintf('Directory already exists: %s', $path),
+				sprintf( 'Directory already exists: %s', $path ),
 			);
 		}
 
-		$parent = dirname($path);
-		if (!$this->is_dir($parent)) {
+		$parent = dirname( $path );
+		if ( ! $this->is_dir( $parent ) ) {
 			throw new FilesystemException(
-				sprintf('Parent directory not found: %s', $parent),
+				sprintf( 'Parent directory not found: %s', $parent ),
 			);
 		}
 
 		try {
-            $this->in_transaction(
-                function() use ($path) {
-                    $parent = dirname($path);
+			$this->in_transaction(
+				function () use ( $path ) {
+					$parent = dirname( $path );
 
-                    $stmt = $this->db->prepare('
+					$stmt = $this->db->prepare(
+						'
                         INSERT INTO files (path, type)
                         VALUES (?, ?)
-                    ');
-                    $stmt->bindValue(1, $path, SQLITE3_TEXT);
-                    $stmt->bindValue(2, 'dir', SQLITE3_TEXT);
-                    $stmt->execute();
+                    '
+					);
+					$stmt->bindValue( 1, $path, SQLITE3_TEXT );
+					$stmt->bindValue( 2, 'dir', SQLITE3_TEXT );
+					$stmt->execute();
 
-                    $stmt = $this->db->prepare('
+					$stmt = $this->db->prepare(
+						'
                         INSERT INTO directory_entries (parent_path, name)
                         VALUES (?, ?)
-                    ');
-                    $stmt->bindValue(1, $parent, SQLITE3_TEXT);
-                    $stmt->bindValue(2, basename($path), SQLITE3_TEXT);
-                    $stmt->execute();
-                }
-            );
-            return true;
-		} catch (\Exception $e) {
+                    '
+					);
+					$stmt->bindValue( 1, $parent, SQLITE3_TEXT );
+					$stmt->bindValue( 2, basename( $path ), SQLITE3_TEXT );
+					$stmt->execute();
+				}
+			);
+			return true;
+		} catch ( \Exception $e ) {
 			throw new FilesystemException(
-				sprintf('Failed to create directory: %s', $path),
-                0,
-                $e
+				sprintf( 'Failed to create directory: %s', $path ),
+				0,
+				$e
 			);
 		}
 	}
 
-	public function rm($path) {
-		if (!$this->is_file($path)) {
+	public function rm( $path ) {
+		if ( ! $this->is_file( $path ) ) {
 			throw new FilesystemException(
-				sprintf('File not found: %s', $path),
+				sprintf( 'File not found: %s', $path ),
 			);
 		}
 
-        try {
-            $this->in_transaction(
-                function() use ($path) {
-                    $parent = dirname($path);
+		try {
+			$this->in_transaction(
+				function () use ( $path ) {
+					$parent = dirname( $path );
 
-                    $stmt = $this->db->prepare('DELETE FROM files WHERE path = ?');
-                    $stmt->bindValue(1, $path, SQLITE3_TEXT);
-                    $stmt->execute();
+					$stmt = $this->db->prepare( 'DELETE FROM files WHERE path = ?' );
+					$stmt->bindValue( 1, $path, SQLITE3_TEXT );
+					$stmt->execute();
 
-                    $stmt = $this->db->prepare('
+					$stmt = $this->db->prepare(
+						'
                         DELETE FROM directory_entries
                         WHERE parent_path = ? AND name = ?
-                    ');
-                    $stmt->bindValue(1, $parent, SQLITE3_TEXT);
-                    $stmt->bindValue(2, basename($path), SQLITE3_TEXT);
-                    $stmt->execute();
-                }
-            );
-		} catch (\Exception $e) {
+                    '
+					);
+					$stmt->bindValue( 1, $parent, SQLITE3_TEXT );
+					$stmt->bindValue( 2, basename( $path ), SQLITE3_TEXT );
+					$stmt->execute();
+				}
+			);
+		} catch ( \Exception $e ) {
 			throw new FilesystemException(
-				sprintf('Failed to remove file: %s', $path),
-                0,
-                $e
+				sprintf( 'Failed to remove file: %s', $path ),
+				0,
+				$e
 			);
 		}
 	}
 
-	public function rmdir($path, $options = []) {
+	public function rmdir( $path, $options = array() ) {
 		$recursive = $options['recursive'] ?? false;
-		if (!$this->is_dir($path)) {
+		if ( ! $this->is_dir( $path ) ) {
 			throw new FilesystemException(
-				sprintf('Directory not found: %s', $path),
+				sprintf( 'Directory not found: %s', $path ),
 			);
 		}
 
 		try {
-            $this->in_transaction(
-                function() use ($path, $options, $recursive) {
-                    if ($recursive) {
-                        $path = rtrim($path, '/');
-                        foreach($this->ls($path) as $child) {
-                            $child_path = wp_join_paths($path, $child);
-                            if($this->is_dir($child_path)) {
-                                $this->rmdir($child_path, $options);
-                            } else {
-                                $this->rm($child_path);
-                            }
-                        }
-                    }
+			$this->in_transaction(
+				function () use ( $path, $options, $recursive ) {
+					if ( $recursive ) {
+						$path = rtrim( $path, '/' );
+						foreach ( $this->ls( $path ) as $child ) {
+							$child_path = wp_join_paths( $path, $child );
+							if ( $this->is_dir( $child_path ) ) {
+								$this->rmdir( $child_path, $options );
+							} else {
+								$this->rm( $child_path );
+							}
+						}
+					}
 
-                    $parent = dirname($path);
+					$parent = dirname( $path );
 
-                    $stmt = $this->db->prepare('DELETE FROM files WHERE path = ?');
-                    $stmt->bindValue(1, $path, SQLITE3_TEXT);
-                    $stmt->execute();
+					$stmt = $this->db->prepare( 'DELETE FROM files WHERE path = ?' );
+					$stmt->bindValue( 1, $path, SQLITE3_TEXT );
+					$stmt->execute();
 
-                    $stmt = $this->db->prepare('
+					$stmt = $this->db->prepare(
+						'
                         DELETE FROM directory_entries
                         WHERE parent_path = ? AND name = ?
-                    ');
-                    $stmt->bindValue(1, $parent, SQLITE3_TEXT);
-                    $stmt->bindValue(2, basename($path), SQLITE3_TEXT);
-                    $stmt->execute();
-                }
-            );
-		} catch (\Exception $e) {
+                    '
+					);
+					$stmt->bindValue( 1, $parent, SQLITE3_TEXT );
+					$stmt->bindValue( 2, basename( $path ), SQLITE3_TEXT );
+					$stmt->execute();
+				}
+			);
+		} catch ( \Exception $e ) {
 			throw new FilesystemException(
-				sprintf('Failed to remove directory: %s', $path),
-                0,
-                $e
+				sprintf( 'Failed to remove directory: %s', $path ),
+				0,
+				$e
 			);
 		}
 	}
 
-	public function put_contents($path, $data, $options = []) {
-		$parent = dirname($path);
-		if (!$this->is_dir($parent)) {
+	public function put_contents( $path, $data, $options = array() ) {
+		$parent = dirname( $path );
+		if ( ! $this->is_dir( $parent ) ) {
 			throw new FilesystemException(
-				sprintf('Parent directory not found: %s', $parent),
+				sprintf( 'Parent directory not found: %s', $parent ),
 			);
 		}
 
 		try {
-            $this->in_transaction(
-                function() use ($path, $data) {
-                    $parent = dirname($path);
+			$this->in_transaction(
+				function () use ( $path, $data ) {
+					$parent = dirname( $path );
 
-                    $stmt = $this->db->prepare('
+					$stmt = $this->db->prepare(
+						'
                         INSERT OR REPLACE INTO files (path, type, contents)
                         VALUES (?, ?, ?)
-                    ');
-                    $stmt->bindValue(1, $path, SQLITE3_TEXT);
-                    $stmt->bindValue(2, 'file', SQLITE3_TEXT);
-                    $stmt->bindValue(3, $data, SQLITE3_BLOB);
-                    $stmt->execute();
+                    '
+					);
+					$stmt->bindValue( 1, $path, SQLITE3_TEXT );
+					$stmt->bindValue( 2, 'file', SQLITE3_TEXT );
+					$stmt->bindValue( 3, $data, SQLITE3_BLOB );
+					$stmt->execute();
 
-                    $stmt = $this->db->prepare('
+					$stmt = $this->db->prepare(
+						'
                         INSERT OR REPLACE INTO directory_entries (parent_path, name)
                         VALUES (?, ?)
-                    ');
-                    $stmt->bindValue(1, $parent, SQLITE3_TEXT);
-                    $stmt->bindValue(2, basename($path), SQLITE3_TEXT);
-                    $stmt->execute();
-                }
-            );
-            return true;
-		} catch (\Exception $e) {
+                    '
+					);
+					$stmt->bindValue( 1, $parent, SQLITE3_TEXT );
+					$stmt->bindValue( 2, basename( $path ), SQLITE3_TEXT );
+					$stmt->execute();
+				}
+			);
+			return true;
+		} catch ( \Exception $e ) {
 			throw new FilesystemException(
-				sprintf('Failed to put contents: %s', $path),
-                0,
-                $e
+				sprintf( 'Failed to put contents: %s', $path ),
+				0,
+				$e
 			);
 		}
 	}
 
-    private function in_transaction( $callback) {
-        $current_level = $this->transaction_level++;
-        try {
-            if($current_level === 0) {
-                $this->db->exec('BEGIN TRANSACTION');
-                try {
-                    $callback();
-                    $this->db->exec('COMMIT');
-                } catch (\Exception $e) {
-                    $this->db->exec('ROLLBACK');
-                    throw $e;
-                }
-            } else {
-                $this->db->exec('SAVEPOINT level_' . $current_level);
-                try {
-                    $callback();
-                    $this->db->exec('RELEASE SAVEPOINT level_' . $current_level);
-                } catch (\Exception $e) {
-                    $this->db->exec('ROLLBACK TO SAVEPOINT level_' . $current_level);
-                    throw $e;
-                }
-            }
-        } finally {
-            --$this->transaction_level;
-        }
-    }
+	private function in_transaction( $callback ) {
+		$current_level = $this->transaction_level++;
+		try {
+			if ( $current_level === 0 ) {
+				$this->db->exec( 'BEGIN TRANSACTION' );
+				try {
+					$callback();
+					$this->db->exec( 'COMMIT' );
+				} catch ( \Exception $e ) {
+					$this->db->exec( 'ROLLBACK' );
+					throw $e;
+				}
+			} else {
+				$this->db->exec( 'SAVEPOINT level_' . $current_level );
+				try {
+					$callback();
+					$this->db->exec( 'RELEASE SAVEPOINT level_' . $current_level );
+				} catch ( \Exception $e ) {
+					$this->db->exec( 'ROLLBACK TO SAVEPOINT level_' . $current_level );
+					throw $e;
+				}
+			}
+		} finally {
+			--$this->transaction_level;
+		}
+	}
 }

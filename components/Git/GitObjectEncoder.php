@@ -9,54 +9,55 @@ use WordPress\ByteStream\WriteStream\TransformedWriteStream;
 
 class GitObjectEncoder implements ByteWriteStream {
 
-    private $downstream;
-    private $repository;
+	private $downstream;
+	private $repository;
 
-    public function __construct($repository, $object_type_name, $object_length) {
-        switch($object_type_name) {
-            case 'blob':
-            case 'tree':
-            case 'commit':
-                break;
-            default:
-                throw new GitException(sprintf(
-                    "Invalid object type passed to GitObjectWriter: %s. Only blob, tree and commit are supported.",
-                    $object_type_name
-                ));
-        }
+	public function __construct( $repository, $object_type_name, $object_length ) {
+		switch ( $object_type_name ) {
+			case 'blob':
+			case 'tree':
+			case 'commit':
+				break;
+			default:
+				throw new GitException(
+					sprintf(
+						'Invalid object type passed to GitObjectWriter: %s. Only blob, tree and commit are supported.',
+						$object_type_name
+					)
+				);
+		}
 
-        $this->repository = $repository;
+		$this->repository = $repository;
 
-        $header = "$object_type_name $object_length\x00";
-        $this->downstream = new TransformedWriteStream(
-            $repository->get_object_storage_filesystem()->open_write_stream('objects/.tmp'),
-            [
-                'checksum' => new ChecksumTransformer('sha1'),
-            ]
-        );
-        $this->downstream->append_bytes($header);
-        $this->downstream['deflate'] = new DeflateTransformer(ZLIB_ENCODING_DEFLATE);
-    }
+		$header           = "$object_type_name $object_length\x00";
+		$this->downstream = new TransformedWriteStream(
+			$repository->get_object_storage_filesystem()->open_write_stream( 'objects/.tmp' ),
+			array(
+				'checksum' => new ChecksumTransformer( 'sha1' ),
+			)
+		);
+		$this->downstream->append_bytes( $header );
+		$this->downstream['deflate'] = new DeflateTransformer( ZLIB_ENCODING_DEFLATE );
+	}
 
-    public function append_bytes($data): void {
-        $this->downstream->append_bytes($data);
-    }
+	public function append_bytes( $data ): void {
+		$this->downstream->append_bytes( $data );
+	}
 
-    public function get_hash(): string {
-        return $this->downstream['checksum']->get_hash();
-    }
+	public function get_hash(): string {
+		return $this->downstream['checksum']->get_hash();
+	}
 
-    public function close_writing(): void {
-        $this->downstream->close_writing();
-        $hash = $this->downstream['checksum']->get_hash();
-        $this->downstream->get_downstream_writer()->close_writing();
-        $target_path = $this->repository->get_storage_path($hash);
-        $target_dir = dirname($target_path);
-        $fs = $this->repository->get_object_storage_filesystem();
-        if(!$fs->is_dir($target_dir)) {
-            $fs->mkdir($target_dir, ['recursive' => true]);
-        }
-        $fs->rename('objects/.tmp', $target_path);
-    }
-
+	public function close_writing(): void {
+		$this->downstream->close_writing();
+		$hash = $this->downstream['checksum']->get_hash();
+		$this->downstream->get_downstream_writer()->close_writing();
+		$target_path = $this->repository->get_storage_path( $hash );
+		$target_dir  = dirname( $target_path );
+		$fs          = $this->repository->get_object_storage_filesystem();
+		if ( ! $fs->is_dir( $target_dir ) ) {
+			$fs->mkdir( $target_dir, array( 'recursive' => true ) );
+		}
+		$fs->rename( 'objects/.tmp', $target_path );
+	}
 }

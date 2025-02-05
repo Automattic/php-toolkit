@@ -56,7 +56,6 @@ class XMLUnsupportedException extends \Exception {
 	 * raw text of the token, including original casing, duplicated attributes,
 	 * and other syntactic variations that are normally abstracted in the XML API.
 	 *
-	 *
 	 * @var string
 	 */
 	public $token;
@@ -66,14 +65,12 @@ class XMLUnsupportedException extends \Exception {
 	 *
 	 * Use this to trace the parsing circumstances which led to the exception.
 	 *
-	 *
 	 * @var string[]
 	 */
 	public $stack_of_open_elements = array();
 
 	/**
 	 * Constructor function.
-	 *
 	 *
 	 * @param string   $message                    Brief message explaining what is unsupported, the reason this exception was raised.
 	 * @param string   $token_name                 Normalized name of matched token when this exception was raised.
@@ -89,10 +86,10 @@ class XMLUnsupportedException extends \Exception {
 		$this->token_at   = $token_at;
 		$this->token      = $token;
 
-		$this->stack_of_open_elements     = $stack_of_open_elements;
+		$this->stack_of_open_elements = $stack_of_open_elements;
 	}
 
-    public function __toString() {
-        return $this->message . ' at ' . $this->token_at . ' in ' . $this->token;
-    }
+	public function __toString() {
+		return $this->message . ' at ' . $this->token_at . ' in ' . $this->token;
+	}
 }

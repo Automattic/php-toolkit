@@ -19,62 +19,62 @@ interface Filesystem {
 	 *
 	 * @param string $parent The path to the parent directory.
 	 * @return array<string> The contents of the directory.
-     * @throws FilesystemException If the directory cannot be listed.
+	 * @throws FilesystemException If the directory cannot be listed.
 	 */
-	public function ls($parent = '/');
+	public function ls( $parent = '/' );
 
 	/**
 	 * Check if a path is a directory.
 	 *
 	 * @param string $path The path to check.
 	 * @return bool True if the path is a directory, false otherwise.
-     * @throws FilesystemException If the path cannot be checked.
+	 * @throws FilesystemException If the path cannot be checked.
 	 */
-	public function is_dir($path);
+	public function is_dir( $path );
 
 	/**
 	 * Check if a path is a file.
 	 *
 	 * @param string $path The path to check.
 	 * @return bool True if the path is a file, false otherwise.
-     * @throws FilesystemException If the path cannot be checked.
+	 * @throws FilesystemException If the path cannot be checked.
 	 */
-	public function is_file($path);
+	public function is_file( $path );
 
 	/**
 	 * Check if a path exists.
 	 *
 	 * @param string $path The path to check.
 	 * @return bool True if the path exists, false otherwise.
-     * @throws FilesystemException If the path cannot be checked.
+	 * @throws FilesystemException If the path cannot be checked.
 	 */
-	public function exists($path);
+	public function exists( $path );
 
 	/**
 	 * Create a directory.
 	 *
 	 * @param string $path The path to create.
-	 * @param array $options Additional options.
-     * @throws FilesystemException If the directory cannot be created.
+	 * @param array  $options Additional options.
+	 * @throws FilesystemException If the directory cannot be created.
 	 */
-	public function mkdir($path, $options = []);
+	public function mkdir( $path, $options = array() );
 
 	/**
 	 * Remove a file.
 	 *
 	 * @param string $path The path to remove.
-     * @throws FilesystemException If the file cannot be removed.
+	 * @throws FilesystemException If the file cannot be removed.
 	 */
-	public function rm($path);
+	public function rm( $path );
 
 	/**
 	 * Remove a directory.
 	 *
 	 * @param string $path The path to remove.
-	 * @param array $options Additional options.
-     * @throws FilesystemException If the directory cannot be removed.
+	 * @param array  $options Additional options.
+	 * @throws FilesystemException If the directory cannot be removed.
 	 */
-	public function rmdir($path, $options = []);
+	public function rmdir( $path, $options = array() );
 
 	/**
 	 * Start streaming a file.
@@ -82,8 +82,8 @@ interface Filesystem {
 	 * @param string $path The path to the file.
 	 *
 	 * @return ByteReadStream The stream identifier.
-     * @throws FilesystemException If the stream cannot be opened.
-	 *@example
+	 * @throws FilesystemException If the stream cannot be opened.
+	 * @example
 	 *
 	 * $fs->open_read_stream($path);
 	 * while($fs->next_file_chunk()) {
@@ -91,9 +91,8 @@ interface Filesystem {
 	 *     // process $chunk
 	 * }
 	 * $fs->close_read_stream();
-	 *
 	 */
-	public function open_read_stream($path): ByteReadStream;
+	public function open_read_stream( $path ): ByteReadStream;
 
 	/**
 	 * Open a write stream to a file.
@@ -101,39 +100,39 @@ interface Filesystem {
 	 * @param string $path The path to write to.
 	 *
 	 * @return ByteWriteStream The stream identifier.
-     * @throws FilesystemException If the stream cannot be opened.
+	 * @throws FilesystemException If the stream cannot be opened.
 	 */
-	public function open_write_stream($path ): ByteWriteStream;
+	public function open_write_stream( $path ): ByteWriteStream;
 
-    /**
-     * Write data to a file.
-     *
-     * @param string $path The path to write to.
-     * @param string $data The data to write.
-     * @param array $options Additional options.
-     * @throws FilesystemException If the data cannot be written.
-     */
-	public function put_contents($path, $data, $options = []);
+	/**
+	 * Write data to a file.
+	 *
+	 * @param string $path The path to write to.
+	 * @param string $data The data to write.
+	 * @param array  $options Additional options.
+	 * @throws FilesystemException If the data cannot be written.
+	 */
+	public function put_contents( $path, $data, $options = array() );
 
-    /**
-     * Copy a file from one path to another.
-     *
-     * @param string $from_path The path to copy from.
-     * @param string $to_path The path to copy to.
-     * @param array $options Additional options.
-     * @throws FilesystemException If the file cannot be copied.
-     */
-	public function copy($from_path, $to_path, $options = []);
+	/**
+	 * Copy a file from one path to another.
+	 *
+	 * @param string $from_path The path to copy from.
+	 * @param string $to_path The path to copy to.
+	 * @param array  $options Additional options.
+	 * @throws FilesystemException If the file cannot be copied.
+	 */
+	public function copy( $from_path, $to_path, $options = array() );
 
-    /**
-     * Moves a file from one path to another.
-     *
-     * @param string $from_path The path to move from.
-     * @param string $to_path The path to move to.
-     * @param array $options Additional options.
-     * @throws FilesystemException If the file cannot be moved.
-     */
-	public function rename($from_path, $to_path, $options = []);
+	/**
+	 * Moves a file from one path to another.
+	 *
+	 * @param string $from_path The path to move from.
+	 * @param string $to_path The path to move to.
+	 * @param array  $options Additional options.
+	 * @throws FilesystemException If the file cannot be moved.
+	 */
+	public function rename( $from_path, $to_path, $options = array() );
 
 	/**
 	 * Buffers the entire contents of a file into a string
@@ -143,6 +142,5 @@ interface Filesystem {
 	 * @return string The contents of the file.
 	 * @throws FilesystemException If the file cannot be read.
 	 */
-	public function get_contents($path);
-
+	public function get_contents( $path );
 }

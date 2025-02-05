@@ -11,10 +11,9 @@ class ZipEncoder {
 
 	private $output;
 	private $centralDirectory = array();
-	private $bytes_written = 0;
+	private $bytes_written    = 0;
 
-	public function __construct(ByteWriteStream $output)
-	{
+	public function __construct( ByteWriteStream $output ) {
 		$this->output = $output;
 	}
 
@@ -22,27 +21,28 @@ class ZipEncoder {
 	 * Appends a file entry to the zip file.
 	 */
 	public function append_file( FileEntry $entry ) {
-        $this->compute_file_hash_and_size($entry);
-        $this->recordFileForCentralDirectory($entry);
-        $this->append_file_entry_header($entry);
+		$this->compute_file_hash_and_size( $entry );
+		$this->recordFileForCentralDirectory( $entry );
+		$this->append_file_entry_header( $entry );
 
-        try {
-            if( $entry->compressionMethod === ZipDecoder::COMPRESSION_DEFLATE) {
-                $body_stream = new DeflateReadStream($entry->body_reader, ZLIB_ENCODING_RAW, 9);
-            } else {
-                $body_stream = $entry->body_reader;
-            }
+		try {
+			if ( $entry->compressionMethod === ZipDecoder::COMPRESSION_DEFLATE ) {
+				$body_stream = new DeflateReadStream( $entry->body_reader, ZLIB_ENCODING_RAW, 9 );
+			} else {
+				$body_stream = $entry->body_reader;
+			}
 
-            while($bytes = $body_stream->pull(10)) {
-                $this->output->append_bytes($body_stream->consume($bytes));
-            }
-            $this->bytes_written += $entry->compressedSize;
-        } finally {
-            if( $entry->compressionMethod === ZipDecoder::COMPRESSION_DEFLATE) {
-                $body_stream->close_reading();;
-            }
-        }
-    }
+			while ( $bytes = $body_stream->pull( 10 ) ) {
+				$this->output->append_bytes( $body_stream->consume( $bytes ) );
+			}
+			$this->bytes_written += $entry->compressedSize;
+		} finally {
+			if ( $entry->compressionMethod === ZipDecoder::COMPRESSION_DEFLATE ) {
+				$body_stream->close_reading();
+
+			}
+		}
+	}
 
 	/**
 	 * Streams a file from disk and writes it into a ZIP archive.
@@ -61,88 +61,95 @@ class ZipEncoder {
 	 * into memory. It reads and compresses the file in chunks, making it suitable for streaming
 	 * large files effectively.
 	 */
-	private function compute_file_hash_and_size(FileEntry $entry) {
-        // Pass 1: Calculate the CRC32, uncompressed size, and compressed size
-        if( $entry->compressionMethod === ZipDecoder::COMPRESSION_DEFLATE) {
-            $reader = new DeflateReadStream($entry->body_reader, ZLIB_ENCODING_RAW, 9);
-        } else {
-            $reader = $entry->body_reader;
-        }
-        $stream = new TransformedReadStream($reader, [
-            'checksum' => new ChecksumTransformer('crc32b'),
-        ]);
+	private function compute_file_hash_and_size( FileEntry $entry ) {
+		// Pass 1: Calculate the CRC32, uncompressed size, and compressed size
+		if ( $entry->compressionMethod === ZipDecoder::COMPRESSION_DEFLATE ) {
+			$reader = new DeflateReadStream( $entry->body_reader, ZLIB_ENCODING_RAW, 9 );
+		} else {
+			$reader = $entry->body_reader;
+		}
+		$stream = new TransformedReadStream(
+			$reader,
+			array(
+				'checksum' => new ChecksumTransformer( 'crc32b' ),
+			)
+		);
 
-        while(true) {
-            $n = $stream->pull(10);
-            if($n === 0) {
-                break;
-            }
-            $stream->consume($n);
-        }
+		while ( true ) {
+			$n = $stream->pull( 10 );
+			if ( $n === 0 ) {
+				break;
+			}
+			$stream->consume( $n );
+		}
 
-        if( $entry->compressionMethod === ZipDecoder::COMPRESSION_DEFLATE) {
-            $reader->close_reading();
-        }
+		if ( $entry->compressionMethod === ZipDecoder::COMPRESSION_DEFLATE ) {
+			$reader->close_reading();
+		}
 
-        $entry->compressedSize = $reader->tell();
-        $entry->uncompressedSize = $entry->body_reader->length();
-        $entry->crc = hexdec($stream['checksum']->get_hash());
+		$entry->compressedSize   = $reader->tell();
+		$entry->uncompressedSize = $entry->body_reader->length();
+		$entry->crc              = hexdec( $stream['checksum']->get_hash() );
 
-        // Reset the reader to the beginning of the file
-        $entry->body_reader->seek(0);
+		// Reset the reader to the beginning of the file
+		$entry->body_reader->seek( 0 );
 	}
 
 
-	private function recordFileForCentralDirectory(FileEntry $file_entry) {
-		$this->centralDirectory[] = new CentralDirectoryEntry(array(
-			'versionCreated' => 2,
-			'versionNeeded' => 2,
-			'generalPurpose' => $file_entry->generalPurpose,
-			'compressionMethod' => $file_entry->compressionMethod,
-			'lastModifiedTime' => $file_entry->lastModifiedTime,
-			'lastModifiedDate' => $file_entry->lastModifiedDate,
-			'crc' => $file_entry->crc,
-			'compressedSize' => $file_entry->compressedSize,
-			'uncompressedSize' => $file_entry->uncompressedSize,
-			'diskNumber' => 0,
-			'internalAttributes' => 0,
-			'externalAttributes' => 0,
-			'firstByteAt' => $this->bytes_written,
-			'path' => $file_entry->path,
-			'extra' => $file_entry->extra,
-			'fileComment' => '',
-		));
+	private function recordFileForCentralDirectory( FileEntry $file_entry ) {
+		$this->centralDirectory[] = new CentralDirectoryEntry(
+			array(
+				'versionCreated' => 2,
+				'versionNeeded' => 2,
+				'generalPurpose' => $file_entry->generalPurpose,
+				'compressionMethod' => $file_entry->compressionMethod,
+				'lastModifiedTime' => $file_entry->lastModifiedTime,
+				'lastModifiedDate' => $file_entry->lastModifiedDate,
+				'crc' => $file_entry->crc,
+				'compressedSize' => $file_entry->compressedSize,
+				'uncompressedSize' => $file_entry->uncompressedSize,
+				'diskNumber' => 0,
+				'internalAttributes' => 0,
+				'externalAttributes' => 0,
+				'firstByteAt' => $this->bytes_written,
+				'path' => $file_entry->path,
+				'extra' => $file_entry->extra,
+				'fileComment' => '',
+			)
+		);
 	}
 
 	public function close() {
 		$this->flushCentralDirectory();
 	}
 
-    /**
-     * Writes the central directory and its end record to the ZIP archive stream.
-     *
-     * This method writes all the central directory entries stored and then writes
-     * the end of central directory record, finalizing the ZIP archive structure.
-     */
-    private function flushCentralDirectory() {
+	/**
+	 * Writes the central directory and its end record to the ZIP archive stream.
+	 *
+	 * This method writes all the central directory entries stored and then writes
+	 * the end of central directory record, finalizing the ZIP archive structure.
+	 */
+	private function flushCentralDirectory() {
 		$centralDirectoryOffset = $this->bytes_written;
 
-        // Write all central directory entries
-        foreach ($this->centralDirectory as $entry) {
-            $this->append_central_directory_entry($entry);
-        }
+		// Write all central directory entries
+		foreach ( $this->centralDirectory as $entry ) {
+			$this->append_central_directory_entry( $entry );
+		}
 
-        $this->append_end_central_directory_entry(
-            new EndCentralDirectoryEntry(array(
-                'numberCentralDirectoryRecordsOnThisDisk' => count($this->centralDirectory),
-                'numberCentralDirectoryRecords' => count($this->centralDirectory),
-                'centralDirectorySize' => $this->bytes_written - $centralDirectoryOffset,
-                'centralDirectoryOffset' => $centralDirectoryOffset,
-            ))
-        );
-    }
+		$this->append_end_central_directory_entry(
+			new EndCentralDirectoryEntry(
+				array(
+					'numberCentralDirectoryRecordsOnThisDisk' => count( $this->centralDirectory ),
+					'numberCentralDirectoryRecords' => count( $this->centralDirectory ),
+					'centralDirectorySize' => $this->bytes_written - $centralDirectoryOffset,
+					'centralDirectoryOffset' => $centralDirectoryOffset,
+				)
+			)
+		);
+	}
 
-    private function append_file_entry_header(FileEntry $entry) {
+	private function append_file_entry_header( FileEntry $entry ) {
 		$header = pack(
 			'VvvvvvVVVvv',
 			FileEntry::SIGNATURE,
@@ -158,15 +165,15 @@ class ZipEncoder {
 			$entry->extraLength
 		) . $entry->path . $entry->extra;
 
-		$this->output->append_bytes($header);
-        $this->bytes_written += strlen($header);
-    }
+		$this->output->append_bytes( $header );
+		$this->bytes_written += strlen( $header );
+	}
 
-    /**
-     * Appends a central directory entry to the zip file.
-     *
-     * @param CentralDirectoryEntry $entry
-     */
+	/**
+	 * Appends a central directory entry to the zip file.
+	 *
+	 * @param CentralDirectoryEntry $entry
+	 */
 	protected function append_central_directory_entry( CentralDirectoryEntry $entry ) {
 		$object = pack(
 			'VvvvvvvVVVvvvvvVV',
@@ -189,8 +196,8 @@ class ZipEncoder {
 			$entry->firstByteAt
 		) . $entry->path . $entry->extra . $entry->fileComment;
 
-		$this->output->append_bytes($object);
-        $this->bytes_written += strlen($object);
+		$this->output->append_bytes( $object );
+		$this->bytes_written += strlen( $object );
 	}
 
 	/**
@@ -209,7 +216,7 @@ class ZipEncoder {
 			$entry->commentLength
 		) . $entry->comment;
 
-		$this->output->append_bytes($object);
-        $this->bytes_written += strlen($object);
+		$this->output->append_bytes( $object );
+		$this->bytes_written += strlen( $object );
 	}
 }

@@ -83,8 +83,8 @@ class EPubEntityReader implements EntityReader {
 				return false;
 			}
 
-			$html_file = array_shift( $this->remaining_html_files );
-			$html      = $this->zip->get_contents( $html_file );
+			$html_file                 = array_shift( $this->remaining_html_files );
+			$html                      = $this->zip->get_contents( $html_file );
 			$converter                 = new MarkupProcessorConsumer( XMLProcessor::create_from_string( $html ) );
 			$blocks_with_meta          = $converter->consume();
 			$this->current_html_reader = new HTMLEntityReader(
@@ -105,8 +105,7 @@ class EPubEntityReader implements EntityReader {
 		return $this->finished;
 	}
 
-    public function get_reentrancy_cursor() {
-        return '';
-    }
-
+	public function get_reentrancy_cursor() {
+		return '';
+	}
 }

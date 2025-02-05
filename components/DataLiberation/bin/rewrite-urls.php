@@ -1,6 +1,6 @@
 <?php
 
-require_once __DIR__ . "/../bootstrap.php";
+require_once __DIR__ . '/../bootstrap.php';
 
 if ( $argc < 2 ) {
 	echo "Usage: php script.php <command> --file <input-file> --from-url <current site url> --to-url <target url>\n";
@@ -11,12 +11,12 @@ if ( $argc < 2 ) {
 }
 
 $command = $argv[1];
-$options = [];
+$options = array();
 
-for ( $i = 2; $i < $argc; $i ++ ) {
+for ( $i = 2; $i < $argc; $i++ ) {
 	if ( str_starts_with( $argv[ $i ], '--' ) && isset( $argv[ $i + 1 ] ) ) {
 		$options[ substr( $argv[ $i ], 2 ) ] = $argv[ $i + 1 ];
-		$i ++;
+		++$i;
 	}
 }
 
@@ -33,14 +33,19 @@ if ( ! file_exists( $inputFile ) ) {
 $block_markup = file_get_contents( $inputFile );
 
 // @TODO: Decide – should the current site URL be always required to
-//        populate $base_url?
+// populate $base_url?
 $base_url = $options['from-url'] ?? 'https://playground.internal';
 $p        = new WP_Block_Markup_Url_Processor( $block_markup, $base_url );
 
 switch ( $command ) {
 	case 'list_urls':
 		echo "URLs found in the markup:\n\n";
-		wp_list_urls_in_block_markup( [ 'block_markup' => $block_markup, 'base_url' => $base_url ]);
+		wp_list_urls_in_block_markup(
+			array(
+				'block_markup' => $block_markup,
+				'base_url' => $base_url,
+			)
+		);
 		echo "\n";
 		break;
 	case 'migrate_urls':
@@ -54,19 +59,21 @@ switch ( $command ) {
 		}
 
 		echo "Replacing $base_url with " . $options['to-url'] . " in the input.\n\n";
-		if (!is_dir('./assets')) {
-			mkdir('./assets/', 0777, true);
+		if ( ! is_dir( './assets' ) ) {
+			mkdir( './assets/', 0777, true );
 		}
-		$result = wp_rewrite_urls( array(
-			'block_markup' => $block_markup,
-			'base_url' => $base_url,
-			'url-mapping' => [
-				$options['from-url'] => $options['to-url'],
-			],
-		) );
-		if(!is_string($result)) {
+		$result = wp_rewrite_urls(
+			array(
+				'block_markup' => $block_markup,
+				'base_url' => $base_url,
+				'url-mapping' => array(
+					$options['from-url'] => $options['to-url'],
+				),
+			)
+		);
+		if ( ! is_string( $result ) ) {
 			echo "Error! \n";
-			print_r($result);
+			print_r( $result );
 			exit( 1 );
 		}
 		echo $result;

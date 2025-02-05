@@ -156,7 +156,7 @@ class FilesystemEntityReader implements EntityReader {
 	 * Initializes the reader with filesystem and options.
 	 *
 	 * @param Filesystem $filesystem The filesystem to traverse.
-	 * @param array $options Configuration options.
+	 * @param array      $options Configuration options.
 	 */
 	public function __construct(
 		Filesystem $filesystem,
@@ -246,19 +246,19 @@ class FilesystemEntityReader implements EntityReader {
 			);
 			if ( $post_tree_node['type'] === 'file' ) {
 				$extension = pathinfo( $post_tree_node['local_file_path'], PATHINFO_EXTENSION );
-                $content   = $this->fs->get_contents( $post_tree_node['local_file_path'] );
+				$content   = $this->fs->get_contents( $post_tree_node['local_file_path'] );
 				switch ( $extension ) {
 					case 'md':
 						$converter = new MarkdownConsumer( $content );
-                        $result = $converter->consume();
+						$result    = $converter->consume();
 						break;
 					case 'xhtml':
 						$converter = new MarkupProcessorConsumer( XMLProcessor::create_from_string( $content ) );
-                        $result = $converter->consume();
+						$result    = $converter->consume();
 						break;
 					case 'html':
 						$converter = new MarkupProcessorConsumer( WP_HTML_Processor::create_fragment( $content ) );
-                        $result = $converter->consume();
+						$result    = $converter->consume();
 						break;
 					default:
 						$filetype = 'application/octet-stream';
@@ -274,12 +274,11 @@ class FilesystemEntityReader implements EntityReader {
 						// The importer will use the same Filesystem instance to
 						// source the attachment.
 						$metadata['attachment_url'] = 'file://' . $post_tree_node['local_file_path'];
-                        $result = new BlocksWithMetadata( '', array() );
+						$result                     = new BlocksWithMetadata( '', array() );
 						break;
 				}
-
 			} elseif ( $post_tree_node['type'] === 'file_placeholder' ) {
-				$result = new BlocksWithMetadata( '', array() );
+				$result                 = new BlocksWithMetadata( '', array() );
 				$metadata['post_title'] = ImportUtils::slug_to_title( basename( $post_tree_node['local_file_path'] ) );
 			}
 
@@ -344,9 +343,9 @@ class FilesystemEntityReader implements EntityReader {
 					// of directories with no relevant content in them:
 					//
 					// - /docs/
-					//   - /foo/
-					//     - /bar/
-					//       - /baz.md
+					// - /foo/
+					// - /bar/
+					// - /baz.md
 					//
 					// In this case, we need to backtrack and create the missing
 					// parent pages for /bar/ and /foo/.
@@ -434,7 +433,6 @@ class FilesystemEntityReader implements EntityReader {
 				continue;
 			}
 
-
 			if ( $event->is_entering() ) {
 				$abs_paths = array();
 				foreach ( $event->files as $filename ) {
@@ -463,9 +461,9 @@ class FilesystemEntityReader implements EntityReader {
 					// with a single relevant file at the bottom:
 					//
 					// - /docs/
-					//   - /foo/
-					//     - /bar/
-					//       - /baz.md
+					// - /foo/
+					// - /bar/
+					// - /baz.md
 					//
 					// In this case, `next_entity()` will backtrack at baz.md and
 					// create the missing parent pages.
@@ -533,13 +531,12 @@ class FilesystemEntityReader implements EntityReader {
 		return preg_match( $this->index_file_pattern, basename( $path ) );
 	}
 
-    /**
-     * @TODO: Implement this
-     *
-     * @return string
-     */
-    public function get_reentrancy_cursor() {
-        return '';
-    }
-
+	/**
+	 * @TODO: Implement this
+	 *
+	 * @return string
+	 */
+	public function get_reentrancy_cursor() {
+		return '';
+	}
 }

@@ -19,39 +19,46 @@ if ( getenv( 'USE_PHAR' ) ) {
 
 $blueprint = BlueprintBuilder::create()
 	->withWordPressVersion( 'https://wordpress.org/latest.zip' )
-	->withSiteOptions( [
-		'blogname' => 'My Playground Blog',
-	] )
-	->withWpConfigConstants( [
-		'WP_DEBUG'         => true,
-		'WP_DEBUG_LOG'     => true,
-		'WP_DEBUG_DISPLAY' => true,
-		'WP_CACHE'         => true,
-	] )
-	->withPlugins( [
-		// Required for withContent():
-		'https://downloads.wordpress.org/plugin/wordpress-importer.zip',
-		'https://downloads.wordpress.org/plugin/hello-dolly.zip',
-		'https://downloads.wordpress.org/plugin/gutenberg.17.7.0.zip',
-	] )
+	->withSiteOptions(
+		array(
+			'blogname' => 'My Playground Blog',
+		)
+	)
+	->withWpConfigConstants(
+		array(
+			'WP_DEBUG'         => true,
+			'WP_DEBUG_LOG'     => true,
+			'WP_DEBUG_DISPLAY' => true,
+			'WP_CACHE'         => true,
+		)
+	)
+	->withPlugins(
+		array(
+			// Required for withContent():
+			'https://downloads.wordpress.org/plugin/wordpress-importer.zip',
+			'https://downloads.wordpress.org/plugin/hello-dolly.zip',
+			'https://downloads.wordpress.org/plugin/gutenberg.17.7.0.zip',
+		)
+	)
 	->withTheme( 'https://downloads.wordpress.org/theme/pendant.zip' )
-//	->withContent( 'https://raw.githubusercontent.com/WordPress/theme-test-data/master/themeunittestdata.wordpress.xml' )
+// ->withContent( 'https://raw.githubusercontent.com/WordPress/theme-test-data/master/themeunittestdata.wordpress.xml' )
 	->withSiteUrl( 'http://localhost:8081' )
-	->andRunSQL( <<<'SQL'
+	->andRunSQL(
+		<<<'SQL'
 CREATE TABLE `tmp_table` ( id INT );
 INSERT INTO `tmp_table` VALUES (1);
 INSERT INTO `tmp_table` VALUES (2);
 SQL
 	)
-	->withFile( 'wordpress.txt', 'Data' )
+	->withFile( 'WordPress.txt', 'Data' )
 	->toBlueprint();
 
-$subscriber = new class implements EventSubscriberInterface {
+$subscriber = new class() implements EventSubscriberInterface {
 	public static function getSubscribedEvents() {
-		return [
+		return array(
 			ProgressEvent::class => 'onProgress',
 			DoneEvent::class     => 'onDone',
-		];
+		);
 	}
 
 	protected $progress_bar;
@@ -59,8 +66,10 @@ $subscriber = new class implements EventSubscriberInterface {
 	public function __construct() {
 		ProgressBar::setFormatDefinition( 'custom', ' [%bar%] %current%/%max% -- %message%' );
 
-		$this->progress_bar = ( new SymfonyStyle( new StringInput( "" ),
-			new ConsoleOutput() ) )->createProgressBar( 100 );
+		$this->progress_bar = ( new SymfonyStyle(
+			new StringInput( '' ),
+			new ConsoleOutput()
+		) )->createProgressBar( 100 );
 		$this->progress_bar->setFormat( 'custom' );
 		$this->progress_bar->setMessage( 'Start' );
 		$this->progress_bar->start();
@@ -78,9 +87,9 @@ $subscriber = new class implements EventSubscriberInterface {
 
 $results = run_blueprint(
 	$blueprint,
-	[
+	array(
 		'environment'        => ContainerBuilder::ENVIRONMENT_NATIVE,
 		'documentRoot'       => __DIR__ . '/new-wp',
 		'progressSubscriber' => $subscriber,
-	]
+	)
 );

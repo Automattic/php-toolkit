@@ -9,15 +9,14 @@ require_once __DIR__ . '/../../dist/data-liberation-markdown.phar';
  * be created without throwing an exception.
  */
 $markdown_root = __DIR__ . '/markdown-test-data';
-$c = WP_Markdown_Importer::create_for_markdown_directory(
-    $markdown_root,
-    array(
-        'source_site_url' => 'file://' . $markdown_root,
-        'local_markdown_assets_root' => $markdown_root,
-        'local_markdown_assets_url_prefix' => '@site/',
-    ),
-    $import['cursor'] ?? null
+$c             = WP_Markdown_Importer::create_for_markdown_directory(
+	$markdown_root,
+	array(
+		'source_site_url' => 'file://' . $markdown_root,
+		'local_markdown_assets_root' => $markdown_root,
+		'local_markdown_assets_url_prefix' => '@site/',
+	),
+	$import['cursor'] ?? null
 );
 
 echo 'Markdown importer created!';
-

@@ -17,7 +17,7 @@ class PropertyParserTest extends PHPUnitTestCase {
 			private $string;
 		};
 
-		$result = PropertyParser::compute_property_map( new ReflectionClass( $class ) );
+		$result   = PropertyParser::compute_property_map( new ReflectionClass( $class ) );
 		$expected = array(
 			'string' => new Property( 'string', 'private', array( 'string' ) ),
 		);
@@ -42,7 +42,7 @@ class PropertyParserTest extends PHPUnitTestCase {
 			private $string_deep_array;
 		};
 
-		$result = PropertyParser::compute_property_map( new ReflectionClass( $class ) );
+		$result   = PropertyParser::compute_property_map( new ReflectionClass( $class ) );
 		$expected = array(
 			'string'            => new Property( 'string', 'private', array( 'string' ) ),
 			'string_array'      => new Property( 'string_array', 'private', array( 'string[]' ) ),
@@ -59,7 +59,7 @@ class PropertyParserTest extends PHPUnitTestCase {
 			private $string_or_array;
 		};
 
-		$result = PropertyParser::compute_property_map( new ReflectionClass( $class ) );
+		$result   = PropertyParser::compute_property_map( new ReflectionClass( $class ) );
 		$expected = array(
 			'string_or_array' => new Property( 'string_or_array', 'private', array( 'string', 'array' ) ),
 		);
@@ -71,14 +71,14 @@ class PropertyParserTest extends PHPUnitTestCase {
 			private $no_docblock;
 		};
 
-		$result = PropertyParser::compute_property_map( new ReflectionClass( $class ) );
+		$result   = PropertyParser::compute_property_map( new ReflectionClass( $class ) );
 		$expected = array(
 			'no_docblock' => new Property( 'no_docblock', 'private', array() ),
 		);
 		$this->assertEquals( $expected, $result );
 	}
 
-	//test visibility parsing
+	// test visibility parsing
 	public function testParsesPropertiesWithPublicVisibility() {
 		$class = new class() {
 			/**
@@ -87,7 +87,7 @@ class PropertyParserTest extends PHPUnitTestCase {
 			public $string;
 		};
 
-		$result = PropertyParser::compute_property_map( new ReflectionClass( $class ) );
+		$result   = PropertyParser::compute_property_map( new ReflectionClass( $class ) );
 		$expected = array(
 			'string' => new Property( 'string', 'public', array( 'string' ) ),
 		);
@@ -102,7 +102,7 @@ class PropertyParserTest extends PHPUnitTestCase {
 			protected $string;
 		};
 
-		$result = PropertyParser::compute_property_map( new ReflectionClass( $class ) );
+		$result   = PropertyParser::compute_property_map( new ReflectionClass( $class ) );
 		$expected = array(
 			'string' => new Property( 'string', 'protected', array( 'string' ) ),
 		);
@@ -117,7 +117,7 @@ class PropertyParserTest extends PHPUnitTestCase {
 			private $string;
 		};
 
-		$result = PropertyParser::compute_property_map( new ReflectionClass( $class ) );
+		$result   = PropertyParser::compute_property_map( new ReflectionClass( $class ) );
 		$expected = array(
 			'string' => new Property( 'string', 'private', array( 'string' ) ),
 		);
@@ -132,11 +132,13 @@ class PropertyParserTest extends PHPUnitTestCase {
 			private $string_or_array_or_bool;
 		};
 
-		$result = PropertyParser::compute_property_map( new ReflectionClass( $class ) );
+		$result   = PropertyParser::compute_property_map( new ReflectionClass( $class ) );
 		$expected = array(
-			'string_or_array_or_bool' => new Property( 'string_or_array_or_bool',
+			'string_or_array_or_bool' => new Property(
+				'string_or_array_or_bool',
 				'private',
-				array( 'string', 'array', 'bool' ) ),
+				array( 'string', 'array', 'bool' )
+			),
 		);
 		$this->assertEquals( $expected, $result );
 	}
@@ -155,7 +157,7 @@ class PropertyParserTest extends PHPUnitTestCase {
 			private $local_stdclass;
 		};
 
-		$result = PropertyParser::compute_property_map( new ReflectionClass( $class ) );
+		$result   = PropertyParser::compute_property_map( new ReflectionClass( $class ) );
 		$expected = array(
 			'global_stdclass' => new Property( 'global_stdclass', 'private', array( '\\stdClass' ) ),
 			'local_stdclass'  => new Property( 'local_stdclass', 'private', array( '\\stdClass' ) ),
@@ -171,7 +173,7 @@ class PropertyParserTest extends PHPUnitTestCase {
 			private $nullable_string;
 		};
 
-		$result = PropertyParser::compute_property_map( new ReflectionClass( $class ) );
+		$result   = PropertyParser::compute_property_map( new ReflectionClass( $class ) );
 		$expected = array(
 			'nullable_string' => new Property( 'nullable_string', 'private', array( 'string' ) ),
 		);

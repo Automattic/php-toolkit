@@ -153,9 +153,9 @@ class ImportSession {
 				'meta_query' => array(
 					// @TODO: This somehow makes $post empty.
 					// array(
-					//     'key' => 'current_stage',
-					//     'value' => WP_Stream_Importer::STAGE_FINISHED,
-					//     'compare' => '!='
+					// 'key' => 'current_stage',
+					// 'value' => WP_Stream_Importer::STAGE_FINISHED,
+					// 'compare' => '!='
 					// )
 				),
 			)
@@ -250,6 +250,7 @@ class ImportSession {
 
 	/**
 	 * Cache of imported entity counts to avoid repeated database queries
+	 *
 	 * @var array
 	 */
 	private $cached_imported_counts = array();
@@ -416,6 +417,7 @@ class ImportSession {
 			 * Check if placeholder with this URL already exists
 			 * There's a race condition here – another insert may happen
 			 * between the check and the insert.
+			 *
 			 * @TODO: Explore solutions. A custom table with a UNIQUE constraint
 			 * may or may not be an option, depending on the performance impact
 			 * on 100GB+ VIP databases.

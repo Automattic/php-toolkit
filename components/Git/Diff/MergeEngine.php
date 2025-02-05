@@ -86,35 +86,35 @@ class MergeEngine {
 		return $merged;
 	}
 
-    public function apply_text_diff( $text, $diff ) {
-        $lines = explode("\n", $text);
-        $updated_lines = array();
-        $last_line = 0;
-        foreach($diff as $change) {
-            if(isset($change['old_index']) && $change['old_index']) {
-                while ($last_line < $change['old_index']) {
-                    $updated_lines[] = $lines[$last_line];
-                    ++$last_line;
-                }
-            }
-            if($change['type'] === '!') {
-                // @TODO: include conflicts in the return value
-                throw new GitException('Conflict at ' . $change['line']);
-            } else if($change['type'] === '-') {
-                ++$last_line;
-            } else if($change['type'] === '+') {
-                $updated_lines[] = $change['line'];
-            } else {
-                $updated_lines[] = $lines[$last_line];
-                ++$last_line;
-            }
-        }
-        while ($last_line < count($lines)) {
-            $updated_lines[] = $lines[$last_line];
-            ++$last_line;
-        }
-        return implode("\n", $updated_lines);
-    }
+	public function apply_text_diff( $text, $diff ) {
+		$lines         = explode( "\n", $text );
+		$updated_lines = array();
+		$last_line     = 0;
+		foreach ( $diff as $change ) {
+			if ( isset( $change['old_index'] ) && $change['old_index'] ) {
+				while ( $last_line < $change['old_index'] ) {
+					$updated_lines[] = $lines[ $last_line ];
+					++$last_line;
+				}
+			}
+			if ( $change['type'] === '!' ) {
+				// @TODO: include conflicts in the return value
+				throw new GitException( 'Conflict at ' . $change['line'] );
+			} elseif ( $change['type'] === '-' ) {
+				++$last_line;
+			} elseif ( $change['type'] === '+' ) {
+				$updated_lines[] = $change['line'];
+			} else {
+				$updated_lines[] = $lines[ $last_line ];
+				++$last_line;
+			}
+		}
+		while ( $last_line < count( $lines ) ) {
+			$updated_lines[] = $lines[ $last_line ];
+			++$last_line;
+		}
+		return implode( "\n", $updated_lines );
+	}
 
 	public function diff( $old_string, $new_string ) {
 		$old_lines = explode( "\n", $old_string );

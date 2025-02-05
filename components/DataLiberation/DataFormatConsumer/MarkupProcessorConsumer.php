@@ -64,7 +64,7 @@ class MarkupProcessorConsumer implements DataFormatConsumer {
 			if ( $this->markup_processor->get_last_error() ) {
 				if ( $this->markup_processor instanceof WP_HTML_Processor ) {
 					$exception = $this->markup_processor->get_unsupported_exception();
-				} else if ( $this->markup_processor instanceof XMLProcessor ) {
+				} elseif ( $this->markup_processor instanceof XMLProcessor ) {
 					$exception = $this->markup_processor->get_exception();
 				} else {
 					$exception = null;
@@ -110,7 +110,7 @@ class MarkupProcessorConsumer implements DataFormatConsumer {
 					break;
 				default:
 					// @TODO: What to do with other void tags, e.g. <input>?
-					//        Just insert an HTML block or what?
+					// Just insert an HTML block or what?
 					break;
 			}
 		} elseif ( ! $html->is_tag_closer() ) {
@@ -349,7 +349,7 @@ class MarkupProcessorConsumer implements DataFormatConsumer {
 	 * opener to the block markup.
 	 *
 	 * @param string $name The name of the block to push.
-	 * @param array $attributes The attributes of the block to push.
+	 * @param array  $attributes The attributes of the block to push.
 	 */
 	private function push_block( $name, $attributes = array() ) {
 		$this->close_ephemeral_paragraph();

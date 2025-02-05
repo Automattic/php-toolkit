@@ -16,24 +16,23 @@ class StreamImporterTest extends TestCase {
 		}
 	}
 
-    /**
-     * @before
+	/**
+	 * @before
 	 *
 	 * TODO: Run each test in a fresh Playground instance instead of sharing the global
 	 * state like this.
-     */
-    public function clean_up_uploads(): void
-    {
-        $files = glob( '/wordpress/wp-content/uploads/*' );
-        foreach( $files as $file ) {
-            if( is_dir( $file ) ) {
-                array_map( 'unlink', glob( "$file/*.*" ) );
-                rmdir( $file );
-            } else {
-                unlink( $file );
-            }
-        }
-    }
+	 */
+	public function clean_up_uploads(): void {
+		$files = glob( '/wordpress/wp-content/uploads/*' );
+		foreach ( $files as $file ) {
+			if ( is_dir( $file ) ) {
+				array_map( 'unlink', glob( "$file/*.*" ) );
+				rmdir( $file );
+			} else {
+				unlink( $file );
+			}
+		}
+	}
 
 	public function test_import_simple_wxr() {
 		$import = data_liberation_import( __DIR__ . '/wxr/small-export.xml' );
@@ -45,7 +44,7 @@ class StreamImporterTest extends TestCase {
 		$wxr_path = __DIR__ . '/wxr/frontloading-1-attachment.xml';
 		$importer = StreamImporter::create_for_wxr_file( $wxr_path );
 		$this->skip_to_stage( $importer, StreamImporter::STAGE_FRONTLOAD_ASSETS );
-		while( $importer->next_step() ) {
+		while ( $importer->next_step() ) {
 			// noop
 		}
 		$files = glob( '/wordpress/wp-content/uploads/*' );
@@ -58,17 +57,17 @@ class StreamImporterTest extends TestCase {
 		$importer = StreamImporter::create_for_wxr_file( $wxr_path );
 		$this->skip_to_stage( $importer, StreamImporter::STAGE_FRONTLOAD_ASSETS );
 
-		$progress_url = null;
+		$progress_url   = null;
 		$progress_value = null;
-		for($i = 0; $i < 20; ++$i) {
+		for ( $i = 0; $i < 20; ++$i ) {
 			$importer->next_step();
 			$progress = $importer->get_frontloading_progress();
-			if( count( $progress ) === 0 ) {
+			if ( count( $progress ) === 0 ) {
 				continue;
 			}
-			$progress_url = array_keys( $progress )[0];
+			$progress_url   = array_keys( $progress )[0];
 			$progress_value = array_values( $progress )[0];
-			if( null === $progress_value['received'] ) {
+			if ( null === $progress_value['received'] ) {
 				continue;
 			}
 			break;
@@ -79,22 +78,22 @@ class StreamImporterTest extends TestCase {
 		$this->assertEquals( 'https://wpthemetestdata.files.wordpress.com/2008/06/canola2.jpg', $progress_url );
 		$this->assertGreaterThan( 0, $progress_value['total'] );
 
-		$cursor = $importer->get_reentrancy_cursor();
-		$importer = StreamImporter::create_for_wxr_file( $wxr_path, [], $cursor );
+		$cursor   = $importer->get_reentrancy_cursor();
+		$importer = StreamImporter::create_for_wxr_file( $wxr_path, array(), $cursor );
 		// Rewind back to the entity we were on.
 		$this->assertTrue( $importer->next_step() );
 
 		// Restart the download of the same entity – from scratch.
-		$progress_value = [];
-		for($i = 0; $i < 20; ++$i) {
+		$progress_value = array();
+		for ( $i = 0; $i < 20; ++$i ) {
 			$importer->next_step();
 			$progress = $importer->get_frontloading_progress();
-			if( count( $progress ) === 0 ) {
+			if ( count( $progress ) === 0 ) {
 				continue;
 			}
-			$progress_url = array_keys( $progress )[0];
+			$progress_url   = array_keys( $progress )[0];
 			$progress_value = array_values( $progress )[0];
-			if( null === $progress_value['received'] ) {
+			if ( null === $progress_value['received'] ) {
 				continue;
 			}
 			break;
@@ -113,10 +112,10 @@ class StreamImporterTest extends TestCase {
 		$importer = StreamImporter::create_for_wxr_file( $wxr_path );
 		$this->skip_to_stage( $importer, StreamImporter::STAGE_IMPORT_ENTITIES );
 
-		for($i = 0; $i < 11; ++$i) {
+		for ( $i = 0; $i < 11; ++$i ) {
 			$this->assertTrue( $importer->next_step() );
-			$cursor = $importer->get_reentrancy_cursor();
-			$importer = StreamImporter::create_for_wxr_file( $wxr_path, [], $cursor );
+			$cursor   = $importer->get_reentrancy_cursor();
+			$importer = StreamImporter::create_for_wxr_file( $wxr_path, array(), $cursor );
 			// Rewind back to the entity we were on.
 			// Note this means we may attempt to insert it twice. It's
 			// the importer's job to detect that and skip the duplicate

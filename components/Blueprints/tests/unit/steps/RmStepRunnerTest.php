@@ -35,8 +35,8 @@ class RmStepRunnerTest extends PHPUnitTestCase {
 	 * @before
 	 */
 	public function before() {
-		$this->document_root = Path::makeAbsolute( "test", sys_get_temp_dir() );
-		$this->runtime = new Runtime( $this->document_root );
+		$this->document_root = Path::makeAbsolute( 'test', sys_get_temp_dir() );
+		$this->runtime       = new Runtime( $this->document_root );
 
 		$this->step_runner = new RmStepRunner();
 		$this->step_runner->setRuntime( $this->runtime );
@@ -52,10 +52,10 @@ class RmStepRunnerTest extends PHPUnitTestCase {
 	}
 
 	public function testRemoveDirectoryWhenUsingAbsolutePath() {
-		$absolute_path = $this->runtime->resolvePath( "dir" );
+		$absolute_path = $this->runtime->resolvePath( 'dir' );
 		$this->filesystem->mkdir( $absolute_path );
 
-		$step = new RmStep();
+		$step       = new RmStep();
 		$step->path = $absolute_path;
 
 		$this->step_runner->run( $step );
@@ -64,11 +64,11 @@ class RmStepRunnerTest extends PHPUnitTestCase {
 	}
 
 	public function testRemoveDirectoryWhenUsingRelativePath() {
-		$relative_path = "dir";
+		$relative_path = 'dir';
 		$absolute_path = $this->runtime->resolvePath( $relative_path );
 		$this->filesystem->mkdir( $absolute_path );
 
-		$step = new RmStep();
+		$step       = new RmStep();
 		$step->path = $relative_path;
 
 		$this->step_runner->run( $step );
@@ -77,11 +77,11 @@ class RmStepRunnerTest extends PHPUnitTestCase {
 	}
 
 	public function testRemoveDirectoryWithSubdirectory() {
-		$relative_path = "dir/subdir";
+		$relative_path = 'dir/subdir';
 		$absolute_path = $this->runtime->resolvePath( $relative_path );
 		$this->filesystem->mkdir( $absolute_path );
 
-		$step = new RmStep();
+		$step       = new RmStep();
 		$step->path = dirname( $relative_path );
 
 		$this->step_runner->run( $step );
@@ -90,11 +90,11 @@ class RmStepRunnerTest extends PHPUnitTestCase {
 	}
 
 	public function testRemoveDirectoryWithFile() {
-		$relative_path = "dir/file.txt";
+		$relative_path  = 'dir/file.txt';
 		$absolute_pPath = $this->runtime->resolvePath( $relative_path );
-		$this->filesystem->dumpFile( $absolute_pPath, "test" );
+		$this->filesystem->dumpFile( $absolute_pPath, 'test' );
 
-		$step = new RmStep();
+		$step       = new RmStep();
 		$step->path = dirname( $relative_path );
 
 		$this->step_runner->run( $step );
@@ -103,11 +103,11 @@ class RmStepRunnerTest extends PHPUnitTestCase {
 	}
 
 	public function testRemoveFile() {
-		$relative_path = "file.txt";
+		$relative_path = 'file.txt';
 		$absolute_path = $this->runtime->resolvePath( $relative_path );
-		$this->filesystem->dumpFile( $absolute_path, "test" );
+		$this->filesystem->dumpFile( $absolute_path, 'test' );
 
-		$step = new RmStep();
+		$step       = new RmStep();
 		$step->path = $relative_path;
 
 		$this->step_runner->run( $step );
@@ -116,10 +116,10 @@ class RmStepRunnerTest extends PHPUnitTestCase {
 	}
 
 	public function testThrowExceptionWhenRemovingNonexistentDirectoryAndUsingRelativePath() {
-		$relative_path = "dir";
+		$relative_path = 'dir';
 		$absolute_path = $this->runtime->resolvePath( $relative_path );
 
-		$step = new RmStep();
+		$step       = new RmStep();
 		$step->path = $relative_path;
 
 		self::expectException( BlueprintException::class );
@@ -128,9 +128,9 @@ class RmStepRunnerTest extends PHPUnitTestCase {
 	}
 
 	public function testThrowExceptionWhenRemovingNonexistentDirectoryAndUsingAbsolutePath() {
-		$absolute_path = "/dir";
+		$absolute_path = '/dir';
 
-		$step = new RmStep();
+		$step       = new RmStep();
 		$step->path = $absolute_path;
 
 		self::expectException( BlueprintException::class );
@@ -139,9 +139,9 @@ class RmStepRunnerTest extends PHPUnitTestCase {
 	}
 
 	public function testThrowExceptionWhenRemovingNonexistentFileAndUsingAbsolutePath() {
-		$relative_path = "/file.txt";
+		$relative_path = '/file.txt';
 
-		$step = new RmStep();
+		$step       = new RmStep();
 		$step->path = $relative_path;
 
 		self::expectException( BlueprintException::class );
@@ -150,10 +150,10 @@ class RmStepRunnerTest extends PHPUnitTestCase {
 	}
 
 	public function testThrowExceptionWhenRemovingNonexistentFileAndUsingRelativePath() {
-		$relativePath = "file.txt";
-		$absolutePath = $this->runtime->resolvePath($relativePath);
+		$relativePath = 'file.txt';
+		$absolutePath = $this->runtime->resolvePath( $relativePath );
 
-		$step = new RmStep();
+		$step       = new RmStep();
 		$step->path = $relativePath;
 
 		self::expectException( BlueprintException::class );

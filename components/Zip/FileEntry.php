@@ -42,101 +42,100 @@ class FileEntry {
 	 */
 	public $version = 2;
 
-    /**
+	/**
 	 * @var int
 	 */
 	public $generalPurpose = 0;
 
-    /**
+	/**
 	 * @var int
 	 */
 	public $compressionMethod;
 
-    /**
+	/**
 	 * @var int
 	 */
 	public $lastModifiedTime;
 
-    /**
+	/**
 	 * @var int
 	 */
 	public $lastModifiedDate;
 
-    /**
+	/**
 	 * @var int
 	 */
 	public $crc;
 
-    /**
+	/**
 	 * @var int
 	 */
 	public $compressedSize;
 
-    /**
+	/**
 	 * @var int
 	 */
 	public $uncompressedSize;
 
-    /**
+	/**
 	 * @var int
 	 */
 	public $pathLength = 0;
 
-    /**
+	/**
 	 * @var int
 	 */
 	public $extraLength = 0;
 
-    /**
+	/**
 	 * @var string
 	 */
 	public $path;
 
-    /**
+	/**
 	 * @var string
 	 */
 	public $extra;
 
-    /**
-     * @var ByteReadStream
-     */
-    public $body_reader;
+	/**
+	 * @var ByteReadStream
+	 */
+	public $body_reader;
 
 	public function __construct(
 		array $header_fields
 	) {
-        $valid_properties = array_keys(get_object_vars($this));
-        foreach($header_fields as $key => $value) {
-            if(!in_array($key, $valid_properties)) {
-                throw new \InvalidArgumentException("Invalid property: $key. Expected one of: " . implode(', ', $valid_properties));
-            }
-            $this->$key = $value;
-        }
+		$valid_properties = array_keys( get_object_vars( $this ) );
+		foreach ( $header_fields as $key => $value ) {
+			if ( ! in_array( $key, $valid_properties ) ) {
+				throw new \InvalidArgumentException( "Invalid property: $key. Expected one of: " . implode( ', ', $valid_properties ) );
+			}
+			$this->$key = $value;
+		}
 
-        // Convert Unix timestamp to DOS date/time format
-        if(null === $this->lastModifiedDate) {
-            // DOS date format: bits 0-4: day, bits 5-8: month, bits 9-15: years since 1980
-            $dt = getdate($this->lastModifiedTime);
-            $this->lastModifiedDate = (($dt['year'] - 1980) << 9) |
-                                    ($dt['mon'] << 5) |
-                                    $dt['mday'];
-        }
+		// Convert Unix timestamp to DOS date/time format
+		if ( null === $this->lastModifiedDate ) {
+			// DOS date format: bits 0-4: day, bits 5-8: month, bits 9-15: years since 1980
+			$dt                     = getdate( $this->lastModifiedTime );
+			$this->lastModifiedDate = ( ( $dt['year'] - 1980 ) << 9 ) |
+									( $dt['mon'] << 5 ) |
+									$dt['mday'];
+		}
 
-        if(null === $this->lastModifiedTime) {
-            // DOS time format: bits 0-4: seconds/2, bits 5-10: minutes, bits 11-15: hours
-            $dt = getdate($this->lastModifiedTime);
-            $this->lastModifiedTime = ($dt['hours'] << 11) |
-                                    ($dt['minutes'] << 5) |
-                                    (floor($dt['seconds']/2));
-        }
+		if ( null === $this->lastModifiedTime ) {
+			// DOS time format: bits 0-4: seconds/2, bits 5-10: minutes, bits 11-15: hours
+			$dt                     = getdate( $this->lastModifiedTime );
+			$this->lastModifiedTime = ( $dt['hours'] << 11 ) |
+									( $dt['minutes'] << 5 ) |
+									( floor( $dt['seconds'] / 2 ) );
+		}
 
-        if(null !== $this->path) {
-            $this->pathLength = strlen($this->path);
-        }
+		if ( null !== $this->path ) {
+			$this->pathLength = strlen( $this->path );
+		}
 
-        if(null !== $this->extra) {
-            $this->extraLength = strlen($this->extra);
-        }
+		if ( null !== $this->extra ) {
+			$this->extraLength = strlen( $this->extra );
+		}
 	}
-
 }

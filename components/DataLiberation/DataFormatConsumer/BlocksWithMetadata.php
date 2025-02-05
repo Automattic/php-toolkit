@@ -15,11 +15,11 @@ class BlocksWithMetadata {
 	public function __construct( $block_markup, $metadata = array() ) {
 		$this->block_markup = $block_markup;
 		$this->metadata     = $metadata;
-        foreach($this->metadata as $key => $values) {
-            if(!is_array($values)) {
-                throw new DataLiberationException('Metadata values for the key ' . $key . ' must be an array but was ' . gettype($values));
-            }
-        }
+		foreach ( $this->metadata as $key => $values ) {
+			if ( ! is_array( $values ) ) {
+				throw new DataLiberationException( 'Metadata values for the key ' . $key . ' must be an array but was ' . gettype( $values ) );
+			}
+		}
 	}
 
 	/**
@@ -59,14 +59,14 @@ class BlocksWithMetadata {
 	 *
 	 * @return array The metadata sourced from the input document.
 	 */
-	public function get_all_metadata(array $options = []) {
-        if(isset($options['first_value_only']) && $options['first_value_only']) {
-            $meta = [];
-            foreach($this->metadata as $key => $values) {
-                $meta[$key] = $values[0];
-            }
-            return $meta;
-        }
+	public function get_all_metadata( array $options = array() ) {
+		if ( isset( $options['first_value_only'] ) && $options['first_value_only'] ) {
+			$meta = array();
+			foreach ( $this->metadata as $key => $values ) {
+				$meta[ $key ] = $values[0];
+			}
+			return $meta;
+		}
 		return $this->metadata;
 	}
 
