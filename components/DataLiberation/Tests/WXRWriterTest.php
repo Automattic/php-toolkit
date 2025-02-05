@@ -536,8 +536,8 @@ XML;
 		// Get the reentrancy cursor
 		$cursor = $this->wxr_writer->get_reentrancy_cursor();
 
-		// Close the current writer
-		$this->wxr_writer->close_writing();
+        // Close the current writer
+        $this->wxr_writer->close_writing();
 
 		// Create a new writer with the same memory pipe and resume from the cursor
 		$this->wxr_writer = new WXRWriter( $this->memory_pipe, $cursor );
