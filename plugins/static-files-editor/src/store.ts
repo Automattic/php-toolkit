@@ -1,4 +1,4 @@
-import { createReduxStore, dispatch, select, resolveSelect } from '@wordpress/data';
+import { createReduxStore, dispatch, select } from '@wordpress/data';
 import { store as editorStore } from '@wordpress/editor';
 import apiFetch from '@wordpress/api-fetch';
 import { store as coreStore } from '@wordpress/core-data';
@@ -74,11 +74,7 @@ export const uiStore = createReduxStore(STORE_NAME, {
 				if (!node) {
 					return;
 				}
-				if (isPreviewableAssetPath(path)) {
-					dispatch({
-						type: 'SET_PREVIEW_PATH',
-						path: path,
-					});
+				if (node.type === 'file' && isPreviewableAssetPath(path)) {
 					registry.dispatch(uiStore).closeListViewOnMobile();
 					return;
 				}
@@ -90,7 +86,6 @@ export const uiStore = createReduxStore(STORE_NAME, {
 					const postId =
 						selectedFile.postId ||
 						(await dispatch.getOrCreatePostForFile(path));
-					dispatch({ type: 'SET_PREVIEW_PATH', path: null });
 					const post = await registry
 						.resolveSelect(coreStore)
 						.getEntityRecord(
