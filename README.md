@@ -1,6 +1,6 @@
-## PHP Libraries
+## PHP Toolkit
 
-Standalone PHP libraries for use in WordPress plugins and standalone PHP projects.
+Standalone PHP libraries for use in WordPress plugins and standalone PHP projects:
 
 -   XMLProcessor – stream-parse XML files on any PHP installation (no libxml2 required).
 -   Git – a pure PHP implementation of Git client and server.
@@ -11,15 +11,13 @@ Standalone PHP libraries for use in WordPress plugins and standalone PHP project
 -   Markdown – convert between markdown and block markup with no dependencies.
 -   Filesystem – single API for working with local files, Git, Google drive, memory, etc.
 
-This project aims to modernize WordPress's data handling capabilities and power
-the Data Liberation project. See [the rationale](RATIONALE.md) and [the plan](PLAN.md)
-for more details.
+This fork consolidates a few earlier projects and explorations into a single composer package.
 
 ### Using the libraries
 
 #### In WordPress
 
-The included [WordPress plugin](https://github.a8c.com/Automattic/wordpress-php-libraries) ships the libraries from this repository. Include it as a dependency in your plugin to use the PHP libraries safely.
+The included [WordPress plugin](https://github.com/Automattic/php-toolkit) ships the libraries from this repository. Include it as a dependency in your plugin to use the PHP libraries safely.
 
 Why not just ship the libraries with your plugin? Imagine two plugins doing that. They would conflict, trigger a PHP fatal error on every page load, and break the site.
 
@@ -33,12 +31,12 @@ This is the minimal composer.json file you need to consume the libraries:
 {
 	"name": "my-namespace/my-package",
 	"require": {
-		"wordpress/php-libraries": "dev-trunk"
+		"Automattic/php-toolkit": "dev-trunk"
 	},
 	"repositories": [
 		{
 			"type": "github",
-			"url": "https://github.com/adamziel/wordpress-components"
+			"url": "https://github.com/Automattic/php-toolkit"
 		}
 	]
 }
@@ -49,7 +47,7 @@ You can also lock it in to a specific commit or tag:
 ```json
 {
 	"require": {
-		"wordpress/php-libraries": "dev-trunk#122b547"
+		"Automattic/php-toolkit": "dev-trunk#122b547"
 	}
 }
 ```
@@ -63,10 +61,10 @@ If you'd like to install just a single library, you'll need to contribute a PR t
 ### Design goals
 
 -   Build re-entrant data tools that can start, stop, resume, tolerate errors, accept alternative media files, posts etc. from the user.
--   WordPress-first – let's build everything in PHP using WordPress naming conventions.
--   Compatibility – Every WordPress version, PHP version (7.2+, CLI), and Playground runtime (web, CLI, browser extension, desktop app, CI etc.) should be supported.
--   Dependency-free – No PHP extensions required. If this means we can't rely on cUrl, then let's build an HTTP client from scratch. Only minimal Composer dependencies allowed, and only when absolutely necessary.
--   Simple – no advanced OOP patterns. Our role model is [WP_HTML_Processor](https://developer.wordpress.org/reference/classes/wp_html_processor/) – a **single class** that can parse nearly all HTML. There's no "Node", "Element", "Attribute" classes etc. Let's aim for the same here.
+-   WordPress-first – Everything is built in PHP using WordPress coding standards. The divergences are strategic and minimal, such as the use of namespaces.
+-   Compatibility – Support for major WordPress versions, PHP version (7.2+), and Playground runtime (web, CLI, browser extension, desktop app, CI etc.).
+-   Dependency-free – No PHP extensions are required and only minimal Composer dependencies are allowed when absolutely necessary.
+-   Simple – The architectural role model is [WP_HTML_Processor](https://developer.wordpress.org/reference/classes/wp_html_processor/) – a **single class** that can parse nearly all HTML. There's no "Node", "Element", "Attribute" classes etc. Let's aim for the same here. Some OOP patterns are used when useful, but we're explicitly avoiding ideas like AbstractSingletonFactoryProxy.
 -   Extensibility – Playground should be able to benefit from, say, WASM markdown parser even if core WordPress cannot.
 -   Reusability – Each library should be framework-agnostic and usable outside of WordPress.
 
