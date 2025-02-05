@@ -5,24 +5,36 @@ Standalone libraries meant for eventual inclusion in WordPress core.
 This repository is what you, as a WordPress developer, have been dreaming
 of. Really. Here's why:
 
-* XMLProcessor – stream-parse XML files on any PHP installation (no libxml2 required).
-* Git – a pure PHP implementation of Git client and server.
-* HttpClient – a streaming, non-blocking, concurrent HTTP client library with no curl dependency.
-* Zip – stream-parse and stream-write ZIP files with no libzip dependency.
-* Data Liberation – generic streaming data importers to WordPress. Supports WXR, zipped markdown, remote git repos, rewriting URLs, and more.
-* ByteStream – composable byte streaming utilities – readers, writers, filters.
-* Markdown – convert between markdown and block markup with no dependencies.
-* Filesystem – single API for working with local files, Git, Google drive, memory, etc.
+-   XMLProcessor – stream-parse XML files on any PHP installation (no libxml2 required).
+-   Git – a pure PHP implementation of Git client and server.
+-   HttpClient – a streaming, non-blocking, concurrent HTTP client library with no curl dependency.
+-   Zip – stream-parse and stream-write ZIP files with no libzip dependency.
+-   Data Liberation – generic streaming data importers to WordPress. Supports WXR, zipped markdown, remote git repos, rewriting URLs, and more.
+-   ByteStream – composable byte streaming utilities – readers, writers, filters.
+-   Markdown – convert between markdown and block markup with no dependencies.
+-   Filesystem – single API for working with local files, Git, Google drive, memory, etc.
 
 This project aims to modernize WordPress's data handling capabilities and power
 the Data Liberation project. See [the rationale](RATIONALE.md) and [the plan](PLAN.md)
 for more details.
 
-### Consuming the libraries
+### Using the libraries
 
 #### In WordPress
 
-The [Data Liberation WordPress plugin](https://github.a8c.com/Automattic/wordpress-components/releases/) ships the libraries from this repository. Include it as a dependency in your plugin to use the PHP libraries safely.
+The Data Liberation WordPress plugin ships the libraries from this repository. Include it as a dependency in your plugin to use the PHP libraries safely.
+
+We're in the process of automating the release of the Data Liberation plugin via GitHub Actions. Until then, build it manually with the following command:
+
+```sh
+$ composer install --no-dev --prefer-dist
+$ composer global require humbug/box
+$ cd plugins/static-files-editor
+$ npm install
+$ cd ../../
+$ bash bin/build-all.sh
+# The built artifact is in dist/plugins/data-liberation.zip
+```
 
 Why not just ship the libraries with your plugin? Imagine two plugins doing that. They would conflict, trigger a PHP fatal error on every page load, and break the site.
 
@@ -51,9 +63,9 @@ You can also lock it in to a specific commit or tag:
 
 ```json
 {
-    "require": {
-        "wordpress/php-libraries": "dev-trunk#122b547"
-    }
+	"require": {
+		"wordpress/php-libraries": "dev-trunk#122b547"
+	}
 }
 ```
 
@@ -126,7 +138,7 @@ composer lint-fix
 
 #### Composer
 
-The root composer.json file is an amalgamation of composer.base.json all 
+The root composer.json file is an amalgamation of composer.base.json all
 component composer.json files. To regenerate it, run:
 
 ```sh
