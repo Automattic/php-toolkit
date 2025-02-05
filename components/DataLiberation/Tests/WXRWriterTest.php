@@ -490,7 +490,6 @@ XML;
         $cursor = $this->wxr_writer->get_reentrancy_cursor();
 
         // Close the current writer
-        $this->wxr_writer->finalize();
         $this->wxr_writer->close_writing();
 
         // Create a new writer with the same memory pipe and resume from the cursor

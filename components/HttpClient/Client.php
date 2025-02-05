@@ -46,7 +46,6 @@ use WordPress\HttpClient\ByteStream\RequestReadStream;
  * ```
  *
  * @TODO
- * * When uploading a body – use transfer-encoding: chunked when the number of uploaded bytes is unknown upfront.
  * * Request headers – accept string lines such as "Content-type: text/plain" instead of key-value pairs. K/V pairs
  *   are confusing and lead to accidental errors such as `0: Content-type: text/plain`. They also diverge from the
  *   format that curl accepts.

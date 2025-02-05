@@ -1,9 +1,6 @@
-## WordPress PHP Libraries and Data Liberation
+## PHP Libraries
 
-Standalone libraries meant for eventual inclusion in WordPress core.
-
-This repository is what you, as a WordPress developer, have been dreaming
-of. Really. Here's why:
+Standalone PHP libraries for use in WordPress plugins and standalone PHP projects.
 
 -   XMLProcessor – stream-parse XML files on any PHP installation (no libxml2 required).
 -   Git – a pure PHP implementation of Git client and server.
@@ -22,19 +19,7 @@ for more details.
 
 #### In WordPress
 
-The Data Liberation WordPress plugin ships the libraries from this repository. Include it as a dependency in your plugin to use the PHP libraries safely.
-
-We're in the process of automating the release of the Data Liberation plugin via GitHub Actions. Until then, build it manually with the following command:
-
-```sh
-$ composer install --no-dev --prefer-dist
-$ composer global require humbug/box
-$ cd plugins/static-files-editor
-$ npm install
-$ cd ../../
-$ bash bin/build-all.sh
-# The built artifact is in dist/plugins/data-liberation.zip
-```
+The included [WordPress plugin](https://github.a8c.com/Automattic/wordpress-php-libraries) ships the libraries from this repository. Include it as a dependency in your plugin to use the PHP libraries safely.
 
 Why not just ship the libraries with your plugin? Imagine two plugins doing that. They would conflict, trigger a PHP fatal error on every page load, and break the site.
 
@@ -75,42 +60,15 @@ Note that the composer.json example above downloads more files than the required
 
 If you'd like to install just a single library, you'll need to contribute a PR to distribute each library as a separate package. Most likely, though, you don't really need that. If you have doubts, open a new issue and we'll figure it out together.
 
-### Play with it
+### Design goals
 
-Here's a very rough process you can use to start WordPress with a plugin that
-uses most of the components shipped with this project.
-
-1. Create a file plugins/static-files-editor/secrets.php with the following content:
-
-```php
-<?php
-define('GIT_REPO_URL', 'https://github.com/woocommerce/woocommerce.git');
-define('GIT_BRANCH', 'trunk');
-define('GIT_DIRECTORY_ROOT', '/docs');
-
-define('GIT_USER_NAME', 'Your name');
-define('GIT_USER_EMAIL', 'your@email.com');
-```
-
-2. Run the following command to start WordPress with the plugin:
-
-```sh
-bash run.sh
-```
-
-3. Navigate to http://127.0.0.1:9400/wp-admin/edit.php?post_type=local_file&dump=1 to import the WooCommerce documentation.
-4. You're done!
-
-The UI build process is not configured yet so this won't get the static files editor UI right now. This part is TBD.
-
-You can also clone your local site as follows:
-
-```sh
-mkdir local-repo
-git init
-git remote add wp http://localhost:9400/wp-content/plugins/git-repo/git-repo.php\?
-git ls-remote wp
-```
+-   Build re-entrant data tools that can start, stop, resume, tolerate errors, accept alternative media files, posts etc. from the user.
+-   WordPress-first – let's build everything in PHP using WordPress naming conventions.
+-   Compatibility – Every WordPress version, PHP version (7.2+, CLI), and Playground runtime (web, CLI, browser extension, desktop app, CI etc.) should be supported.
+-   Dependency-free – No PHP extensions required. If this means we can't rely on cUrl, then let's build an HTTP client from scratch. Only minimal Composer dependencies allowed, and only when absolutely necessary.
+-   Simple – no advanced OOP patterns. Our role model is [WP_HTML_Processor](https://developer.wordpress.org/reference/classes/wp_html_processor/) – a **single class** that can parse nearly all HTML. There's no "Node", "Element", "Attribute" classes etc. Let's aim for the same here.
+-   Extensibility – Playground should be able to benefit from, say, WASM markdown parser even if core WordPress cannot.
+-   Reusability – Each library should be framework-agnostic and usable outside of WordPress.
 
 ### Development
 
