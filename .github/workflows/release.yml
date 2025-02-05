@@ -47,7 +47,7 @@ jobs:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               with:
                   tag_name: v${{ github.run_number }}
-                  release_name: Release ${{ github.run_number }}
+                  release_name: Data Liberation plugin v${{ github.run_number }}
                   draft: false
                   prerelease: false
 
@@ -60,3 +60,4 @@ jobs:
                   asset_path: ./dist/plugins/data-liberation.zip
                   asset_name: data-liberation.zip
                   asset_content_type: application/zip
+
