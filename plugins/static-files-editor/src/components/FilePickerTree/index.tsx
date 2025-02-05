@@ -298,7 +298,7 @@ export const FilePickerTree: React.FC<FilePickerControlProps> = ({
 		e: React.DragEvent,
 		path: string,
 		node: FileNode
-	) => {
+    ) => {
 		e.stopPropagation();
 		const dragImage = createDragImage(node);
 		e.dataTransfer.setDragImage(dragImage, 10, 10);
@@ -315,7 +315,12 @@ export const FilePickerTree: React.FC<FilePickerControlProps> = ({
 			isExternal: false,
 		});
 
-		onDragStart?.(e, path, node.type);
+        if (onDragStart) {
+            // Mobile Safari won't notice a drag&drop interaction unless
+            // some data is set in OnDragStart's event;
+            e.dataTransfer.setData('text/plain', 'placeholder');
+            onDragStart?.(e, path, node.type);
+        }
 	};
 
 	const isDescendantPath = (parentPath: string, childPath: string) => {
