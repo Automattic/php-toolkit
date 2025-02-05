@@ -50,4 +50,27 @@ class GitFilesystemTest extends TestCase {
 			$this->fs->ls( '/subdirectory' )
 		);
 	}
+
+	public function test_rename_directory() {
+		// Rename the subdirectory
+		$this->fs->rename('/subdirectory', '/new-subdirectory');
+
+		// Check that the old directory is no longer present
+		$this->assertEquals(
+			array(
+				'README.md',
+				'new-subdirectory',
+			),
+			$this->fs->ls( '/' )
+		);
+
+		// Check that the new directory contains the expected files
+		$this->assertEquals(
+			array(
+				'hello-world.txt',
+				'script.js',
+			),
+			$this->fs->ls( '/new-subdirectory' )
+		);
+	}
 }

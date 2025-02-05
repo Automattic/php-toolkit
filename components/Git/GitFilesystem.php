@@ -13,7 +13,6 @@ use WordPress\Filesystem\Mixin\RenameFileViaCopyAndRm;
 class GitFilesystem implements Filesystem {
 
 	use CopyRecursiveViaStreaming;
-	use RenameFileViaCopyAndRm;
 	use BufferedWriteStreamViaPutContents;
 
 	/**
@@ -136,6 +135,23 @@ class GitFilesystem implements Filesystem {
 				),
 			)
 		);
+	}
+
+	public function rename( $from_path, $to_path, $options = array() ) {
+		if ( $this->is_file( $from_path ) ) {
+            $this->copy( $from_path, $to_path, $options );
+            $this->rm( $from_path );
+		} else if ( $this->is_dir( $from_path ) ) {
+            $this->commit(
+                array(
+                    'move_trees' => array(
+                        $from_path => $to_path,
+                    ),
+                )
+            );
+		} else {
+			throw new FilesystemException( sprintf( 'Path is not a file or directory: %s', $from_path ) );
+		}
 	}
 
 	public function put_contents( $path, $contents, $options = array() ) {
