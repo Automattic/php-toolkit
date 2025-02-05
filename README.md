@@ -59,7 +59,7 @@ You can also lock it in to a specific commit or tag:
 
 For now, there is no way to cherry-pick just the one library you need. It's all or nothing.
 
-Note that the composer.json example above downloads more files than the required minimum, e.g. markdowns, unit tests, the `plugins` directory, etc. That's about 50MB of code in total and, most likely, it's not a big deal for your project.
+Note that the composer.json example above downloads more files than the required minimum, e.g. markdowns, unit tests, the `plugins` directory, etc. That's about 50MB of code in total and, most likely, it's not a big deal for your project. If you want a smaller package, the Data Liberation plugin referenced above ships a minified phar file that's about ~500KB compressed.
 
 If you'd like to install just a single library, you'll need to contribute a PR to distribute each library as a separate package. Most likely, though, you don't really need that. If you have doubts, open a new issue and we'll figure it out together.
 
