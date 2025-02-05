@@ -1170,53 +1170,76 @@ class WP_Static_Files_Editor_Plugin {
                 return;
             }
             $from_path = wp_canonicalize_path($request->get_param('id'));
+            $from_path = rtrim($from_path, '/');
+
             $to_path = $request->get_param('path');
+            $to_path = rtrim($to_path, '/');
 
             if (!$from_path || !$to_path) {
                 return new WP_Error('missing_path', 'Both source and target paths are required');
             }
 
             $fs = self::get_fs();
-            if(!$fs->is_file($from_path)) {
-                return new WP_Error('move_failed', sprintf('Failed to move file – source path is not a file (%s)', $from_path));
-            }
+            if($fs->is_file($from_path)) {
+                // Find and update associated post
+                $previous_content = $fs->get_contents($from_path);
+                $existing_posts = get_posts(array(
+                    'post_type' => WP_LOCAL_FILE_POST_TYPE,
+                    'meta_key' => 'local_file_path',
+                    'meta_value' => $from_path,
+                    'posts_per_page' => 1
+                ));
+                $existing_post = count($existing_posts) > 0 ? $existing_posts[0] : null;
 
-            // Find and update associated post
-            $previous_content = $fs->get_contents($from_path);
-            $existing_posts = get_posts(array(
-                'post_type' => WP_LOCAL_FILE_POST_TYPE,
-                'meta_key' => 'local_file_path',
-                'meta_value' => $from_path,
-                'posts_per_page' => 1
-            ));
-            $existing_post = count($existing_posts) > 0 ? $existing_posts[0] : null;
+                $moved = false;
 
-            $moved = false;
+                if ($existing_post) {
+                    // Regenerate the content from scratch if we're changing the file format.
+                    $previous_extension = pathinfo($from_path, PATHINFO_EXTENSION);
+                    $new_extension = pathinfo($to_path, PATHINFO_EXTENSION);
+                    if($existing_post->post_type === WP_LOCAL_FILE_POST_TYPE && $previous_extension !== $new_extension) {
+                        $parsed = self::parse_local_file(
+                            $previous_content,
+                            $previous_extension
+                        );
+                        $new_content = self::convert_post_data_to_string(
+                            $parsed,
+                            $new_extension
+                        );
+                        $fs->put_contents(
+                            $to_path,
+                            $new_content
+                        );
+                        $fs->rm($from_path);
+                        $moved = true;
+                    }
 
-            if ($existing_post) {
-                // Regenerate the content from scratch if we're changing the file format.
-                $previous_extension = pathinfo($from_path, PATHINFO_EXTENSION);
-                $new_extension = pathinfo($to_path, PATHINFO_EXTENSION);
-                if($existing_post->post_type === WP_LOCAL_FILE_POST_TYPE && $previous_extension !== $new_extension) {
-                    $parsed = self::parse_local_file(
-                        $previous_content,
-                        $previous_extension
-                    );
-                    $new_content = self::convert_post_data_to_string(
-                        $parsed,
-                        $new_extension
-                    );
-                    $fs->put_contents(
-                        $to_path,
-                        $new_content
-                    );
-                    $fs->rm($from_path);
-                    $moved = true;
+                    // Update the local file path
+                    if(false === update_post_meta($existing_post->ID, 'local_file_path', $to_path)) {
+                        throw new Exception('Failed to update local file path');
+                    }
                 }
+            } else if($fs->is_dir($from_path)) {
+                // Update the local file paths for all posts within the directory
+                $nested_posts = get_posts(array(
+                    'post_type' => WP_LOCAL_FILE_POST_TYPE,
+                    'meta_query' => array(
+                        array(
+                            'key' => 'local_file_path',
+                            'value' => $from_path . '%',
+                            'compare' => 'LIKE'
+                        )
+                    ),
+                    'posts_per_page' => -1
+                ));
 
-                // Update the local file path
-                if(false === update_post_meta($existing_post->ID, 'local_file_path', $to_path)) {
-                    throw new Exception('Failed to update local file path');
+                foreach ($nested_posts as $existing_post) {
+                    $current_path = get_post_meta($existing_post->ID, 'local_file_path', true);
+                    $new_path = $to_path . substr($current_path, strlen($from_path));
+
+                    if (false === update_post_meta($existing_post->ID, 'local_file_path', $new_path)) {
+                        throw new Exception('Failed to update local file path for post ID ' . $existing_post->ID);
+                    }
                 }
             }
 
