@@ -25,7 +25,8 @@
     "require-dev": {
         "yoast/phpunit-polyfills": "2.0.0",
         "phpunit/phpunit": "^9.5",
-        "rector/rector": "dev-main"
+        "rector/rector": "dev-main",
+        "squizlabs/php_codesniffer": "4.0.x-dev"
     },
     "autoload": {
         "exclude-from-classmap": [
