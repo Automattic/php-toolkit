@@ -27,9 +27,7 @@ class Commit {
 	 *
 	 * @var array
 	 */
-	public $parent = array(
-		self::NULL_HASH,
-	);
+	public $parents = array();
 
 	/**
 	 * The commit author details
@@ -87,9 +85,9 @@ class Commit {
 	}
 
 	public function get_first_parent_hash() {
-		if ( is_array( $this->parent ) ) {
-			return $this->parent[0];
+		if ( is_array( $this->parents ) ) {
+			return $this->parents[0];
 		}
-		return $this->parent;
+		return $this->parents;
 	}
 }

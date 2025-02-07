@@ -303,7 +303,7 @@ class GitEndpoint {
 				}
 
 				$parsed_commit = $reader->as_commit();
-				if ( ! isset( $parsed_commit->parent ) ) {
+				if ( ! isset( $parsed_commit->parents ) ) {
 					$common_parent_hash = Commit::NULL_HASH;
 					break;
 				}

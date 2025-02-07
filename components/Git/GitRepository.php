@@ -84,6 +84,11 @@ class GitRepository {
 		return $this->parsed_config[ $key ] ?? null;
 	}
 
+    public function get_remote_client( $name = 'origin', $options = array() ) {
+        $remote_url = $this->get_config_value( array( 'remote', $name, 'url' ) );
+        return new GitRemote( $this, $name, array_merge( $options, array( 'url' => $remote_url ) ) );
+    }
+
 	public function set_config_value( $key, $value ) {
 		$this->parse_config();
 		list($section, $key) = $this->parse_config_key( $key );
@@ -198,6 +203,34 @@ class GitRepository {
 
 	public function has_object( $oid ) {
 		return $this->fs->is_file( $this->get_storage_path( $oid ) );
+	}
+
+	public function has_blobs_from_commit( $oid, $path='/' ) {
+		if(!$this->has_object($oid)) {
+            return false;
+        }
+
+        $commit = $this->read_object( $oid )->as_commit();
+        try{
+            $tree = $this->find_hash_by_path($path, $commit->tree);
+        } catch(GitPathDoesNotExistException $e) {
+            return false;
+        }
+        
+        $stack = [$tree];
+        while(!empty($stack)) {
+            $hash = array_pop($stack);
+            if(!$this->has_object($hash)) {
+                return false;
+            }
+            $object = $this->read_object($hash);
+            if($object->get_object_type_name() === 'tree') {
+                foreach($object->as_tree()->entries as $entry) {
+                    $stack[] = $entry->hash;
+                }
+            }
+        }
+        return true;
 	}
 
 	public function find_objects_added_in( $new_commit_hash, $old_commit_hash = Commit::NULL_HASH, $options = array() ) {
@@ -316,6 +349,7 @@ class GitRepository {
 	/**
 	 * Merge two branches.
 	 *
+     * @TODO: Sparse merge that only processes specific paths
 	 * @TODO: Implement a streaming merge. The current implementation buffers
 	 *        everything into memory and will fail for large merges.
 	 * @TODO: Do not change the HEAD ref.
@@ -378,7 +412,10 @@ class GitRepository {
 				'message' => 'Merge commit ' . $commit_hash2 . ' into ' . $commit_hash1,
 				'updates' => $updates,
 				'deletes' => $deletes,
-			// @TODO: Store the second parent hash
+                'parents' => [
+                    $commit_hash1,
+                    $commit_hash2,
+                ]
 			)
 		);
 	}
@@ -390,7 +427,7 @@ class GitRepository {
 	 *
 	 * @param string $ref1 The first reference.
 	 * @param string $ref2 The second reference.
-	 * @return string|false The common ancestor hash, or false if no common ancestor is found.
+	 * @return string The common ancestor hash.
 	 */
 	public function find_first_common_ancestor( $commit_hash1, $commit_hash2 ) {
 		// If both refs point to the same commit, return it immediately.
@@ -423,6 +460,46 @@ class GitRepository {
 		// No common ancestor found.
 		throw new GitException( 'No common ancestor found for ' . $commit_hash1 . ' and ' . $commit_hash2 );
 	}
+
+    /**
+     * Returns parents of the specified commit.
+     * 
+     * @return array A list of parent commits hashes.
+     */
+    public function get_ancestors_hashes($commit_hash, $options = array()) {
+        $on_missing = $options['on_missing'] ?? 'throw'; // throw | return-early
+        $limit = $options['count'] ?? -1;
+
+		$found_parents = array();
+        $enqueued_parents = array( $commit_hash );
+		while ( ! empty ( $enqueued_parents ) ) {
+            $next_parent_hash = array_pop( $enqueued_parents );
+			if ( Commit::is_null_hash( $next_parent_hash ) ) {
+                continue;
+            }
+
+            if ( ! $this->has_object( $next_parent_hash ) ) {
+                if($on_missing === 'throw') {
+                    throw new GitException('');
+                } else {
+                    continue;
+                }
+            }
+
+            $found_parents[] = $next_parent_hash;
+
+            array_push(
+                $enqueued_parents,
+                ...$this->read_object( $next_parent_hash )->as_commit()->parents
+            );
+
+            if($limit !== -1 && count($found_parents) >= $limit) {
+                break;
+            }
+		}
+
+        return $found_parents;
+    }
 
 
 	/**
@@ -515,13 +592,16 @@ class GitRepository {
 		}
 
 		// Create a new commit object
-		$options['tree'] = $root_tree_oid;
-		if ( $this->get_ref_head( 'HEAD' ) ) {
-			$options['parent'] = $this->get_ref_head( 'HEAD' );
-			if ( $is_amend && ! $options['message'] ) {
-				$options['message'] = $this->read_object( $options['parent'] )->as_commit()->message;
-			}
+        $options['tree'] = $root_tree_oid;
+
+        $head = $this->get_ref_head( 'HEAD' );
+		if ( ! isset($options['parents']) && $this->get_ref_head( 'HEAD' ) ) {
+			$options['parents'] = [ $head ];
 		}
+
+        if ( $is_amend && ! $options['message'] ) {
+            $options['message'] = $this->read_object( $head )->as_commit()->message;
+        }
 		$commit_oid = $this->add_object(
 			'commit',
 			$this->create_commit_string( $options )
@@ -533,8 +613,8 @@ class GitRepository {
 			$this->set_ref_head( $head_ref, $commit_oid );
 		}
 
-		if ( isset( $options['amend'] ) && $options['amend'] && isset( $options['parent'] ) ) {
-			$commit_oid = $this->squash( $commit_oid, $options['parent'] );
+		if ( isset( $options['amend'] ) && $options['amend'] && isset( $options['parents'] ) ) {
+			$commit_oid = $this->squash( $commit_oid, $options['parents'][0] );
 		}
 
 		return $commit_oid;
@@ -698,7 +778,7 @@ class GitRepository {
 				$this->derive_commit_string(
 					$parsed_old_commit,
 					array(
-						'parent' => $new_parent_oid,
+						'parents' => array( $new_parent_oid ),
 					)
 				)
 			);
@@ -747,8 +827,10 @@ class GitRepository {
 		$options['message'] = $options['message'] ?? 'Changes';
 		$commit_message     = array();
 		$commit_message[]   = 'tree ' . $options['tree'];
-		if ( isset( $options['parent'] ) && ! Commit::is_null_hash( $options['parent'] ) ) {
-			$commit_message[] = 'parent ' . $options['parent'];
+		if ( isset( $options['parents'] ) ) {
+            foreach($options['parents'] as $parent) {
+			    $commit_message[] = 'parent ' . $parent;
+            }
 		}
 		$commit_message[] = 'author ' . $options['author'] . ' ' . $options['author_date'];
 		$commit_message[] = 'committer ' . $options['committer'] . ' ' . $options['committer_date'];
