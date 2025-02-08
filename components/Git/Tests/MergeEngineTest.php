@@ -2,12 +2,12 @@
 
 namespace WordPress\Git\Tests;
 
-use WordPress\Git\Diff\MergeEngine;
+use WordPress\Git\Diff\LinesMergeDriver;
 
-class MergeEngineTest extends \PHPUnit\Framework\TestCase {
+class LinesMergeDriverTest extends \PHPUnit\Framework\TestCase {
 
 	public function test_apply_text_diff() {
-		$merge_engine = new MergeEngine();
+		$merge_engine = new LinesMergeDriver();
 		$base         = <<<EOT
         Line 1: The quick brown fox
         Line 2: jumps over the lazy dog.

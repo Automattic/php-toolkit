@@ -4,7 +4,7 @@ namespace WordPress\Git\Diff;
 
 use WordPress\Git\GitException;
 
-class MergeEngine {
+class LinesMergeDriver {
 
 	public function three_way_merge_blob( $diff1, $diff2 ) {
 		$merged    = array();

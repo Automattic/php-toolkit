@@ -3,7 +3,7 @@
 namespace WordPress\Git;
 
 use WordPress\Filesystem\Filesystem;
-use WordPress\Git\Diff\MergeEngine;
+use WordPress\Git\Diff\LinesMergeDriver;
 use WordPress\Git\Model\Commit;
 use WordPress\Git\Model\Tree;
 use WordPress\Git\Model\TreeEntry;
@@ -29,7 +29,7 @@ class GitRepository {
 	private $parsed_config;
 
 	/**
-	 * @var MergeEngine
+	 * @var LinesMergeDriver
 	 */
 	private $diff_engine;
 
@@ -40,7 +40,7 @@ class GitRepository {
 		$options = array()
 	) {
 		$this->fs          = $fs;
-		$this->diff_engine = $options['diff_engine'] ?? new MergeEngine();
+		$this->diff_engine = $options['diff_engine'] ?? new LinesMergeDriver();
 		$this->initialize_filesystem( $options );
 	}
 
