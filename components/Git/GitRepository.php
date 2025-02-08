@@ -392,19 +392,16 @@ class GitRepository {
 				if ( $is_text_diff ) {
 					$current_content = $this->read_object_by_path( $path, $common_ancestor_commit_hash )->consume_all();
 					if ( ! $current_entry ) {
-						$updates[ $path ] = $this->diff_engine->apply_text_diff(
+						$updates[ $path ] = $this->diff_engine->apply_diff(
 							$current_content,
 							$merged_entry->content['diff']
 						);
 						continue;
 					}
-					$text_diffs       = $this->diff_engine->three_way_merge_blob(
+					$merged_content = $this->diff_engine->three_way_merge_blob(
+                        $current_content,
 						$current_entry->content['diff'],
 						$merged_entry->content['diff']
-					);
-					$merged_content   = $this->diff_engine->apply_text_diff(
-						$current_content,
-						$text_diffs
 					);
 					$updates[ $path ] = $merged_content;
 				} elseif ( is_array( $merged_entry->content ) ) {

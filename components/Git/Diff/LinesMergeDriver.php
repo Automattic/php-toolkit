@@ -4,11 +4,10 @@ namespace WordPress\Git\Diff;
 
 use WordPress\Git\GitException;
 
-class LinesMergeDriver {
+class LinesMergeDriver implements MergeDriver {
 
-	public function three_way_merge_blob( $diff1, $diff2 ) {
+	public function three_way_merge_blob( $common_parent, $diff1, $diff2 ) {
 		$merged    = array();
-		$conflicts = array();
 
 		$index1 = 0;
 		$index2 = 0;
@@ -24,8 +23,9 @@ class LinesMergeDriver {
 					++$index2;
 				} elseif ( $change1['type'] === '+' && $change2['type'] === '+' ) {
 					if ( $change1['line'] !== $change2['line'] ) {
-						$conflicts[] = array(
+						$merged[] = array(
 							'type' => '!',
+                            'line' => $change1['line'] . ' | ' . $change2['line'],
 							'line1' => $change1['line'],
 							'line2' => $change2['line'],
 						);
@@ -57,8 +57,9 @@ class LinesMergeDriver {
 					$merged[] = $change2;
 					++$index2;
 				} else {
-					$conflicts[] = array(
+					$merged[] = array(
 						'type' => '!',
+						'line' => $change1['line'] . ' | ' . $change2['line'],
 						'line1' => $change1['line'],
 						'line2' => $change2['line'],
 					);
@@ -74,19 +75,10 @@ class LinesMergeDriver {
 			}
 		}
 
-		if ( ! empty( $conflicts ) ) {
-			foreach ( $conflicts as $conflict ) {
-				$merged[] = array(
-					'type' => '!',
-					'line' => 'CONFLICT: ' . $conflict['line1'] . ' | ' . $conflict['line2'],
-				);
-			}
-		}
-
-		return $merged;
+		return $this->apply_diff($common_parent, $merged);
 	}
 
-	public function apply_text_diff( $text, $diff ) {
+	public function apply_diff( $text, $diff ) {
 		$lines         = explode( "\n", $text );
 		$updated_lines = array();
 		$last_line     = 0;

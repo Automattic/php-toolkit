@@ -20,7 +20,8 @@
     ],
     "require": {
         "php": ">=7.2",
-        "ext-json": "*"
+        "ext-json": "*",
+        "yetanotherape/diff-match-patch": "dev-master"
     },
     "require-dev": {
         "yoast/phpunit-polyfills": "2.0.0",

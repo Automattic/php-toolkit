@@ -6,7 +6,7 @@ use WordPress\Git\Diff\LinesMergeDriver;
 
 class LinesMergeDriverTest extends \PHPUnit\Framework\TestCase {
 
-	public function test_apply_text_diff() {
+	public function test_apply_diff() {
 		$merge_engine = new LinesMergeDriver();
 		$base         = <<<EOT
         Line 1: The quick brown fox
@@ -46,6 +46,6 @@ class LinesMergeDriverTest extends \PHPUnit\Framework\TestCase {
         EOT;
 
 		$diff = $merge_engine->diff( $base, $updated );
-		$this->assertEquals( $updated, $merge_engine->apply_text_diff( $base, $diff ) );
+		$this->assertEquals( $updated, $merge_engine->apply_diff( $base, $diff ) );
 	}
 }
