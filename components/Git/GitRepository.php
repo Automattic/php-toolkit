@@ -84,10 +84,10 @@ class GitRepository {
 		return $this->parsed_config[ $key ] ?? null;
 	}
 
-    public function get_remote_client( $name = 'origin', $options = array() ) {
-        $remote_url = $this->get_config_value( array( 'remote', $name, 'url' ) );
-        return new GitRemote( $this, $name, array_merge( $options, array( 'url' => $remote_url ) ) );
-    }
+	public function get_remote_client( $name = 'origin', $options = array() ) {
+		$remote_url = $this->get_config_value( array( 'remote', $name, 'url' ) );
+		return new GitRemote( $this, $name, array_merge( $options, array( 'url' => $remote_url ) ) );
+	}
 
 	public function set_config_value( $key, $value ) {
 		$this->parse_config();
@@ -167,9 +167,9 @@ class GitRepository {
 	}
 
 	public function find_hash_by_path( $path, $commit_hash = null ) {
-        $commit_hash = $commit_hash ?? $this->get_ref_head( 'HEAD' );
-        $commit        = $this->read_object( $commit_hash )->as_commit();
-        $root_tree_oid = $commit->tree;
+		$commit_hash   = $commit_hash ?? $this->get_ref_head( 'HEAD' );
+		$commit        = $this->read_object( $commit_hash )->as_commit();
+		$root_tree_oid = $commit->tree;
 
 		if ( $root_tree_oid === null ) {
 			throw new GitPathDoesNotExistException( sprintf( 'Could not resolve root tree to lookup path: %s', $path ) );
@@ -200,31 +200,31 @@ class GitRepository {
 		return $this->fs->is_file( $this->get_storage_path( $oid ) );
 	}
 
-	public function has_blobs_from_commit( $commit_hash, $path='/' ) {
-		if(!$this->has_object($commit_hash)) {
-            return false;
-        }
+	public function has_blobs_from_commit( $commit_hash, $path = '/' ) {
+		if ( ! $this->has_object( $commit_hash ) ) {
+			return false;
+		}
 
-        try{
-            $tree = $this->find_hash_by_path($path, $commit_hash);
-        } catch(GitPathDoesNotExistException $e) {
-            return false;
-        }
-        
-        $stack = [$tree];
-        while(!empty($stack)) {
-            $hash = array_pop($stack);
-            if(!$this->has_object($hash)) {
-                return false;
-            }
-            $object = $this->read_object($hash);
-            if($object->get_object_type_name() === 'tree') {
-                foreach($object->as_tree()->entries as $entry) {
-                    $stack[] = $entry->hash;
-                }
-            }
-        }
-        return true;
+		try {
+			$tree = $this->find_hash_by_path( $path, $commit_hash );
+		} catch ( GitPathDoesNotExistException $e ) {
+			return false;
+		}
+
+		$stack = array( $tree );
+		while ( ! empty( $stack ) ) {
+			$hash = array_pop( $stack );
+			if ( ! $this->has_object( $hash ) ) {
+				return false;
+			}
+			$object = $this->read_object( $hash );
+			if ( $object->get_object_type_name() === 'tree' ) {
+				foreach ( $object->as_tree()->entries as $entry ) {
+					$stack[] = $entry->hash;
+				}
+			}
+		}
+		return true;
 	}
 
 	public function find_objects_added_in( $new_commit_hash, $old_commit_hash = Commit::NULL_HASH, $options = array() ) {
@@ -274,17 +274,17 @@ class GitRepository {
 		return $this->fs->rm( $path );
 	}
 
-    public function checkout( $ref ) {
-        if(!$this->has_object($ref)) {
-            // Symref
-            $ref = 'ref: ' . $ref;
-        }
-        $this->set_ref_head('HEAD', $ref);
-    }
+	public function checkout( $ref ) {
+		if ( ! $this->has_object( $ref ) ) {
+			// Symref
+			$ref = 'ref: ' . $ref;
+		}
+		$this->set_ref_head( 'HEAD', $ref );
+	}
 
-    public function get_current_branch_name() {
-        return $this->get_ref_head( 'HEAD', array( 'follow_symrefs' => false ) );
-    }
+	public function get_current_branch_name() {
+		return $this->get_ref_head( 'HEAD', array( 'follow_symrefs' => false ) );
+	}
 
 	public function get_ref_head( $ref = 'HEAD', $options = array() ) {
 		while ( true ) {
@@ -355,19 +355,19 @@ class GitRepository {
 	/**
 	 * Merge two branches.
 	 *
-     * @TODO: Sparse merge that only processes specific paths
+	 * @TODO: Sparse merge that only processes specific paths
 	 * @TODO: Implement a streaming merge. The current implementation buffers
 	 *        everything into memory and will fail for large merges.
 	 * @TODO: Do not change the HEAD ref.
 	 *
 	 * @param string $ref The branch to merge.
-     * @param array $options An associative array of options. {
-     *     @type string $path The path to merge files at. The other paths will be ignored.
-     * }
+	 * @param array  $options An associative array of options. {
+	 *     @type string $path The path to merge files at. The other paths will be ignored.
+	 * }
 	 * @return string The hash of the merge commit.
 	 */
 	public function merge( $ref, $options = array() ) {
-        $path = $options['path'] ?? '/';
+		$path = $options['path'] ?? '/';
 
 		$commit_hash1 = $this->get_ref_head( 'HEAD' );
 		$commit_hash2 = $this->get_ref_head( $ref );
@@ -398,8 +398,8 @@ class GitRepository {
 						);
 						continue;
 					}
-					$merged_content = $this->diff_engine->three_way_merge_blob(
-                        $current_content,
+					$merged_content   = $this->diff_engine->three_way_merge_blob(
+						$current_content,
 						$current_entry->content['diff'],
 						$merged_entry->content['diff']
 					);
@@ -419,10 +419,10 @@ class GitRepository {
 				'message' => 'Merge commit ' . $commit_hash2 . ' into ' . $commit_hash1,
 				'updates' => $updates,
 				'deletes' => $deletes,
-                'parents' => [
-                    $commit_hash1,
-                    $commit_hash2,
-                ]
+				'parents' => array(
+					$commit_hash1,
+					$commit_hash2,
+				),
 			)
 		);
 	}
@@ -468,61 +468,61 @@ class GitRepository {
 		throw new GitException( 'No common ancestor found for ' . $commit_hash1 . ' and ' . $commit_hash2 );
 	}
 
-    public function get_nth_ancestor_hash($n, $commit_hash=null) {
-        $commit_hash = $options['commit_hash'] ?? $this->get_ref_head('HEAD');
+	public function get_nth_ancestor_hash( $n, $commit_hash = null ) {
+		$commit_hash = $options['commit_hash'] ?? $this->get_ref_head( 'HEAD' );
 
-        for($i = 0; $i < $n; $i++) {
-            $commit_hash = $this->read_object($commit_hash)->as_commit()->parents[0];
-        }
-
-        return $commit_hash;
-    }
-
-    /**
-     * Returns parents of the specified commit.
-     * 
-     * @return array A list of parent commits hashes.
-     */
-    public function get_ancestors_hashes($options = array()) {
-        $commit_hash = $options['commit_hash'] ?? $this->get_ref_head('HEAD');
-        $on_missing = $options['on_missing'] ?? 'throw'; // throw | return-early
-        $limit = $options['count'] ?? -1;
-
-		$found_parents = array();
-        $enqueued_parents = array( $commit_hash );
-		while ( ! empty ( $enqueued_parents ) ) {
-            $next_parent_hash = array_pop( $enqueued_parents );
-			if ( Commit::is_null_hash( $next_parent_hash ) ) {
-                continue;
-            }
-
-            if ( ! $this->has_object( $next_parent_hash ) ) {
-                if($on_missing === 'throw') {
-                    throw new GitException('Parent commit of ' . $next_parent_hash . ' not found.');
-                } else {
-                    continue;
-                }
-            }
-
-            $parents = $this->read_object( $next_parent_hash )->as_commit()->parents;
-
-            $found_parents = array_merge(
-                $found_parents,
-                $parents
-            );
-
-            $enqueued_parents = array_merge(
-                $enqueued_parents,
-                $parents
-            );
-
-            if($limit !== -1 && count($found_parents) >= $limit) {
-                break;
-            }
+		for ( $i = 0; $i < $n; $i++ ) {
+			$commit_hash = $this->read_object( $commit_hash )->as_commit()->parents[0];
 		}
 
-        return $found_parents;
-    }
+		return $commit_hash;
+	}
+
+	/**
+	 * Returns parents of the specified commit.
+	 *
+	 * @return array A list of parent commits hashes.
+	 */
+	public function get_ancestors_hashes( $options = array() ) {
+		$commit_hash = $options['commit_hash'] ?? $this->get_ref_head( 'HEAD' );
+		$on_missing  = $options['on_missing'] ?? 'throw'; // throw | return-early
+		$limit       = $options['count'] ?? -1;
+
+		$found_parents    = array();
+		$enqueued_parents = array( $commit_hash );
+		while ( ! empty( $enqueued_parents ) ) {
+			$next_parent_hash = array_pop( $enqueued_parents );
+			if ( Commit::is_null_hash( $next_parent_hash ) ) {
+				continue;
+			}
+
+			if ( ! $this->has_object( $next_parent_hash ) ) {
+				if ( $on_missing === 'throw' ) {
+					throw new GitException( 'Parent commit of ' . $next_parent_hash . ' not found.' );
+				} else {
+					continue;
+				}
+			}
+
+			$parents = $this->read_object( $next_parent_hash )->as_commit()->parents;
+
+			$found_parents = array_merge(
+				$found_parents,
+				$parents
+			);
+
+			$enqueued_parents = array_merge(
+				$enqueued_parents,
+				$parents
+			);
+
+			if ( $limit !== -1 && count( $found_parents ) >= $limit ) {
+				break;
+			}
+		}
+
+		return $found_parents;
+	}
 
 
 	/**
@@ -615,14 +615,14 @@ class GitRepository {
 		}
 
 		// Create a new commit object
-        $options['tree'] = $root_tree_oid;
-		if ( ! isset($options['parents']) && $this->get_ref_head( 'HEAD' ) ) {
-			$options['parents'] = [ $head ];
+		$options['tree'] = $root_tree_oid;
+		if ( ! isset( $options['parents'] ) && $this->get_ref_head( 'HEAD' ) ) {
+			$options['parents'] = array( $head );
 		}
 
-        if ( $is_amend && ! $options['message'] ) {
-            $options['message'] = $this->read_object( $head )->as_commit()->message;
-        }
+		if ( $is_amend && ! $options['message'] ) {
+			$options['message'] = $this->read_object( $head )->as_commit()->message;
+		}
 		$commit_oid = $this->add_object(
 			'commit',
 			$this->create_commit_string( $options )
@@ -633,8 +633,8 @@ class GitRepository {
 		if ( $this->branch_exists( $head_ref ) ) {
 			$this->set_ref_head( $head_ref, $commit_oid );
 		} else {
-            $this->set_ref_head( 'HEAD', $commit_oid );
-        }
+			$this->set_ref_head( 'HEAD', $commit_oid );
+		}
 
 		if ( isset( $options['amend'] ) && $options['amend'] && isset( $options['parents'] ) ) {
 			$commit_oid = $this->squash( $commit_oid, $options['parents'][0] );
@@ -643,9 +643,9 @@ class GitRepository {
 		return $commit_oid;
 	}
 
-	public function diff_commits( $previous_commit_hash, $current_commit_hash, $path='/' ) {
-        $current_tree_oid = $this->find_hash_by_path($path, $current_commit_hash);
-        $previous_tree_oid = $this->find_hash_by_path($path, $previous_commit_hash);
+	public function diff_commits( $previous_commit_hash, $current_commit_hash, $path = '/' ) {
+		$current_tree_oid  = $this->find_hash_by_path( $path, $current_commit_hash );
+		$previous_tree_oid = $this->find_hash_by_path( $path, $previous_commit_hash );
 
 		return $this->diff_trees( $current_tree_oid, $previous_tree_oid );
 	}
@@ -842,9 +842,9 @@ class GitRepository {
 		$commit_message     = array();
 		$commit_message[]   = 'tree ' . $options['tree'];
 		if ( isset( $options['parents'] ) ) {
-            foreach($options['parents'] as $parent) {
-			    $commit_message[] = 'parent ' . $parent;
-            }
+			foreach ( $options['parents'] as $parent ) {
+				$commit_message[] = 'parent ' . $parent;
+			}
 		}
 		$commit_message[] = 'author ' . $options['author'] . ' ' . $options['author_date'];
 		$commit_message[] = 'committer ' . $options['committer'] . ' ' . $options['committer_date'];

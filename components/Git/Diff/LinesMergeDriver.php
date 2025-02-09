@@ -7,7 +7,7 @@ use WordPress\Git\GitException;
 class LinesMergeDriver implements MergeDriver {
 
 	public function three_way_merge_blob( $common_parent, $diff1, $diff2 ) {
-		$merged    = array();
+		$merged = array();
 
 		$index1 = 0;
 		$index2 = 0;
@@ -25,7 +25,7 @@ class LinesMergeDriver implements MergeDriver {
 					if ( $change1['line'] !== $change2['line'] ) {
 						$merged[] = array(
 							'type' => '!',
-                            'line' => $change1['line'] . ' | ' . $change2['line'],
+							'line' => $change1['line'] . ' | ' . $change2['line'],
 							'line1' => $change1['line'],
 							'line2' => $change2['line'],
 						);
@@ -75,7 +75,7 @@ class LinesMergeDriver implements MergeDriver {
 			}
 		}
 
-		return $this->apply_diff($common_parent, $merged);
+		return $this->apply_diff( $common_parent, $merged );
 	}
 
 	public function apply_diff( $text, $diff ) {

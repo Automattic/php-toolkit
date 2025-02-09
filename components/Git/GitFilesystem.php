@@ -139,16 +139,16 @@ class GitFilesystem implements Filesystem {
 
 	public function rename( $from_path, $to_path, $options = array() ) {
 		if ( $this->is_file( $from_path ) ) {
-            $this->copy( $from_path, $to_path, $options );
-            $this->rm( $from_path );
-		} else if ( $this->is_dir( $from_path ) ) {
-            $this->commit(
-                array(
-                    'move_trees' => array(
-                        $from_path => $to_path,
-                    ),
-                )
-            );
+			$this->copy( $from_path, $to_path, $options );
+			$this->rm( $from_path );
+		} elseif ( $this->is_dir( $from_path ) ) {
+			$this->commit(
+				array(
+					'move_trees' => array(
+						$from_path => $to_path,
+					),
+				)
+			);
 		} else {
 			throw new FilesystemException( sprintf( 'Path is not a file or directory: %s', $from_path ) );
 		}
@@ -186,9 +186,9 @@ class GitFilesystem implements Filesystem {
 			} catch ( GitException $e ) {
 				// If push failed, force pull and retry
 				$this->remote->pull(
-                    $this->get_repository()->get_current_branch_name(),
-                    [ 'force' => true ]
-                );
+					$this->get_repository()->get_current_branch_name(),
+					array( 'force' => true )
+				);
 
 				// If pull succeeded, try committing and pushing again
 				$this->repo->commit( $options );
