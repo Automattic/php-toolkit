@@ -5,106 +5,98 @@ namespace WordPress\Git\Tests;
 use WordPress\Git\Diff\DiffMatchPatchMergeDriver;
 
 class DiffMatchPatchMergeDriverTest extends \PHPUnit\Framework\TestCase {
-
-	public function test_cleanly_applies_non_overlapping_changes_in_same_line() {
-		$common_parent = <<<EOT
-        <!-- wp:heading {"level":1} -->
-        <h1>A test note</h1>
-        <!-- /wp:heading -->
-        EOT;
-
-		$branch1 = <<<EOT
-        <!-- wp:heading {"newattribute": "before", "level":1} -->
-        <h1>A test note</h1>
-        <!-- /wp:heading -->
-        EOT;
-
-		$branch2 = <<<EOT
-        <!-- wp:heading {"level":2} -->
-        <h1>A test note</h1>
-        <!-- /wp:heading -->
-        EOT;
-
-		$expected = <<<EOT
-        <!-- wp:heading {"newattribute": "before", "level":2} -->
-        <h1>A test note</h1>
-        <!-- /wp:heading -->
-        EOT;
-
+	/**
+	 * @dataProvider threeWayMergeDataProvider
+	 */
+	public function test_three_way_merge( $common_parent, $branch1, $branch2, $options, $expected ) {
 		$driver = new DiffMatchPatchMergeDriver();
-		$diff1  = $driver->diff( $common_parent, $branch1 );
-		$diff2  = $driver->diff( $common_parent, $branch2 );
-
-		$merged = $driver->three_way_merge_blob( $common_parent, $diff1, $diff2 );
-
+		$merged = $driver->three_way_merge( $common_parent, $branch1, $branch2, $options );
 		$this->assertEquals( $expected, $merged );
 	}
 
-	public function test_cleanly_applies_overlapping_changes_in_same_line() {
-		$common_parent = <<<EOT
-        <!-- wp:heading {"level": 1, "id": "main-heading"} -->
-        <h1>A test note</h1>
-        <!-- /wp:heading -->
-        EOT;
+	public function threeWayMergeDataProvider() {
+		return [
+			'Block attributes: (A) Adds new attribute (B) Updates an existing attribute' => [
+				'parent' => <<<EOT
+                <!-- wp:heading {"level":1} -->
+                <h1>A test note</h1>
+                <!-- /wp:heading -->
+                EOT,
 
-		$branch1 = <<<EOT
-        <!-- wp:heading {"id": "main-heading", "level": 1} -->
-        <h1>A test note</h1>
-        <!-- /wp:heading -->
-        EOT;
+				'branch1' => <<<EOT
+                <!-- wp:heading {"newattribute": "before", "level":1} -->
+                <h1>A test note</h1>
+                <!-- /wp:heading -->
+                EOT,
 
-		$branch2 = <<<EOT
-        <!-- wp:heading {"level": 2, "id": "main-heading"} -->
-        <h1>A test note</h1>
-        <!-- /wp:heading -->
-        EOT;
+				'branch2' => <<<EOT
+                <!-- wp:heading {"level":2} -->
+                <h1>A test note</h1>
+                <!-- /wp:heading -->
+                EOT,
 
-		$expected = <<<EOT
-        <!-- wp:heading {"id": "main-heading", "level": 2} -->
-        <h1>A test note</h1>
-        <!-- /wp:heading -->
-        EOT;
+				'options' => [],
 
-		$driver = new DiffMatchPatchMergeDriver();
-		$diff1  = $driver->diff( $common_parent, $branch1 );
-		$diff2  = $driver->diff( $common_parent, $branch2 );
+				'expected' => <<<EOT
+                <!-- wp:heading {"newattribute": "before", "level":2} -->
+                <h1>A test note</h1>
+                <!-- /wp:heading -->
+                EOT
+			],
+			'Block attributes: (A) Reorders attributes (B) Updates an existing attribute' => [
+				'parent' => <<<EOT
+                <!-- wp:heading {"level": 1, "id": "main-heading"} -->
+                <h1>A test note</h1>
+                <!-- /wp:heading -->
+                EOT,
 
-		$merged = $driver->three_way_merge_blob( $common_parent, $diff1, $diff2 );
+				'branch1' => <<<EOT
+                <!-- wp:heading {"id": "main-heading", "level": 1} -->
+                <h1>A test note</h1>
+                <!-- /wp:heading -->
+                EOT,
 
-		$this->assertEquals( $expected, $merged );
-	}
+				'branch2' => <<<EOT
+                <!-- wp:heading {"level": 2, "id": "main-heading"} -->
+                <h1>A test note</h1>
+                <!-- /wp:heading -->
+                EOT,
 
-	public function test_cleanly_applies_tricky_overlapping_changes_in_same_line() {
-		$common_parent = <<<EOT
-        <!-- wp:heading {"level": 1, "id": "main-heading"} -->
-        <h1>A test note</h1>
-        <!-- /wp:heading -->
-        EOT;
+				'options' => [],
 
-		$branch1 = <<<EOT
-        <!-- wp:heading {"id": "main-heading", "level": 1} -->
-        <h1>A test note</h1>
-        <!-- /wp:heading -->
-        EOT;
+				'expected' => <<<EOT
+                <!-- wp:heading {"id": "main-heading", "level": 2} -->
+                <h1>A test note</h1>
+                <!-- /wp:heading -->
+                EOT
+			],
+			'Block attributes: (A) Reorders attributes (B) Removes an attribute' => [
+				'parent' => <<<EOT
+                <!-- wp:heading {"level": 1, "id": "main-heading"} -->
+                <h1>A test note</h1>
+                <!-- /wp:heading -->
+                EOT,
 
-		$branch2 = <<<EOT
-        <!-- wp:heading {"level": 1} -->
-        <h1>A test note</h1>
-        <!-- /wp:heading -->
-        EOT;
+				'branch1' => <<<EOT
+                <!-- wp:heading {"id": "main-heading", "level": 1} -->
+                <h1>A test note</h1>
+                <!-- /wp:heading -->
+                EOT,
 
-		$expected = <<<EOT
-        <!-- wp:heading {"id": "main-heading", "level": 2} -->
-        <h1>A test note</h1>
-        <!-- /wp:heading -->
-        EOT;
+				'branch2' => <<<EOT
+                <!-- wp:heading {"level": 1} -->
+                <h1>A test note</h1>
+                <!-- /wp:heading -->
+                EOT,
 
-		$driver = new DiffMatchPatchMergeDriver();
-		$diff1  = $driver->diff( $common_parent, $branch1 );
-		$diff2  = $driver->diff( $common_parent, $branch2 );
+				'options' => ['rebase' => true],
 
-		$merged = $driver->three_way_merge_blob( $common_parent, $diff1, $diff2 );
-
-		$this->assertEquals( $expected, $merged );
+				'expected' => <<<EOT
+                <!-- wp:heading {"level": 1} -->
+                <h1>A test note</h1>
+                <!-- /wp:heading -->
+                EOT
+			],
+		];
 	}
 }
