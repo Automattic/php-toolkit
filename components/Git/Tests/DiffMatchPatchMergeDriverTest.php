@@ -17,85 +17,32 @@ class DiffMatchPatchMergeDriverTest extends \PHPUnit\Framework\TestCase {
 	public function threeWayMergeDataProvider() {
 		return [
 			'Block attributes: (A) Adds new attribute (B) Updates an existing attribute' => [
-				'parent' => <<<EOT
-                <!-- wp:heading {"level":1} -->
-                <h1>A test note</h1>
-                <!-- /wp:heading -->
-                EOT,
-
-				'branch1' => <<<EOT
-                <!-- wp:heading {"newattribute": "before", "level":1} -->
-                <h1>A test note</h1>
-                <!-- /wp:heading -->
-                EOT,
-
-				'branch2' => <<<EOT
-                <!-- wp:heading {"level":2} -->
-                <h1>A test note</h1>
-                <!-- /wp:heading -->
-                EOT,
-
-				'options' => [],
-
-				'expected' => <<<EOT
-                <!-- wp:heading {"newattribute": "before", "level":2} -->
-                <h1>A test note</h1>
-                <!-- /wp:heading -->
-                EOT
+				'parent' => '{"level":1}',
+				'branch1' => '{"newattribute": "before", "level":1}',
+				'branch2' => '{"level":2}',
+				'options' => ['rebase' => true],
+				'expected' => '{"newattribute": "before", "level":2}'
 			],
 			'Block attributes: (A) Reorders attributes (B) Updates an existing attribute' => [
-				'parent' => <<<EOT
-                <!-- wp:heading {"level": 1, "id": "main-heading"} -->
-                <h1>A test note</h1>
-                <!-- /wp:heading -->
-                EOT,
-
-				'branch1' => <<<EOT
-                <!-- wp:heading {"id": "main-heading", "level": 1} -->
-                <h1>A test note</h1>
-                <!-- /wp:heading -->
-                EOT,
-
-				'branch2' => <<<EOT
-                <!-- wp:heading {"level": 2, "id": "main-heading"} -->
-                <h1>A test note</h1>
-                <!-- /wp:heading -->
-                EOT,
-
+				'parent' => '{"level": 1, "id": "main-heading"}',
+				'branch1' => '{"id": "main-heading", "level": 1}',
+				'branch2' => '{"level": 2, "id": "main-heading"}',
 				'options' => [],
-
-				'expected' => <<<EOT
-                <!-- wp:heading {"id": "main-heading", "level": 2} -->
-                <h1>A test note</h1>
-                <!-- /wp:heading -->
-                EOT
+				'expected' => '{"id": "main-heading", "level": 2}'
 			],
-			'Block attributes: (A) Reorders attributes (B) Removes an attribute' => [
-				'parent' => <<<EOT
-                <!-- wp:heading {"level": 1, "id": "main-heading"} -->
-                <h1>A test note</h1>
-                <!-- /wp:heading -->
-                EOT,
-
-				'branch1' => <<<EOT
-                <!-- wp:heading {"id": "main-heading", "level": 1} -->
-                <h1>A test note</h1>
-                <!-- /wp:heading -->
-                EOT,
-
-				'branch2' => <<<EOT
-                <!-- wp:heading {"level": 1} -->
-                <h1>A test note</h1>
-                <!-- /wp:heading -->
-                EOT,
-
+			'Block attributes: (A) Prepends and attribute and pops an attribute (B) Updates an attribute' => [
+				'parent' => '{"level": 100, "id": "main-heading"}',
+				'branch1' => '{"third": "key", "level": 100}',
+				'branch2' => '{"level": 2, "id": "main-heading"}',
 				'options' => ['rebase' => true],
-
-				'expected' => <<<EOT
-                <!-- wp:heading {"level": 1} -->
-                <h1>A test note</h1>
-                <!-- /wp:heading -->
-                EOT
+				'expected' => '{"third": "key", "level": 2}'
+			],
+			'Block attributes: (A) Swaps attributes order (B) Removes an attribute' => [
+				'parent' => '{"level": 1, "id": "main-heading"}',
+				'branch1' => '{"id": "main-heading", "level": 1}',
+				'branch2' => '{"level": 1}',
+				'options' => ['rebase' => true],
+				'expected' => '{"level": 1}'
 			],
 		];
 	}
