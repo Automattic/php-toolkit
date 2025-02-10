@@ -131,7 +131,7 @@ class ByteReadStreamTest extends TestCase {
 		$this->assertFalse( $reader->reached_end_of_data() );
 
 		while ( ! $reader->reached_end_of_data() ) {
-			$pulled = $reader->pull( 8192 );
+			$pulled = $reader->pull( 65536 );
 			$reader->consume( $pulled );
 		}
 		$this->assertTrue( $reader->reached_end_of_data() );

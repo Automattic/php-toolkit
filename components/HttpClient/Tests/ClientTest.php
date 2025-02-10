@@ -94,14 +94,14 @@ class ClientTest extends \PHPUnit\Framework\TestCase {
 			if ( ! is_resource( $server ) ) {
 				$this->fail( 'Failed to start chunked encoding test server' );
 			}
-			$errors = fread( $pipes[2], 8192 );
+			$errors = fread( $pipes[2], 65536 );
 			if ( $errors ) {
 				$this->fail( 'Failed to start chunked encoding dev server: ' . $errors );
 			}
 			if ( feof( $pipes[1] ) ) {
 				$this->fail( 'Failed to start chunked encoding dev server' );
 			}
-			$output .= fread( $pipes[1], 8192 );
+			$output .= fread( $pipes[1], 65536 );
 			if ( str_contains( $output, 'Server is listening on' ) ) {
 				break;
 			}

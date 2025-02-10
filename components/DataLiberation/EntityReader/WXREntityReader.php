@@ -44,7 +44,7 @@ use WordPress\XML\XMLUnsupportedException;
  *     $reader = WP_WXR_Entity_Reader::create_for_streaming();
  *
  *     // Add data as it becomes available
- *     $reader->append_bytes( fread( $file_handle, 8192 ) );
+ *     $reader->append_bytes( fread( $file_handle, 65536 ) );
  *
  *     // Process entities
  *     while ( $reader->next_entity() ) {
@@ -68,7 +68,7 @@ use WordPress\XML\XMLUnsupportedException;
  *     // Check if we need more input
  *     if ( $reader->is_paused_at_incomplete_input() ) {
  *         // Add more data and continue processing
- *         $reader->append_bytes( fread( $file_handle, 8192 ) );
+ *         $reader->append_bytes( fread( $file_handle, 65536 ) );
  *     }
  *
  * The next_entity() -> fread -> break usage pattern may seem a bit tedious. This is expected. Even
@@ -869,7 +869,7 @@ class WXREntityReader implements EntityReader {
 			return false;
 		}
 
-		$available_bytes = $this->upstream->pull( 8192 );
+		$available_bytes = $this->upstream->pull( 65536 );
 		$this->append_bytes( $this->upstream->consume( $available_bytes ) );
 		return true;
 	}

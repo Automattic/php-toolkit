@@ -636,7 +636,7 @@ class WP_Static_Files_Editor_Plugin {
         header('Cache-Control: no-cache');
 
         while(!$object->reached_end_of_data()) {
-            $bytes_available = $object->pull(8192);
+            $bytes_available = $object->pull(65536);
             echo $object->consume($bytes_available);
         }
         die();

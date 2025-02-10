@@ -30,6 +30,11 @@ use WP_HTML_Processor;
  * array(
  *     'post_title' => array( 'My first post' ),
  * )
+ * 
+ * @TODO: Satisfy the same test suite as the Gutenberg paste/raw handler.
+ *        Look for the test examples (input/output) in the Gutenberg repo.
+ * @TODO: Consider option for "presentation" vs "semantics" mode. We can preserve
+ *        anything in the HTML block if needed.
  */
 class MarkupProcessorConsumer implements DataFormatConsumer {
 	private $markup_processor;

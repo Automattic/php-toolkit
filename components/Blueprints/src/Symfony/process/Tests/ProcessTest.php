@@ -113,7 +113,7 @@ class ProcessTest extends TestCase
 
     public function testAllOutputIsActuallyReadOnTermination()
     {
-        // this code will result in a maximum of 2 reads of 8192 bytes by calling
+        // this code will result in a maximum of 2 reads of 65536 bytes by calling
         // start() and isRunning().  by the time getOutput() is called the process
         // has terminated so the internal pipes array is already empty. normally
         // the call to start() will not read any data as the process will not have

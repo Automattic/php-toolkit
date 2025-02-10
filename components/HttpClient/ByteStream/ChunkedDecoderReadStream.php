@@ -57,7 +57,7 @@ class ChunkedDecoderReadStream extends BaseByteReadStream {
 				$this->chunk_remaining_bytes = $chunk_size;
 				$this->state                 = self::SCAN_CHUNK_DATA;
 			} elseif ( $this->state === self::SCAN_CHUNK_DATA ) {
-				$bytes_to_read = min( $this->chunk_remaining_bytes, 8192 );
+				$bytes_to_read = min( $this->chunk_remaining_bytes, 65536 );
 				$available     = $this->upstream->pull( $bytes_to_read );
 				if ( $available === 0 ) {
 					break;

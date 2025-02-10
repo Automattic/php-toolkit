@@ -163,7 +163,7 @@ class PacketParser {
 		}
 
 		$remaining  = $this->expected_length - $this->packet_bytes_read;
-		$chunk_size = min( 8192, $remaining );
+		$chunk_size = min( 65536, $remaining );
 		if ( $this->bytes_read_so_far + $chunk_size > strlen( $this->bytes ) ) {
 			throw new NotEnoughDataException();
 		}
