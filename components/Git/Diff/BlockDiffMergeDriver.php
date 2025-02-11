@@ -73,6 +73,11 @@ use WordPress\Git\GitException;
  *   them. However, the diff-match-patch library is not designed for structured
  *   data, and would introduce block markup syntax errors in the output.
  * 
+ * ## Future work
+ * 
+ * * Explore low-cost techniques of matching block IDs and performing the fuzzy
+ *   diff on their textual content when all the trees are similar.
+ * 
  * [1] https://github.com/google/diff-match-patch/wiki/Plain-Text-vs.-Structured-Content
  * [2] https://github.com/WordPress/gutenberg/discussions/65012#discussioncomment-10801420
  */
@@ -88,48 +93,243 @@ class BlockDiffMergeDriver {
     /**
      * 
      */
-	public function three_way_merge( $common_parent, $branch_a, $branch_b, $options = [] ) {
-        $diff_a = $this->dmp->diff_main($common_parent, $branch_a);
-        // $this->dmp->diff_cleanupSemantic($diff_a);
-        // $this->dmp->diff_cleanupEfficiency($diff_a);
-        // $diff_a = $this->diff_cleanup_block_boundaries($common_parent, $branch_a, $diff_a);
+	public function three_way_merge( $common_parent, $version_b, $version_c ) {
+        $a = $common_parent;
+        $b = $version_b;
+        $c = $version_c;
 
-        $diff_b = $this->dmp->diff_main($common_parent, $branch_b);
-        // $this->dmp->diff_cleanupSemantic($diff_b);
-        // $this->dmp->diff_cleanupEfficiency($diff_b);
-        // $diff_b = $this->diff_cleanup_block_boundaries($common_parent, $branch_b, $diff_b);
+        $diff_ab = $this->diff($a, $b);
+        // $diff_ab = $this->diff_cleanup_block_boundaries($a, $b, $diff_ab);
+        $diff_ac = $this->diff($a, $c);
+        $diff_ab_rebased = $this->rebase_diff($diff_ab, $diff_ac, $b);
 
-        $patch_a = $this->dmp->patch_make($common_parent, $diff_a);
-        list($merged_a, $applied_a) = $this->dmp->patch_apply($patch_a, $common_parent);
-        if ( ! $applied_a ) {
-            throw new GitException( 'Diff failed to apply cleanly onto common parent' );
+        return self::get_final_text($diff_ab_rebased);
+    }
+
+    static public function get_final_text( $diff ) {
+        $merged_c = [];
+        foreach($diff as $change) {
+            switch($change[0]) {
+                case Diff::EQUAL:
+                    $merged_c[] = $change[1];
+                    break;
+                case Diff::INSERT:
+                    $merged_c[] = $change[1];
+                    break;
+            }
         }
+        return implode('', $merged_c);
+    }
 
-        $mode = $options['mode'] ?? 'fallback';
-        if($mode === 'dmp') {
-            $patch_b = $this->dmp->patch_make($common_parent, $diff_b);
-            $merged_b = $this->apply_patch($merged_a, $patch_b);
-        } else {
-            try {
-                // Always try rebasing the patch
-                $diff_b = $this->rebase_diff($diff_a, $diff_b, $merged_a);
-                $patch_b = $this->dmp->patch_make($merged_a, $diff_b);
-                $merged_b = $this->apply_patch($merged_a, $patch_b);        
-            } catch(MergeConflictException $e) {
-                if($mode === 'rebase') {
-                    throw $e;
+	public function apply_diff( $text, $diff ) {
+        return self::get_final_text($diff);
+	}
+
+	public function diff( $old_string, $new_string ) {
+		$diff = $this->dmp->diff_main( $old_string, $new_string );
+        $this->dmp->diff_cleanupSemantic($diff);
+        $this->dmp->diff_cleanupEfficiency($diff);
+        return $diff;
+	}
+
+    public function rebase_diff( $base_diff, $diff_to_rebase, $document_after_base_diff ) {
+        // Convert the diffs to format that makes rebasing easier
+        $diff_a = self::dmp_diff_to_annotated_diff($base_diff);
+        $diff_b = self::dmp_diff_to_annotated_diff($diff_to_rebase);
+
+        // Do the rebase
+        $i_a = 0;
+        $i_b = 0;
+
+        $rebased_diff = [];
+        $accumulated_shift = 0;
+        while($i_b < count($diff_b)) {
+            $change_b = $diff_b[$i_b];
+            $change_b['start'] += $accumulated_shift;
+            if(!isset($diff_a[$i_a])) {
+                $rebased_diff[] = $change_b;
+                $i_b++;
+                continue;
+            }
+
+            $change_a = $diff_a[$i_a];
+
+            if($change_a['start'] === $change_b['start']) {
+                /**
+                 * version a: {"level": 1}
+                 * version b: {"level": 20}
+                 * patch b:   =10\t-1\t+20
+                 * 
+                 * version c: {"level": 3}
+                 * patch c:   =10\t-1\t+3
+                 * 
+                 * If we apply insertions from both patches, we'll get {"level": 320}
+                 * which is not what we want. Let's throw and fall back to the fuzzy
+                 * merging from diff-match-patch.
+                 */
+                if($change_a['type'] === Diff::INSERT && $change_b['type'] === Diff::INSERT) {
+                    throw new MergeConflictException('Two insertions at the same start position');
                 }
-                // If the rebasing failed, fall back to fuzzy diff-match-patch merging
-                $patch_b = $this->dmp->patch_make($common_parent, $diff_b);
-                $merged_b = $this->apply_patch($merged_a, $patch_b);
+            }
+            
+            if($change_b['start'] < $change_a['start']) {
+                $rebased_diff[] = $change_b;
+                $i_b++;
+            } else {
+                switch($change_a['type']) {
+                    case Diff::INSERT:
+                        $accumulated_shift += $change_a['length'];
+                        break;
+                    case Diff::DELETE:
+                        if($change_a['start'] + $change_a['length'] > $change_b['start']) {
+                            switch($change_b['type']) {
+                                case Diff::INSERT:
+                                    if($change_a['start'] !== $change_b['start']) {
+                                        throw new MergeConflictException('Deletion in A intersects with an insertion in B');
+                                    }
+                                    break;
+                                case Diff::DELETE:
+                                    if($change_b['start'] + $change_b['length'] <= $change_a['start'] + $change_a['length']) {
+                                        // If deletion B is contained within deletion A, we can just ignore it
+                                        $i_b++;
+                                        // var_dump([
+                                        //     'change_a' => $change_a,
+                                        //     'change_b' => $change_b,
+                                        // ]);
+                                        if($change_b['start'] === $change_a['start']) {
+                                            // Diff b already accounts for the shift from this change, let's add it to
+                                            // the accumulator to make sure we won't count it twice.
+                                            $accumulated_shift += $change_b['length'];
+                                        }
+                                        continue 3;
+                                    } else {
+                                        // Otherwise we can merge the two deletions
+                                        $merged_deletion = [
+                                            'type' => Diff::DELETE,
+                                            'start' => $change_a['start'],
+                                            'length' => $change_b['length'] + ($change_b['start'] - $change_b['start']),
+                                        ];
+                                        // Store the deleted substring for debugging
+                                        $merged_deletion['string'] = mb_substr($document_after_base_diff, $merged_deletion['start'], $merged_deletion['length']);
+                                        $rebased_diff[] = $merged_deletion;
+                                        // Move past both deletions
+                                        $i_b++;
+                                        $i_a++;
+                                    }
+                                    break;
+                            }
+                        }
+
+                        // Shift by the number of characters that are being deleted, but
+                        // only up to the point where deletion A starts.
+                        $accumulated_shift -= min(
+                            $change_a['length'],
+                            $change_b['start'] - $change_a['start']
+                        );
+                        break;
+                }
+                $i_a++;
             }
         }
 
-        return $merged_b;
+        // Convert the rebased diff back to DMP format
+        $dmp_diff = [];
+        $cursor_in_original_doc = 0;
+        foreach($rebased_diff as $change) {
+            if($change['start'] > $cursor_in_original_doc) {
+                $length = $change['start'] - $cursor_in_original_doc;
+                $dmp_diff[] = [
+                    Diff::EQUAL,
+                    substr($document_after_base_diff, $cursor_in_original_doc, $length),
+                ];
+                $cursor_in_original_doc += $length;
+            }
+            switch($change['type']) {
+                case Diff::INSERT:
+                    $dmp_diff[] = [
+                        Diff::INSERT,
+                        $change['string'],
+                    ];
+                    break;
+                case Diff::DELETE:
+                    $length = $change['start'] + $change['length'] - $cursor_in_original_doc;
+                    $dmp_diff[] = [
+                        Diff::DELETE,
+                        substr($document_after_base_diff, $cursor_in_original_doc, $length),
+                    ];
+                    $cursor_in_original_doc += $length;
+                    break;
+            }
+        }
+
+        if($cursor_in_original_doc < strlen($document_after_base_diff)) {
+            $dmp_diff[] = [
+                Diff::EQUAL,
+                substr($document_after_base_diff, $cursor_in_original_doc, strlen($document_after_base_diff) - $cursor_in_original_doc),
+            ];
+        }
+
+        // print_r([
+        //     'diff' => $base_diff,
+        //     'diff_a' => $this->diff_as_delta($base_diff),
+        //     'diff_b' => $this->diff_as_delta($diff_to_rebase),
+        //     'diff_r' => $this->diff_as_delta($dmp_diff),
+        // ]);
+        return $dmp_diff;
     }
 
-    // @TODO: Cleanup all this messy internal state. Or not. Internal can be messy.
-    public function diff_cleanup_block_boundaries( $document_a, $document_b, $diff ) {
+    // For debugging
+    private function diff_as_delta($diff) {
+        $delta = [];
+        foreach($diff as $change) {
+            switch($change[0]) {
+                case Diff::EQUAL:
+                    $delta[] = '=' . strlen($change[1]);
+                    break;
+                case Diff::INSERT:
+                    $delta[] = '+' . $change[1];
+                    break;
+                case Diff::DELETE:
+                    $delta[] = '-' . strlen($change[1]);
+            }
+        }
+        return implode('|', $delta);
+    }
+
+    private static function dmp_diff_to_annotated_diff($diff) {
+        $cursor_in_original_doc = 0;
+        $annotated_diff = [];
+        foreach($diff as $change) {
+            switch($change[0]) {
+                case Diff::EQUAL:
+                    $cursor_in_original_doc += mb_strlen($change[1]);
+                    break;
+                case Diff::INSERT:
+                    $annotated_change = [
+                        'type' => Diff::INSERT,
+                        'start' => $cursor_in_original_doc,
+                        'length' => mb_strlen($change[1]),
+                        'string' => $change[1],
+                    ];
+                    $cursor_in_original_doc += $annotated_change['length'];
+                    $annotated_diff[] = $annotated_change;
+                    break;
+                case Diff::DELETE:
+                    $annotated_change = [
+                        'type' => Diff::DELETE,
+                        'start' => $cursor_in_original_doc,
+                        'length' => mb_strlen($change[1]),
+                        'string' => $change[1],
+                    ];
+                    $cursor_in_original_doc += $annotated_change['length'];
+                    $annotated_diff[] = $annotated_change;
+                    break;
+            }
+        }
+        return $annotated_diff;
+    }
+
+    private function diff_cleanup_block_boundaries( $document_a, $document_b, $diff ) {
         $annotated_diff = [];
         $cursor_in_original_doc = 0;
         $cursor_in_updated_doc = 0;
@@ -389,233 +589,4 @@ class BlockDiffMergeDriver {
         return $reduced_split_diff;
     }
 
-    private function apply_patch( $text, $patch ) {
-		list($merged, $changes_applied) = $this->dmp->patch_apply( $patch, $text );
-        // @TODO: Reason about $changes_applied. Sometimes it contains
-        //        false entries when the $merged value looks great.
-        return $merged;
-    }
-
-	public function apply_diff( $text, $diff ) {
-        $patch = $this->dmp->patch_make($text, $diff);
-		return $this->dmp->patch_apply( $patch, $text );
-	}
-
-	public function diff( $old_string, $new_string ) {
-		return $this->dmp->diff_main( $old_string, $new_string );
-	}
-
-    public function rebase_diff( $base_diff, $diff_to_rebase, $document_after_base_diff ) {
-        // Convert the diffs to format that makes rebasing easier
-        $diff_a = self::dmp_diff_to_annotated_diff($base_diff);
-        $diff_b = self::dmp_diff_to_annotated_diff($diff_to_rebase);
-
-        // Do the rebase
-        $i_a = 0;
-        $i_b = 0;
-
-        $rebased_diff = [];
-        $accumulated_shift = 0;
-        while($i_b < count($diff_b)) {
-            $change_b = $diff_b[$i_b];
-            $change_b['start'] += $accumulated_shift;
-            if(!isset($diff_a[$i_a])) {
-                $rebased_diff[] = $change_b;
-                $i_b++;
-                continue;
-            }
-
-            $change_a = $diff_a[$i_a];
-
-            if($change_a['start'] === $change_b['start']) {
-                /**
-                 * version a: {"level": 1}
-                 * version b: {"level": 20}
-                 * patch b:   =10\t-1\t+20
-                 * 
-                 * version c: {"level": 3}
-                 * patch c:   =10\t-1\t+3
-                 * 
-                 * If we apply insertions from both patches, we'll get {"level": 320}
-                 * which is not what we want. Let's throw and fall back to the fuzzy
-                 * merging from diff-match-patch.
-                 */
-                if($change_a['type'] === Diff::INSERT && $change_b['type'] === Diff::INSERT) {
-                    throw new MergeConflictException('Two insertions at the same start position');
-                }
-            }
-            
-            if($change_b['start'] < $change_a['start']) {
-                $rebased_diff[] = $change_b;
-                $i_b++;
-            } else {
-                switch($change_a['type']) {
-                    case Diff::INSERT:
-                        $accumulated_shift += $change_a['length'];
-                        break;
-                    case Diff::DELETE:
-                        if($change_a['start'] + $change_a['length'] > $change_b['start']) {
-                            switch($change_b['type']) {
-                                case Diff::INSERT:
-                                    if($change_a['start'] !== $change_b['start']) {
-                                        throw new MergeConflictException('Deletion in A intersects with an insertion in B');
-                                    }
-                                    break;
-                                case Diff::DELETE:
-                                    if($change_b['start'] + $change_b['length'] <= $change_a['start'] + $change_a['length']) {
-                                        // If deletion B is contained within deletion A, we can just ignore it
-                                        $i_b++;
-                                        // var_dump([
-                                        //     'change_a' => $change_a,
-                                        //     'change_b' => $change_b,
-                                        // ]);
-                                        if($change_b['start'] === $change_a['start']) {
-                                            // Diff b already accounts for the shift from this change, let's add it to
-                                            // the accumulator to make sure we won't count it twice.
-                                            $accumulated_shift += $change_b['length'];
-                                        }
-                                        continue 3;
-                                    } else {
-                                        // Otherwise we can merge the two deletions
-                                        $merged_deletion = [
-                                            'type' => Diff::DELETE,
-                                            'start' => $change_a['start'],
-                                            'length' => $change_b['length'] + ($change_b['start'] - $change_b['start']),
-                                        ];
-                                        // Store the deleted substring for debugging
-                                        $merged_deletion['string'] = mb_substr($document_after_base_diff, $merged_deletion['start'], $merged_deletion['length']);
-                                        $rebased_diff[] = $merged_deletion;
-                                        // Move past both deletions
-                                        $i_b++;
-                                        $i_a++;
-                                    }
-                                    break;
-                            }
-                        }
-
-                        // Shift by the number of characters that are being deleted, but
-                        // only up to the point where deletion A starts.
-                        $accumulated_shift -= min(
-                            $change_a['length'],
-                            $change_b['start'] - $change_a['start']
-                        );
-                        break;
-                }
-                $i_a++;
-            }
-        }
-
-        // Convert the rebased diff back to DMP format
-        $dmp_diff = [];
-        $cursor_in_original_doc = 0;
-        foreach($rebased_diff as $change) {
-            if($change['start'] > $cursor_in_original_doc) {
-                $length = $change['start'] - $cursor_in_original_doc;
-                $dmp_diff[] = [
-                    Diff::EQUAL,
-                    substr($document_after_base_diff, $cursor_in_original_doc, $length),
-                ];
-                $cursor_in_original_doc += $length;
-            }
-            switch($change['type']) {
-                case Diff::INSERT:
-                    $dmp_diff[] = [
-                        Diff::INSERT,
-                        $change['string'],
-                    ];
-                    break;
-                case Diff::DELETE:
-                    $length = $change['start'] + $change['length'] - $cursor_in_original_doc;
-                    $dmp_diff[] = [
-                        Diff::DELETE,
-                        substr($document_after_base_diff, $cursor_in_original_doc, $length),
-                    ];
-                    $cursor_in_original_doc += $length;
-                    break;
-            }
-        }
-
-        if($cursor_in_original_doc < strlen($document_after_base_diff)) {
-            $dmp_diff[] = [
-                Diff::EQUAL,
-                substr($document_after_base_diff, $cursor_in_original_doc, strlen($document_after_base_diff) - $cursor_in_original_doc),
-            ];
-        }
-
-        print_r([
-            'diff' => $base_diff,
-            'diff_a' => $this->diff_as_delta($base_diff),
-            'diff_b' => $this->diff_as_delta($diff_to_rebase),
-            'diff_r' => $this->diff_as_delta($dmp_diff),
-        ]);
-        return $dmp_diff;
-    }
-
-    public function diff_as_delta($diff) {
-        $delta = [];
-        foreach($diff as $change) {
-            switch($change[0]) {
-                case Diff::EQUAL:
-                    $delta[] = '=' . strlen($change[1]);
-                    break;
-                case Diff::INSERT:
-                    $delta[] = '+' . $change[1];
-                    break;
-                case Diff::DELETE:
-                    $delta[] = '-' . strlen($change[1]);
-            }
-        }
-        return implode('|', $delta);
-    }
-
-    private static function dmp_diff_to_annotated_diff($diff) {
-        $cursor_in_original_doc = 0;
-        $annotated_diff = [];
-        foreach($diff as $change) {
-            switch($change[0]) {
-                case Diff::EQUAL:
-                    $cursor_in_original_doc += mb_strlen($change[1]);
-                    break;
-                case Diff::INSERT:
-                    $annotated_change = [
-                        'type' => Diff::INSERT,
-                        'start' => $cursor_in_original_doc,
-                        'length' => mb_strlen($change[1]),
-                        'string' => $change[1],
-                    ];
-                    $cursor_in_original_doc += $annotated_change['length'];
-                    $annotated_diff[] = $annotated_change;
-                    break;
-                case Diff::DELETE:
-                    $annotated_change = [
-                        'type' => Diff::DELETE,
-                        'start' => $cursor_in_original_doc,
-                        'length' => mb_strlen($change[1]),
-                        'string' => $change[1],
-                    ];
-                    $cursor_in_original_doc += $annotated_change['length'];
-                    $annotated_diff[] = $annotated_change;
-                    break;
-            }
-        }
-        return $annotated_diff;
-    }
-
-}
-
-class ChangeStack {
-    private $changes;
-    private $cursor_in_original_doc = 0;
-
-    public function __construct() {
-        $this->changes = [];
-        $this->cursor_in_original_doc = 0;
-    }
-
-    public function next_change() {
-        $change = $this->changes[$this->cursor_in_original_doc];
-        $this->cursor_in_original_doc++;
-        return $change;
-    }
-    
 }

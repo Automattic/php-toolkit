@@ -273,6 +273,9 @@ class BlockMarkupProcessor extends WP_HTML_Tag_Processor {
 	 * @return bool Whether a token was parsed.
 	 */
 	public function next_token(): bool {
+        if($this->has_bookmark('block-delimiter')) {
+            $this->release_bookmark('block-delimiter');
+        }
 		$this->get_updated_html();
 
 		$this->block_name                = null;
@@ -310,7 +313,7 @@ class BlockMarkupProcessor extends WP_HTML_Tag_Processor {
 		 * while it can parse blocks, it has no semantics for rewriting the
 		 * block markup. Let's do our best here:
 		 */
-		$at = strspn( $text, ' \t\f\r\n' ); // Whitespace.
+		$at = strspn( $text, " \t\f\r\n" ); // Whitespace.
 
 		if ( $at >= strlen( $text ) ) {
 			// This is an empty comment. Not a block.
@@ -351,7 +354,7 @@ class BlockMarkupProcessor extends WP_HTML_Tag_Processor {
 		$attributes = array();
 
 		// Skip the whitespace that follows the block name.
-		$at += strspn( $text, ' \t\f\r\n', $at );
+		$at += strspn( $text, " \t\f\r\n", $at );
 		if ( $at < strlen( $text ) ) {
 			// It may be a self-closing block or a block with attributes.
 
@@ -400,8 +403,29 @@ class BlockMarkupProcessor extends WP_HTML_Tag_Processor {
 			array_push( $this->stack_of_open_blocks, $name );
 		}
 
+        $this->set_bookmark('block-delimiter');
+
 		return true;
 	}
+
+    public function get_block_delimiter_span() {
+        if(!$this->has_bookmark('block-delimiter')) {
+            return false;
+        }
+        return $this->bookmarks['block-delimiter'];
+    }
+
+    public function next_block_delimiter() {
+        while($this->next_token()) {
+            if($this->get_token_type() === '#block-comment') {
+                break;
+            }
+        }
+        if($this->get_token_type() !== '#block-comment') {
+            return false;
+        }
+        return true;
+    }
 
 	/**
 	 * @inheritDoc
