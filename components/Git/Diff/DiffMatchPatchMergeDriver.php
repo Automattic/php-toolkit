@@ -21,7 +21,7 @@ class DiffMatchPatchMergeDriver {
      */
 	public function three_way_merge( $common_parent, $branch_a, $branch_b, $options = [] ) {
         $diff_a = $this->dmp->diff_main($common_parent, $branch_a);
-        // $this->dmp->diff_cleanupSemantic($diff_a);
+        $this->dmp->diff_cleanupSemantic($diff_a);
         // $this->dmp->diff_cleanupEfficiency($diff_a);
 
         $diff_b = $this->dmp->diff_main($common_parent, $branch_b);
@@ -34,18 +34,34 @@ class DiffMatchPatchMergeDriver {
             throw new GitException( 'Diff failed to apply cleanly onto common parent' );
         }
 
-        if(isset($options['rebase']) && $options['rebase']) {
-            $diff_b = $this->rebase_diff($diff_a, $diff_b, $merged_a);
-            $patch_b = $this->dmp->patch_make($merged_a, $diff_b);
-            list($merged_b, $applied_b) = $this->dmp->patch_apply($patch_b, $merged_a);
-        } else {
+        $mode = $options['mode'] ?? 'fallback';
+        if($mode === 'dmp') {
             $patch_b = $this->dmp->patch_make($common_parent, $diff_b);
-            list($merged_b, $applied_b) = $this->dmp->patch_apply($patch_b, $merged_a);
+            $merged_b = $this->apply_patch($merged_a, $patch_b);
+        } else {
+            try {
+                // Always try rebasing the patch
+                $diff_b = $this->rebase_diff($diff_a, $diff_b, $merged_a);
+                $patch_b = $this->dmp->patch_make($merged_a, $diff_b);
+                $merged_b = $this->apply_patch($merged_a, $patch_b);        
+            } catch(MergeConflictException $e) {
+                if($mode === 'rebase') {
+                    throw $e;
+                }
+                // If the rebasing failed, fall back to fuzzy diff-match-patch merging
+                $patch_b = $this->dmp->patch_make($common_parent, $diff_b);
+                $merged_b = $this->apply_patch($merged_a, $patch_b);
+            }
         }
-        if ( ! $applied_b ) {
-            throw new GitException( 'Diff failed to apply cleanly onto common parent' );
-        }
+
         return $merged_b;
+    }
+
+    private function apply_patch( $text, $patch ) {
+		list($merged, $changes_applied) = $this->dmp->patch_apply( $patch, $text );
+        // @TODO: Reason about $changes_applied. Sometimes it contains
+        //        false entries when the $merged value looks great.
+        return $merged;
     }
 
 	public function apply_diff( $text, $diff ) {
@@ -86,6 +102,18 @@ class DiffMatchPatchMergeDriver {
             $change_a = $diff_a[$i_a];
 
             if($change_a['start'] === $change_b['start']) {
+                /**
+                 * version a: {"level": 1}
+                 * version b: {"level": 20}
+                 * patch b:   =10\t-1\t+20
+                 * 
+                 * version c: {"level": 3}
+                 * patch c:   =10\t-1\t+3
+                 * 
+                 * If we apply insertions from both patches, we'll get {"level": 320}
+                 * which is not what we want. Let's throw and fall back to the fuzzy
+                 * merging from diff-match-patch.
+                 */
                 if($change_a['type'] === Diff::INSERT && $change_b['type'] === Diff::INSERT) {
                     throw new MergeConflictException('Two insertions at the same start position');
                 }
@@ -111,6 +139,15 @@ class DiffMatchPatchMergeDriver {
                                     if($change_b['start'] + $change_b['length'] <= $change_a['start'] + $change_a['length']) {
                                         // If deletion B is contained within deletion A, we can just ignore it
                                         $i_b++;
+                                        var_dump([
+                                            'change_a' => $change_a,
+                                            'change_b' => $change_b,
+                                        ]);
+                                        // if($change_b['start'] === $change_a['start']) {
+                                            // Diff b already accounts for the shift from this change, let's add it to
+                                            // the accumulator to make sure we won't count it twice.
+                                            $accumulated_shift += $change_b['length'];
+                                        // }
                                         continue 3;
                                     } else {
                                         // Otherwise we can merge the two deletions
@@ -178,12 +215,12 @@ class DiffMatchPatchMergeDriver {
             ];
         }
 
-        // print_r([
-        //     'diff' => $base_diff,
-        //     'diff_a' => $this->diff_as_delta($base_diff),
-        //     'diff_b' => $this->diff_as_delta($diff_to_rebase),
-        //     'diff_r' => $this->diff_as_delta($dmp_diff),
-        // ]);
+        print_r([
+            'diff' => $base_diff,
+            'diff_a' => $this->diff_as_delta($base_diff),
+            'diff_b' => $this->diff_as_delta($diff_to_rebase),
+            'diff_r' => $this->diff_as_delta($dmp_diff),
+        ]);
         return $dmp_diff;
     }
 

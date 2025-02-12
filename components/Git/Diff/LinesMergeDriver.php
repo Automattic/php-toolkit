@@ -142,7 +142,7 @@ class LinesMergeDriver implements MergeDriver {
 		$old_lines = explode( "\n", $old_string );
 		$new_lines = explode( "\n", $new_string );
 
-		$lcs = $this->calculate_longest_common_subsequence( $old_lines, $new_lines );
+		$lcs = self::calculate_longest_common_subsequence( $old_lines, $new_lines );
 
 		$old_index = 0;
 		$new_index = 0;
@@ -284,7 +284,7 @@ class LinesMergeDriver implements MergeDriver {
 		return $formatted_diff;
 	}
 
-	private function calculate_longest_common_subsequence( $old_lines, $new_lines ) {
+	static public function calculate_longest_common_subsequence( $old_lines, $new_lines ) {
 		$old_len   = count( $old_lines );
 		$new_len   = count( $new_lines );
 		$lcsMatrix = array_fill( 0, $old_len + 1, array_fill( 0, $new_len + 1, 0 ) );
