@@ -461,8 +461,61 @@ class BlockDiffMergeDriverTest extends \PHPUnit\Framework\TestCase {
 					<!-- /wp:paragraph -->
 					HTML
 			],
+            '(A) Deletes the first paragraph, (B) Deletes the second paragraph' => [
+                'parent' => <<<'HTML'
+                    <!-- wp:paragraph -->
+                    <p>First paragraph</p>
+                    <!-- /wp:paragraph -->
+
+                    <!-- wp:paragraph -->
+                    <p>Second paragraph</p>
+                    <!-- /wp:paragraph -->
+                    HTML,
+                'version_b' => <<<'HTML'
+                    <!-- wp:paragraph -->
+                    <p>First paragraph</p>
+                    <!-- /wp:paragraph -->
+                    HTML,
+                'version_c' => <<<'HTML'
+                    <!-- wp:paragraph -->
+                    <p>Second paragraph</p>
+                    <!-- /wp:paragraph -->
+                    HTML,
+                'expected' => ''
+            ]
 		];
 	}
+
+    /**
+     * @dataProvider conflictingChangesProvider
+     */
+    public function test_three_way_merge_throws_on_conflicts($common_parent, $branch1, $branch2) {
+        $this->expectException(\WordPress\Git\Diff\MergeConflictException::class);
+        $driver = new BlockDiffMergeDriver();
+        $driver->three_way_merge($common_parent, $branch1, $branch2);
+    }
+
+    public function conflictingChangesProvider() {
+        return [
+            'Conflicting text changes to same paragraph' => [
+                'parent' => <<<'HTML'
+                    <!-- wp:paragraph -->
+                    <p>Original text</p>
+                    <!-- /wp:paragraph -->
+                    HTML,
+                'version_b' => <<<'HTML'
+                    <!-- wp:paragraph -->
+                    <p>Changed text B</p>
+                    <!-- /wp:paragraph -->
+                    HTML,
+                'version_c' => <<<'HTML'
+                    <!-- wp:paragraph -->
+                    <p>Changed text C</p>
+                    <!-- /wp:paragraph -->
+                    HTML
+            ],
+        ];
+    }
 
     // public function test_rebase_diff() {
     //     $diff_a = [
