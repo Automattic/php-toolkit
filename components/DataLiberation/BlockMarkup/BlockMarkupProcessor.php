@@ -102,9 +102,9 @@ class BlockMarkupProcessor extends WP_HTML_Tag_Processor {
 	/**
 	 * Gets the most recent error encountered while parsing blocks
 	 *
-	 * @return string|null The error message or null if no error
+	 * @return WP_Block_Parser_Error|null The error message or null if no error
 	 */
-	public function get_last_error(): ?string {
+	public function get_last_error(): ?WP_Block_Parser_Error {
 		return $this->last_block_error;
 	}
 

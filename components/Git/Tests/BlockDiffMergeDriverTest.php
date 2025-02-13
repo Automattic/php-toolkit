@@ -9,6 +9,40 @@ use WordPress\Git\Diff\MergeConflictException;
 class BlockDiffMergeDriverTest extends \PHPUnit\Framework\TestCase {
 
 	/**
+	 * @dataProvider corruptedResolutionCasesProvider 
+	 */
+	public function test_corrupted_block_markup($parent, $changeA, $changeB) {
+        $this->expectException(MergeConflictException::class);
+		$driver = new BlockDiffMergeDriver();
+        $chunks = $driver->three_way_diff($parent, $changeA, $changeB);
+        $driver->three_way_merge($chunks);
+	}
+
+	public function corruptedResolutionCasesProvider() {
+        return $this->getTestCasesFromDirectory('corrupted-resolution');
+	}
+
+	/**
+	 * @dataProvider corruptedMergeResultsProvider 
+	 */
+	public function test_assert_merge_result_is_structurally_sound($result) {
+        $this->expectException(MergeConflictException::class);
+		$driver = new BlockDiffMergeDriver();
+        $driver->assert_merge_result_is_structurally_sound($result);
+	}
+
+	public function corruptedMergeResultsProvider() {
+        $testCases = [];
+		$testCasesPaths = glob(__DIR__ . '/test-data/corrupted-merge-results/*');
+        foreach($testCasesPaths as $path) {
+            $testCases[basename($path)] = [
+                file_get_contents($path)
+            ];
+        }
+        return $testCases;
+	}
+
+	/**
 	 * @dataProvider conflictingMergeCasesProvider 
 	 */
 	public function test_conflicting_merge_cases($parent, $changeA, $changeB) {
@@ -16,6 +50,10 @@ class BlockDiffMergeDriverTest extends \PHPUnit\Framework\TestCase {
 		$driver = new BlockDiffMergeDriver();
         $chunks = $driver->three_way_diff($parent, $changeA, $changeB);
         $driver->three_way_merge($chunks);
+	}
+
+	public function conflictingMergeCasesProvider() {
+        return $this->getTestCasesFromDirectory('conflicts-during-resolution');
 	}
 
 	/**
@@ -36,21 +74,25 @@ class BlockDiffMergeDriverTest extends \PHPUnit\Framework\TestCase {
             $this->assertEquals($expected, $merged);
         } catch(MergeConflictException $e) {
             DiffUtils::print_diff_chunks($chunks);
+            echo $e->getMessage();
+            echo $e->getTraceAsString();
+            die();
             throw $e;
         }
 	}
 
 	public function cleanMergeCasesProvider() {
-        return $this->getTestCasesFromDirectory('clean-merges');
+        return $this->getTestCasesFromDirectory('clean-resolution');
 	}
 
-	public function conflictingMergeCasesProvider() {
-        return $this->getTestCasesFromDirectory('conflicts');
-	}
+
 
     private function getTestCasesFromDirectory($subdirectoryName) {
 		$cases = [];
 		
+        // @TODO: Only test the block markup files, create a separate driver for
+        //        merging markdown other formats. Or don't and just convert everything
+        //        to block markup before merging.
 		$testCases = glob(__DIR__ . '/test-data/' . $subdirectoryName . '/*_parent.*');
 		foreach ($testCases as $parentFile) {
 			$caseId = preg_replace('/_parent\.txt$/', '', basename($parentFile));

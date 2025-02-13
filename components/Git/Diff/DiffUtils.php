@@ -291,7 +291,6 @@ class DiffUtils {
         return $result;
     }
 
-
 }
 
 function mb_wordwrap(string $text, int $width, string $break = "\n", bool $cut = true, string $encoding = "UTF-8"): array {

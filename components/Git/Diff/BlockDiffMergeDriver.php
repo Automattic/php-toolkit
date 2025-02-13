@@ -25,6 +25,32 @@ use \WP_HTML_Processor;
  * then need to use another reconciliation algorithm, e.g. add A as a history
  * entry and set the latest version to B.
  * 
+ * ## Usage
+ * 
+ * For best results, feed this class block markup where:
+ *
+ * * All the HTML tags are closed
+ * * All the named character references are expanded, e.g. it contains ' and not &apos;
+ * * Block openers and closers are stored in their own lines
+ * * Top-level tag openers and closers in every block are stored in their own lines
+ * * There are no spaces or tabs at the beginning of the line
+ * * Long fragments of text are stored as single, long lines without breaking them
+ *   into multiple lines
+ * 
+ * You don't have to go through these steps, but they seem to reduce changes of getting
+ * a MergeConflictException.
+ * 
+ * From there, you can run:
+ * 
+ * try {
+ *     $diff = $driver->three_way_diff( $parent, $changeA, $changeB )
+ *     $merged = $driver->three_way_merge( $diff );
+ * } catch ( MergeConflictException $e ) {
+ *     // Handle merge conflict – choose a different merge strategy or
+ *     // add $changeA as a history entry and set the latest version to
+ *     // $changeB.
+ * }
+ * 
  * ## Goals and non-goals
  * 
  * Goal: Helping people collaborate on the same documents in typical situations.
@@ -100,8 +126,9 @@ class BlockDiffMergeDriver {
      */
 	public function three_way_merge( $chunks ) {
         try {
-            $naive_merge_result = DiffUtils::three_way_merge_chunks( $chunks );
-            return $this->normalize_merge_result($naive_merge_result);
+            $merge_result = DiffUtils::three_way_merge_chunks( $chunks );
+            $this->assert_merge_result_is_structurally_sound( $merge_result );
+            return $merge_result;
         } catch(MergeConflictException $e) {
             throw $e;
         } catch(\Exception $e) {
@@ -109,19 +136,16 @@ class BlockDiffMergeDriver {
         }
     }
 
-    private function normalize_merge_result( $html ) {
-        return $html;
-        $normalized = WP_HTML_Processor::normalize($html);
-        if($normalized !== $html) {
-            throw new MergeConflictException('Merge resulted in a non-normative HTML.');
-        }
-
-        $block_markup_processor = new BlockMarkupProcessor($normalized);
+    public function assert_merge_result_is_structurally_sound( $html ) {
+        /**
+         * Validate the block markup. We treat any warning during parsing
+         * as a failure.
+         */
+        $block_markup_processor = new BlockMarkupProcessor($html);
         while($block_markup_processor->next_token()) {
             $error = $block_markup_processor->get_last_error();
             if($error) {
-                throw $error;
-                throw new MergeConflictException('Merge resulted in invalid block markup: ' . $error->getMessage());
+                throw new MergeConflictException( 'Merge resulted in invalid block markup', 0, $error );
             }
         }
 
@@ -132,9 +156,90 @@ class BlockDiffMergeDriver {
             ));
         }
 
-        return $normalized;
+        /**
+         * Validate the resulting HTML
+         */
+
+        // Validate the entire document
+        $this->assert_html_is_structurally_sound($html);
+
+        // Validate the inner HTML of each block separately in case
+        // there's a structural error spanning the block boundary.
+        $block_markup_processor = new BlockMarkupProcessor($html);
+        while($block_markup_processor->next_token()) {
+            if($block_markup_processor->get_token_type() !== '#block-comment') {
+                continue;
+            }
+            $inner_html = $block_markup_processor->skip_and_get_block_inner_html();
+            $this->assert_html_is_structurally_sound($inner_html);
+        }
     }
 
+    private function assert_html_is_structurally_sound( $html ) {
+        $html .= '<TERMINATE-PROCESSING>';
+        $html_processor = WP_HTML_Processor::create_fragment($html);
+        $seen_terminate_tag = false;
+        while($html_processor->next_token()) {
+            $error = $html_processor->get_last_error();
+            if($error) {
+                throw new MergeConflictException(
+                    'Merge resulted in invalid block markup',
+                    0,
+                    $html_processor->get_unsupported_exception()
+                );
+            }
+
+            /**
+             * If merging three normative HTML documents yields a non-normative HTML
+             * document with virtual tags, the structure is likely corrupted.
+             * 
+             * @TODO: is_virtual() is private. Let's review this with Dennis Snell.
+             */
+            if($html_processor->is_virtual()) {
+                throw new MergeConflictException(<<<MESSAGE
+                    "Merge resulted in a non-normative block markup. The inputs are assumed to be normative,
+                    which means the merge result is likely corrupted.
+                MESSAGE );
+            }
+
+            /**
+             * Workaround to let us inspect the stack of open elements right before
+             * the HTML processor implicitly generates virtual closers for the open
+             * elements.
+             * 
+             * @TODO Remove the synthetic <TERMINATE-PROCESSING> tag once the HTML
+             * processor supports streaming. We'll be able to communicate we're
+             * still waiting for more input and do not wish to close open elements
+             * just because we've processed the entire HTML chunk.
+             */
+            if($html_processor->get_tag() === 'TERMINATE-PROCESSING') {
+                $seen_terminate_tag = true;
+                $breadcrumbs = $html_processor->get_breadcrumbs();
+                if($breadcrumbs !== ['HTML', 'BODY', 'TERMINATE-PROCESSING']) {
+                    array_pop($breadcrumbs);
+                    throw new MergeConflictException(sprintf(
+                        'Merge resulted in unclosed tags – the document likely got corrupted: %s',
+                        implode(' > ', $breadcrumbs)
+                    ));
+                }
+                break;
+            }
+        }
+        
+        /**
+         * If we haven't stopped at <TERMINATE-PROCESSING>, it means the merged document
+         * ended with RCData, unfinished tag opener, or another type of HTML syntax that
+         * prevented the processor from recognizing the tag. This is a structural error
+         * and we won't let the caller consume that document.
+         */
+        if(!$seen_terminate_tag) {
+            throw new MergeConflictException( 'Merging resulted in a structurally corrupted document.' );
+        }
+    }
+
+    /**
+     * 
+     */
     public function three_way_diff( $common_parent, $version_b, $version_c ) {
         $a = $common_parent;
         $b = $version_b;
@@ -163,7 +268,6 @@ class BlockDiffMergeDriver {
         $this->dmp->diff_cleanupEfficiency($diff);
         return $diff;
 	}
-
 
     private function diff_cleanup_block_boundaries( $document_a, $document_b, $diff ) {
         $annotated_diff = [];
