@@ -1,10 +1,10 @@
 <?php
 
-namespace WordPress\Git\Tests;
+namespace WordPress\Merge\Tests;
 
-use WordPress\Git\Diff\BlockDiffMergeDriver;
-use WordPress\Git\Diff\DiffUtils;
-use WordPress\Git\Diff\MergeConflictException;
+use WordPress\Merge\BlockDiffMergeDriver;
+use WordPress\Merge\DiffUtils;
+use WordPress\Merge\MergeConflictException;
 
 class BlockDiffMergeDriverTest extends \PHPUnit\Framework\TestCase {
 

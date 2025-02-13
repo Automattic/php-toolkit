@@ -1,6 +1,6 @@
 <?php
 
-namespace WordPress\Git\Diff;
+namespace WordPress\Merge;
 
 interface MergeDriver {
 

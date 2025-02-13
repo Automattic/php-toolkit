@@ -1,8 +1,8 @@
 <?php
 
-namespace WordPress\Git\Diff;
+namespace WordPress\Merge;
 
-use WordPress\Git\GitException;
+use WordPress\Merge\MergeException;
 
 class LinesMergeDriver implements MergeDriver {
 
@@ -91,7 +91,7 @@ class LinesMergeDriver implements MergeDriver {
 			}
 			if ( $change['type'] === '!' ) {
 				// @TODO: include conflicts in the return value
-				throw new GitException( 'Conflict at ' . $change['line'] );
+				throw new MergeException( 'Conflict at ' . $change['line'] );
 			} elseif ( $change['type'] === '-' ) {
 				++$last_line;
 			} elseif ( $change['type'] === '+' ) {
@@ -121,7 +121,7 @@ class LinesMergeDriver implements MergeDriver {
 			}
 			if ( $change['type'] === '!' ) {
 				// @TODO: include conflicts in the return value
-				throw new GitException( 'Conflict at ' . $change['line'] );
+				throw new MergeException( 'Conflict at ' . $change['line'] );
 			} elseif ( $change['type'] === '-' ) {
 				++$last_line;
 			} elseif ( $change['type'] === '+' ) {

@@ -3,7 +3,7 @@
 namespace WordPress\Git;
 
 use WordPress\Filesystem\Filesystem;
-use WordPress\Git\Diff\LinesMergeDriver;
+use WordPress\Merge\LinesMergeDriver;
 use WordPress\Git\Model\Commit;
 use WordPress\Git\Model\Tree;
 use WordPress\Git\Model\TreeEntry;

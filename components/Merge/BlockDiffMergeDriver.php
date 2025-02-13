@@ -1,6 +1,6 @@
 <?php
 
-namespace WordPress\Git\Diff;
+namespace WordPress\Merge;
 
 use DiffMatchPatch\Diff;
 use DiffMatchPatch\DiffMatchPatch;
@@ -133,6 +133,18 @@ class BlockDiffMergeDriver {
             throw $e;
         } catch(\Exception $e) {
             throw new MergeConflictException('Merge resulted in an error: ' . $e->getMessage(), 0, $e);
+        }
+    }
+
+    public function preformat_block_markup( $html ) {
+        $final_document = [];
+        $block_markup_processor = new BlockMarkupProcessor($html);
+        while($block_markup_processor->next_token()) {
+            switch($block_markup_processor->get_token_type()) {
+                case '#block-comment':
+                    $final_document[] = '<!-- ' . $block_markup_processor->get_modifiable_text() . '  -->';
+                    break;
+            }
         }
     }
 

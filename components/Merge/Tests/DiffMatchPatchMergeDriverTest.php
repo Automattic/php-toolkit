@@ -1,8 +1,8 @@
 <?php
 
-namespace WordPress\Git\Tests;
+namespace WordPress\Merge\Tests;
 
-use WordPress\Git\Diff\DiffMatchPatchMergeDriver;
+use WordPress\Merge\DiffMatchPatchMergeDriver;
 
 class DiffMatchPatchMergeDriverTest extends \PHPUnit\Framework\TestCase {
 	/**

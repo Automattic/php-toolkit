@@ -1,11 +1,11 @@
 <?php
 
-namespace WordPress\Git\Diff;
+namespace WordPress\Merge;
 
 use DiffMatchPatch\Diff;
 use DiffMatchPatch\DiffMatchPatch;
 use DiffMatchPatch\PatchObject;
-use WordPress\Git\GitException;
+use WordPress\Merge\MergeException;
 
 class DiffMatchPatchMergeDriver {
 	// implements MergeDriver {
@@ -31,7 +31,7 @@ class DiffMatchPatchMergeDriver {
         $patch_a = $this->dmp->patch_make($common_parent, $diff_a);
         list($merged_a, $applied_a) = $this->dmp->patch_apply($patch_a, $common_parent);
         if ( ! $applied_a ) {
-            throw new GitException( 'Diff failed to apply cleanly onto common parent' );
+            throw new MergeException( 'Diff failed to apply cleanly onto common parent' );
         }
 
         $mode = $options['mode'] ?? 'fallback';
