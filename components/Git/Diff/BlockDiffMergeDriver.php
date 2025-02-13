@@ -5,7 +5,7 @@ namespace WordPress\Git\Diff;
 use DiffMatchPatch\Diff;
 use DiffMatchPatch\DiffMatchPatch;
 use WordPress\DataLiberation\BlockMarkup\BlockMarkupProcessor;
-use WordPress\Git\GitException;
+use \WP_HTML_Processor;
 
 /**
  * A simple three-way merge driver for reconciling **non-conflicting**
@@ -98,7 +98,44 @@ class BlockDiffMergeDriver {
     /**
      * 
      */
-	public function three_way_merge( $common_parent, $version_b, $version_c ) {
+	public function three_way_merge( $chunks ) {
+        try {
+            $naive_merge_result = DiffUtils::three_way_merge_chunks( $chunks );
+            return $this->normalize_merge_result($naive_merge_result);
+        } catch(MergeConflictException $e) {
+            throw $e;
+        } catch(\Exception $e) {
+            throw new MergeConflictException('Merge resulted in an error: ' . $e->getMessage(), 0, $e);
+        }
+    }
+
+    private function normalize_merge_result( $html ) {
+        return $html;
+        $normalized = WP_HTML_Processor::normalize($html);
+        if($normalized !== $html) {
+            throw new MergeConflictException('Merge resulted in a non-normative HTML.');
+        }
+
+        $block_markup_processor = new BlockMarkupProcessor($normalized);
+        while($block_markup_processor->next_token()) {
+            $error = $block_markup_processor->get_last_error();
+            if($error) {
+                throw $error;
+                throw new MergeConflictException('Merge resulted in invalid block markup: ' . $error->getMessage());
+            }
+        }
+
+        if(count($block_markup_processor->get_block_breadcrumbs()) > 0) {
+            throw new MergeConflictException(sprintf(
+                'Merge resulted in an unclosed blocks: %s',
+                implode(' > ', $block_markup_processor->get_block_breadcrumbs())
+            ));
+        }
+
+        return $normalized;
+    }
+
+    public function three_way_diff( $common_parent, $version_b, $version_c ) {
         $a = $common_parent;
         $b = $version_b;
         $c = $version_c;
@@ -110,7 +147,10 @@ class BlockDiffMergeDriver {
         $diff_ab = DiffUtils::resliceDiff($diff_ab, $boundaries);
         $diff_ac = DiffUtils::resliceDiff($diff_ac, $boundaries);
 
-        return DiffUtils::three_way_merge_chunked($diff_ab, $diff_ac);
+        $chunksA = DiffUtils::convertDiffToChunks($diff_ab);
+        $chunksB = DiffUtils::convertDiffToChunks($diff_ac);
+
+        return [$chunksA, $chunksB];
     }
 
 	public function apply_diff( $text, $diff ) {

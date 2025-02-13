@@ -2,6 +2,7 @@
 
 namespace WordPress\DataLiberation\BlockMarkup;
 
+use WP_Block_Parser_Error;
 use WP_HTML_Tag_Processor;
 
 /**
@@ -345,6 +346,10 @@ class BlockMarkupProcessor extends WP_HTML_Tag_Processor {
 		$name_length = strspn( $text, 'abcdefghijklmnopqrstuwxvyzABCDEFGHIJKLMNOPRQSTUWXVYZ0123456789_-', $at );
 		if ( $name_length === 0 ) {
 			// This wasn't a block after all, just a regular comment.
+            $this->last_block_error = new WP_Block_Parser_Error( 
+                sprintf( 'An HTML comment started with "wp:" that was not followed by a valid block name: %s', $text ),
+                WP_Block_Parser_Error::TYPE_SUSPICIOUS_DELIMITER
+            );
 			return true;
 		}
 		$name = substr( $text, $name_starts_at, $name_length + 3 );
@@ -382,6 +387,10 @@ class BlockMarkupProcessor extends WP_HTML_Tag_Processor {
 				if ( null === $attributes || ! is_array( $attributes ) ) {
 					// This comment looked like a block comment, but the attributes didn't
 					// parse as a JSON array. This means it wasn't a block after all.
+                    $this->last_block_error = new WP_Block_Parser_Error( 
+                        sprintf( '%s could be parsed as a delimiter but JSON attributes were malformed: %s.', $name, $json_maybe ),
+                        WP_Block_Parser_Error::TYPE_SUSPICIOUS_DELIMITER
+                    );
 					return true;
 				}
 			}
@@ -396,7 +405,10 @@ class BlockMarkupProcessor extends WP_HTML_Tag_Processor {
 		if ( $this->block_closer ) {
 			$popped = array_pop( $this->stack_of_open_blocks );
 			if ( $popped !== $name ) {
-				$this->last_block_error = sprintf( 'Block closer %s does not match the last opened block %s.', $name, $popped );
+				$this->last_block_error = new WP_Block_Parser_Error( 
+                    sprintf( 'Block closer %s does not match the last opened block %s.', $name, $popped ),
+                    WP_Block_Parser_Error::TYPE_MISMATCHED_CLOSER
+                );
 				return false;
 			}
 		} elseif ( ! $this->self_closing_flag ) {

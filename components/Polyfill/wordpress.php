@@ -16,12 +16,29 @@ if ( ! class_exists( 'WP_Block_Parser' ) ) {
 	require_once __DIR__ . '/../BlockParser/class-wp-block-parser.php';
 }
 
-
 if ( ! function_exists( '_doing_it_wrong' ) ) {
 	$GLOBALS['_doing_it_wrong_messages'] = array();
 	function _doing_it_wrong( $method, $message, $version ) {
 		$GLOBALS['_doing_it_wrong_messages'][] = $message;
 	}
+}
+
+if(!class_exists('WP_Exception')) {
+    class WP_Exception extends Exception {}
+}
+
+if ( ! function_exists( 'wp_trigger_error' ) ) {
+    function wp_trigger_error( $function_name, $message, $error_level = E_USER_NOTICE ) {
+        if ( ! empty( $function_name ) ) {
+            $message = sprintf( '%s(): %s', $function_name, $message );
+        }
+
+        if ( E_USER_ERROR === $error_level ) {
+            throw new WP_Exception( $message );
+        }
+
+        trigger_error( $message, $error_level );
+    }
 }
 
 if ( ! function_exists( 'wp_kses_uri_attributes' ) ) {
