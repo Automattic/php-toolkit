@@ -2,20 +2,44 @@
 
 namespace WordPress\Merge\Tests;
 
-use WordPress\Merge\BlockDiffMergeDriver;
-use WordPress\Merge\DiffUtils;
+use WordPress\Merge\ThreeWayMerge;
+use WordPress\Merge\TwoWayDiff;
 use WordPress\Merge\MergeConflictException;
 
-class BlockDiffMergeDriverTest extends \PHPUnit\Framework\TestCase {
+use function WordPress\Merge\print_diff_chunks;
+
+class ThreeWayMergeTest extends \PHPUnit\Framework\TestCase {
+	/**
+	 * @dataProvider threeWayMergeDataProvider
+	 */
+	public function test_three_way_merge( $common_parent, $branch1, $branch2, $expected ) {
+        $diff_ab = TwoWayDiff::myers_diff( $common_parent, $branch1 );
+        $diff_ac = TwoWayDiff::myers_diff( $common_parent, $branch2 );
+		$merged = ThreeWayMerge::merge_as_chunks( $diff_ab, $diff_ac );
+		$this->assertEquals( $expected, $merged );
+	}
+
+	public function threeWayMergeDataProvider() {
+		return [
+			'Block attributes: (A) Adds new attribute (B) Updates an existing attribute' => [
+				'parent' => '{"level":1}',
+				'branch1' => '{"newattribute": "before", "level":1}',
+				'branch2' => '{"level":2}',
+				'expected' => '{"newattribute": "before", "level":2}'
+			]
+        ];
+    }
+
 
 	/**
 	 * @dataProvider corruptedResolutionCasesProvider 
 	 */
 	public function test_corrupted_block_markup($parent, $changeA, $changeB) {
         $this->expectException(MergeConflictException::class);
-		$driver = new BlockDiffMergeDriver();
-        $chunks = $driver->three_way_diff($parent, $changeA, $changeB);
-        $driver->three_way_merge($chunks);
+		$diff_ab = TwoWayDiff::myers_diff($parent, $changeA);
+        $diff_ac = TwoWayDiff::myers_diff($parent, $changeB);
+        $result = ThreeWayMerge::merge_as_chunks($diff_ab, $diff_ac);
+        ThreeWayMerge::assert_block_markup_merge_is_structurally_sound($result);
 	}
 
 	public function corruptedResolutionCasesProvider() {
@@ -27,8 +51,7 @@ class BlockDiffMergeDriverTest extends \PHPUnit\Framework\TestCase {
 	 */
 	public function test_assert_merge_result_is_structurally_sound($result) {
         $this->expectException(MergeConflictException::class);
-		$driver = new BlockDiffMergeDriver();
-        $driver->assert_merge_result_is_structurally_sound($result);
+        ThreeWayMerge::assert_block_markup_merge_is_structurally_sound($result);
 	}
 
 	public function corruptedMergeResultsProvider() {
@@ -47,9 +70,9 @@ class BlockDiffMergeDriverTest extends \PHPUnit\Framework\TestCase {
 	 */
 	public function test_conflicting_merge_cases($parent, $changeA, $changeB) {
         $this->expectException(MergeConflictException::class);
-		$driver = new BlockDiffMergeDriver();
-        $chunks = $driver->three_way_diff($parent, $changeA, $changeB);
-        $driver->three_way_merge($chunks);
+		$diff_ab = TwoWayDiff::myers_diff($parent, $changeA);
+        $diff_ac = TwoWayDiff::myers_diff($parent, $changeB);
+        ThreeWayMerge::merge_as_chunks($diff_ab, $diff_ac);
 	}
 
 	public function conflictingMergeCasesProvider() {
@@ -68,12 +91,12 @@ class BlockDiffMergeDriverTest extends \PHPUnit\Framework\TestCase {
 	 */
 	public function test_clean_merge_cases($parent, $changeA, $changeB, $expected) {
         try {
-            $driver = new BlockDiffMergeDriver();
-            $chunks = $driver->three_way_diff($parent, $changeA, $changeB);
-            $merged = $driver->three_way_merge($chunks);
+            $diff_ab = TwoWayDiff::myers_diff($parent, $changeA);
+            $diff_ac = TwoWayDiff::myers_diff($parent, $changeB);
+            $merged = ThreeWayMerge::merge_as_chunks($diff_ab, $diff_ac);
             $this->assertEquals($expected, $merged);
         } catch(MergeConflictException $e) {
-            DiffUtils::print_diff_chunks($chunks);
+            print_diff_chunks($diff_ab, $diff_ac);
             echo $e->getMessage();
             echo $e->getTraceAsString();
             die();
@@ -84,8 +107,6 @@ class BlockDiffMergeDriverTest extends \PHPUnit\Framework\TestCase {
 	public function cleanMergeCasesProvider() {
         return $this->getTestCasesFromDirectory('clean-resolution');
 	}
-
-
 
     private function getTestCasesFromDirectory($subdirectoryName) {
 		$cases = [];
@@ -112,5 +133,5 @@ class BlockDiffMergeDriverTest extends \PHPUnit\Framework\TestCase {
 
 		return $cases;
 	}
-
+    
 }

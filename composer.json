@@ -48,7 +48,8 @@
             "components/Filesystem/functions.php",
             "components/Polyfill/wordpress.php",
             "components/Polyfill/mbstring.php",
-            "components/Git/functions.php"
+            "components/Git/functions.php",
+            "components/Merge/functions.php"
         ],
         "psr-4": {
             "WordPress\\DataLiberation\\": "components/DataLiberation/",

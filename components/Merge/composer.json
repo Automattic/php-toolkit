@@ -1,26 +1,34 @@
 {
     "name": "wordpress/merge",
-    "description": "Merge component for WordPress.",
+    "description": "Merge component for WordPress with configurable diffing and merging strategies.",
     "type": "library",
-    "authors": [
-        {
-            "name": "Adam Zielinski",
-            "email": "adam@adamziel.com"
-        },
-        {
-            "name": "WordPress Team",
-            "email": "wordpress@wordpress.org"
-        }
-    ],
-    "require": {
-        "php": ">=7.2"
-    },
+    "license": "GPL-2.0-or-later",
     "autoload": {
         "psr-4": {
             "WordPress\\Merge\\": ""
         }
     },
+    "authors": [
+        {
+            "name": "WordPress Contributors"
+        }
+    ],
+    "require": {
+        "php": ">=7.4",
+        "yetanotherape/diff-match-patch": "^1.0",
+        "wordpress/data-liberation": "*"
+    },
     "require-dev": {
-        "phpunit/phpunit": "^9.5"
+        "phpunit/phpunit": "^9.5",
+        "squizlabs/php_codesniffer": "^3.6",
+        "wp-coding-standards/wpcs": "^2.3"
+    },
+    "scripts": {
+        "test": "phpunit",
+        "cs": "phpcs",
+        "cs-fix": "phpcbf"
+    },
+    "config": {
+        "sort-packages": true
     }
 }

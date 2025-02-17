@@ -1,10 +1,11 @@
 <?php
 
+// @TODO: Likely remove this file.
+
 namespace WordPress\Merge;
 
 use DiffMatchPatch\Diff;
 use DiffMatchPatch\DiffMatchPatch;
-use DiffMatchPatch\PatchObject;
 use WordPress\Merge\MergeException;
 
 class DiffMatchPatchMergeDriver {
@@ -215,31 +216,15 @@ class DiffMatchPatchMergeDriver {
             ];
         }
 
-        print_r([
-            'diff' => $base_diff,
-            'diff_a' => $this->diff_as_delta($base_diff),
-            'diff_b' => $this->diff_as_delta($diff_to_rebase),
-            'diff_r' => $this->diff_as_delta($dmp_diff),
-        ]);
+        // print_r([
+        //     'diff' => $base_diff,
+        //     'diff_a' => $this->diff_as_delta($base_diff),
+        //     'diff_b' => $this->diff_as_delta($diff_to_rebase),
+        //     'diff_r' => $this->diff_as_delta($dmp_diff),
+        // ]);
         return $dmp_diff;
     }
 
-    public function diff_as_delta($diff) {
-        $delta = [];
-        foreach($diff as $change) {
-            switch($change[0]) {
-                case Diff::EQUAL:
-                    $delta[] = '=' . strlen($change[1]);
-                    break;
-                case Diff::INSERT:
-                    $delta[] = '+' . $change[1];
-                    break;
-                case Diff::DELETE:
-                    $delta[] = '-' . strlen($change[1]);
-            }
-        }
-        return implode('|', $delta);
-    }
 
     private static function dmp_diff_to_annotated_diff($diff) {
         $cursor = 0;
