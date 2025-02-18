@@ -37,7 +37,7 @@ class MergeStrategy {
 		$merge_result = $this->merger->merge( $diffAB, $diffAC );
 
 		if ( $merge_result->has_conflicts() ) {
-			throw new InvalidMergeException( 'Merge resulted in conflicts' );
+			throw new InvalidMergeException( 'Merge resulted in conflicts', $merge_result );
 		}
 
 		if ( $this->validator ) {

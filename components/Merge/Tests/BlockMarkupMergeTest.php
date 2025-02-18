@@ -95,7 +95,6 @@ class BlockMarkupMergeTest extends \PHPUnit\Framework\TestCase {
 			print_diff_chunks( $chunk_merger->chunksA, $chunk_merger->chunksB );
 			echo $e->getMessage();
 			echo $e->getTraceAsString();
-			// die();
 			throw $e;
 		}
 	}

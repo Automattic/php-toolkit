@@ -1,5 +1,4 @@
 # Updated Title
-
 This is the original markdown document.
 
 - Item 1
