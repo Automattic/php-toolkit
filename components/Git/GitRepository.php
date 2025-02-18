@@ -70,8 +70,8 @@ class GitRepository {
 		if ( ! $this->fs->is_file( 'HEAD' ) ) {
 			// Initialize the repository with a default branch
 			$default_branch = $options['default_branch'] ?? 'trunk';
-			$this->set_ref_head( 'HEAD', "ref: refs/heads/{$default_branch}\n" );
-			$this->set_ref_head( "refs/heads/{$default_branch}", Commit::NULL_HASH );
+			$this->set_branch_head( 'HEAD', "ref: refs/heads/{$default_branch}\n" );
+			$this->set_branch_head( "refs/heads/{$default_branch}", Commit::NULL_HASH );
 		}
 	}
 
@@ -174,7 +174,7 @@ class GitRepository {
 	}
 
 	public function find_hash_by_path( $path, $commit_hash = null ) {
-		$commit_hash   = $commit_hash ?? $this->get_ref_head( 'HEAD' );
+		$commit_hash   = $commit_hash ?? $this->get_branch_tip( 'HEAD' );
 		$commit        = $this->read_object( $commit_hash )->as_commit();
 		$root_tree_oid = $commit->tree;
 
@@ -271,84 +271,89 @@ class GitRepository {
 		return array_keys( $diff );
 	}
 
-	public function set_ref_head( $ref, $oid ) {
-		$path = $this->resolve_ref_file_path( $ref );
+	public function set_branch_head( $branch_name, $oid ) {
+		$path = $this->resolve_branch_file_path( $branch_name );
 		return $this->fs->put_contents( $path, $oid );
 	}
 
-	public function delete_ref( $ref ) {
-		$path = $this->resolve_ref_file_path( $ref );
+	public function delete_branch( $branch_name ) {
+		$path = $this->resolve_branch_file_path( $branch_name );
 		return $this->fs->rm( $path );
 	}
 
-	public function checkout( $ref ) {
-		if ( ! $this->has_object( $ref ) ) {
+	public function checkout( $branch_name ) {
+		if ( ! $this->has_object( $branch_name ) ) {
 			// Symref
-			$ref = 'ref: ' . $ref;
+			$branch_name = 'ref: ' . $branch_name;
 		}
-		$this->set_ref_head( 'HEAD', $ref );
+		$this->set_branch_head( 'HEAD', $branch_name );
 	}
 
-    public function create_branch( $ref, $head_oid ) {
-        if($this->branch_exists($ref)) {
-            throw new GitException( 'Branch already exists: ' . $ref );
+    public function create_branch( $branch_name, $head_oid ) {
+        if($this->branch_exists($branch_name)) {
+            throw new GitException( 'Branch already exists: ' . $branch_name );
         }
-        $this->set_ref_head( $ref, $head_oid );
+        $this->set_branch_head( $branch_name, $head_oid );
     }
 
 	public function get_current_branch_name() {
-		return $this->get_ref_head( 'HEAD', array( 'follow_symrefs' => false ) );
-	}
-
-	public function get_ref_head( $ref = 'HEAD', $options = array() ) {
-		while ( true ) {
-			if ( $this->has_object( $ref ) ) {
-				return $ref;
-			}
-			$path = $this->resolve_ref_file_path( $ref );
-			if ( ! $path ) {
-				throw new GitException( 'Failed to resolve ref file path: ' . $ref );
-			}
-			if ( ! $this->fs->is_file( $path ) ) {
-				throw new GitException( 'Ref file not found: ' . $path );
-			}
-			$ref = trim( $this->fs->get_contents( $path ) );
-			if ( str_starts_with( $ref, 'ref: ' ) && ( $options['follow_symrefs'] ?? true ) ) {
-				continue;
-			}
-			return $ref;
-		}
-	}
-
-	private function resolve_ref_file_path( $ref ) {
-		$ref = trim( $ref );
-		if ( str_starts_with( $ref, 'ref: ' ) ) {
-			$ref = trim( substr( $ref, 5 ) );
-		}
-		if (
-			str_contains( $ref, '/' ) &&
-			! str_starts_with( $ref, 'refs/heads/' ) &&
-			! str_starts_with( $ref, 'refs/remotes/' )
-		) {
-			_doing_it_wrong( __METHOD__, 'Invalid ref name: ' . $ref, '1.0.0' );
+		$name = $this->get_branch_tip( 'HEAD', array( 'follow_symrefs' => false ) );
+		if($this->has_object($name)) {
+			// Commit hash, not a branch name
 			return false;
 		}
-		if ( str_contains( $ref, '../' ) ) {
-			_doing_it_wrong( __METHOD__, 'Invalid ref name: ' . $ref, '1.0.0' );
+		return $name;
+	}
+
+	public function get_branch_tip( $branch_name = 'HEAD', $options = array() ) {
+		while ( true ) {
+			if ( $this->has_object( $branch_name ) ) {
+				return $branch_name;
+			}
+			$path = $this->resolve_branch_file_path( $branch_name );
+			if ( ! $path ) {
+				throw new GitException( 'Failed to resolve branch file path: ' . $branch_name );
+			}
+			if ( ! $this->fs->is_file( $path ) ) {
+				throw new GitException( 'Branch file not found: ' . $path );
+			}
+			$branch_name = trim( $this->fs->get_contents( $path ) );
+			if ( str_starts_with( $branch_name, 'ref: ' ) && ( $options['follow_symrefs'] ?? true ) ) {
+				continue;
+			}
+			return $branch_name;
+		}
+	}
+
+	private function resolve_branch_file_path( $branch_name ) {
+		$branch_name = trim( $branch_name );
+		if ( str_starts_with( $branch_name, 'ref: ' ) ) {
+			$branch_name = trim( substr( $branch_name, 5 ) );
+		}
+		if (
+			str_contains( $branch_name, '/' ) &&
+			! str_starts_with( $branch_name, 'refs/heads/' ) &&
+			! str_starts_with( $branch_name, 'refs/remotes/' )
+		) {
+			_doing_it_wrong( __METHOD__, 'Invalid ref name: ' . $branch_name, '1.0.0' );
+			return false;
+		}
+		if ( str_contains( $branch_name, '../' ) ) {
+			_doing_it_wrong( __METHOD__, 'Invalid ref name: ' . $branch_name, '1.0.0' );
 			return false;
 		}
 
 		// Make sure all the directories leading up to the ref exist
-		$parent_path = dirname( $ref );
+		$parent_path = dirname( $branch_name );
 		if ( ! $this->fs->exists( $parent_path ) ) {
 			$this->fs->mkdir( $parent_path, array( 'recursive' => true ) );
 		}
 
-		return $ref;
+		return $branch_name;
 	}
 
-	public function branch_exists( $ref ) {
-		$path = $this->resolve_ref_file_path( $ref );
+	public function branch_exists( $branch_name ) {
+		$path = $this->resolve_branch_file_path( $branch_name );
 		return $path && $this->fs->is_file( $path );
 	}
 
@@ -374,17 +379,18 @@ class GitRepository {
 	 *        everything into memory and will fail for large merges.
 	 * @TODO: Do not change the HEAD ref.
 	 *
-	 * @param string $ref The branch to merge.
+	 * @param string $branch_name  The branch to merge.
 	 * @param array  $options An associative array of options. {
+	 *
 	 *     @type string $path The path to merge files at. The other paths will be ignored.
 	 * }
 	 * @return string The hash of the merge commit.
 	 */
-	public function merge( $ref, $options = array() ) {
+	public function merge( $branch_name, $options = array() ) {
 		$path = $options['path'] ?? '/';
 
-		$commit_hash1 = $this->get_ref_head( 'HEAD' );
-		$commit_hash2 = $this->get_ref_head( $ref );
+		$commit_hash1 = $this->get_branch_tip( 'HEAD' );
+		$commit_hash2 = $this->get_branch_tip( $branch_name );
 
 		$common_ancestor_commit_hash = $this->find_first_common_ancestor( $commit_hash1, $commit_hash2 );
 		$current_branch_diff_root    = $this->diff_commits( $commit_hash1, $common_ancestor_commit_hash, $path );
@@ -452,8 +458,8 @@ class GitRepository {
 	 *
 	 * TODO: Support commits with multiple parents.
 	 *
-	 * @param string $ref1 The first reference.
-	 * @param string $ref2 The second reference.
+	 * @param string $commit_hash1 The first reference.
+	 * @param string $commit_hash2 The second reference.
 	 * @return string The common ancestor hash.
 	 */
 	public function find_first_common_ancestor( $commit_hash1, $commit_hash2 ) {
@@ -489,7 +495,7 @@ class GitRepository {
 	}
 
 	public function get_nth_ancestor_hash( $n, $commit_hash = null ) {
-		$commit_hash = $options['commit_hash'] ?? $this->get_ref_head( 'HEAD' );
+		$commit_hash = $options['commit_hash'] ?? $this->get_branch_tip( 'HEAD' );
 
 		for ( $i = 0; $i < $n; $i++ ) {
 			$commit_hash = $this->read_object( $commit_hash )->as_commit()->parents[0];
@@ -504,7 +510,7 @@ class GitRepository {
 	 * @return array A list of parent commits hashes.
 	 */
 	public function get_ancestors_hashes( $options = array() ) {
-		$commit_hash = $options['commit_hash'] ?? $this->get_ref_head( 'HEAD' );
+		$commit_hash = $options['commit_hash'] ?? $this->get_branch_tip( 'HEAD' );
 		$on_missing  = $options['on_missing'] ?? 'throw'; // throw | return-early
 		$limit       = $options['count'] ?? -1;
 
@@ -618,7 +624,7 @@ class GitRepository {
 
 		// Process trees bottom-up recursively
 		$root_tree_oid = $this->commit_tree( '/', $changed_trees );
-		$head          = $this->get_ref_head( 'HEAD' );
+		$head          = $this->get_branch_tip( 'HEAD' );
 		if ( $this->has_object( $head ) ) {
 			$current_commit = $this->read_object( $head )->as_commit();
 			$old_tree_hash  = $current_commit->tree;
@@ -636,7 +642,7 @@ class GitRepository {
 
 		// Create a new commit object
 		$options['tree'] = $root_tree_oid;
-		if ( ! isset( $options['parents'] ) && $this->get_ref_head( 'HEAD' ) ) {
+		if ( ! isset( $options['parents'] ) && $this->get_branch_tip( 'HEAD' ) ) {
 			$options['parents'] = array( $head );
 		}
 
@@ -649,11 +655,11 @@ class GitRepository {
 		);
 
 		// Update HEAD
-		$head_ref = $this->get_ref_head( 'HEAD', array( 'follow_symrefs' => false ) );
-		if ( $this->branch_exists( $head_ref ) ) {
-			$this->set_ref_head( $head_ref, $commit_oid );
+		$head_tip = $this->get_branch_tip( 'HEAD', array( 'follow_symrefs' => false ) );
+		if ( $this->branch_exists( $head_tip ) ) {
+			$this->set_branch_head( $head_tip, $commit_oid );
 		} else {
-			$this->set_ref_head( 'HEAD', $commit_oid );
+			$this->set_branch_head( 'HEAD', $commit_oid );
 		}
 
 		if ( isset( $options['amend'] ) && $options['amend'] && isset( $options['parents'] ) ) {
@@ -765,14 +771,14 @@ class GitRepository {
 		// Reparent the commits from HEAD until $squash_into_commit_oid onto the parent
 		// of the squashed range.
 		$new_head = $this->reparent_commit_range(
-			$this->get_ref_head( 'HEAD' ),
+			$this->get_branch_tip( 'HEAD' ),
 			$squash_into_commit_oid,
 			$new_base_oid
 		);
 
 		// Finally, set the HEAD of the current branch to the new squashed commit.
-		$current_branch = $this->get_ref_head( 'HEAD', array( 'follow_symrefs' => false ) );
-		$this->set_ref_head( $current_branch, $new_head );
+		$current_branch = $this->get_branch_tip( 'HEAD', array( 'follow_symrefs' => false ) );
+		$this->set_branch_head( $current_branch, $new_head );
 
 		return $new_head;
 	}
@@ -972,7 +978,7 @@ class GitRepository {
 		// Check if we should include HEAD
 		foreach ( $prefixes as $prefix ) {
 			if ( $prefix === '' || str_starts_with( 'HEAD', $prefix ) ) {
-				$refs['HEAD'] = $this->get_ref_head( 'HEAD' );
+				$refs['HEAD'] = $this->get_branch_tip( 'HEAD' );
 				break;
 			}
 		}

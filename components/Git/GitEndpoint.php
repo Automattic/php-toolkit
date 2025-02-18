@@ -417,7 +417,7 @@ class GitEndpoint {
 
 		// Handle deletion
 		if ( Commit::is_null_hash( $new_oid ) ) {
-			if ( $this->repository->delete_ref( $ref_name ) ) {
+			if ( $this->repository->delete_branch( $ref_name ) ) {
 				$git_response->append_packet_line( "ok $ref_name\n" );
 			} else {
 				$git_response->append_error_packet_line( "error $ref_name delete failed\n" );
@@ -444,7 +444,7 @@ class GitEndpoint {
 
 		try {
 			$this->repository->read_object( $new_oid );
-			$this->repository->set_ref_head( $ref_name, $new_oid );
+			$this->repository->set_branch_head( $ref_name, $new_oid );
 		} catch ( GitException $e ) {
 			$git_response->append_error_packet_line( "error processing pack: $new_oid\n" );
 			$git_response->append_error_packet_line( '0000' );

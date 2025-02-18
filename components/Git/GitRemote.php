@@ -68,7 +68,7 @@ class GitRemote {
 
 					if ( str_starts_with( $ref['ref_name'], 'refs/heads/' ) ) {
 						$branch_name = substr( $ref['ref_name'], strlen( 'refs/heads/' ) );
-						$this->repository->set_ref_head( 'refs/remotes/' . $this->remote_name . '/' . $branch_name, $ref['hash'] );
+						$this->repository->set_branch_head( 'refs/remotes/' . $this->remote_name . '/' . $branch_name, $ref['hash'] );
 					}
 					break;
 			}
@@ -105,14 +105,14 @@ class GitRemote {
 	}
 
 	public function force_push_one_commit() {
-		$push_ref_name = $this->repository->get_ref_head( 'HEAD', array( 'follow_symrefs' => false ) );
+		$push_ref_name = $this->repository->get_branch_tip( 'HEAD', array( 'follow_symrefs' => false ) );
 		$push_ref_name = $this->localize_ref_name( $push_ref_name );
 
-		$push_commit = $this->repository->get_ref_head( 'refs/heads/' . $push_ref_name );
+		$push_commit = $this->repository->get_branch_tip( 'refs/heads/' . $push_ref_name );
 		$parent_hash = $this->repository->read_object( $push_commit )->as_commit()->get_first_parent_hash();
 
 		try {
-			$remote_commit = $this->repository->get_ref_head( 'refs/remotes/' . $this->remote_name . '/' . $push_ref_name );
+			$remote_commit = $this->repository->get_branch_tip( 'refs/remotes/' . $this->remote_name . '/' . $push_ref_name );
 		} catch ( GitException $e ) {
 			$remote_commit = Commit::NULL_HASH;
 		}
@@ -162,7 +162,7 @@ class GitRemote {
 			throw new GitException( 'Push failed:' . var_export( $data_packets, true ) );
 		}
 
-		$this->repository->set_ref_head( 'refs/remotes/' . $this->remote_name . '/' . $push_ref_name, $push_commit );
+		$this->repository->set_branch_head( 'refs/remotes/' . $this->remote_name . '/' . $push_ref_name, $push_commit );
 	}
 
 	private function localize_ref_name( $ref_name ) {
@@ -179,7 +179,7 @@ class GitRemote {
 	public function list_objects( $ref_hash ): GitRepository {
 		$response = $this->request_objects_list( $ref_hash );
 		$tmp_repo = new GitRepository( InMemoryFilesystem::create() );
-		$tmp_repo->set_ref_head( 'HEAD', $ref_hash );
+		$tmp_repo->set_branch_head( 'HEAD', $ref_hash );
 		$protocol = new GitProtocolDecoder(
 			$response,
 			array(
@@ -260,7 +260,7 @@ class GitRemote {
 			$remote_head = $this->fetch( $full_branch_name, array() );
 		}
 
-		$local_head = $this->repository->get_ref_head( 'HEAD' );
+		$local_head = $this->repository->get_branch_tip( 'HEAD' );
 		if ( Commit::is_null_hash( $local_head ) ) {
 			// If the local head is an unborn branch, there's nothing to merge.
 			// We just pull and point the head to the remote head.
@@ -269,7 +269,7 @@ class GitRemote {
 
 		if ( isset( $options['force'] ) && $options['force'] ) {
 			$nice_branch_name = $this->localize_ref_name( $full_branch_name );
-			$this->repository->set_ref_head( 'refs/heads/' . $nice_branch_name, $remote_head );
+			$this->repository->set_branch_head( 'refs/heads/' . $nice_branch_name, $remote_head );
 			return $remote_head;
 		}
 
@@ -300,7 +300,7 @@ class GitRemote {
 	public function fetch( $full_branch_name, $options = array() ) {
 		$branch_name = $this->localize_ref_name( $full_branch_name );
 		try {
-			$last_fetched_head_ref = $this->repository->get_ref_head( 'refs/remotes/' . $this->remote_name . '/' . $branch_name );
+			$last_fetched_head_ref = $this->repository->get_branch_tip( 'refs/remotes/' . $this->remote_name . '/' . $branch_name );
 		} catch ( GitException $e ) {
 			$last_fetched_head_ref = Commit::NULL_HASH;
 		}
@@ -333,7 +333,7 @@ class GitRemote {
 				)
 			)->consume_stream();
 		}
-		$this->repository->set_ref_head( "refs/remotes/{$this->remote_name}/{$branch_name}", $remote_head );
+		$this->repository->set_branch_head( "refs/remotes/{$this->remote_name}/{$branch_name}", $remote_head );
 		return $remote_head;
 	}
 

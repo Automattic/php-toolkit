@@ -27,8 +27,8 @@ class GitServerTest extends TestCase {
 				'default_branch' => 'main',
 			)
 		);
-		$this->repository->set_ref_head( 'HEAD', 'ref: refs/heads/main' );
-		$this->repository->set_ref_head( 'ref: refs/heads/main', Commit::NULL_HASH );
+		$this->repository->set_branch_head( 'HEAD', 'ref: refs/heads/main' );
+		$this->repository->set_branch_head( 'ref: refs/heads/main', Commit::NULL_HASH );
 		$this->main_branch_oid = $this->repository->commit(
 			array(
 				'updates' => array(
@@ -37,11 +37,11 @@ class GitServerTest extends TestCase {
 			)
 		);
 
-		$this->repository->set_ref_head( 'refs/heads/main', $this->main_branch_oid );
-		$this->repository->set_ref_head( 'refs/heads/twin', $this->main_branch_oid );
-		$this->repository->set_ref_head( 'refs/heads/main-backup', $this->main_branch_oid );
-		$this->repository->set_ref_head( 'refs/heads/dev', $this->main_branch_oid );
-		$this->repository->set_ref_head( 'HEAD', 'ref: refs/heads/dev' );
+		$this->repository->set_branch_head( 'refs/heads/main', $this->main_branch_oid );
+		$this->repository->set_branch_head( 'refs/heads/twin', $this->main_branch_oid );
+		$this->repository->set_branch_head( 'refs/heads/main-backup', $this->main_branch_oid );
+		$this->repository->set_branch_head( 'refs/heads/dev', $this->main_branch_oid );
+		$this->repository->set_branch_head( 'HEAD', 'ref: refs/heads/dev' );
 
 		$this->dev_branch_oid = $this->repository->commit(
 			array(
@@ -568,7 +568,7 @@ RESPONSE
 				// Should be updated
 				$this->assertBinaryEquals(
 					$test['expected_oid'],
-					$this->repository->get_ref_head( $test['expected_ref'] ),
+					$this->repository->get_branch_tip( $test['expected_ref'] ),
 					"$name: Ref should be updated to new commit"
 				);
 			}

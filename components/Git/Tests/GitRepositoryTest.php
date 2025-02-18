@@ -154,15 +154,15 @@ class GitRepositoryTest extends \PHPUnit\Framework\TestCase {
 
 	public function test_get_ref_head() {
 		$repo = new GitRepository( InMemoryFilesystem::create() );
-		$repo->set_ref_head( 'refs/heads/master', '6a59200c7c2330ebacd7830ea59e63e7c37f9287' );
-		$repo->set_ref_head( 'HEAD', 'ref: refs/heads/master' );
-		$this->assertEquals( '6a59200c7c2330ebacd7830ea59e63e7c37f9287', $repo->get_ref_head() );
+		$repo->set_branch_head( 'refs/heads/master', '6a59200c7c2330ebacd7830ea59e63e7c37f9287' );
+		$repo->set_branch_head( 'HEAD', 'ref: refs/heads/master' );
+		$this->assertEquals( '6a59200c7c2330ebacd7830ea59e63e7c37f9287', $repo->get_branch_tip() );
 	}
 
 	public function test_commit() {
 		$repo = new GitRepository( InMemoryFilesystem::create() );
-		$repo->set_ref_head( 'refs/heads/trunk', Commit::NULL_HASH );
-		$repo->set_ref_head( 'HEAD', 'ref: refs/heads/trunk' );
+		$repo->set_branch_head( 'refs/heads/trunk', Commit::NULL_HASH );
+		$repo->set_branch_head( 'HEAD', 'ref: refs/heads/trunk' );
 		$commit_oid = $repo->commit(
 			array(
 				'updates' => array(
@@ -170,13 +170,13 @@ class GitRepositoryTest extends \PHPUnit\Framework\TestCase {
 				),
 			)
 		);
-		$this->assertEquals( $commit_oid, $repo->get_ref_head() );
+		$this->assertEquals( $commit_oid, $repo->get_branch_tip() );
 	}
 
 	public function test_find_path_descendants() {
 		$repo = new GitRepository( InMemoryFilesystem::create() );
-		$repo->set_ref_head( 'refs/heads/trunk', Commit::NULL_HASH );
-		$repo->set_ref_head( 'HEAD', 'ref: refs/heads/trunk' );
+		$repo->set_branch_head( 'refs/heads/trunk', Commit::NULL_HASH );
+		$repo->set_branch_head( 'HEAD', 'ref: refs/heads/trunk' );
 		$commit_oid  = $repo->commit(
 			array(
 				'updates' => array(

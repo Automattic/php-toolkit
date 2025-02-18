@@ -93,7 +93,7 @@ class WP_Static_Files_Editor_Plugin {
             $local_fs = LocalFilesystem::create(WP_STATIC_PAGES_DIR);
             $repo = new GitRepository($local_fs);
             $repo->add_remote('origin', $config['gitRepo']);
-            $repo->set_ref_head('HEAD', 'ref: refs/heads/' . $config['selectedBranch']);
+            $repo->set_branch_head('HEAD', 'ref: refs/heads/' . $config['selectedBranch']);
             $repo->set_config_value('user.name', $config['gitUserName']);
             $repo->set_config_value('user.email', $config['gitUserEmail']);
 
@@ -913,7 +913,7 @@ class WP_Static_Files_Editor_Plugin {
         $keyed_list = [];
         foreach($list as $item) {
             $item['id'] = $item['path'];
-            
+
             $keyed_list[$item['path']] = $item;
         }
 
@@ -1363,7 +1363,7 @@ class WP_Static_Files_Editor_Plugin {
         $remote = new GitRemote($repo, 'origin');
         $refs = $remote->ls_refs('refs/heads/');
         $head_ref = $remote->ls_refs('HEAD');
-        
+
         $by_hash = array_flip($refs);
         $default_branch_full_name = $by_hash[$head_ref['HEAD']];
         unset($refs[$default_branch_full_name]);
@@ -1396,7 +1396,7 @@ class WP_Static_Files_Editor_Plugin {
         $repo = new GitRepository(InMemoryFilesystem::create());
         $repo->add_remote('origin', $git_repo_url);
         $remote = new GitRemote($repo, 'origin');
-        
+
         $refs = $remote->ls_refs('refs/heads/');
         if(!isset($refs[$branch])) {
             return new WP_Error('branch_not_found', 'Branch "' . $branch . '" not found');
