@@ -40,7 +40,8 @@
         "classmap": [
             "components/DataLiberation/vendor-patched/",
             "components/Markdown/vendor-patched",
-            "components/HTML/./"
+            "components/HTML/./",
+            "components/BlockParser/"
         ],
         "files": [
             "components/DataLiberation/URL/functions.php",
@@ -66,7 +67,6 @@
             "Opis\\JsonSchema\\": "components/Blueprints/src/opis/json-schema/src",
             "Opis\\String\\": "components/Blueprints/src/opis/string/src",
             "Opis\\Uri\\": "components/Blueprints/src/opis/uri/src",
-            "WordPress\\BlockParser\\": "components/BlockParser/",
             "WordPress\\Markdown\\": "components/Markdown/",
             "WordPress\\Filesystem\\": "components/Filesystem/",
             "WordPress\\XML\\": "components/XML/",

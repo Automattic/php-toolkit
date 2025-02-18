@@ -2,7 +2,7 @@
 
 namespace WordPress\DataLiberation\BlockMarkup;
 
-use WP_Block_Parser_Error;
+use \WP_Block_Parser_Error;
 use WP_HTML_Tag_Processor;
 
 /**

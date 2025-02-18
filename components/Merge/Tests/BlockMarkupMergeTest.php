@@ -2,21 +2,29 @@
 
 namespace WordPress\Merge\Tests;
 
+use WordPress\Merge\Diff\MyersDiffer;
+use WordPress\Merge\Merge\ChunkMerger;
 use WordPress\Merge\ThreeWayMerge;
 use WordPress\Merge\TwoWayDiff;
 use WordPress\Merge\MergeConflictException;
+use WordPress\Merge\MergeException;
+use WordPress\Merge\MergeStrategy;
+use WordPress\Merge\Validate\BlockMarkupMergeValidator;
+use WordPress\Merge\Validate\InvalidMergeException;
 
 use function WordPress\Merge\print_diff_chunks;
 
-class ThreeWayMergeTest extends \PHPUnit\Framework\TestCase {
+class BlockMarkupMergeTest extends \PHPUnit\Framework\TestCase {
 	/**
 	 * @dataProvider threeWayMergeDataProvider
 	 */
 	public function test_three_way_merge( $common_parent, $branch1, $branch2, $expected ) {
-        $diff_ab = TwoWayDiff::myers_diff( $common_parent, $branch1 );
-        $diff_ac = TwoWayDiff::myers_diff( $common_parent, $branch2 );
-		$merged = ThreeWayMerge::merge_as_chunks( $diff_ab, $diff_ac );
-		$this->assertEquals( $expected, $merged );
+        $strategy = new MergeStrategy(
+            new MyersDiffer(),
+            new ChunkMerger()
+        );
+        $merge_result = $strategy->merge($common_parent, $branch1, $branch2);
+        $this->assertEquals($expected, $merge_result->get_merged_content());
 	}
 
 	public function threeWayMergeDataProvider() {
@@ -30,16 +38,17 @@ class ThreeWayMergeTest extends \PHPUnit\Framework\TestCase {
         ];
     }
 
-
 	/**
 	 * @dataProvider corruptedResolutionCasesProvider 
 	 */
 	public function test_corrupted_block_markup($parent, $changeA, $changeB) {
-        $this->expectException(MergeConflictException::class);
-		$diff_ab = TwoWayDiff::myers_diff($parent, $changeA);
-        $diff_ac = TwoWayDiff::myers_diff($parent, $changeB);
-        $result = ThreeWayMerge::merge_as_chunks($diff_ab, $diff_ac);
-        ThreeWayMerge::assert_block_markup_merge_is_structurally_sound($result);
+        $this->expectException(InvalidMergeException::class);
+        $strategy = new MergeStrategy(
+            new MyersDiffer(),
+            new ChunkMerger(),
+            new BlockMarkupMergeValidator()
+        );
+        $strategy->merge($parent, $changeA, $changeB);
 	}
 
 	public function corruptedResolutionCasesProvider() {
@@ -47,32 +56,16 @@ class ThreeWayMergeTest extends \PHPUnit\Framework\TestCase {
 	}
 
 	/**
-	 * @dataProvider corruptedMergeResultsProvider 
-	 */
-	public function test_assert_merge_result_is_structurally_sound($result) {
-        $this->expectException(MergeConflictException::class);
-        ThreeWayMerge::assert_block_markup_merge_is_structurally_sound($result);
-	}
-
-	public function corruptedMergeResultsProvider() {
-        $testCases = [];
-		$testCasesPaths = glob(__DIR__ . '/test-data/corrupted-merge-results/*');
-        foreach($testCasesPaths as $path) {
-            $testCases[basename($path)] = [
-                file_get_contents($path)
-            ];
-        }
-        return $testCases;
-	}
-
-	/**
 	 * @dataProvider conflictingMergeCasesProvider 
 	 */
 	public function test_conflicting_merge_cases($parent, $changeA, $changeB) {
-        $this->expectException(MergeConflictException::class);
-		$diff_ab = TwoWayDiff::myers_diff($parent, $changeA);
-        $diff_ac = TwoWayDiff::myers_diff($parent, $changeB);
-        ThreeWayMerge::merge_as_chunks($diff_ab, $diff_ac);
+        $this->expectException(InvalidMergeException::class);
+        $strategy = new MergeStrategy(
+            new MyersDiffer(),
+            new ChunkMerger(),
+            new BlockMarkupMergeValidator()
+        );
+        $strategy->merge($parent, $changeA, $changeB);
 	}
 
 	public function conflictingMergeCasesProvider() {
@@ -91,15 +84,18 @@ class ThreeWayMergeTest extends \PHPUnit\Framework\TestCase {
 	 */
 	public function test_clean_merge_cases($parent, $changeA, $changeB, $expected) {
         try {
-            $diff_ab = TwoWayDiff::myers_diff($parent, $changeA);
-            $diff_ac = TwoWayDiff::myers_diff($parent, $changeB);
-            $merged = ThreeWayMerge::merge_as_chunks($diff_ab, $diff_ac);
-            $this->assertEquals($expected, $merged);
-        } catch(MergeConflictException $e) {
-            print_diff_chunks($diff_ab, $diff_ac);
+            $chunk_merger = new ChunkMerger();
+            $strategy = new MergeStrategy(
+                new MyersDiffer(),
+                $chunk_merger
+            );
+            $merge_result = $strategy->merge($parent, $changeA, $changeB);
+            $this->assertEquals($expected, $merge_result->get_merged_content());
+        } catch(MergeException $e) {
+            print_diff_chunks($chunk_merger->chunksA, $chunk_merger->chunksB);
             echo $e->getMessage();
             echo $e->getTraceAsString();
-            die();
+            // die();
             throw $e;
         }
 	}

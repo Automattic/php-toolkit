@@ -8,6 +8,10 @@ use WordPress\Git\Model\Commit;
 use WordPress\Git\Model\Tree;
 use WordPress\Git\Model\TreeEntry;
 use WordPress\Git\Protocol\GitProtocolEncoderPipe;
+use WordPress\Merge\Diff\MyersDiffer;
+use WordPress\Merge\Merge\ChunkMerger;
+use WordPress\Merge\MergeStrategy;
+use WordPress\Merge\Validate\BlockMarkupMergeValidator;
 
 use function WordPress\Filesystem\wp_canonicalize_path;
 use function WordPress\Filesystem\wp_join_paths;
@@ -28,10 +32,7 @@ class GitRepository {
 	 */
 	private $parsed_config;
 
-	/**
-	 * @var LinesMergeDriver
-	 */
-	private $diff_engine;
+	private $merge_function;
 
 	private const DELETE_PLACEHOLDER = 'DELETE_PLACEHOLDER';
 
@@ -40,7 +41,13 @@ class GitRepository {
 		$options = array()
 	) {
 		$this->fs          = $fs;
-		$this->diff_engine = $options['diff_engine'] ?? new LinesMergeDriver();
+		$this->merge_function = $options['merge_function'] ?? function($data) {
+			$strategy = new MergeStrategy(
+				new MyersDiffer(),
+				new ChunkMerger()
+		    );
+			return $strategy->merge($data['parent'], $data['branchA'], $data['branchB']);
+        };
 		$this->initialize_filesystem( $options );
 	}
 
@@ -282,6 +289,13 @@ class GitRepository {
 		$this->set_ref_head( 'HEAD', $ref );
 	}
 
+    public function create_branch( $ref, $head_oid ) {
+        if($this->branch_exists($ref)) {
+            throw new GitException( 'Branch already exists: ' . $ref );
+        }
+        $this->set_ref_head( $ref, $head_oid );
+    }
+
 	public function get_current_branch_name() {
 		return $this->get_ref_head( 'HEAD', array( 'follow_symrefs' => false ) );
 	}
@@ -379,34 +393,40 @@ class GitRepository {
 		$tree_stack = array( array( $merged_branch_diff_root, $current_branch_diff_root, $path ) );
 		$updates    = array();
 		$deletes    = array();
+        $merge_function = $this->merge_function;
 		while ( ! empty( $tree_stack ) ) {
-			list($merged_branch_diff, $current_branch_diff, $parent_path) = array_pop( $tree_stack );
-			foreach ( $merged_branch_diff as $name => $merged_entry ) {
+			list($incoming_branch_diff, $current_branch_diff, $parent_path) = array_pop( $tree_stack );
+			foreach ( $incoming_branch_diff as $name => $incoming_entry ) {
 				$path = wp_join_paths( $parent_path, $name );
-				if ( $merged_entry === self::DELETE_PLACEHOLDER ) {
+				if ( $incoming_entry === self::DELETE_PLACEHOLDER ) {
 					$deletes[] = $path;
 					continue;
 				}
 				$current_entry = $current_branch_diff[ $name ] ?? null;
-				$is_text_diff  = is_array( $merged_entry->content ) && isset( $merged_entry->content['type'] ) && $merged_entry->content['type'] === 'text_diff';
-				if ( $is_text_diff ) {
+				$is_text  = is_array( $incoming_entry->content ) && isset( $incoming_entry->content['type'] ) && $incoming_entry->content['type'] === 'text';
+				if ( $is_text ) {
 					$current_content = $this->read_object_by_path( $path, $common_ancestor_commit_hash )->consume_all();
 					if ( ! $current_entry ) {
-						$updates[ $path ] = $this->diff_engine->apply_diff(
-							$current_content,
-							$merged_entry->content['diff']
-						);
+						$updates[ $path ] = $incoming_entry->content['text'];
 						continue;
 					}
-					$merged_content   = $this->diff_engine->three_way_merge_blob(
-						$current_content,
-						$current_entry->content['diff'],
-						$merged_entry->content['diff']
+					$merge_result = $merge_function(
+						array(
+							'parent' => $current_content,
+							'branchA' => $current_entry->content['text'],
+							'branchB' => $incoming_entry->content['text']
+						)
 					);
-					$updates[ $path ] = $merged_content;
-				} elseif ( is_array( $merged_entry->content ) ) {
+                    if($merge_result->has_conflicts()) {
+                        // @TODO: Add a history entry for the "current entry" content.
+                        // @TODO: Communicate the overwrite to the caller.
+                        $updates[ $path ] = $incoming_entry->content['text'];
+                    } else {
+                        $updates[ $path ] = $merge_result->get_merged_content();
+                    }
+				} elseif ( is_array( $incoming_entry->content ) ) {
 					$tree_stack[] = array(
-						$merged_entry->content,
+						$incoming_entry->content,
 						$current_entry !== null ? $current_entry->content : array(),
 						$path,
 					);
@@ -643,7 +663,7 @@ class GitRepository {
 		return $commit_oid;
 	}
 
-	public function diff_commits( $previous_commit_hash, $current_commit_hash, $path = '/' ) {
+	public function diff_commits( $current_commit_hash, $previous_commit_hash, $path = '/' ) {
 		$current_tree_oid  = $this->find_hash_by_path( $path, $current_commit_hash );
 		$previous_tree_oid = $this->find_hash_by_path( $path, $previous_commit_hash );
 
@@ -717,8 +737,8 @@ class GitRepository {
 			return array( 'type' => 'completely_new_blob' );
 		} else {
 			return array(
-				'type' => 'text_diff',
-				'diff' => $this->diff_engine->diff( $current_blob_contents, $previous_blob_contents ),
+				'type' => 'text',
+				'text' => $current_blob_contents,
 			);
 		}
 	}

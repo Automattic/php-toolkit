@@ -3,7 +3,6 @@
 namespace WordPress\Merge;
 
 function print_diff_chunks(array $chunks_a, array $chunks_b): void {
-    list($chunks_a, $chunks_b) = ThreeWayMerge::ensure_chunks($chunks_a, $chunks_b);
     $width = (int) shell_exec('tput cols') - 20;
     $half_width = (int) ($width / 2);
     $empty_line = str_repeat(" ", $half_width);
