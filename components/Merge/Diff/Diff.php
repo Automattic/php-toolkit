@@ -3,67 +3,70 @@
 namespace WordPress\Merge\Diff;
 
 class Diff {
-    const DIFF_DELETE = -1;
-    const DIFF_INSERT = 1;
-    const DIFF_EQUAL = 0;
+	const DIFF_DELETE = - 1;
+	const DIFF_INSERT = 1;
+	const DIFF_EQUAL  = 0;
 
-    private $changes;
+	private $changes;
 
-    public function __construct(array $changes) {
-        $this->changes = $changes;
-    }
+	public function __construct( array $changes ) {
+		$this->changes = $changes;
+	}
 
-    public function get_changes(): array {
-        return $this->changes;
-    }
+	public function get_changes(): array {
+		return $this->changes;
+	}
 
-    public function get_old_document(): string {
-        $merged = [];
-        foreach ($this->changes as $change) {
-            if ($change[0] === self::DIFF_EQUAL) {
-                $merged[] = $change[1];
-            } else if ($change[0] === self::DIFF_DELETE) {
-                $merged[] = $change[1];
-            }
-        }
-        return implode('', $merged);
-    }
+	public function get_old_document(): string {
+		$merged = array();
+		foreach ( $this->changes as $change ) {
+			if ( $change[0] === self::DIFF_EQUAL ) {
+				$merged[] = $change[1];
+			} elseif ( $change[0] === self::DIFF_DELETE ) {
+				$merged[] = $change[1];
+			}
+		}
 
-    public function get_new_document(): string {
-        $merged = [];
-        foreach ($this->changes as $change) {
-            if ($change[0] === self::DIFF_EQUAL) {
-                $merged[] = $change[1];
-            } else if ($change[0] === self::DIFF_INSERT) {
-                $merged[] = $change[1];
-            }
-        }
-        return implode('', $merged);
-    }
+		return implode( '', $merged );
+	}
 
-    public function format_as_delta(): string {
-        $delta = [];
-        foreach ($this->changes as $change) {
-            switch ($change[0]) {
-                case self::DIFF_EQUAL:
-                    $delta[] = '=' . strlen($change[1]);
-                    break;
-                case self::DIFF_INSERT:
-                    $delta[] = '+' . $change[1];
-                    break;
-                case self::DIFF_DELETE:
-                    $delta[] = '-' . strlen($change[1]);
-            }
-        }
-        return implode("\r", $delta);
-    }
+	public function get_new_document(): string {
+		$merged = array();
+		foreach ( $this->changes as $change ) {
+			if ( $change[0] === self::DIFF_EQUAL ) {
+				$merged[] = $change[1];
+			} elseif ( $change[0] === self::DIFF_INSERT ) {
+				$merged[] = $change[1];
+			}
+		}
+
+		return implode( '', $merged );
+	}
+
+	public function format_as_delta(): string {
+		$delta = array();
+		foreach ( $this->changes as $change ) {
+			switch ( $change[0] ) {
+				case self::DIFF_EQUAL:
+					$delta[] = '=' . strlen( $change[1] );
+					break;
+				case self::DIFF_INSERT:
+					$delta[] = '+' . $change[1];
+					break;
+				case self::DIFF_DELETE:
+					$delta[] = '-' . strlen( $change[1] );
+			}
+		}
+
+		return implode( "\r", $delta );
+	}
 
 	public function format_as_git_patch( $options = array() ) {
-		$options['contextLines'] ??= 3;
-		$options['a_source']     ??= 'a/string';
-		$options['b_source']     ??= 'b/string';
+		$options['contextLines'] = $options['contextLines'] ?? 3;
+		$options['a_source']     = $options['a_source'] ?? 'a/string';
+		$options['b_source']     = $options['b_source'] ?? 'b/string';
 
-		// Format the diff to Git-style with context
+		// Format the diff to Git-style with context.
 		$formatted_diff  = 'diff --git ' . $options['a_source'] . ' ' . $options['b_source'] . "\n";
 		$formatted_diff .= '--- ' . $options['a_source'] . "\n";
 		$formatted_diff .= '+++ ' . $options['b_source'] . "\n";
@@ -73,7 +76,7 @@ class Diff {
 
 		$last_changed_lineno = null;
 		foreach ( $this->changes as $lineno => $change ) {
-            $type = $change[0];
+			$type = $change[0];
 			if ( $type === self::DIFF_EQUAL ) {
 				if ( empty( $current_block ) ) {
 					continue;
@@ -100,14 +103,12 @@ class Diff {
 			$changed_blocks[] = $current_block;
 		}
 
-        $old_line_cursor = 1;
-        $new_line_cursor = 1;
+		$old_line_cursor = 1;
+		$new_line_cursor = 1;
 		foreach ( $changed_blocks as $changes ) {
-			$block     = '';
+			$block          = '';
 			$old_start_line = null;
 			$new_start_line = null;
-			$old_lines_nb  = 0;
-			$new_lines_nb  = 0;
 
 			foreach ( $changes as $change ) {
 				if ( $change[0] !== self::DIFF_INSERT ) {
@@ -115,42 +116,42 @@ class Diff {
 						$old_start_line = $old_line_cursor;
 					}
 				}
-                if ( $change[0] !== self::DIFF_DELETE ) {
+				if ( $change[0] !== self::DIFF_DELETE ) {
 					if ( $new_start_line === null ) {
 						$new_start_line = $new_line_cursor;
 					}
 				}
 				$nb_newlines = substr_count( $change[1], "\n" );
-                switch ($change[0]) {
-                    case self::DIFF_EQUAL:
-                        $old_line_cursor += $nb_newlines;
-                        $new_line_cursor += $nb_newlines;
-                        break;
-                    case self::DIFF_DELETE:
-                        $old_line_cursor += $nb_newlines;
-                        break;
-                    case self::DIFF_INSERT:
-                        $new_line_cursor += $nb_newlines;
-                        break;
-                }
+				switch ( $change[0] ) {
+					case self::DIFF_EQUAL:
+						$old_line_cursor += $nb_newlines;
+						$new_line_cursor += $nb_newlines;
+						break;
+					case self::DIFF_DELETE:
+						$old_line_cursor += $nb_newlines;
+						break;
+					case self::DIFF_INSERT:
+						$new_line_cursor += $nb_newlines;
+						break;
+				}
 			}
-            $old_lines_nb = $old_line_cursor - $old_start_line;
-            $new_lines_nb = $new_line_cursor - $new_start_line;
+			$old_lines_nb = $old_line_cursor - $old_start_line;
+			$new_lines_nb = $new_line_cursor - $new_start_line;
 
 			$block .= sprintf( '@@ -%d,%d +%d,%d @@', $old_start_line, $old_lines_nb, $new_start_line, $new_lines_nb );
 
 			foreach ( $changes as $change ) {
-                switch ($change[0]) {
-                    case self::DIFF_EQUAL:
-                        $symbol = ' ';
-                        break;
-                    case self::DIFF_DELETE:
-                        $symbol = '-';
-                        break;
-                    case self::DIFF_INSERT:
-                        $symbol = '+';
-                        break;
-                }
+				switch ( $change[0] ) {
+					case self::DIFF_EQUAL:
+						$symbol = ' ';
+						break;
+					case self::DIFF_DELETE:
+						$symbol = '-';
+						break;
+					case self::DIFF_INSERT:
+						$symbol = '+';
+						break;
+				}
 				$block .= $symbol . ' ' . $change[1];
 			}
 
@@ -158,6 +159,6 @@ class Diff {
 		}
 
 		return $formatted_diff;
-    }
+	}
 
 }

@@ -8,23 +8,24 @@ use WordPress\Merge\Validate\InvalidMergeException;
 class BlockMarkupMergeValidatorTest extends \PHPUnit\Framework\TestCase {
 
 	/**
-	 * @dataProvider corruptedMergeResultsProvider 
+	 * @dataProvider corruptedMergeResultsProvider
 	 */
-	public function test_assert_merge_result_is_structurally_sound($markup) {
-        $this->expectException(InvalidMergeException::class);
-        $validator = new BlockMarkupMergeValidator();
-        $validator->validate($markup);
+	public function test_assert_merge_result_is_structurally_sound( $markup ) {
+		$this->expectException( InvalidMergeException::class );
+		$validator = new BlockMarkupMergeValidator();
+		$validator->validate( $markup );
 	}
 
 	public function corruptedMergeResultsProvider() {
-        $testCases = [];
-		$testCasesPaths = glob(__DIR__ . '/test-data/corrupted-merge-results/*');
-        foreach($testCasesPaths as $path) {
-            $testCases[basename($path)] = [
-                file_get_contents($path)
-            ];
-        }
-        return $testCases;
+		$testCases      = [];
+		$testCasesPaths = glob( __DIR__ . '/test-data/corrupted-merge-results/*' );
+		foreach ( $testCasesPaths as $path ) {
+			$testCases[ basename( $path ) ] = [
+				file_get_contents( $path ),
+			];
+		}
+
+		return $testCases;
 	}
-    
+
 }
