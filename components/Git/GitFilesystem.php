@@ -67,6 +67,7 @@ class GitFilesystem implements Filesystem {
 	public function is_dir( $path ) {
 		try {
 			$reader = $this->repo->read_object_by_path( $path );
+
 			return $reader->get_object_type_name() === 'tree';
 		} catch ( GitException $e ) {
 			return false;
@@ -76,6 +77,7 @@ class GitFilesystem implements Filesystem {
 	public function is_file( $path ) {
 		try {
 			$reader = $this->repo->read_object_by_path( $path );
+
 			return $reader->get_object_type_name() === 'blob';
 		} catch ( GitException $e ) {
 			return false;
@@ -109,6 +111,7 @@ class GitFilesystem implements Filesystem {
 		if ( $this->is_dir( $path ) ) {
 			return false;
 		}
+
 		return $this->commit(
 			array(
 				'deletes' => array(
@@ -182,18 +185,18 @@ class GitFilesystem implements Filesystem {
 		 */
 		if ( $this->auto_push ) {
 			try {
-				$this->remote->force_push_one_commit();
+				$this->remote->push();
 			} catch ( GitException $e ) {
 				// If push failed, pull and retry
 				$this->remote->pull(
 					$this->get_repository()->get_current_branch_name()
 				);
 
-				// If pull succeeded, try committing and pushing again
-				$this->repo->commit( $options );
-				$this->remote->force_push_one_commit();
+				// If pull succeeded, try pushing again
+				$this->remote->push();
 			}
 		}
+
 		return true;
 	}
 }

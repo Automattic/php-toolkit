@@ -37,7 +37,7 @@ class GitRepository {
 		Filesystem $fs,
 		$options = array()
 	) {
-		$this->fs          = $fs;
+		$this->fs = $fs;
 		$this->initialize_filesystem( $options );
 	}
 
@@ -78,17 +78,19 @@ class GitRepository {
 	public function get_remote( $name ) {
 		$this->parse_config();
 		$key = 'remote "' . $name . '"';
+
 		return $this->parsed_config[ $key ] ?? null;
 	}
 
 	public function get_remote_client( $name = 'origin', $options = array() ) {
 		$remote_url = $this->get_config_value( array( 'remote', $name, 'url' ) );
+
 		return new GitRemote( $this, $name, array_merge( $options, array( 'url' => $remote_url ) ) );
 	}
 
 	public function set_config_value( $key, $value ) {
 		$this->parse_config();
-		list($section, $key) = $this->parse_config_key( $key );
+		list( $section, $key ) = $this->parse_config_key( $key );
 
 		if ( ! isset( $this->parsed_config[ $section ] ) ) {
 			$this->parsed_config[ $section ] = array();
@@ -99,7 +101,8 @@ class GitRepository {
 
 	public function get_config_value( $key ) {
 		$this->parse_config();
-		list($section, $key) = $this->parse_config_key( $key );
+		list( $section, $key ) = $this->parse_config_key( $key );
+
 		return $this->parsed_config[ $section ][ $key ] ?? null;
 	}
 
@@ -115,6 +118,7 @@ class GitRepository {
 		if ( $section_subkey ) {
 			$section .= ' "' . $section_subkey . '"';
 		}
+
 		return array( $section, $trailing_key );
 	}
 
@@ -122,6 +126,7 @@ class GitRepository {
 		if ( ! $this->parsed_config ) {
 			if ( ! $this->fs->is_file( 'config' ) ) {
 				$this->parsed_config = array();
+
 				return;
 			}
 			$this->parsed_config = parse_ini_string( $this->fs->get_contents( 'config' ), true, INI_SCANNER_RAW );
@@ -155,11 +160,13 @@ class GitRepository {
 			$this->fs->open_read_stream( $this->get_storage_path( $oid ) )
 		);
 		$producer->read_header();
+
 		return $producer;
 	}
 
 	public function read_object_by_path( $path, $commit_hash = null ) {
 		$oid = $this->find_hash_by_path( $path, $commit_hash );
+
 		return $this->read_object( $oid );
 	}
 
@@ -197,7 +204,7 @@ class GitRepository {
 		return $this->fs->is_file( $this->get_storage_path( $oid ) );
 	}
 
-	public function has_blobs_from_commit( $commit_hash, $path = '/' ) {
+	public function has_all_objects_from_commit( $commit_hash, $path = '/' ) {
 		if ( ! $this->has_object( $commit_hash ) ) {
 			return false;
 		}
@@ -221,10 +228,18 @@ class GitRepository {
 				}
 			}
 		}
+
 		return true;
 	}
 
-	public function find_objects_added_in( $new_commit_hash, $old_commit_hash = Commit::NULL_HASH, $options = array() ) {
+	public function find_objects_added_in( $new_commit_hash, $options = array() ) {
+		$new_commit  = $this->read_object( $new_commit_hash )->as_commit();
+		$parent_hash = $new_commit->get_first_parent_hash();
+
+		return $this->find_objects_added_since( $new_commit_hash, $parent_hash, $options );
+	}
+
+	public function find_objects_added_since( $new_commit_hash, $old_commit_hash = Commit::NULL_HASH, $options = array() ) {
 		$new_commit       = $this->read_object( $new_commit_hash )->as_commit();
 		$old_tree_hash    = Commit::NULL_HASH;
 		$old_objects_oids = array();
@@ -258,16 +273,19 @@ class GitRepository {
 		}
 
 		$diff = array_diff_key( $new_objects_oids, $old_objects_oids );
+
 		return array_keys( $diff );
 	}
 
 	public function set_branch_head( $branch_name, $oid ) {
 		$path = $this->resolve_branch_file_path( $branch_name );
+
 		return $this->fs->put_contents( $path, $oid );
 	}
 
 	public function delete_branch( $branch_name ) {
 		$path = $this->resolve_branch_file_path( $branch_name );
+
 		return $this->fs->rm( $path );
 	}
 
@@ -279,19 +297,20 @@ class GitRepository {
 		$this->set_branch_head( 'HEAD', $branch_name );
 	}
 
-    public function create_branch( $branch_name, $head_oid ) {
-        if($this->branch_exists($branch_name)) {
-            throw new GitException( 'Branch already exists: ' . $branch_name );
-        }
-        $this->set_branch_head( $branch_name, $head_oid );
-    }
+	public function create_branch( $branch_name, $head_oid ) {
+		if ( $this->branch_exists( $branch_name ) ) {
+			throw new GitException( 'Branch already exists: ' . $branch_name );
+		}
+		$this->set_branch_head( $branch_name, $head_oid );
+	}
 
 	public function get_current_branch_name() {
 		$name = $this->get_branch_tip( 'HEAD', array( 'follow_symrefs' => false ) );
-		if($this->has_object($name)) {
+		if ( $this->has_object( $name ) ) {
 			// Commit hash, not a branch name
 			return false;
 		}
+
 		return $name;
 	}
 
@@ -311,6 +330,7 @@ class GitRepository {
 			if ( str_starts_with( $branch_name, 'ref: ' ) && ( $options['follow_symrefs'] ?? true ) ) {
 				continue;
 			}
+
 			return $branch_name;
 		}
 	}
@@ -326,10 +346,12 @@ class GitRepository {
 			! str_starts_with( $branch_name, 'refs/remotes/' )
 		) {
 			_doing_it_wrong( __METHOD__, 'Invalid ref name: ' . $branch_name, '1.0.0' );
+
 			return false;
 		}
 		if ( str_contains( $branch_name, '../' ) ) {
 			_doing_it_wrong( __METHOD__, 'Invalid ref name: ' . $branch_name, '1.0.0' );
+
 			return false;
 		}
 
@@ -344,6 +366,7 @@ class GitRepository {
 
 	public function branch_exists( $branch_name ) {
 		$path = $this->resolve_branch_file_path( $branch_name );
+
 		return $path && $this->fs->is_file( $path );
 	}
 
@@ -354,6 +377,7 @@ class GitRepository {
 		$object_writer = $this->new_object_open_write_stream( $type_name, strlen( $content ) );
 		$object_writer->append_bytes( $content );
 		$object_writer->close_writing();
+
 		return $object_writer->get_hash();
 	}
 
@@ -369,10 +393,10 @@ class GitRepository {
 	 *        everything into memory and will fail for large merges.
 	 * @TODO: Do not change the HEAD ref.
 	 *
-	 * @param string $branch_name  The branch to merge.
-	 * @param array  $options An associative array of options. {
+	 * @param  string  $branch_name  The branch to merge.
+	 * @param  array  $options  An associative array of options. {
 	 *
-	 *     @type string $path The path to merge files at. The other paths will be ignored.
+	 * @type string $path The path to merge files at. The other paths will be ignored.
 	 * }
 	 * @return string The hash of the merge commit.
 	 */
@@ -386,18 +410,18 @@ class GitRepository {
 		$current_branch_diff_root    = $this->diff_commits( $commit_hash1, $common_ancestor_commit_hash, $path );
 		$merged_branch_diff_root     = $this->diff_commits( $commit_hash2, $common_ancestor_commit_hash, $path );
 
-        $conflicts = array();
-        $conflict_resolution_strategy = $options['conflict_resolution_strategy'] ?? 'theirs';
-        if($conflict_resolution_strategy !== 'theirs') {
-            throw new GitException( "Conflict resolution strategy not supported: {$conflict_resolution_strategy}. Supported strategies: 'theirs'." );
-        }
+		$conflicts                    = array();
+		$conflict_resolution_strategy = $options['conflict_resolution_strategy'] ?? 'theirs';
+		if ( $conflict_resolution_strategy !== 'theirs' ) {
+			throw new GitException( "Conflict resolution strategy not supported: {$conflict_resolution_strategy}. Supported strategies: 'theirs'." );
+		}
 
-		$tree_stack = array( array( $merged_branch_diff_root, $current_branch_diff_root, $path ) );
-		$updates    = array();
-		$deletes    = array();
-        $merge_function = $options['merge_function'] ?? array($this, 'default_merge_function');
+		$tree_stack     = array( array( $merged_branch_diff_root, $current_branch_diff_root, $path ) );
+		$updates        = array();
+		$deletes        = array();
+		$merge_function = $options['merge_function'] ?? array( $this, 'default_merge_function' );
 		while ( ! empty( $tree_stack ) ) {
-			list($incoming_branch_diff, $current_branch_diff, $parent_path) = array_pop( $tree_stack );
+			list( $incoming_branch_diff, $current_branch_diff, $parent_path ) = array_pop( $tree_stack );
 			foreach ( $incoming_branch_diff as $name => $incoming_entry ) {
 				$path = wp_join_paths( $parent_path, $name );
 				if ( $incoming_entry === self::DELETE_PLACEHOLDER ) {
@@ -405,7 +429,7 @@ class GitRepository {
 					continue;
 				}
 				$current_entry = $current_branch_diff[ $name ] ?? null;
-				$is_text  = is_array( $incoming_entry->content ) && isset( $incoming_entry->content['type'] ) && $incoming_entry->content['type'] === 'text';
+				$is_text       = is_array( $incoming_entry->content ) && isset( $incoming_entry->content['type'] ) && $incoming_entry->content['type'] === 'text';
 				if ( $is_text ) {
 					$current_content = $this->read_object_by_path( $path, $common_ancestor_commit_hash )->consume_all();
 					if ( ! $current_entry ) {
@@ -414,25 +438,25 @@ class GitRepository {
 					}
 					$merge_result = $merge_function(
 						array(
-							'parent' => $current_content,
+							'parent'  => $current_content,
 							'branchA' => $current_entry->content['text'],
-							'branchB' => $incoming_entry->content['text']
+							'branchB' => $incoming_entry->content['text'],
 						)
 					);
-                    if(!$merge_result->has_conflicts()) {
-                        $updates[ $path ] = $merge_result->get_merged_content();
-                        continue;
-                    }
+					if ( ! $merge_result->has_conflicts() ) {
+						$updates[ $path ] = $merge_result->get_merged_content();
+						continue;
+					}
 
-                    $conflicts[] = $path;
-                    switch($conflict_resolution_strategy) {
-                        case 'theirs':
-                            // Overwrite the current entry with the incoming entry.
-                            $updates[ $path ] = $incoming_entry->content['text'];
-                            break;
-                        default:
-                            throw new GitException( "Unsupported conflict resolution strategy: {$conflict_resolution_strategy}." );
-                    }
+					$conflicts[] = $path;
+					switch ( $conflict_resolution_strategy ) {
+						case 'theirs':
+							// Overwrite the current entry with the incoming entry.
+							$updates[ $path ] = $incoming_entry->content['text'];
+							break;
+						default:
+							throw new GitException( "Unsupported conflict resolution strategy: {$conflict_resolution_strategy}." );
+					}
 				} elseif ( is_array( $incoming_entry->content ) ) {
 					$tree_stack[] = array(
 						$incoming_entry->content,
@@ -455,27 +479,29 @@ class GitRepository {
 			)
 		);
 
-        return array(
-            'new_head' => $new_commit_hash,
-            'conflicts' => $conflicts,
-        );
+		return array(
+			'new_head'  => $new_commit_hash,
+			'conflicts' => $conflicts,
+		);
 	}
 
-    private function default_merge_function($data) {
-        $strategy = new MergeStrategy(
-            new MyersDiffer(),
-            new ChunkMerger()
-        );
-        return $strategy->merge($data['parent'], $data['branchA'], $data['branchB']);
-    }
+	private function default_merge_function( $data ) {
+		$strategy = new MergeStrategy(
+			new MyersDiffer(),
+			new ChunkMerger()
+		);
+
+		return $strategy->merge( $data['parent'], $data['branchA'], $data['branchB'] );
+	}
 
 	/**
 	 * Find the common ancestor of two references.
 	 *
 	 * TODO: Support commits with multiple parents.
 	 *
-	 * @param string $commit_hash1 The first reference.
-	 * @param string $commit_hash2 The second reference.
+	 * @param  string  $commit_hash1  The first reference.
+	 * @param  string  $commit_hash2  The second reference.
+	 *
 	 * @return string The common ancestor hash.
 	 */
 	public function find_first_common_ancestor( $commit_hash1, $commit_hash2 ) {
@@ -513,7 +539,7 @@ class GitRepository {
 	public function get_nth_ancestor_hash( $n, $commit_hash = null ) {
 		$commit_hash = $options['commit_hash'] ?? $this->get_branch_tip( 'HEAD' );
 
-		for ( $i = 0; $i < $n; $i++ ) {
+		for ( $i = 0; $i < $n; $i ++ ) {
 			$commit_hash = $this->read_object( $commit_hash )->as_commit()->parents[0];
 		}
 
@@ -528,7 +554,7 @@ class GitRepository {
 	public function get_ancestors_hashes( $options = array() ) {
 		$commit_hash = $options['commit_hash'] ?? $this->get_branch_tip( 'HEAD' );
 		$on_missing  = $options['on_missing'] ?? 'throw'; // throw | return-early
-		$limit       = $options['count'] ?? -1;
+		$limit       = $options['count'] ?? - 1;
 
 		$found_parents    = array();
 		$enqueued_parents = array( $commit_hash );
@@ -558,7 +584,7 @@ class GitRepository {
 				$parents
 			);
 
-			if ( $limit !== -1 && count( $found_parents ) >= $limit ) {
+			if ( $limit !== - 1 && count( $found_parents ) >= $limit ) {
 				break;
 			}
 		}
@@ -605,6 +631,7 @@ class GitRepository {
 			$path = '/' . ltrim( $path, '/' );
 			if ( ! $this->read_object_by_path( dirname( $path ) ) ) {
 				_doing_it_wrong( __METHOD__, 'File not found in HEAD: ' . $path, '1.0.0' );
+
 				return false;
 			}
 			$this->mark_tree_path_changed( $changed_trees, dirname( $path ) );
@@ -617,13 +644,14 @@ class GitRepository {
 			$new_path = '/' . ltrim( $new_path, '/' );
 			if ( ! $this->read_object_by_path( $old_path ) ) {
 				_doing_it_wrong( __METHOD__, 'Path not found in HEAD: ' . $old_path, '1.0.0' );
+
 				return false;
 			}
 			$this->mark_tree_path_changed( $changed_trees, dirname( $old_path ) );
 			$this->mark_tree_path_changed( $changed_trees, dirname( $new_path ) );
 
 			$changed_trees[ dirname( $old_path ) ]->entries[ basename( $old_path ) ] = self::DELETE_PLACEHOLDER;
-			$new_basename = basename( $new_path );
+			$new_basename                                                            = basename( $new_path );
 			if ( $new_basename === '' ) {
 				throw new GitException( 'Cannot rename a file to an empty filename' );
 			}
@@ -740,6 +768,7 @@ class GitRepository {
 				$diff[ $name ] = self::DELETE_PLACEHOLDER;
 			}
 		}
+
 		return $diff;
 	}
 
@@ -767,7 +796,8 @@ class GitRepository {
 
 	private static function guess_if_binary_blob( $blob_name, $blob_contents ) {
 		$extension = pathinfo( $blob_name, PATHINFO_EXTENSION );
-		if ( in_array( $extension, array( 'png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'ico', 'bmp', 'tiff', 'tif', 'raw', 'heic', 'heif', 'avif' ) ) ) {
+		if ( in_array( $extension,
+			array( 'png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'ico', 'bmp', 'tiff', 'tif', 'raw', 'heic', 'heif', 'avif' ) ) ) {
 			return true;
 		}
 
@@ -826,7 +856,7 @@ class GitRepository {
 		// Rebase $squash_into_commit_oid and its descenrants onto the parent
 		// of the squashed range.
 		$new_parent_oid = $new_base_oid;
-		for ( $i = count( $commits_to_rebase ) - 1; $i >= 0; $i-- ) {
+		for ( $i = count( $commits_to_rebase ) - 1; $i >= 0; $i -- ) {
 			$this->read_object( $commits_to_rebase[ $i ] );
 			$parsed_old_commit = $this->read_object( $commits_to_rebase[ $i ] )->as_commit();
 			$new_parent_oid    = $this->add_object(
@@ -860,12 +890,14 @@ class GitRepository {
 		 */
 		unset( $updates['author'] );
 		unset( $updates['author_date'] );
+
 		return $this->create_commit_string( array_merge( $parsed_commit, $updates ) );
 	}
 
 	private function create_commit_string( $options ) {
 		if ( ! isset( $options['tree'] ) ) {
 			_doing_it_wrong( __METHOD__, '"tree" commit meta field is required', '1.0.0' );
+
 			return false;
 		}
 		if ( ! isset( $options['author'] ) ) {
@@ -891,6 +923,7 @@ class GitRepository {
 		$commit_message[] = 'author ' . $options['author'] . ' ' . $options['author_date'];
 		$commit_message[] = 'committer ' . $options['committer'] . ' ' . $options['committer_date'];
 		$commit_message[] = "\n" . $options['message'];
+
 		return implode( "\n", $commit_message );
 	}
 

@@ -73,6 +73,7 @@ class GitRemote {
 					break;
 			}
 		}
+
 		return $refs;
 	}
 
@@ -81,6 +82,7 @@ class GitRemote {
 		if ( ! isset( $remote_refs[ $full_branch_name ] ) ) {
 			throw new GitException( 'Branch "' . $full_branch_name . '" not found on remote ' . $this->remote_name );
 		}
+
 		return $remote_refs[ $full_branch_name ];
 	}
 
@@ -99,35 +101,38 @@ class GitRemote {
 		}
 
 		return array(
-			'hash' => $hash,
+			'hash'     => $hash,
 			'ref_name' => $ref_name,
 		);
 	}
 
-	public function force_push_one_commit() {
-		$push_ref_name = $this->repository->get_branch_tip( 'HEAD', array( 'follow_symrefs' => false ) );
-		$push_ref_name = $this->localize_ref_name( $push_ref_name );
+	/**
+	 * @TODO: Support pushing any branch such as refs/pull/123
+	 */
+	public function push( $short_branch_name = null ) {
+		if ( ! $short_branch_name ) {
+			$short_branch_name = $this->repository->get_current_branch_name();
+			$short_branch_name = $this->localize_ref_name( $short_branch_name );
+		}
 
-		$push_commit = $this->repository->get_branch_tip( 'refs/heads/' . $push_ref_name );
-		$parent_hash = $this->repository->read_object( $push_commit )->as_commit()->get_first_parent_hash();
+		$push_commit = $this->repository->get_branch_tip( 'refs/heads/' . $short_branch_name );
 
 		try {
-			$remote_commit = $this->repository->get_branch_tip( 'refs/remotes/' . $this->remote_name . '/' . $push_ref_name );
+			$remote_commit = $this->repository->get_branch_tip( 'refs/remotes/' . $this->remote_name . '/' . $short_branch_name );
 		} catch ( GitException $e ) {
 			$remote_commit = Commit::NULL_HASH;
 		}
-		// @TODO: Do find_objects_added_since to enable pushing multiple commits at once.
-		// OR! perhaps supporting "have" and "want" would solve this.
-		// $delta = $this->repository->find_objects_added_in($push_commit, $parent_hash);
-		$delta = $this->repository->find_objects_added_in( $push_commit, $remote_commit );
 
+		// @TODO: Respect a subpath
+		$common_ancestor = $this->resolve_first_common_ancestor( $push_commit, $remote_commit );
+		$delta           = $this->repository->find_objects_added_since( $push_commit, $common_ancestor );
 		if ( ! count( $delta ) ) {
 			// Don't push empty commits
 			return;
 		}
 
 		$producer = new GitProtocolEncoderPipe();
-		$producer->append_packet_line( "$remote_commit $push_commit refs/heads/$push_ref_name\0report-status force-update side-band-64k\n" );
+		$producer->append_packet_line( "$remote_commit $push_commit refs/heads/$short_branch_name\0report-status force-update side-band-64k\n" );
 		$producer->append_packet_line( '0000' );
 		$producer->append_packfile( $this->repository, $delta );
 		$producer->close_writing();
@@ -156,13 +161,13 @@ class GitRemote {
 
 		$expected_response = array(
 			'unpack ok',
-			'ok refs/heads/' . $push_ref_name,
+			'ok refs/heads/' . $short_branch_name,
 		);
 		if ( $data_packets != $expected_response ) {
 			throw new GitException( 'Push failed:' . var_export( $data_packets, true ) );
 		}
 
-		$this->repository->set_branch_head( 'refs/remotes/' . $this->remote_name . '/' . $push_ref_name, $push_commit );
+		$this->repository->set_branch_head( 'refs/remotes/' . $this->remote_name . '/' . $short_branch_name, $push_commit );
 	}
 
 	private function localize_ref_name( $ref_name ) {
@@ -183,11 +188,12 @@ class GitRemote {
 		$protocol = new GitProtocolDecoder(
 			$response,
 			array(
-				'write_to_repository' => $tmp_repo,
+				'write_to_repository'            => $tmp_repo,
 				'resolve_deltas_from_repository' => $this->repository,
 			)
 		);
 		$protocol->consume_stream();
+
 		return $tmp_repo;
 	}
 
@@ -214,7 +220,7 @@ class GitRemote {
 		$protocol = new GitProtocolDecoder(
 			$response,
 			array(
-				'write_to_repository' => $this->repository,
+				'write_to_repository'            => $this->repository,
 				'resolve_deltas_from_repository' => $this->repository,
 			)
 		);
@@ -222,7 +228,7 @@ class GitRemote {
 
 		$commit                = $this->repository->read_object( $remote_commit_hash )->as_commit();
 		$subpath               = trim( $path, '/' );
-		$requested_tree_oid    = $this->repository->find_hash_by_path( $subpath, $commit->tree );
+		$requested_tree_oid    = $this->repository->find_hash_by_path( $subpath, $commit->hash );
 		$descentant_blobs_oids = get_all_descendant_oids_in_tree(
 			$this->repository,
 			$requested_tree_oid,
@@ -240,18 +246,19 @@ class GitRemote {
 				$blobs_oids[] = $oid;
 			}
 		}
+
 		return $blobs_oids;
 	}
 
 	public function pull( $full_branch_name, $options = array() ) {
 		$path = $options['path'] ?? '/';
 
-		if ( isset( $options['path'] ) ) {
+		if ( isset( $options['path'] ) && $options['path'] ) {
 			// Sparse pull
 			$remote_head = $this->fetch(
 				$full_branch_name,
 				array(
-					'path' => $path,
+					'path'    => $path,
 					'shallow' => $options['shallow'] ?? false,
 				)
 			);
@@ -270,6 +277,7 @@ class GitRemote {
 		if ( isset( $options['force'] ) && $options['force'] ) {
 			$nice_branch_name = $this->localize_ref_name( $full_branch_name );
 			$this->repository->set_branch_head( 'refs/heads/' . $nice_branch_name, $remote_head );
+
 			return $remote_head;
 		}
 
@@ -280,14 +288,14 @@ class GitRemote {
 		);
 		$required_commits = array( $remote_head, $common_ancestor );
 		foreach ( $required_commits as $commit ) {
-			if ( ! $this->repository->has_blobs_from_commit( $commit, $path ) ) {
+			if ( ! $this->repository->has_all_objects_from_commit( $commit, $path ) ) {
 				$this->git_upload_pack(
 					array(
 						'want_refs' => $this->resolve_missing_blobs_oids(
 							$commit,
 							array( 'path' => $path )
 						),
-						'shallow' => array( $commit ),
+						'shallow'   => array( $commit ),
 						'deepen'    => 1,
 					)
 				)->consume_stream();
@@ -306,35 +314,51 @@ class GitRemote {
 		}
 
 		$remote_head = $this->get_remote_head( 'refs/heads/' . $branch_name );
-		if ( $remote_head === $last_fetched_head_ref ) {
-			return $remote_head;
-		}
-		if ( isset( $options['path'] ) ) {
-			if ( ! isset( $options['shallow'] ) || $options['shallow'] !== true ) {
-				throw new GitException( 'When you pass a "path" to fetch(), you must also set the "shallow" option to true. Deep partial fetches are not supported.' );
+		try {
+			if ( $remote_head === $last_fetched_head_ref ) {
+				return $remote_head;
 			}
-			$missing_oids = $this->resolve_missing_blobs_oids(
-				$remote_head,
-				array( 'path' => $options['path'] )
-			);
-			$this->git_upload_pack(
-				array(
-					'shallow'   => array( $remote_head ),
-					'deepen'    => 1,
-					'want_refs' => array( $remote_head, ...$missing_oids ),
-					'have_refs' => array( $last_fetched_head_ref ),
-				)
-			)->consume_stream();
-		} else {
-			$this->git_upload_pack(
-				array(
-					'want_refs' => array( $remote_head ),
-					'have_refs' => array( $last_fetched_head_ref ),
-				)
-			)->consume_stream();
+			if ( isset( $options['path'] ) && $options['path'] ) {
+				if ( ! isset( $options['shallow'] ) || $options['shallow'] !== true ) {
+					throw new GitException( 'When you pass a "path" to fetch(), you must also set the "shallow" option to true. Deep partial fetches are not supported.' );
+				}
+				$missing_oids = $this->resolve_missing_blobs_oids(
+					$remote_head,
+					array( 'path' => $options['path'] )
+				);
+				$this->git_upload_pack(
+					array(
+						'shallow'   => array( $remote_head ),
+						'deepen'    => 1,
+						'want_refs' => array( $remote_head, ...$missing_oids ),
+						'have_refs' => array( $last_fetched_head_ref ),
+					)
+				)->consume_stream();
+			} else {
+				$this->git_upload_pack(
+					array(
+						'want_refs' => array( $remote_head ),
+						'have_refs' => array( $last_fetched_head_ref ),
+					)
+				)->consume_stream();
+			}
+			$this->repository->set_branch_head( "refs/remotes/{$this->remote_name}/{$branch_name}", $remote_head );
+
+			return $remote_head;
+		} finally {
+			// Make double sure we have all the relevant objects from the remote commit.
+			// @TODO: investigate why sometimes the root tree is missing and address the
+			//        root cause instead of plugging the hole with a bandaid.
+			if ( ! $this->repository->has_all_objects_from_commit( $remote_head ) ) {
+				$this->git_upload_pack(
+					array(
+						'want_refs' => array( $remote_head ),
+						'shallow'   => array( $remote_head ),
+						'deepen'    => 1,
+					)
+				)->consume_stream();
+			}
 		}
-		$this->repository->set_branch_head( "refs/remotes/{$this->remote_name}/{$branch_name}", $remote_head );
-		return $remote_head;
 	}
 
 	public function resolve_first_common_ancestor( $remote_commit_hash, $local_commit_hash ) {
@@ -350,18 +374,22 @@ class GitRemote {
 		$this->git_upload_pack(
 			array(
 				'want_refs' => array( $remote_commit_hash ),
-				'have_refs' => $this->repository->get_ancestors_hashes(
-					$local_commit_hash,
-					array(
-						// Arbitrary number of ancestors to send to the remote server.
-						// Hopefully one of them is also an ancestor of the remote commit.
-						'count' => 100,
-					)
-				),
+				'have_refs' => $this->repository->get_ancestors_hashes( [
+					'commit_hash' => $local_commit_hash,
+
+					// Arbitrary number of ancestors to send to the remote server.
+					// Hopefully one of them is also an ancestor of the remote commit.
+					// @TODO: Find an exact solution instead of handwaving.
+					'count'       => 100,
+
+					// Just get as many parents as we have. Don't enforce having
+					// exactly 100 hashes available.
+					'on_missing'  => 'return-early',
+				] ),
 				// Only fetch the commits. Ignore any associated trees and blobs.
 				// We're answering a question about a common ancestor in the commit
 				// graph. We don't need all the extra downloads to do that.
-				'filter' => 'tree:0',
+				'filter'    => 'tree:0',
 			)
 		)->consume_stream();
 
@@ -384,7 +412,7 @@ class GitRemote {
 				// Only fetch the commits. Ignore any associated trees and blobs.
 				// We're answering a question about a common ancestor in the commit
 				// graph. We don't need all the extra downloads to do that.
-				'filter' => 'tree:0',
+				'filter'    => 'tree:0',
 			)
 		)->consume_stream();
 
@@ -408,12 +436,12 @@ class GitRemote {
 		}
 		$want_refs    = $options['want_refs'];
 		$packet_lines = array();
-		for ( $i = 0; $i < count( $want_refs ); $i++ ) {
+		for ( $i = 0; $i < count( $want_refs ); $i ++ ) {
 			$packet_line = "want {$want_refs[$i]}";
 			if ( $i === 0 ) {
 				$packet_line .= ' multi_ack_detailed no-done side-band-64k ofs-delta agent=git/2.37.3 filter push-options';
 			}
-			$packet_line   .= "\n";
+			$packet_line    .= "\n";
 			$packet_lines[] = $packet_line;
 		}
 
@@ -452,7 +480,7 @@ class GitRemote {
 			'/git-upload-pack',
 			GitProtocolEncoderPipe::encode_packet_lines( $packet_lines ),
 			array(
-				'Accept' => 'application/x-git-upload-pack-advertisement',
+				'Accept'       => 'application/x-git-upload-pack-advertisement',
 				'Content-Type' => 'application/x-git-upload-pack-request',
 			)
 		);

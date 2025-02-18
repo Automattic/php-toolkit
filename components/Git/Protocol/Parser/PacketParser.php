@@ -8,19 +8,19 @@ use WordPress\Git\GitException;
 class PacketParser {
 
 	const STATE_SCAN_FOR_EXPECTED_LENGTH = 'scan_for_expected_length';
-	const STATE_READ_PACKET_BODY         = 'read_packet_body';
-	const STATE_PACKET_FOOTER            = 'packet_footer';
+	const STATE_READ_PACKET_BODY = 'read_packet_body';
+	const STATE_PACKET_FOOTER = 'packet_footer';
 
-	protected $bytes                         = '';
-	protected $bytes_read_so_far             = 0;
-	protected $bytes_already_forgotten       = 0;
-	protected $is_finished                   = false;
+	protected $bytes = '';
+	protected $bytes_read_so_far = 0;
+	protected $bytes_already_forgotten = 0;
+	protected $is_finished = false;
 	protected $is_paused_at_incomplete_input = false;
-	protected $packet_type                   = null;
-	protected $expected_length               = 0;
-	protected $packet_bytes_read             = 0;
-	protected $body_chunk                    = '';
-	protected $state                         = self::STATE_SCAN_FOR_EXPECTED_LENGTH;
+	protected $packet_type = null;
+	protected $expected_length = 0;
+	protected $packet_bytes_read = 0;
+	protected $body_chunk = '';
+	protected $state = self::STATE_SCAN_FOR_EXPECTED_LENGTH;
 
 	public function next_token() {
 		if ( $this->is_paused_at_incomplete_input ) {
@@ -53,10 +53,12 @@ class PacketParser {
 						}
 						break;
 				}
+
 				return true;
 			}
 		} catch ( NotEnoughDataException $e ) {
 			$this->is_paused_at_incomplete_input = true;
+
 			return false;
 		}
 	}
@@ -69,6 +71,7 @@ class PacketParser {
 		} elseif ( $this->packet_type && $this->packet_bytes_read ) {
 			return '#packet-body';
 		}
+
 		return null;
 	}
 
@@ -88,6 +91,7 @@ class PacketParser {
 			$this->expected_length   = 0;
 			$this->packet_bytes_read = 0;
 			$this->state             = self::STATE_READ_PACKET_BODY;
+
 			return;
 		} elseif ( ! preg_match( '/^[0-9a-f]{4}$/', $length_hex ) ) {
 			throw new GitException( 'Invalid packet length hex "' . $length_hex . '" at offset ' . $this->get_offset_in_stream() );
@@ -101,6 +105,7 @@ class PacketParser {
 				$this->expected_length   = 0;
 				$this->packet_bytes_read = 0;
 				$this->body_chunk        = '';
+
 				return;
 
 			case '0001':
@@ -109,6 +114,7 @@ class PacketParser {
 				$this->expected_length   = 0;
 				$this->packet_bytes_read = 0;
 				$this->body_chunk        = '';
+
 				return;
 
 			case '0002':
@@ -118,6 +124,7 @@ class PacketParser {
 				$this->expected_length   = 0;
 				$this->packet_bytes_read = 0;
 				$this->body_chunk        = '';
+
 				return;
 		}
 
@@ -156,9 +163,10 @@ class PacketParser {
 			if ( ! $next_chunk ) {
 				throw new NotEnoughDataException();
 			}
-			$this->body_chunk         = $next_chunk;
+			$this->body_chunk        = $next_chunk;
 			$this->bytes_read_so_far += strlen( $next_chunk );
 			$this->packet_bytes_read += strlen( $next_chunk );
+
 			return;
 		}
 
@@ -168,23 +176,23 @@ class PacketParser {
 			throw new NotEnoughDataException();
 		}
 
-		$chunk                    = substr( $this->bytes, $this->bytes_read_so_far, $chunk_size );
+		$chunk                   = substr( $this->bytes, $this->bytes_read_so_far, $chunk_size );
 		$this->bytes_read_so_far += $chunk_size;
 		$this->packet_bytes_read += $chunk_size;
-		$this->body_chunk         = $chunk;
+		$this->body_chunk        = $chunk;
 
 		if ( $this->packet_bytes_read === $this->expected_length ) {
 			if ( str_ends_with( $this->body_chunk, "\n" ) ) {
-				$this->body_chunk = substr( $this->body_chunk, 0, -1 );
+				$this->body_chunk = substr( $this->body_chunk, 0, - 1 );
 			}
 		}
 	}
 
 	public function append_bytes( $bytes ) {
-		$this->bytes_already_forgotten      += $this->bytes_read_so_far;
+		$this->bytes_already_forgotten       += $this->bytes_read_so_far;
 		$this->bytes                         = substr( $this->bytes, $this->bytes_read_so_far );
 		$this->bytes_read_so_far             = 0;
-		$this->bytes                        .= $bytes;
+		$this->bytes                         .= $bytes;
 		$this->is_paused_at_incomplete_input = false;
 	}
 

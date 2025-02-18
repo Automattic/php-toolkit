@@ -83,13 +83,13 @@ class ProtocolDemultiplexerTest extends \PHPUnit\Framework\TestCase {
 			if ( ! isset( $chunks_counts[ $demuxer->get_stream_code() ] ) ) {
 				$chunks_counts[ $demuxer->get_stream_code() ] = 0;
 			}
-			++$chunks_counts[ $demuxer->get_stream_code() ];
+			++ $chunks_counts[ $demuxer->get_stream_code() ];
 		}
 		$reader->close_reading();
 		$this->assertEquals(
 			array(
-				'unknown' => 3,
-				'progress' => 29,
+				'unknown'   => 3,
+				'progress'  => 29,
 				'side_band' => 5,
 			),
 			$chunks_counts
@@ -104,13 +104,13 @@ class ProtocolDemultiplexerTest extends \PHPUnit\Framework\TestCase {
 			if ( ! isset( $chunks_counts[ $demuxer->get_stream_code() ] ) ) {
 				$chunks_counts[ $demuxer->get_stream_code() ] = 0;
 			}
-			++$chunks_counts[ $demuxer->get_stream_code() ];
+			++ $chunks_counts[ $demuxer->get_stream_code() ];
 		}
 		$reader->close_reading();
 		$this->assertEquals(
 			array(
-				'unknown' => 3,
-				'progress' => 106,
+				'unknown'   => 3,
+				'progress'  => 106,
 				'side_band' => 4286,
 			),
 			$chunks_counts

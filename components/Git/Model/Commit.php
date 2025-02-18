@@ -88,6 +88,7 @@ class Commit {
 		if ( is_array( $this->parents ) ) {
 			return $this->parents[0];
 		}
+
 		return $this->parents;
 	}
 }

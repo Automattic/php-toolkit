@@ -22,9 +22,9 @@ class GitFilesystemTest extends TestCase {
 		$this->head_oid = $this->repo->commit(
 			array(
 				'updates' => array(
-					'README.md' => 'Hello, world!',
+					'README.md'                    => 'Hello, world!',
 					'subdirectory/hello-world.txt' => 'Hello, world!',
-					'subdirectory/script.js' => 'console.log("Hello, world!");',
+					'subdirectory/script.js'       => 'console.log("Hello, world!");',
 				),
 			)
 		);

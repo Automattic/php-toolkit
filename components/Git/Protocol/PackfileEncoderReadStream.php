@@ -20,13 +20,14 @@ class PackfileEncoderReadStream extends BaseByteReadStream {
 
 	public static function create( GitRepository $objects_source, $oids ) {
 		$encoder = new self( $objects_source, $oids );
+
 		return new TransformedReadStream(
 			$encoder,
 			array(
 				'checksum' => new ChecksumTransformer(
 					'sha1',
 					array(
-						'flush_hash' => true,
+						'flush_hash'    => true,
 						'binary_output' => true,
 					)
 				),
@@ -43,12 +44,14 @@ class PackfileEncoderReadStream extends BaseByteReadStream {
 	public function internal_pull( $n ): string {
 		if ( $this->objects_written >= count( $this->oids ) ) {
 			$this->close_reading();
+
 			return '';
 		}
 
 		if ( ! $this->object_reader ) {
 			$this->object_reader = $this->objects_source->read_object( $this->oids[ $this->objects_written ] );
 			$this->object_reader->set_inflate_enabled( false );
+
 			return $this->encode_packfile_object_header(
 				$this->object_reader->get_object_type_name(),
 				$this->object_reader->get_uncompressed_size()
@@ -63,7 +66,7 @@ class PackfileEncoderReadStream extends BaseByteReadStream {
 		if ( $this->object_reader->reached_end_of_data() ) {
 			$this->object_reader->close_reading();
 			$this->object_reader = null;
-			++$this->objects_written;
+			++ $this->objects_written;
 		}
 
 		return $this->internal_pull( $n );
@@ -74,7 +77,7 @@ class PackfileEncoderReadStream extends BaseByteReadStream {
 		$object_type = $types[ $object_type_name ];
 
 		// First byte: type in bits 4-6, size bits 0-3
-		$firstByte  = $uncompressed_size & 0b1111;
+		$firstByte = $uncompressed_size & 0b1111;
 		$firstByte |= ( $object_type & 0b111 ) << 4;
 
 		// Continuation bit 7 if needed
@@ -90,7 +93,7 @@ class PackfileEncoderReadStream extends BaseByteReadStream {
 		// Add continuation bytes if needed
 		while ( $remainingSize > 0 ) {
 			// Set continuation bit if we have more bytes
-			$byte            = $remainingSize & 0b01111111;
+			$byte          = $remainingSize & 0b01111111;
 			$remainingSize >>= 7;
 			if ( $remainingSize > 0 ) {
 				$byte |= 0b10000000;

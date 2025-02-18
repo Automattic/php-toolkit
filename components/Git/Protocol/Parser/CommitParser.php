@@ -24,6 +24,7 @@ class CommitParser {
 	public static function parse( string $bytes ) {
 		$parser = new CommitParser( $bytes );
 		$parser->next();
+
 		return $parser->get_commit();
 	}
 
@@ -58,6 +59,7 @@ class CommitParser {
 					$this->bytes
 				);
 				$this->bytes           = '';
+
 				return true;
 			}
 

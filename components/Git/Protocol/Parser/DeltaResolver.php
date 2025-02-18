@@ -23,9 +23,9 @@ class DeltaResolver {
 	 */
 	private $delta_reader;
 
-	private $base_length                = null;
-	private $target_length              = null;
-	private $resolved_chunk             = '';
+	private $base_length = null;
+	private $target_length = null;
+	private $resolved_chunk = '';
 	private $paused_on_incomplete_input = false;
 
 	public function __construct( GitObjectDecoder $base_object_reader, ByteReadStream $delta_reader ) {
@@ -69,6 +69,7 @@ class DeltaResolver {
 			// a fixed MemoryPipe
 			$this->delta_reader->seek( $position );
 			$this->paused_on_incomplete_input = true;
+
 			return false;
 		}
 	}
@@ -77,10 +78,11 @@ class DeltaResolver {
 		$result = 0;
 		$shift  = 0;
 		do {
-			$byte    = ord( $this->delta_reader->consume( 1 ) );
+			$byte   = ord( $this->delta_reader->consume( 1 ) );
 			$result |= ( $byte & 0x7F ) << $shift;
 			$shift  += 7;
 		} while ( $byte & 0x80 );
+
 		return $result;
 	}
 
@@ -116,9 +118,9 @@ class DeltaResolver {
 				$copySize   = 0;
 
 				$needed_bytes = 0;
-				for ( $i = 0; $i < 7; $i++ ) {
+				for ( $i = 0; $i < 7; $i ++ ) {
 					if ( $command_byte & ( 1 << $i ) ) {
-						++$needed_bytes;
+						++ $needed_bytes;
 					}
 				}
 
@@ -127,25 +129,25 @@ class DeltaResolver {
 				$offset_bytes = $this->delta_reader->consume( $needed_bytes );
 				$read_offset  = 0;
 				if ( $command_byte & 0b00000001 ) {
-					$copyOffset |= ord( $offset_bytes[ $read_offset++ ] );
+					$copyOffset |= ord( $offset_bytes[ $read_offset ++ ] );
 				}
 				if ( $command_byte & 0b00000010 ) {
-					$copyOffset |= ord( $offset_bytes[ $read_offset++ ] ) << 8;
+					$copyOffset |= ord( $offset_bytes[ $read_offset ++ ] ) << 8;
 				}
 				if ( $command_byte & 0b00000100 ) {
-					$copyOffset |= ord( $offset_bytes[ $read_offset++ ] ) << 16;
+					$copyOffset |= ord( $offset_bytes[ $read_offset ++ ] ) << 16;
 				}
 				if ( $command_byte & 0b00001000 ) {
-					$copyOffset |= ord( $offset_bytes[ $read_offset++ ] ) << 24;
+					$copyOffset |= ord( $offset_bytes[ $read_offset ++ ] ) << 24;
 				}
 				if ( $command_byte & 0b00010000 ) {
-					$copySize |= ord( $offset_bytes[ $read_offset++ ] );
+					$copySize |= ord( $offset_bytes[ $read_offset ++ ] );
 				}
 				if ( $command_byte & 0b00100000 ) {
-					$copySize |= ord( $offset_bytes[ $read_offset++ ] ) << 8;
+					$copySize |= ord( $offset_bytes[ $read_offset ++ ] ) << 8;
 				}
 				if ( $command_byte & 0b01000000 ) {
-					$copySize |= ord( $offset_bytes[ $read_offset++ ] ) << 16;
+					$copySize |= ord( $offset_bytes[ $read_offset ++ ] ) << 16;
 				}
 				if ( $copySize === 0 ) {
 					$copySize = 0x10000;
@@ -157,12 +159,14 @@ class DeltaResolver {
 				$this->delta_reader->pull( $command_byte, ByteReadStream::PULL_EXACTLY );
 				$this->resolved_chunk = $this->delta_reader->consume( $command_byte );
 			}
+
 			return true;
 		} catch ( NotEnoughDataException $e ) {
 			if ( ! $this->delta_reader->reached_end_of_data() ) {
 				$this->delta_reader->seek( $position );
 				$this->paused_on_incomplete_input = true;
 			}
+
 			return false;
 		}
 	}
