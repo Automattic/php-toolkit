@@ -40,6 +40,7 @@
         "classmap": [
             "components/DataLiberation/vendor-patched/",
             "components/Markdown/vendor-patched",
+            "components/Merge/vendor-patched",
             "components/HTML/./",
             "components/BlockParser/"
         ],
