@@ -93,7 +93,7 @@ class WP_Static_Files_Editor_Plugin {
 			$local_fs = LocalFilesystem::create( WP_STATIC_PAGES_DIR );
 			$repo     = new GitRepository( $local_fs );
 			$repo->add_remote( 'origin', $config['gitRepo'] );
-			$repo->set_branch_head( 'HEAD', 'ref: refs/heads/' . $config['selectedBranch'] );
+			$repo->set_branch_tip( 'HEAD', 'ref: refs/heads/' . $config['selectedBranch'] );
 			$repo->set_config_value( 'user.name', $config['gitUserName'] );
 			$repo->set_config_value( 'user.email', $config['gitUserEmail'] );
 

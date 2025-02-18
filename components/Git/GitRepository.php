@@ -60,8 +60,8 @@ class GitRepository {
 		if ( ! $this->fs->is_file( 'HEAD' ) ) {
 			// Initialize the repository with a default branch
 			$default_branch = $options['default_branch'] ?? 'trunk';
-			$this->set_branch_head( 'HEAD', "ref: refs/heads/{$default_branch}\n" );
-			$this->set_branch_head( "refs/heads/{$default_branch}", Commit::NULL_HASH );
+			$this->set_branch_tip( 'HEAD', "ref: refs/heads/{$default_branch}\n" );
+			$this->set_branch_tip( "refs/heads/{$default_branch}", Commit::NULL_HASH );
 		}
 	}
 
@@ -277,7 +277,7 @@ class GitRepository {
 		return array_keys( $diff );
 	}
 
-	public function set_branch_head( $branch_name, $oid ) {
+	public function set_branch_tip( $branch_name, $oid ) {
 		$path = $this->resolve_branch_file_path( $branch_name );
 
 		return $this->fs->put_contents( $path, $oid );
@@ -294,14 +294,14 @@ class GitRepository {
 			// Symref
 			$branch_name = 'ref: ' . $branch_name;
 		}
-		$this->set_branch_head( 'HEAD', $branch_name );
+		$this->set_branch_tip( 'HEAD', $branch_name );
 	}
 
 	public function create_branch( $branch_name, $head_oid ) {
 		if ( $this->branch_exists( $branch_name ) ) {
 			throw new GitException( 'Branch already exists: ' . $branch_name );
 		}
-		$this->set_branch_head( $branch_name, $head_oid );
+		$this->set_branch_tip( $branch_name, $head_oid );
 	}
 
 	public function get_current_branch_name() {
@@ -701,9 +701,9 @@ class GitRepository {
 		// Update HEAD
 		$head_tip = $this->get_branch_tip( 'HEAD', array( 'follow_symrefs' => false ) );
 		if ( $this->branch_exists( $head_tip ) ) {
-			$this->set_branch_head( $head_tip, $commit_oid );
+			$this->set_branch_tip( $head_tip, $commit_oid );
 		} else {
-			$this->set_branch_head( 'HEAD', $commit_oid );
+			$this->set_branch_tip( 'HEAD', $commit_oid );
 		}
 
 		if ( isset( $options['amend'] ) && $options['amend'] && isset( $options['parents'] ) ) {
@@ -824,7 +824,7 @@ class GitRepository {
 
 		// Finally, set the HEAD of the current branch to the new squashed commit.
 		$current_branch = $this->get_branch_tip( 'HEAD', array( 'follow_symrefs' => false ) );
-		$this->set_branch_head( $current_branch, $new_head );
+		$this->set_branch_tip( $current_branch, $new_head );
 
 		return $new_head;
 	}

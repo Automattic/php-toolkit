@@ -68,7 +68,7 @@ class GitRemote {
 
 					if ( str_starts_with( $ref['ref_name'], 'refs/heads/' ) ) {
 						$branch_name = substr( $ref['ref_name'], strlen( 'refs/heads/' ) );
-						$this->repository->set_branch_head( 'refs/remotes/' . $this->remote_name . '/' . $branch_name, $ref['hash'] );
+						$this->repository->set_branch_tip( 'refs/remotes/' . $this->remote_name . '/' . $branch_name, $ref['hash'] );
 					}
 					break;
 			}
@@ -167,7 +167,7 @@ class GitRemote {
 			throw new GitException( 'Push failed:' . var_export( $data_packets, true ) );
 		}
 
-		$this->repository->set_branch_head( 'refs/remotes/' . $this->remote_name . '/' . $short_branch_name, $push_commit );
+		$this->repository->set_branch_tip( 'refs/remotes/' . $this->remote_name . '/' . $short_branch_name, $push_commit );
 	}
 
 	private function localize_ref_name( $ref_name ) {
@@ -184,7 +184,7 @@ class GitRemote {
 	public function list_objects( $ref_hash ): GitRepository {
 		$response = $this->request_objects_list( $ref_hash );
 		$tmp_repo = new GitRepository( InMemoryFilesystem::create() );
-		$tmp_repo->set_branch_head( 'HEAD', $ref_hash );
+		$tmp_repo->set_branch_tip( 'HEAD', $ref_hash );
 		$protocol = new GitProtocolDecoder(
 			$response,
 			array(
@@ -276,7 +276,7 @@ class GitRemote {
 
 		if ( isset( $options['force'] ) && $options['force'] ) {
 			$nice_branch_name = $this->localize_ref_name( $full_branch_name );
-			$this->repository->set_branch_head( 'refs/heads/' . $nice_branch_name, $remote_head );
+			$this->repository->set_branch_tip( 'refs/heads/' . $nice_branch_name, $remote_head );
 
 			return $remote_head;
 		}
@@ -342,7 +342,7 @@ class GitRemote {
 					)
 				)->consume_stream();
 			}
-			$this->repository->set_branch_head( "refs/remotes/{$this->remote_name}/{$branch_name}", $remote_head );
+			$this->repository->set_branch_tip( "refs/remotes/{$this->remote_name}/{$branch_name}", $remote_head );
 
 			return $remote_head;
 		} finally {

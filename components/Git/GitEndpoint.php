@@ -453,7 +453,7 @@ class GitEndpoint {
 
 		try {
 			$this->repository->read_object( $new_oid );
-			$this->repository->set_branch_head( $ref_name, $new_oid );
+			$this->repository->set_branch_tip( $ref_name, $new_oid );
 		} catch ( GitException $e ) {
 			$git_response->append_error_packet_line( "error processing pack: $new_oid\n" );
 			$git_response->append_error_packet_line( '0000' );

@@ -17,8 +17,8 @@ class GitFilesystemTest extends TestCase {
 	public function setUp(): void {
 		parent::setUp();
 		$this->repo = new GitRepository( FilesystemInMemoryFilesystem::create() );
-		$this->repo->set_branch_head( 'refs/heads/trunk', Commit::NULL_HASH );
-		$this->repo->set_branch_head( 'HEAD', 'ref: refs/heads/trunk' );
+		$this->repo->set_branch_tip( 'refs/heads/trunk', Commit::NULL_HASH );
+		$this->repo->set_branch_tip( 'HEAD', 'ref: refs/heads/trunk' );
 		$this->head_oid = $this->repo->commit(
 			array(
 				'updates' => array(
