@@ -11,7 +11,6 @@ use WordPress\Git\Protocol\GitProtocolEncoderPipe;
 use WordPress\Merge\Diff\MyersDiffer;
 use WordPress\Merge\Merge\ChunkMerger;
 use WordPress\Merge\MergeStrategy;
-use WordPress\Merge\Validate\BlockMarkupMergeValidator;
 
 use function WordPress\Filesystem\wp_canonicalize_path;
 use function WordPress\Filesystem\wp_join_paths;
@@ -32,8 +31,6 @@ class GitRepository {
 	 */
 	private $parsed_config;
 
-	private $merge_function;
-
 	private const DELETE_PLACEHOLDER = 'DELETE_PLACEHOLDER';
 
 	public function __construct(
@@ -41,13 +38,6 @@ class GitRepository {
 		$options = array()
 	) {
 		$this->fs          = $fs;
-		$this->merge_function = $options['merge_function'] ?? function($data) {
-			$strategy = new MergeStrategy(
-				new MyersDiffer(),
-				new ChunkMerger()
-		    );
-			return $strategy->merge($data['parent'], $data['branchA'], $data['branchB']);
-        };
 		$this->initialize_filesystem( $options );
 	}
 
@@ -396,10 +386,16 @@ class GitRepository {
 		$current_branch_diff_root    = $this->diff_commits( $commit_hash1, $common_ancestor_commit_hash, $path );
 		$merged_branch_diff_root     = $this->diff_commits( $commit_hash2, $common_ancestor_commit_hash, $path );
 
+        $conflicts = array();
+        $conflict_resolution_strategy = $options['conflict_resolution_strategy'] ?? 'theirs';
+        if($conflict_resolution_strategy !== 'theirs') {
+            throw new GitException( "Conflict resolution strategy not supported: {$conflict_resolution_strategy}. Supported strategies: 'theirs'." );
+        }
+
 		$tree_stack = array( array( $merged_branch_diff_root, $current_branch_diff_root, $path ) );
 		$updates    = array();
 		$deletes    = array();
-        $merge_function = $this->merge_function;
+        $merge_function = $options['merge_function'] ?? array($this, 'default_merge_function');
 		while ( ! empty( $tree_stack ) ) {
 			list($incoming_branch_diff, $current_branch_diff, $parent_path) = array_pop( $tree_stack );
 			foreach ( $incoming_branch_diff as $name => $incoming_entry ) {
@@ -423,12 +419,19 @@ class GitRepository {
 							'branchB' => $incoming_entry->content['text']
 						)
 					);
-                    if($merge_result->has_conflicts()) {
-                        // @TODO: Add a history entry for the "current entry" content.
-                        // @TODO: Communicate the overwrite to the caller.
-                        $updates[ $path ] = $incoming_entry->content['text'];
-                    } else {
+                    if(!$merge_result->has_conflicts()) {
                         $updates[ $path ] = $merge_result->get_merged_content();
+                        continue;
+                    }
+
+                    $conflicts[] = $path;
+                    switch($conflict_resolution_strategy) {
+                        case 'theirs':
+                            // Overwrite the current entry with the incoming entry.
+                            $updates[ $path ] = $incoming_entry->content['text'];
+                            break;
+                        default:
+                            throw new GitException( "Unsupported conflict resolution strategy: {$conflict_resolution_strategy}." );
                     }
 				} elseif ( is_array( $incoming_entry->content ) ) {
 					$tree_stack[] = array(
@@ -440,7 +443,7 @@ class GitRepository {
 			}
 		}
 
-		return $this->commit(
+		$new_commit_hash = $this->commit(
 			array(
 				'message' => 'Merge commit ' . $commit_hash2 . ' into ' . $commit_hash1,
 				'updates' => $updates,
@@ -451,7 +454,20 @@ class GitRepository {
 				),
 			)
 		);
+
+        return array(
+            'new_head' => $new_commit_hash,
+            'conflicts' => $conflicts,
+        );
 	}
+
+    private function default_merge_function($data) {
+        $strategy = new MergeStrategy(
+            new MyersDiffer(),
+            new ChunkMerger()
+        );
+        return $strategy->merge($data['parent'], $data['branchA'], $data['branchB']);
+    }
 
 	/**
 	 * Find the common ancestor of two references.

@@ -294,7 +294,7 @@ class GitRemote {
 			}
 		}
 
-		return $this->repository->merge( $remote_head );
+		return $this->repository->merge( $remote_head, $options['merge_options'] ?? array() );
 	}
 
 	public function fetch( $full_branch_name, $options = array() ) {

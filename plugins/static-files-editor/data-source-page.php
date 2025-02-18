@@ -13,7 +13,7 @@ add_action('admin_init', function() {
 
 function msf_render_data_source() {
     if(isset($_POST['force_pull'])) {
-        $success = WP_Static_Files_Editor_Plugin::force_pull();
+        $success = WP_Static_Files_Editor_Plugin::pull();
         wp_redirect(admin_url('admin.php?page=static-files-data-source&success=' . ($success ? 'true' : 'false')));
         exit;
     }
@@ -61,15 +61,15 @@ function msf_render_data_source() {
                     <tr>
                         <th scope="row">Git Repository</th>
                         <td>
-                            <input 
-                                type="text" 
+                            <input
+                                type="text"
                                 class="regular-text"
                                 data-wp-bind--value="state.gitRepo"
                                 data-wp-on--input="actions.updateGitRepo"
                                 data-wp-on--keydown="actions.onGitRepoInputEnter"
                             />
-                            <button 
-                                type="button" 
+                            <button
+                                type="button"
                                 class="button"
                                 data-wp-on--click="actions.fetchBranches"
                             >
@@ -81,13 +81,13 @@ function msf_render_data_source() {
                     <tr>
                         <th scope="row">Branch</th>
                         <td>
-                            <select 
+                            <select
                                 data-wp-watch="callbacks.bindSelectedBranch"
                                 data-wp-on--change="actions.updateSelectedBranch"
                             >
                                 <option value="">Select branch</option>
                                 <template data-wp-each--branch="state.branches">
-                                    <option 
+                                    <option
                                         data-wp-text="context.branch.niceName"
                                         data-wp-bind--value="context.branch.fullName"
                                     ></option>
@@ -105,14 +105,14 @@ function msf_render_data_source() {
                 </table>
 
                 <p class="submit">
-                    <button 
+                    <button
                         type="button"
                         class="button button-primary"
                         data-wp-on--click="actions.saveSettings"
                     >
                         Save Changes
                     </button>
-                    <button 
+                    <button
                         type="button"
                         class="button"
                         data-wp-on--click="actions.forcePull"

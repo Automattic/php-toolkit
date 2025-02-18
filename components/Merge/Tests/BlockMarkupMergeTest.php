@@ -42,13 +42,13 @@ class BlockMarkupMergeTest extends \PHPUnit\Framework\TestCase {
 	 * @dataProvider corruptedResolutionCasesProvider
 	 */
 	public function test_corrupted_block_markup( $parent, $changeA, $changeB ) {
-		$this->expectException( InvalidMergeException::class );
 		$strategy = new MergeStrategy(
 			new MyersDiffer(),
 			new ChunkMerger(),
 			new BlockMarkupMergeValidator()
 		);
-		$strategy->merge( $parent, $changeA, $changeB );
+		$merge_result = $strategy->merge( $parent, $changeA, $changeB );
+		$this->assertCount( 1, $merge_result->get_conflicts() );
 	}
 
 	public function corruptedResolutionCasesProvider() {
@@ -59,13 +59,13 @@ class BlockMarkupMergeTest extends \PHPUnit\Framework\TestCase {
 	 * @dataProvider conflictingMergeCasesProvider
 	 */
 	public function test_conflicting_merge_cases( $parent, $changeA, $changeB ) {
-		$this->expectException( InvalidMergeException::class );
 		$strategy = new MergeStrategy(
 			new MyersDiffer(),
 			new ChunkMerger(),
 			new BlockMarkupMergeValidator()
 		);
-		$strategy->merge( $parent, $changeA, $changeB );
+		$merge_result = $strategy->merge( $parent, $changeA, $changeB );
+		$this->assertCount( 1, $merge_result->get_conflicts() );
 	}
 
 	public function conflictingMergeCasesProvider() {

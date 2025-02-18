@@ -3,6 +3,7 @@
 namespace WordPress\Merge;
 
 use WordPress\Merge\Diff\Differ;
+use WordPress\Merge\Merge\MergeConflict;
 use WordPress\Merge\Merge\Merger;
 use WordPress\Merge\Merge\MergeResult;
 use WordPress\Merge\Validate\InvalidMergeException;
@@ -36,12 +37,22 @@ class MergeStrategy {
 		// Perform the merge using the configured merge strategy
 		$merge_result = $this->merger->merge( $diffAB, $diffAC );
 
-		if ( $merge_result->has_conflicts() ) {
-			throw new InvalidMergeException( 'Merge resulted in conflicts', $merge_result );
+		if ( ! $this->validator ) {
+			return $merge_result;
 		}
 
-		if ( $this->validator ) {
+		try {
 			$this->validator->validate( $merge_result->get_merged_content() );
+		} catch ( InvalidMergeException $e ) {
+            return new MergeResult([
+                new MergeConflict(
+                    $branchA,
+                    $branchB,
+                    [
+                        'message' => $e->getMessage(),
+                    ]
+                )
+            ]);
 		}
 
 		return $merge_result;

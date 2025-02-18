@@ -5,7 +5,7 @@ namespace WordPress\Merge\Diff;
 use DiffMatchPatch\DiffMatchPatch;
 
 class MyersDiffer implements Differ {
-	private DiffMatchPatch $dmp;
+	private $dmp;
 
 	public function __construct() {
 		$this->dmp = new DiffMatchPatch();

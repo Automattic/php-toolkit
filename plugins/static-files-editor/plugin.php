@@ -103,7 +103,7 @@ class WP_Static_Files_Editor_Plugin {
             $last_pull_time = get_transient('wp_git_last_pull_time');
             if (!$last_pull_time) {
                 set_transient('wp_git_last_pull_time', time(), 10 * MINUTE_IN_SECONDS);
-                // self::force_pull();
+                // self::pull();
             }
 
             self::$fs = GitFilesystem::create(
@@ -123,20 +123,17 @@ class WP_Static_Files_Editor_Plugin {
         return self::$fs;
     }
 
-    static public function force_pull() {
+    static public function pull($options = []) {
         $config = static::get_settings();
         if(!$config['gitRepo']) {
-            return false;
         }
         self::get_fs();
         self::$remote->pull(
             $config['selectedBranch'],
-            [
+            array_merge([
                 'path' => $config['pathToSync'],
-                'force' => true
-            ]
+            ], $options)
         );
-        return true;
     }
 
     static public function menu_item_callback() {
@@ -150,14 +147,11 @@ class WP_Static_Files_Editor_Plugin {
 
         if (empty($posts)) {
             try {
-                if(!self::force_pull()) {
-                    throw new GitException('Failed to pull from remote');
-                }
+                self::pull();
                 wp_redirect(admin_url('post-new.php?post_type=' . WP_LOCAL_FILE_POST_TYPE));
                 exit;
             } catch (GitException $e) {
                 // There are more ways to get here than just the new GitException above.
-                // @TODO: Don't return false in self::force_pull() but throw instead.
                 wp_redirect(admin_url('admin.php?page=static_files_editor-data-source&error=no_data_source'));
                 exit('Please configure a data source in the settings page before continuing.');
             }
@@ -1469,7 +1463,11 @@ class WP_Static_Files_Editor_Plugin {
             if(!self::acquire_synchronization_lock()) {
                 return new WP_REST_Response('Failed to acquire synchronization lock', 500);
             }
-            if(!self::force_pull()) {
+            try {
+				self::pull([
+                    'force' => true,
+                ]);
+			} catch (Exception $e) {
                 return new WP_REST_Response('Force pull failed', 500);
             }
             return new WP_REST_Response('Force pull completed', 200);
