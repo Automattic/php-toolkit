@@ -11,6 +11,7 @@
         "@wordpress/scripts": "^30.9.0",
         "classnames": "^2.5.1",
         "diff": "^7.0.0",
+        "diff-match-patch": "^1.0.5",
         "html-react-parser": "^5.2.2"
     },
     "devDependencies": {

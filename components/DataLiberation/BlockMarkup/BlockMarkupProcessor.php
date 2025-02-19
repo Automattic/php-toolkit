@@ -383,7 +383,7 @@ class BlockMarkupProcessor extends WP_HTML_Tag_Processor {
 
 			// Let's try to parse attributes as JSON.
 			if ( strlen( $json_maybe ) > 0 ) {
-				$attributes = json_decode( $json_maybe, true );
+				$attributes = json_decode( trim( $json_maybe ), true );
 				if ( null === $attributes || ! is_array( $attributes ) ) {
 					// This comment looked like a block comment, but the attributes didn't
 					// parse as a JSON array. This means it wasn't a block after all.

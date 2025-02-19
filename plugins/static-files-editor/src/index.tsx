@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { useEffect, createRoot } from '@wordpress/element';
 import { FileNode, FilePickerTree } from './components/FilePickerTree';
 import { MobileMenu } from './components/MobileMenu/index';
+import { parse } from '@wordpress/blocks';
 import { store as editorStore, ErrorBoundary } from '@wordpress/editor';
 import { store as preferencesStore } from '@wordpress/preferences';
 import {
@@ -541,21 +542,63 @@ closeInserterOnBlockInsert();
 
 // Subscribe to the entity record and resetBlocks() whenever it changes
 const replaceEditorContentOnEntityChange = () => {
-	let previousPost = select(coreStore).getEntityRecord('postType', 'post', select(editorStore).getCurrentPostId());
-
+    let previousPost = select(coreStore).getEntityRecord(
+        'postType',
+        WP_LOCAL_FILE_POST_TYPE,
+        select(editorStore).getCurrentPostId()
+    );
 	subscribe(() => {
 		const postId = select(editorStore).getCurrentPostId();
-		const currentPost = select(coreStore).getEntityRecord('postType', 'post', postId);
+        const currentPost = select(coreStore).getEntityRecord('postType', WP_LOCAL_FILE_POST_TYPE, postId);
 
-		if (currentPost && currentPost.content.raw !== previousPost.content.raw) {
-			const blockMarkup = currentPost.content.raw;
-			dispatch(blockEditorStore).resetBlocks(blockMarkup);
-			previousPost = currentPost;
+        if (currentPost && !previousPost) {
+            previousPost = currentPost;
+        }
+        if (!previousPost || previousPost === currentPost) {
+            return;
+        }
+
+        if (currentPost && currentPost.content.raw !== previousPost?.content?.raw) {
+            const blockMarkup = currentPost.content.raw;
+            const blocks = parse(blockMarkup);
+            previousPost = currentPost;
+
+            dispatch(blockEditorStore).resetBlocks(blocks);
 		}
-	});
+    });
+
+    // Uncomment this to replace the editor content on autosave.
+    // @TODO: Need a client-side Merge engine to reconcile anything the user may have
+    //        typed since the autosave request started.
+    // let previousAutosave = select(coreStore).getAutosave(
+    //     WP_LOCAL_FILE_POST_TYPE,
+    //     select(editorStore).getCurrentPostId(),
+    //     select(coreStore).getCurrentUser().id
+    // );
+    // subscribe(() => {
+    //     const postId = select(editorStore).getCurrentPostId();
+    //     const user = select(coreStore).getCurrentUser();
+
+    //     const currentAutosave = select(coreStore).getAutosave(WP_LOCAL_FILE_POST_TYPE, postId, user.id);
+    //     if (currentAutosave && ! previousAutosave) {
+    //         previousAutosave = currentAutosave;
+    //     }
+    //     if (!previousAutosave || previousAutosave === currentAutosave) {
+    //         return;
+    //     }
+
+    //     if (currentAutosave && currentAutosave.content.raw !== previousAutosave?.content?.raw) {
+    //         const blockMarkup = currentAutosave.content.raw;
+    //         const blocks = parse(blockMarkup);
+    //         previousAutosave = currentAutosave;
+
+    //         dispatch(blockEditorStore).resetBlocks(blocks);
+	// 	}
+    // });
 };
 
 replaceEditorContentOnEntityChange();
+
 
 /*
 window.wp.data.dispatch(window.wp.blockEditor.store).resetBlocks(window.wp.blocks.parse(`<!-- wp:heading {"level":3} -->
@@ -565,3 +608,5 @@ window.wp.data.dispatch(window.wp.blockEditor.store).resetBlocks(window.wp.block
 <li>Easy PHP plugin testing inside Playground – mount the plugin files from a local directory. That must happen in the UI and we need an "override" button somewhere. Ideally that would be a Blueprints builder, but maybe we can start with a list of resources and "override" buttons in the site details in Playground?</li><!-- /wp:list-item -->
 </ul><!-- /wp:list -->`))
 */
+
+

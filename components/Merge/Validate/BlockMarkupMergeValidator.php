@@ -16,7 +16,11 @@ class BlockMarkupMergeValidator implements MergeValidator {
 		while ( $block_markup_processor->next_token() ) {
 			$error = $block_markup_processor->get_last_error();
 			if ( $error ) {
-				throw new InvalidMergeException( 'Merge resulted in invalid block markup', 0, $error );
+				throw new InvalidMergeException(
+                    sprintf('Merge resulted in invalid block markup: %s', $error->getMessage() ),
+                    0,
+                    $error
+                );
 			}
 		}
 
@@ -49,14 +53,25 @@ class BlockMarkupMergeValidator implements MergeValidator {
 	private function assert_html_is_structurally_sound( $html ) {
 		$html               .= '<TERMINATE-PROCESSING>';
 		$html_processor     = WP_HTML_Processor::create_fragment( $html );
+
+        /**
+         * Make the is_virtual() method public to enable deeper inspection.
+         *
+         * @TODO: Review the visibility in the HTML processor class.
+         */
+		$reflection = new \ReflectionClass($html_processor);
+		$is_virtual = $reflection->getMethod('is_virtual');
+		$is_virtual->setAccessible(true);
+
 		$seen_terminate_tag = false;
 		while ( $html_processor->next_token() ) {
 			$error = $html_processor->get_last_error();
 			if ( $error ) {
+                $source = $html_processor->get_unsupported_exception();
 				throw new InvalidMergeException(
-					'Merge resulted in invalid block markup',
+					sprintf('Merge resulted in invalid block markup: %s', $source ? $source->getMessage() : '' ),
 					0,
-					$html_processor->get_unsupported_exception()
+					$source
 				);
 			}
 
@@ -66,7 +81,7 @@ class BlockMarkupMergeValidator implements MergeValidator {
 			 *
 			 * @TODO: is_virtual() is private. Let's review this with Dennis Snell.
 			 */
-			if ( $html_processor->is_virtual() ) {
+			if ( $is_virtual->invoke($html_processor) ) {
 				throw new InvalidMergeException( <<<MESSAGE
                     "Merge resulted in a non-normative block markup. The inputs are assumed to be normative,
                     which means the merge result is likely corrupted.

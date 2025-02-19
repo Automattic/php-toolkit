@@ -31,6 +31,10 @@ use WordPress\Git\GitRemote;
 use WordPress\Git\GitRepository;
 use WordPress\Markdown\MarkdownConsumer;
 use WordPress\Markdown\MarkdownProducer;
+use WordPress\Merge\Diff\MyersDiffer;
+use WordPress\Merge\Merge\ChunkMerger;
+use WordPress\Merge\MergeStrategy;
+use WordPress\Merge\Validate\BlockMarkupMergeValidator;
 use WordPress\XML\XMLProcessor;
 
 use function WordPress\DataLiberation\URL\is_child_url_of;
@@ -96,10 +100,10 @@ class WP_Static_Files_Editor_Plugin {
             );
 
 			// Update the local index once every 10 minutes
-			$last_pull_time = get_transient( 'wp_git_last_pull_time' );
-			if ( ! $last_pull_time ) {
-				set_transient( 'wp_git_last_pull_time', time(), 10 * MINUTE_IN_SECONDS );
-				self::$data_source->refresh_index();
+			$last_reindex_time = get_transient( 'wp_static_files_reindex_time' );
+			if ( ! $last_reindex_time ) {
+				set_transient( 'wp_static_files_reindex_time', time(), 10 * MINUTE_IN_SECONDS );
+				self::$data_source->pull_updates();
 			}
 		}
 
@@ -122,7 +126,7 @@ class WP_Static_Files_Editor_Plugin {
 
 		if ( empty( $posts ) ) {
 			try {
-				self::get_data_source()->refresh_index();
+				self::get_data_source()->pull_updates();
 				wp_redirect( admin_url( 'post-new.php?post_type=' . WP_LOCAL_FILE_POST_TYPE ) );
 				exit;
 			} catch ( Exception $e ) {
@@ -356,7 +360,7 @@ class WP_Static_Files_Editor_Plugin {
 
 			register_rest_route( 'static-files-editor/v1', '/git/refresh-index', array(
 				'methods'             => 'POST',
-				'callback'            => array( self::class, 'local_files_refresh_index' ),
+				'callback'            => array( self::class, 'local_files_pull_updates' ),
 				'permission_callback' => function () {
 					return current_user_can( 'edit_posts' );
 				},
@@ -439,36 +443,57 @@ class WP_Static_Files_Editor_Plugin {
 			) );
 		} );
 
+        /**
+         * Shorten the autosave interval to 5 seconds to remove the need
+         * for clicking the "Save" button.
+         *
+         * @param array $settings
+         * @return array
+         */
+        add_filter('block_editor_settings_all', function($settings, $context) {
+            if(isset($context->post) && $context->post->post_type === WP_LOCAL_FILE_POST_TYPE) {
+                $settings['autosaveInterval'] = 5;
+            }
+            return $settings;
+        }, 10, 2);
+
+
 		// @TODO: the_content and rest_prepare_local_file filters run twice for REST API requests.
 		//        find a way of only running them once.
 
 		// Add the filter for 'the_content'
-		add_filter( 'the_content', function ( $content, $post = null ) {
-			// If no post is provided, try to get it from the global scope
-			if ( ! $post ) {
-				global $post;
-			}
+		// add_filter( 'the_content', function ( $content, $post = null ) {
+		// 	// If no post is provided, try to get it from the global scope
+		// 	if ( ! $post ) {
+		// 		global $post;
+		// 	}
 
-			// Check if this post is of type "local_file"
-			if ( $post && $post->post_type === WP_LOCAL_FILE_POST_TYPE ) {
-				// Get the latest content from the database first
-				$content = $post->post_content;
+		// 	// Check if this post is of type "local_file"
+		// 	if ( $post && $post->post_type === WP_LOCAL_FILE_POST_TYPE ) {
+		// 		// Get the latest content from the database first
+		// 		$content = $post->post_content;
 
-				// Then refresh from file if needed
-				$new_content = self::refresh_post_from_local_file( $post );
-				if ( false !== $new_content && ! is_wp_error( $new_content ) ) {
-					$content = $new_content;
-				}
+		// 		// Then refresh from file if needed
+		// 		$new_content = self::refresh_post_from_local_file( $post );
+		// 		if ( false !== $new_content && ! is_wp_error( $new_content ) ) {
+		// 			$content = $new_content;
+		// 		}
 
-				return $content;
-			}
+		// 		return $content;
+		// 	}
 
-			// Return original content for all other post types
-			return $content;
-		}, 10, 2 );
+		// 	// Return original content for all other post types
+		// 	return $content;
+		// }, 10, 2 );
 
 		// Add filter for REST API responses
 		add_filter( 'rest_prepare_' . WP_LOCAL_FILE_POST_TYPE, function ( $response, $post, $request ) {
+			// Short-circuit on non-GET requests to avoid messing with
+            // POST requests.
+			if ( $request->get_method() !== 'GET' ) {
+				return $response;
+			}
+
 			$new_content = self::refresh_post_from_local_file( $post );
 			if ( ! is_wp_error( $new_content ) ) {
 				$response->data['content']['raw']      = $new_content;
@@ -478,69 +503,197 @@ class WP_Static_Files_Editor_Plugin {
 			return $response;
 		}, 10, 3 );
 
-		// Update the file after post is saved
-		add_action( 'save_post_' . WP_LOCAL_FILE_POST_TYPE, function ( $post_id, $post, $update ) {
-			try {
-				if ( ! self::acquire_synchronization_lock() ) {
-					return;
-				}
-				$post_id = $post->ID;
-				if (
-					empty( $post->ID ) ||
-					$post->post_status !== 'publish' ||
-					$post->post_type !== WP_LOCAL_FILE_POST_TYPE
-				) {
-					return;
-				}
+        /**
+         * Merge the proposed post content with the local file content.
+         *
+         * This is used to reconcile changes made in the block editor with
+         * changes made in the local file.
+         * 
+         * @TODO: Also merge meta data, post title, etc.
+         */
+        $is_running_wp_insert_post_data = false;
+		add_action( 'wp_insert_post_data', function ( $processed_post, $unprocessed_post, $unsanitized_postarr, $update ) use (&$is_running_wp_insert_post_data) {
+            /**
+             * Make sure we don't run this action recursively as one of the outcomes
+             * is creating a new post revision.
+             */
+            if($is_running_wp_insert_post_data) {
+                return $processed_post;
+            }
 
-				$content = self::convert_post_to_string( $post );
+            $creating_revision = false;
+            if($processed_post['post_type'] === 'revision') {
+                $parent_post = get_post($processed_post['post_parent']);
+                if($parent_post->post_type === WP_LOCAL_FILE_POST_TYPE) {
+                    $creating_revision = true;
+                }
+            }
+            /**
+             * @TODO: Remove this line once we can merge documents in JS.
+             * 
+             * Right now, the JS-side change gets correctly merged with the static file,
+             * but the user may have typed some content in the block editor since the save
+             * started and those would not be merged back into the final document. As a result,
+             * we'd overwrite the static file with the block editor content on the next save.
+             */
+            $creating_revision = false;
 
-				$path = get_post_meta( $post_id, 'local_file_path', true );
-				if ( ! $path ) {
-					return;
-				}
-				$fs = self::get_data_source()->get_filesystem();
-				$fs->put_contents( $path, $content, [
-					'message' => 'User saved ' . $post->post_title,
-				] );
-			} finally {
-				self::release_synchronization_lock();
-			}
-		}, 10, 3 );
+            $updating_post = $processed_post['post_type'] === WP_LOCAL_FILE_POST_TYPE && $update;
+            $should_run = $updating_post || $creating_revision;
+            if(!$should_run) {
+                return $processed_post;
+            }
 
-		// Also update file when autosave occurs
-		add_action( 'wp_creating_autosave', function ( $autosave ) {
-			try {
-				if ( ! self::acquire_synchronization_lock() ) {
-					return;
-				}
-				$autosave = (object) $autosave;
-				if (
-					empty( $autosave->ID ) ||
-					$autosave->post_status !== 'inherit' ||
-					$autosave->post_type !== 'revision'
-				) {
-					return;
-				}
-				$parent_post = get_post( $autosave->post_parent );
-				if ( $parent_post->post_type !== WP_LOCAL_FILE_POST_TYPE ) {
-					return;
-				}
+            $post_id = $creating_revision ? $processed_post['post_parent'] : $unprocessed_post['ID'];
+            
+            $is_running_wp_insert_post_data = true;
+            try {
+                $db_post = get_post($post_id);
+                $path    = get_post_meta( $post_id, 'local_file_path', true );
+    
+                $fs_post = self::local_file_to_post_entity( $path );
+                if(!$fs_post) {
+                    return $processed_post;
+                }
 
-				$content = self::convert_post_to_string( $autosave );
 
-				$path = wp_join_paths(
-					'/' . WP_AUTOSAVES_DIRECTORY . '/',
-					get_post_meta( $parent_post->ID, 'local_file_path', true )
-				);
-				$fs = self::get_data_source()->get_filesystem();
-				$fs->put_contents( $path, $content, [
-					'amend' => true,
-				] );
-			} finally {
-				self::release_synchronization_lock();
-			}
-		}, 10, 1 );
+                if($fs_post['post_content']) {
+                    /**
+                     * Local file content is up to date with the last version indexed in the
+                     * database. No need to merge.
+                     */
+                    if($fs_post['post_content'] === $db_post->post_content) {
+                        return $processed_post;
+                    }
+                    
+                    /**
+                     * Uh-oh, the database content is different from the local file content!
+                     * Let's perform a three-way merge.
+                     */
+                    $proposed_content = wp_unslash($processed_post['post_content']);
+                    $merge_strategy = new MergeStrategy(
+                        new MyersDiffer(),
+                        new ChunkMerger(),
+                        new BlockMarkupMergeValidator()
+                    );
+
+                    $merge_result = $merge_strategy->merge(
+                        trim($db_post->post_content),
+                        trim($fs_post['post_content']),
+                        trim($proposed_content)
+                    );
+
+                    if($merge_result->has_conflicts()) {
+                        /**
+                         * We could not resolve the conflicts.
+                         *
+                         * Let's overwrite the post content with the block editor contents and
+                         * ignore the local file content.
+                         *
+                         * However, to avoid data loss, let's create a post revision with the
+                         * filesystem content. It can be recovered as long as the app is running.
+                         *
+                         * @TODO: Add a standardized "overwrite_on_conflict" mechanics with
+                         *        custom logic for each data source. In git, it would be a commit.
+                         *        In a local filesystem, it would be a file in the "conflicts" directory.
+                         */
+                        $revision_data = [
+                            'post_content' => $fs_post['post_content'],
+                            'post_title'   => $fs_post['post_title'],
+                            'post_parent'  => $post_id,
+                            'post_type'    => 'revision',
+                            'post_status'  => 'inherit',
+                            'post_author'  => get_current_user_id(),
+                            // @TODO: Also store $fs_post metadata in the revision.
+                        ];
+                        wp_insert_post( $revision_data );
+                    } else {
+                        /**
+                         * The merge was successful.
+                         *
+                         * Let's store the merged content in the database (and use it in the REST
+                         * API response so the client can live update the post content).
+                         */
+                        $processed_post['post_content'] = wp_slash($merge_result->get_merged_content());
+                        $unprocessed_post['post_content'] = $processed_post['post_content'];
+                    }
+                }
+
+                // @TODO: Don't run a separate merge. Instead, run merge on the block markup
+                //        representation of the entire post.
+                // if(isset($processed_post['post_title'])) {
+                //     $title_merge_result = $merge_strategy->merge( $db_post->post_title, $fs_post['post_title'], $unprocessed_post['post_title'] );
+                //     if(!$title_merge_result->has_conflicts()) {
+                //         $processed_post['post_title'] = wp_slash($title_merge_result->get_merged_content());
+                //         $unprocessed_post['post_title'] = $processed_post['post_title'];
+                //     }
+                // }
+
+                if ( $creating_revision ) {
+                    // Update the parent post
+                    $update = array( 'ID' => $post_id );
+                    if(isset($processed_post['post_content'])) {
+                        $update['post_content'] = $processed_post['post_content'];
+                    }
+                    if(isset($processed_post['post_title'])) {
+                        $update['post_title'] = $processed_post['post_title'];
+                    }
+                    wp_update_post( $update );
+                    $new_static_file_content = self::convert_post_to_string( get_post( $post_id ) );
+                } else {
+                    $new_static_file_content = self::convert_post_to_string( wp_unslash( (object) $unprocessed_post ) );
+                }
+
+                $fs = self::get_data_source()->get_filesystem();
+                $fs->put_contents(
+                    $path,
+                    $new_static_file_content,
+                    [
+                        'message' => 'User saved ' . basename($path),
+                        'amend' => $creating_revision,
+                    ]
+                );
+                return $processed_post;
+            } finally {
+                $is_running_wp_insert_post_data = false;
+            }
+        }, 10, 4 );
+
+        /**
+         * Store autosaves in the data source.
+         */
+		// add_action( 'wp_creating_autosave', function ( $autosave ) {
+		// 	try {
+		// 		if ( ! self::acquire_synchronization_lock() ) {
+		// 			return;
+		// 		}
+		// 		$autosave = (object) $autosave;
+		// 		if (
+		// 			empty( $autosave->ID ) ||
+		// 			$autosave->post_status !== 'inherit' ||
+		// 			$autosave->post_type !== 'revision'
+		// 		) {
+		// 			return;
+		// 		}
+		// 		$parent_post = get_post( $autosave->post_parent );
+		// 		if ( $parent_post->post_type !== WP_LOCAL_FILE_POST_TYPE ) {
+		// 			return;
+		// 		}
+
+		// 		$content = self::convert_post_to_string( $autosave );
+
+		// 		$path = get_post_meta( $parent_post->ID, 'local_file_path', true );
+		// 		$fs = self::get_data_source()->get_filesystem();
+        //         if(!$fs->is_file($path)) {
+        //             return;
+        //         }
+		// 		$fs->put_contents( $path, $content, [
+		// 			'amend' => true,
+		// 		] );
+		// 	} finally {
+		// 		self::release_synchronization_lock();
+		// 	}
+		// }, 10, 1 );
 	}
 
 	/**
@@ -652,54 +805,67 @@ class WP_Static_Files_Editor_Plugin {
 				return false;
 			}
 
-			$post_id = $post->ID;
-            $fs      = self::get_data_source()->get_filesystem();
-			$path    = get_post_meta( $post_id, 'local_file_path', true );
-			if ( ! $fs->is_file( $path ) ) {
-				// @TODO: Log the error outside of this method.
-				//        This happens naturally when the underlying file is deleted.
-				//        It's annoying to keep seeing this error when developing
-				//        the plugin so I'm commenting it out.
-				//
-				//        Really, this may not even be an error. The caller must
-				//        decide whether to log the error or handle the failure
-				//        gracefully.
-				//
-				//        This method only needs to bubble the error information up,
-				//        e.g. by throwing, returning WP_Error, or setting self::$last_error.
-				return false;
-			}
-			$content = $fs->get_contents( $path );
-			if ( ! is_string( $content ) ) {
-				// @TODO: Ditto the previous comment.
-				return false;
-			}
-			$extension = pathinfo( $path, PATHINFO_EXTENSION );
-			$converter = self::parse_local_file( $content, $extension );
-			if ( ! $converter ) {
-				return false;
-			}
+			$path    = get_post_meta( $post->ID, 'local_file_path', true );
+            $entity  = self::local_file_to_post_entity( $path );
+            if($entity['post_content'] === $post->post_content) {
+                return $post->post_content;
+            }
 
-			$new_content = self::wordpressify_static_assets_urls(
-				$converter->get_block_markup()
-			);
-			$updated     = wp_update_post( array(
-				'ID'            => $post_id,
-				'post_content'  => $new_content,
-				'post_title'    => $converter->get_first_meta_value( 'post_title' ) ?? '',
-				'post_date_gmt' => $converter->get_first_meta_value( 'post_date_gmt' ) ?? '',
-				'menu_order'    => $converter->get_first_meta_value( 'menu_order' ) ?? '',
-				// 'meta_input' => $converter->get_all_metadata(),
+			$updated = wp_update_post( array(
+				'ID' => $post->ID,
+                ...$entity,
 			) );
 			if ( is_wp_error( $updated ) ) {
 				return $updated;
 			}
 
-			return $new_content;
+			return $entity['post_content'];
 		} finally {
 			self::release_synchronization_lock();
 		}
 	}
+
+    /**
+     * @TODO: Use an importer for that instead of hardcoding the logic here.
+     */
+	static private function local_file_to_post_entity( $path ) {
+        $fs      = self::get_data_source()->get_filesystem();
+        if ( ! $fs->is_file( $path ) ) {
+            // @TODO: Log the error outside of this method.
+            //        This happens naturally when the underlying file is deleted.
+            //        It's annoying to keep seeing this error when developing
+            //        the plugin so I'm commenting it out.
+            //
+            //        Really, this may not even be an error. The caller must
+            //        decide whether to log the error or handle the failure
+            //        gracefully.
+            //
+            //        This method only needs to bubble the error information up,
+            //        e.g. by throwing, returning WP_Error, or setting self::$last_error.
+            return false;
+        }
+        $content = $fs->get_contents( $path );
+        if ( ! is_string( $content ) ) {
+            // @TODO: Ditto the previous comment.
+            return false;
+        }
+        $extension = pathinfo( $path, PATHINFO_EXTENSION );
+        $converter = self::parse_local_file( $content, $extension );
+        if ( ! $converter ) {
+            return false;
+        }
+
+        $new_content = self::wordpressify_static_assets_urls(
+            $converter->get_block_markup()
+        );
+        return array(
+            'post_content'  => $new_content,
+            'post_title'    => $converter->get_first_meta_value( 'post_title' ) ?? '',
+            'post_date_gmt' => $converter->get_first_meta_value( 'post_date_gmt' ) ?? '',
+            'menu_order'    => $converter->get_first_meta_value( 'menu_order' ) ?? '',
+            // 'meta_input' => $converter->get_all_metadata(),
+        );
+    }
 
 	static private function parse_local_file( $content, $format ) {
 		switch ( $format ) {
@@ -736,7 +902,9 @@ class WP_Static_Files_Editor_Plugin {
 
 		$metadata = [];
 		foreach ( [ 'post_date_gmt', 'post_title', 'menu_order' ] as $key ) {
-			$metadata[ $key ] = [ get_post_field( $key, $post->ID ) ];
+			$metadata[ $key ] = [ 
+                get_post_field( $key, $post->ID )
+            ];
 		}
 		// @TODO: Also include actual post_meta. Which ones? All? The
 		//        ones explicitly set by the user in the editor?
@@ -1444,13 +1612,13 @@ class WP_Static_Files_Editor_Plugin {
 		return new WP_REST_Response( 'Settings saved successfully', 200 );
 	}
 
-	static public function local_files_refresh_index( $request ) {
+	static public function local_files_pull_updates( $request ) {
 		try {
 			if ( ! self::acquire_synchronization_lock() ) {
 				return new WP_REST_Response( 'Failed to acquire synchronization lock', 500 );
 			}
 			try {
-                self::get_data_source()->refresh_index();
+                self::get_data_source()->pull_updates();
 			} catch ( Exception $e ) {
 				return new WP_REST_Response( 'Refreshing index failed: ' . $e->getMessage(), 500 );
 			}

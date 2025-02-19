@@ -113,7 +113,7 @@ class MarkdownConsumer implements DataFormatConsumer {
 								'level' => $node->getLevel(),
 							)
 						);
-						$this->append_content( '<h' . $node->getLevel() . '>' );
+						$this->append_content( '<h' . $node->getLevel() . ' class="wp-block-heading">' );
 						break;
 
 					case ExtensionBlock\ListBlock::class:
@@ -401,7 +401,7 @@ BLOCK;
 	private function pop_block() {
 		if ( ! empty( $this->block_stack ) ) {
 			$popped              = array_pop( $this->block_stack );
-			$this->block_markup .= ImportUtils::block_closer( $popped->block_name ) . "\n";
+			$this->block_markup .= "\n" . ImportUtils::block_closer( $popped->block_name ) . "\n\n";
 			return $popped;
 		}
 	}

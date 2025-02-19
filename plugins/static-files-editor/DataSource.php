@@ -7,7 +7,7 @@ use WordPress\Git\GitRemote;
 use WordPress\Git\GitRepository;
 
 interface DataSource {
-    public function refresh_index();
+    public function pull_updates();
     public function get_filesystem(): Filesystem;
 }
 
@@ -55,7 +55,7 @@ class GitDataSource implements DataSource {
         );
     }
 
-    public function refresh_index() {
+    public function pull_updates() {
         $this->remote->pull( $this->full_branch_name, [
             'path' => $this->subdirectory,
         ] );
@@ -74,7 +74,7 @@ class LocalDirectoryDataSource implements DataSource {
         $this->local_filesystem = $local_filesystem;
     }
 
-    public function refresh_index() {
+    public function pull_updates() {
         // No op
     }
 
