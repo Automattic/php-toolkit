@@ -26,7 +26,6 @@ use WordPress\Filesystem\InMemoryFilesystem;
 use WordPress\Filesystem\LocalFilesystem;
 use WordPress\Filesystem\UploadedFilesystem;
 use WordPress\Filesystem\Visitor\FilesystemVisitor;
-use WordPress\Git\GitException;
 use WordPress\Git\GitFilesystem;
 use WordPress\Git\GitRemote;
 use WordPress\Git\GitRepository;
@@ -67,87 +66,48 @@ if ( isset( $_GET['dump'] ) ) {
 }
 
 require_once __DIR__ . '/data-source-page.php';
+require_once __DIR__ . '/DataSource.php';
 
 class WP_Static_Files_Editor_Plugin {
 
 	/**
-	 * @var GitFilesystem
+	 * @var DataSource
 	 */
-	static private $fs;
+	static private $data_source;
 
-	/**
-	 * @var GitRemote
-	 */
-	static private $remote;
-
-	static private function get_fs() {
-		if ( ! self::$fs ) {
-			if ( ! is_dir( WP_STATIC_PAGES_DIR ) ) {
-				mkdir( WP_STATIC_PAGES_DIR, 0777, true );
-			}
-			if ( ! self::is_git_configured() ) {
-				throw new RuntimeException( 'No git repo configured' );
-			}
-
-			$config   = static::get_settings();
-			$local_fs = LocalFilesystem::create( WP_STATIC_PAGES_DIR );
-			$repo     = new GitRepository( $local_fs );
-			$repo->add_remote( 'origin', $config['gitRepo'] );
-			$repo->set_branch_tip( 'HEAD', 'ref: refs/heads/' . $config['selectedBranch'] );
-			$repo->set_config_value( 'user.name', $config['gitUserName'] );
-			$repo->set_config_value( 'user.email', $config['gitUserEmail'] );
-
-			self::$remote = new GitRemote( $repo, 'origin' );
-
-			// Only force pull at most once every 10 minutes
-			$last_pull_time = get_transient( 'wp_git_last_pull_time' );
-			if ( ! $last_pull_time ) {
-				set_transient( 'wp_git_last_pull_time', time(), 10 * MINUTE_IN_SECONDS );
-				// self::pull();
-			}
-
-			self::$fs = GitFilesystem::create(
-				$repo,
-				[
-					'root'      => $config['pathToSync'],
-					'auto_push' => true,
-					'remote'    => self::$remote,
-				]
-			);
-
-			// @TODO: Uncomment
-			// if(!self::$fs->is_dir('/' . WP_AUTOSAVES_DIRECTORY)) {
-			//     self::$fs->mkdir('/' . WP_AUTOSAVES_DIRECTORY);
-			// }
-		}
-
-		return self::$fs;
-	}
-
-	static public function pull( $options = [] ) {
-		if ( ! self::is_git_configured() ) {
-			throw new RuntimeException( 'No git repo configured' );
-		}
-
-		$config = static::get_settings();
-		self::get_fs();
-
-		return self::$remote->pull(
-			$config['selectedBranch'],
-			array_merge( [
-				'path' => $config['pathToSync'],
-			], $options )
-		);
-	}
-
-	static public function is_git_configured() {
+	static public function is_data_source_configured() {
+        return true;
 		$config = static::get_settings();
 
 		return $config['gitRepo'] && $config['selectedBranch'];
 	}
 
+	static private function get_data_source() {
+		if ( ! self::$data_source ) {
+            return new LocalDirectoryDataSource(
+                LocalFilesystem::create( __DIR__ . '/notes' )
+            );
+
+			if ( ! self::is_data_source_configured() ) {
+				throw new RuntimeException( 'No data source configured' );
+			}
+            self::$data_source = GitDataSource::create(
+                static::get_settings()
+            );
+
+			// Update the local index once every 10 minutes
+			$last_pull_time = get_transient( 'wp_git_last_pull_time' );
+			if ( ! $last_pull_time ) {
+				set_transient( 'wp_git_last_pull_time', time(), 10 * MINUTE_IN_SECONDS );
+				self::$data_source->refresh_index();
+			}
+		}
+
+		return self::$data_source;
+	}
+
 	static public function menu_item_callback() {
-		if ( ! self::is_git_configured() ) {
+		if ( ! self::is_data_source_configured() ) {
 			wp_redirect( admin_url( 'admin.php?page=static_files_editor-data-source&error=no_data_source' ) );
 			exit( 'Please configure a data source in the settings page before continuing.' );
 		}
@@ -162,11 +122,11 @@ class WP_Static_Files_Editor_Plugin {
 
 		if ( empty( $posts ) ) {
 			try {
-				self::pull();
+				self::get_data_source()->refresh_index();
 				wp_redirect( admin_url( 'post-new.php?post_type=' . WP_LOCAL_FILE_POST_TYPE ) );
 				exit;
-			} catch ( GitException $e ) {
-				// There are more ways to get here than just the new GitException above.
+			} catch ( Exception $e ) {
+				// There are more ways to get here than just the new Exception above.
 				wp_redirect( admin_url( 'admin.php?page=static_files_editor-data-source&error=no_data_source' ) );
 				exit( 'Please configure a data source in the settings page before continuing.' );
 			}
@@ -194,7 +154,7 @@ class WP_Static_Files_Editor_Plugin {
 	static public function initialize() {
 		// Register hooks
 		register_activation_hook( __FILE__, function () {
-			if ( self::is_git_configured() ) {
+			if ( self::is_data_source_configured() ) {
 				self::import_static_pages();
 			}
 		} );
@@ -207,10 +167,6 @@ class WP_Static_Files_Editor_Plugin {
 
 		add_action( 'init', function () {
 			self::register_post_type();
-			if ( self::is_git_configured() ) {
-				self::get_fs();
-			}
-
 			// Redirect menu page to custom route
 			global $pagenow;
 			if ( $pagenow === 'admin.php' && isset( $_GET['page'] ) && $_GET['page'] === 'static_files_editor' ) {
@@ -251,13 +207,13 @@ class WP_Static_Files_Editor_Plugin {
 
 				$file_path = self::resize_to_max_dimensions_if_files_is_an_image( $file_path );
 
-				$main_fs  = self::get_fs();
 				$local_fs = LocalFilesystem::create( dirname( $file_path ) );
 
 				$file_name   = basename( $file_path );
 				$target_path = wp_join_paths( WP_STATIC_MEDIA_DIR, $file_name );
 
 				// Skip if the file was already processed
+				$main_fs  = self::get_data_source()->get_filesystem();
 				if ( $main_fs->is_file( $target_path ) ) {
 					return $metadata;
 				}
@@ -300,13 +256,13 @@ class WP_Static_Files_Editor_Plugin {
 
 				$file_path = self::resize_to_max_dimensions_if_files_is_an_image( $file_path );
 
-				$main_fs  = self::get_fs();
 				$local_fs = LocalFilesystem::create( dirname( $file_path ) );
 
 				$file_name   = basename( $file_path );
 				$target_path = wp_join_paths( WP_STATIC_MEDIA_DIR, $file_name );
 
 				// Skip if the file was already processed
+				$main_fs  = self::get_data_source()->get_filesystem();
 				if ( $main_fs->is_file( $target_path ) ) {
 					return $metadata;
 				}
@@ -398,9 +354,9 @@ class WP_Static_Files_Editor_Plugin {
 				},
 			) );
 
-			register_rest_route( 'static-files-editor/v1', '/git/force-pull', array(
+			register_rest_route( 'static-files-editor/v1', '/git/refresh-index', array(
 				'methods'             => 'POST',
-				'callback'            => array( self::class, 'git_force_pull_endpoint' ),
+				'callback'            => array( self::class, 'local_files_refresh_index' ),
 				'permission_callback' => function () {
 					return current_user_can( 'edit_posts' );
 				},
@@ -539,11 +495,11 @@ class WP_Static_Files_Editor_Plugin {
 
 				$content = self::convert_post_to_string( $post );
 
-				$fs   = self::get_fs();
 				$path = get_post_meta( $post_id, 'local_file_path', true );
 				if ( ! $path ) {
 					return;
 				}
+				$fs = self::get_data_source()->get_filesystem();
 				$fs->put_contents( $path, $content, [
 					'message' => 'User saved ' . $post->post_title,
 				] );
@@ -577,7 +533,7 @@ class WP_Static_Files_Editor_Plugin {
 					'/' . WP_AUTOSAVES_DIRECTORY . '/',
 					get_post_meta( $parent_post->ID, 'local_file_path', true )
 				);
-				$fs   = self::get_fs();
+				$fs = self::get_data_source()->get_filesystem();
 				$fs->put_contents( $path, $content, [
 					'amend' => true,
 				] );
@@ -638,7 +594,7 @@ class WP_Static_Files_Editor_Plugin {
 
 	static public function download_file_endpoint( $request ) {
 		$path = wp_canonicalize_path( $request->get_param( 'path' ) );
-		$fs   = self::get_fs();
+        $fs = self::get_data_source()->get_filesystem();
 
 		if ( $fs->is_dir( $path ) ) {
 			return new WP_Error( 'file_error', 'Directory download is not supported yet.' );
@@ -673,7 +629,7 @@ class WP_Static_Files_Editor_Plugin {
 			return false;
 		}
 
-		if ( ! self::get_fs() ) {
+		if ( ! self::is_data_source_configured() ) {
 			return false;
 		}
 
@@ -697,7 +653,7 @@ class WP_Static_Files_Editor_Plugin {
 			}
 
 			$post_id = $post->ID;
-			$fs      = self::get_fs();
+            $fs      = self::get_data_source()->get_filesystem();
 			$path    = get_post_meta( $post_id, 'local_file_path', true );
 			if ( ! $fs->is_file( $path ) ) {
 				// @TODO: Log the error outside of this method.
@@ -897,11 +853,9 @@ class WP_Static_Files_Editor_Plugin {
 
 	static public function get_local_files_list( $subdirectory = '' ) {
 		$list = [];
-		$fs   = self::get_fs();
-		if ( ! $fs ) {
-			return $list;
-		}
-
+        if(!self::is_data_source_configured()) {
+            return $list;
+        }
 		// Get all file paths and post IDs in one query
 		$file_posts = get_posts( array(
 			'post_type'      => WP_LOCAL_FILE_POST_TYPE,
@@ -931,6 +885,7 @@ class WP_Static_Files_Editor_Plugin {
 		}
 
 		$base_dir = $subdirectory ? $subdirectory : '/';
+		$fs   = self::get_data_source()->get_filesystem();
 		self::build_local_file_list( $fs, $base_dir, $list, $path_to_post );
 
 		$keyed_list = [];
@@ -1010,12 +965,12 @@ class WP_Static_Files_Editor_Plugin {
 		// Prevent ID conflicts
 		self::reset_db_data();
 
-		if ( ! self::get_fs() ) {
+		if ( ! self::is_data_source_configured() ) {
 			return;
 		}
 
 		return self::do_import_static_pages( [
-			'from_filesystem' => self::get_fs(),
+			'from_filesystem' => self::get_data_source()->get_filesystem(),
 		] );
 	}
 
@@ -1137,7 +1092,7 @@ class WP_Static_Files_Editor_Plugin {
 	}
 
 	static private function get_or_create_post_for_file( $file_path, $create_file = false ) {
-		$fs = self::get_fs();
+		$fs   = self::get_data_source()->get_filesystem();
 		if ( $create_file && ! $fs->is_file( $file_path ) ) {
 			$fs->put_contents( $file_path, '' );
 		}
@@ -1178,7 +1133,7 @@ class WP_Static_Files_Editor_Plugin {
 			}
 			$path    = wp_canonicalize_path( $request->get_param( 'path' ) );
 			$content = $request->get_param( 'content' );
-			$fs      = self::get_fs();
+            $fs   = self::get_data_source()->get_filesystem();
 			if ( ! $fs->is_dir( dirname( $path ) ) ) {
 				$fs->mkdir( dirname( $path ), [ 'recursive' => true ] );
 			}
@@ -1206,7 +1161,7 @@ class WP_Static_Files_Editor_Plugin {
 				return new WP_Error( 'missing_path', 'Both source and target paths are required' );
 			}
 
-			$fs = self::get_fs();
+            $fs   = self::get_data_source()->get_filesystem();
 			if ( $fs->is_file( $from_path ) ) {
 				// Find and update associated post
 				$previous_content = $fs->get_contents( $from_path );
@@ -1300,7 +1255,7 @@ class WP_Static_Files_Editor_Plugin {
 			$uploaded_fs = UploadedFilesystem::create( $request, 'content' );
 
 			// Copy the uploaded files to the main filesystem
-			$main_fs       = self::get_fs();
+		    $main_fs   = self::get_data_source()->get_filesystem();
 			$create_in_dir = wp_canonicalize_path( $request->get_param( 'path' ) );
 			copy_between_filesystems( [
 				'source_filesystem' => $uploaded_fs,
@@ -1457,7 +1412,7 @@ class WP_Static_Files_Editor_Plugin {
 			}
 
 			// Delete the actual file
-			$fs = self::get_fs();
+		    $fs = self::get_data_source()->get_filesystem();
 			if ( $fs->is_dir( $path ) ) {
 				if ( ! $fs->rmdir( $path, [ 'recursive' => true ] ) ) {
 					return new WP_Error( 'delete_failed', 'Failed to delete directory' );
@@ -1477,32 +1432,30 @@ class WP_Static_Files_Editor_Plugin {
 	static public function save_settings_endpoint( WP_REST_Request $request ) {
 		$gitRepo        = $request->get_param( 'gitRepo' );
 		$selectedBranch = $request->get_param( 'selectedBranch' );
-		$pathToSync     = $request->get_param( 'pathToSync' );
+		$subdirectory     = $request->get_param( 'subdirectory' );
 
 		$new_settings = array(
 			'gitRepo'        => $gitRepo,
 			'selectedBranch' => $selectedBranch,
-			'pathToSync'     => $pathToSync,
+			'subdirectory'     => $subdirectory,
 		);
 		update_option( 'static_files_editor_settings', $new_settings );
 
 		return new WP_REST_Response( 'Settings saved successfully', 200 );
 	}
 
-	static public function git_force_pull_endpoint( $request ) {
+	static public function local_files_refresh_index( $request ) {
 		try {
 			if ( ! self::acquire_synchronization_lock() ) {
 				return new WP_REST_Response( 'Failed to acquire synchronization lock', 500 );
 			}
 			try {
-				self::pull( [
-					'force' => true,
-				] );
+                self::get_data_source()->refresh_index();
 			} catch ( Exception $e ) {
-				return new WP_REST_Response( 'Force pull failed: ' . $e->getMessage(), 500 );
+				return new WP_REST_Response( 'Refreshing index failed: ' . $e->getMessage(), 500 );
 			}
 
-			return new WP_REST_Response( 'Force pull completed', 200 );
+			return new WP_REST_Response( 'Index refreshed', 200 );
 		} finally {
 			self::release_synchronization_lock();
 		}
@@ -1516,7 +1469,7 @@ class WP_Static_Files_Editor_Plugin {
 		$settings = array_merge( array(
 			'gitRepo'        => '',
 			'selectedBranch' => '',
-			'pathToSync'     => '/',
+			'subdirectory'     => '/',
 			'localRepoPath'  => $uploads_dir['basedir'] . '/static-files-editor',
 			'gitUserName'    => $user->display_name ?? 'WordPress User',
 			'gitUserEmail'   => $user->user_email ?? 'wordpress.admin@localhost',

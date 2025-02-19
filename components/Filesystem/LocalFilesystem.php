@@ -22,6 +22,11 @@ class LocalFilesystem implements Filesystem {
 	private $root;
 
 	public static function create( $root = '/' ) {
+        if(!is_dir($root)) {
+            if(false === mkdir($root, 0755, true)) {
+                throw new FilesystemException(sprintf('Root directory did not exist and could not be created: %s', $root));
+            }
+        }
 		return new ChrootLayer(
 			new LocalFilesystem( $root ),
 			$root

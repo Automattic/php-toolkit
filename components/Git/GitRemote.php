@@ -250,7 +250,8 @@ class GitRemote {
 		return $blobs_oids;
 	}
 
-	public function pull( $full_branch_name, $options = array() ) {
+	public function pull( $full_branch_name=null, $options = array() ) {
+        $full_branch_name = $full_branch_name ?? $this->repository->get_current_branch_name();
 		$path = $options['path'] ?? '/';
 
 		if ( isset( $options['path'] ) && $options['path'] ) {
@@ -267,7 +268,7 @@ class GitRemote {
 			$remote_head = $this->fetch( $full_branch_name, array() );
 		}
 
-		$local_head = $this->repository->get_branch_tip( 'HEAD' );
+		$local_head = $this->repository->get_branch_tip( $full_branch_name );
 		if ( Commit::is_null_hash( $local_head ) ) {
 			// If the local head is an unborn branch, there's nothing to merge.
 			// We just pull and point the head to the remote head.

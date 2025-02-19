@@ -538,3 +538,30 @@ const closeInserterOnBlockInsert = () => {
 };
 
 closeInserterOnBlockInsert();
+
+// Subscribe to the entity record and resetBlocks() whenever it changes
+const replaceEditorContentOnEntityChange = () => {
+	let previousPost = select(coreStore).getEntityRecord('postType', 'post', select(editorStore).getCurrentPostId());
+
+	subscribe(() => {
+		const postId = select(editorStore).getCurrentPostId();
+		const currentPost = select(coreStore).getEntityRecord('postType', 'post', postId);
+
+		if (currentPost && currentPost.content.raw !== previousPost.content.raw) {
+			const blockMarkup = currentPost.content.raw;
+			dispatch(blockEditorStore).resetBlocks(blockMarkup);
+			previousPost = currentPost;
+		}
+	});
+};
+
+replaceEditorContentOnEntityChange();
+
+/*
+window.wp.data.dispatch(window.wp.blockEditor.store).resetBlocks(window.wp.blocks.parse(`<!-- wp:heading {"level":3} -->
+<h3>Devex</h3><!-- /wp:heading -->
+<!-- wp:list {"ordered":false} -->
+<ul class="wp-block-list"><!-- wp:list-item -->
+<li>Easy PHP plugin testing inside Playground – mount the plugin files from a local directory. That must happen in the UI and we need an "override" button somewhere. Ideally that would be a Blueprints builder, but maybe we can start with a list of resources and "override" buttons in the site details in Playground?</li><!-- /wp:list-item -->
+</ul><!-- /wp:list -->`))
+*/

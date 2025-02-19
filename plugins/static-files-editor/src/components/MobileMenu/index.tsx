@@ -21,7 +21,7 @@ const MobileMenu: React.FC = () => {
 		setIsPulling(true);
 		try {
 			await apiFetch({
-				path: '/static-files-editor/v1/git/force-pull',
+				path: '/static-files-editor/v1/git/refresh-index',
 				method: 'POST',
 			});
 			dispatch(noticesStore).createSuccessNotice(
@@ -73,7 +73,7 @@ const MobileMenu: React.FC = () => {
 				}}
 				className={css.menuItem}
 			>
-				{isPulling ? <Spinner /> : 'Force pull'}
+				{isPulling ? <Spinner /> : 'Pull changes'}
 			</a>
 			<a href="/wp-admin/" className={css.menuItem}>
 				WP Admin

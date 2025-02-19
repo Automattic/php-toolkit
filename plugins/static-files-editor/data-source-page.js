@@ -18,8 +18,8 @@ const { state, actions } = store('staticFiles', {
         updateSelectedBranch(e) {
             state.selectedBranch = e.target.value;
         },
-        updatePathToSync(e) {
-            state.pathToSync = e.target.value;
+        updateSubdirectory(e) {
+            state.subdirectory = e.target.value;
         },
         async onGitRepoInputEnter(e) {
             if(e.key === 'Enter') {
@@ -64,7 +64,7 @@ const { state, actions } = store('staticFiles', {
                     data: {
                         gitRepo: state.gitRepo,
                         selectedBranch: state.selectedBranch,
-                        pathToSync: state.pathToSync,
+                        subdirectory: state.subdirectory,
                     },
                 });
                 state.notices.push({
@@ -81,7 +81,7 @@ const { state, actions } = store('staticFiles', {
         async forcePull() {
             try {
                 const response = await apiFetch({
-                    path: '/static-files-editor/v1/git/force-pull',
+                    path: '/static-files-editor/v1/git/refresh-index',
                     method: 'POST',
                 });
                 state.notices.push({

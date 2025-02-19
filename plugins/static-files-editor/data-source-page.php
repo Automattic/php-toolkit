@@ -37,7 +37,7 @@ function msf_render_data_source() {
         array_merge(
             array(
                 'branches' => $branches,
-                'pathToSync' => '/',
+                'subdirectory' => '/',
             ),
             $config,
             array(
@@ -99,7 +99,7 @@ function msf_render_data_source() {
                     <tr>
                         <th scope="row">Path to synchronize</th>
                         <td>
-                            <input type="text" class="regular-text" data-wp-bind--value="state.pathToSync" data-wp-on--input="actions.updatePathToSync" />
+                            <input type="text" class="regular-text" data-wp-bind--value="state.subdirectory" data-wp-on--input="actions.updateSubdirectory" />
                         </td>
                     </tr>
                 </table>
