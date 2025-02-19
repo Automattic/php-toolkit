@@ -508,8 +508,6 @@ class WP_Static_Files_Editor_Plugin {
          *
          * This is used to reconcile changes made in the block editor with
          * changes made in the local file.
-         * 
-         * @TODO: Also merge meta data, post title, etc.
          */
         $is_running_wp_insert_post_data = false;
 		add_action( 'wp_insert_post_data', function ( $processed_post, $unprocessed_post, $unsanitized_postarr, $update ) use (&$is_running_wp_insert_post_data) {
@@ -550,13 +548,17 @@ class WP_Static_Files_Editor_Plugin {
             try {
                 $db_post = get_post($post_id);
                 $path    = get_post_meta( $post_id, 'local_file_path', true );
-    
+                $format  = pathinfo($path, PATHINFO_EXTENSION);
+                if(!$format) {
+                    $format = 'html';
+                }
+
                 $fs_post = self::local_file_to_post_entity( $path );
                 if(!$fs_post) {
                     return $processed_post;
                 }
 
-
+                $blocks_with_metadata = self::post_entity_to_blocks_with_metadata($unprocessed_post);
                 if($fs_post['post_content']) {
                     /**
                      * Local file content is up to date with the last version indexed in the
@@ -565,22 +567,25 @@ class WP_Static_Files_Editor_Plugin {
                     if($fs_post['post_content'] === $db_post->post_content) {
                         return $processed_post;
                     }
-                    
+
                     /**
                      * Uh-oh, the database content is different from the local file content!
                      * Let's perform a three-way merge.
                      */
-                    $proposed_content = wp_unslash($processed_post['post_content']);
                     $merge_strategy = new MergeStrategy(
                         new MyersDiffer(),
                         new ChunkMerger(),
                         new BlockMarkupMergeValidator()
                     );
 
+                    /**
+                     * Three-way merge the post entities in an annotated block markup
+                     * format that includes all the relevant metadata.
+                     */
                     $merge_result = $merge_strategy->merge(
-                        trim($db_post->post_content),
-                        trim($fs_post['post_content']),
-                        trim($proposed_content)
+                        self::post_entity_to_annotated_block_markup((array)$db_post),
+                        self::post_entity_to_annotated_block_markup($fs_post),
+                        self::post_entity_to_annotated_block_markup(wp_unslash((array)$unprocessed_post))
                     );
 
                     if($merge_result->has_conflicts()) {
@@ -608,40 +613,43 @@ class WP_Static_Files_Editor_Plugin {
                         ];
                         wp_insert_post( $revision_data );
                     } else {
+                        $blocks_with_metadata = self::annotated_block_markup_to_blocks_with_metadata($merge_result->get_merged_content());
+                        $delta_post = array(
+                            'post_content' => $blocks_with_metadata->get_block_markup(),
+                            ...$blocks_with_metadata->get_all_metadata(['first_value_only' => true]),
+                        );
                         /**
                          * The merge was successful.
                          *
                          * Let's store the merged content in the database (and use it in the REST
                          * API response so the client can live update the post content).
+                         * 
+                         * @TODO: A generic way of merging post entities. This one is naive and won't
+                         *        remove fields $processed_post that were deleted in $merged_post_entity.
                          */
-                        $processed_post['post_content'] = wp_slash($merge_result->get_merged_content());
-                        $unprocessed_post['post_content'] = $processed_post['post_content'];
+                        $processed_post = array_merge($processed_post, wp_slash($delta_post));
+                        $unprocessed_post = array_merge($unprocessed_post, wp_slash($delta_post));
                     }
                 }
 
-                // @TODO: Don't run a separate merge. Instead, run merge on the block markup
-                //        representation of the entire post.
-                // if(isset($processed_post['post_title'])) {
-                //     $title_merge_result = $merge_strategy->merge( $db_post->post_title, $fs_post['post_title'], $unprocessed_post['post_title'] );
-                //     if(!$title_merge_result->has_conflicts()) {
-                //         $processed_post['post_title'] = wp_slash($title_merge_result->get_merged_content());
-                //         $unprocessed_post['post_title'] = $processed_post['post_title'];
-                //     }
-                // }
-
                 if ( $creating_revision ) {
                     // Update the parent post
-                    $update = array( 'ID' => $post_id );
-                    if(isset($processed_post['post_content'])) {
-                        $update['post_content'] = $processed_post['post_content'];
-                    }
-                    if(isset($processed_post['post_title'])) {
-                        $update['post_title'] = $processed_post['post_title'];
-                    }
-                    wp_update_post( $update );
-                    $new_static_file_content = self::convert_post_to_string( get_post( $post_id ) );
+                    // $update = array( 'ID' => $post_id );
+                    // if(isset($processed_post['post_content'])) {
+                    //     $update['post_content'] = $processed_post['post_content'];
+                    // }
+                    // if(isset($processed_post['post_title'])) {
+                    //     $update['post_title'] = $processed_post['post_title'];
+                    // }
+                    // wp_update_post( $update );
+                    // $new_static_file_content = self::serialize_post_to_string(
+                    //     self::post_entity_to_blocks_with_metadata(get_post( $post_id ))
+                    // );
                 } else {
-                    $new_static_file_content = self::convert_post_to_string( wp_unslash( (object) $unprocessed_post ) );
+                    $new_static_file_content = self::convert_post_data_to_string(
+                        $blocks_with_metadata,
+                        $format
+                    );
                 }
 
                 $fs = self::get_data_source()->get_filesystem();
@@ -695,6 +703,28 @@ class WP_Static_Files_Editor_Plugin {
 		// 	}
 		// }, 10, 1 );
 	}
+
+    static private function post_entity_to_blocks_with_metadata( $post_entity ) {
+        return new BlocksWithMetadata(
+            $post_entity['post_content'],
+            array(
+                'post_title' => [$post_entity['post_title']],
+                'post_date_gmt' => [$post_entity['post_date_gmt']],
+                'menu_order' => [$post_entity['menu_order']],
+            )
+        );
+    }
+
+    static private function post_entity_to_annotated_block_markup( $post_entity ) {
+        $annotated_block_markup = self::post_entity_to_blocks_with_metadata($post_entity);
+        $producer = new AnnotatedBlockMarkupProducer( $annotated_block_markup );
+        return $producer->produce();
+    }
+
+    static private function annotated_block_markup_to_blocks_with_metadata( $annotated_block_markup ) {
+        $consumer = new AnnotatedBlockMarkupConsumer( $annotated_block_markup );
+        return $consumer->consume();
+    }
 
 	/**
 	 * Resize image to a maximum width and height.
@@ -806,7 +836,13 @@ class WP_Static_Files_Editor_Plugin {
 			}
 
 			$path    = get_post_meta( $post->ID, 'local_file_path', true );
+            if(!$path) {
+                return false;
+            }
             $entity  = self::local_file_to_post_entity( $path );
+            if(!$entity) {
+                return false;
+            }
             if($entity['post_content'] === $post->post_content) {
                 return $post->post_content;
             }
@@ -889,7 +925,7 @@ class WP_Static_Files_Editor_Plugin {
 		return $converter->consume();
 	}
 
-	static private function convert_post_to_string( $post, $format = null ) {
+	static private function serialize_post_to_string( $post, $format = null ) {
 		if ( $format === null ) {
 			$path = get_post_meta( $post->ID, 'local_file_path', true );
 			if ( $path ) {
