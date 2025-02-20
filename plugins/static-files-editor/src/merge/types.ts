@@ -2,7 +2,7 @@ export class MergeConflict {
     constructor(
         public branchA: string,
         public branchB: string,
-        public options: { message?: string } = {}
+        public options: { message?: string, mergedContent?: string } = {}
     ) {}
 
     get message(): string | undefined {

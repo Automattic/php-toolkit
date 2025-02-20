@@ -1,16 +1,17 @@
 <?php
+/**
+ * A PHP implementation of merge.spec.ts
+ * 
+ * Keep in sync with the TypeScript version.
+ */
 
 namespace WordPress\Merge\Tests;
 
 use WordPress\Merge\Diff\MyersDiffer;
 use WordPress\Merge\Merge\ChunkMerger;
-use WordPress\Merge\ThreeWayMerge;
-use WordPress\Merge\TwoWayDiff;
-use WordPress\Merge\MergeConflictException;
 use WordPress\Merge\MergeException;
 use WordPress\Merge\MergeStrategy;
 use WordPress\Merge\Validate\BlockMarkupMergeValidator;
-use WordPress\Merge\Validate\InvalidMergeException;
 
 use function WordPress\Merge\print_diff_chunks;
 
@@ -89,8 +90,17 @@ class BlockMarkupMergeTest extends \PHPUnit\Framework\TestCase {
 				new MyersDiffer(),
 				$chunk_merger
 			);
-			$merge_result = $strategy->merge( $parent, $changeA, $changeB );
-			$this->assertEquals( $expected, $merge_result->get_merged_content() );
+            /**
+             * In this test, we're largely diffing structured text where we can trim whitespace.
+             * This is not true for all document formats. Do not use this approach when trailing
+             * whitespace matters.
+             */
+			$merge_result = $strategy->merge(
+                trim( $parent ),
+                trim( $changeA ),
+                trim( $changeB )
+            );
+			$this->assertEquals( trim( $expected ), $merge_result->get_merged_content() );
 		} catch ( MergeException $e ) {
 			print_diff_chunks( $chunk_merger->chunksA, $chunk_merger->chunksB );
 			echo $e->getMessage();

@@ -526,15 +526,6 @@ class WP_Static_Files_Editor_Plugin {
                     $creating_revision = true;
                 }
             }
-            /**
-             * @TODO: Remove this line once we can merge documents in JS.
-             * 
-             * Right now, the JS-side change gets correctly merged with the static file,
-             * but the user may have typed some content in the block editor since the save
-             * started and those would not be merged back into the final document. As a result,
-             * we'd overwrite the static file with the block editor content on the next save.
-             */
-            $creating_revision = false;
 
             $updating_post = $processed_post['post_type'] === WP_LOCAL_FILE_POST_TYPE && $update;
             $should_run = $updating_post || $creating_revision;
@@ -546,7 +537,11 @@ class WP_Static_Files_Editor_Plugin {
             
             $is_running_wp_insert_post_data = true;
             try {
+                $last_autosave = wp_get_post_autosave($post_id, get_current_user_id());
                 $db_post = get_post($post_id);
+                if($last_autosave && new DateTime($last_autosave->post_date) > new DateTime($db_post->post_date)) {
+                    $db_post = $last_autosave;
+                }
                 $path    = get_post_meta( $post_id, 'local_file_path', true );
                 $format  = pathinfo($path, PATHINFO_EXTENSION);
                 if(!$format) {
@@ -583,9 +578,9 @@ class WP_Static_Files_Editor_Plugin {
                      * format that includes all the relevant metadata.
                      */
                     $merge_result = $merge_strategy->merge(
-                        self::post_entity_to_annotated_block_markup((array)$db_post),
-                        self::post_entity_to_annotated_block_markup($fs_post),
-                        self::post_entity_to_annotated_block_markup(wp_unslash((array)$unprocessed_post))
+                        trim(self::post_entity_to_annotated_block_markup((array)$db_post)),
+                        trim(self::post_entity_to_annotated_block_markup($fs_post)),
+                        trim(self::post_entity_to_annotated_block_markup(wp_unslash((array)$unprocessed_post)))
                     );
 
                     if($merge_result->has_conflicts()) {
@@ -632,25 +627,10 @@ class WP_Static_Files_Editor_Plugin {
                     }
                 }
 
-                if ( $creating_revision ) {
-                    // Update the parent post
-                    // $update = array( 'ID' => $post_id );
-                    // if(isset($processed_post['post_content'])) {
-                    //     $update['post_content'] = $processed_post['post_content'];
-                    // }
-                    // if(isset($processed_post['post_title'])) {
-                    //     $update['post_title'] = $processed_post['post_title'];
-                    // }
-                    // wp_update_post( $update );
-                    // $new_static_file_content = self::serialize_post_to_string(
-                    //     self::post_entity_to_blocks_with_metadata(get_post( $post_id ))
-                    // );
-                } else {
-                    $new_static_file_content = self::convert_post_data_to_string(
-                        $blocks_with_metadata,
-                        $format
-                    );
-                }
+                $new_static_file_content = self::convert_post_data_to_string(
+                    $blocks_with_metadata,
+                    $format
+                );
 
                 $fs = self::get_data_source()->get_filesystem();
                 $fs->put_contents(

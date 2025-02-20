@@ -20,6 +20,7 @@ import {
 	addLocalFilesTab,
 } from './add-local-files-tab';
 import { store as blockEditorStore } from '@wordpress/block-editor';
+import { serialize } from '@wordpress/blocks';
 import { Spinner } from '@wordpress/components';
 import { store as coreStore } from '@wordpress/core-data';
 import css from './style.module.css';
@@ -30,6 +31,7 @@ import {
 	WP_LOCAL_FILE_POST_TYPE,
 	isPreviewableAssetPath,
 } from './store';
+import { threeWayMerge, validateMergedBlockMarkup } from './merge';
 
 // Register middleware to log any 500 error responses for easier
 // debugging in development mode.
@@ -124,7 +126,7 @@ function ConnectedFilePickerTree() {
 						file.path.split('/').pop() ||
 						'',
 				}))
-                .filter((file) => !file.isDeleted);
+				.filter((file) => !file.isDeleted);
 			return {
 				selectedPath: select(uiStore).getSelectedPath(),
 				filesList,
@@ -542,71 +544,88 @@ closeInserterOnBlockInsert();
 
 // Subscribe to the entity record and resetBlocks() whenever it changes
 const replaceEditorContentOnEntityChange = () => {
-    let previousPost = select(coreStore).getEntityRecord(
-        'postType',
-        WP_LOCAL_FILE_POST_TYPE,
-        select(editorStore).getCurrentPostId()
-    );
+	let lastSavedPost = select(coreStore).getEntityRecord(
+		'postType',
+		WP_LOCAL_FILE_POST_TYPE,
+		select(editorStore).getCurrentPostId()
+	);
 	subscribe(() => {
 		const postId = select(editorStore).getCurrentPostId();
-        const currentPost = select(coreStore).getEntityRecord('postType', WP_LOCAL_FILE_POST_TYPE, postId);
+		const updatedPost = select(coreStore).getEntityRecord(
+			'postType',
+			WP_LOCAL_FILE_POST_TYPE,
+			postId
+		);
 
-        if (currentPost && !previousPost) {
-            previousPost = currentPost;
-        }
-        if (!previousPost || previousPost === currentPost) {
-            return;
-        }
-
-        if (currentPost && currentPost.content.raw !== previousPost?.content?.raw) {
-            const blockMarkup = currentPost.content.raw;
-            const blocks = parse(blockMarkup);
-            previousPost = currentPost;
-
-            dispatch(blockEditorStore).resetBlocks(blocks);
+		if (updatedPost && !lastSavedPost) {
+			lastSavedPost = updatedPost;
 		}
-    });
+		if (!lastSavedPost || lastSavedPost === updatedPost) {
+			return;
+		}
 
-    // Uncomment this to replace the editor content on autosave.
-    // @TODO: Need a client-side Merge engine to reconcile anything the user may have
-    //        typed since the autosave request started.
-    // let previousAutosave = select(coreStore).getAutosave(
-    //     WP_LOCAL_FILE_POST_TYPE,
-    //     select(editorStore).getCurrentPostId(),
-    //     select(coreStore).getCurrentUser().id
-    // );
-    // subscribe(() => {
-    //     const postId = select(editorStore).getCurrentPostId();
-    //     const user = select(coreStore).getCurrentUser();
+		if (
+			updatedPost &&
+			updatedPost.content.raw !== lastSavedPost?.content?.raw
+		) {
+			lastSavedPost = updatedPost;
 
-    //     const currentAutosave = select(coreStore).getAutosave(WP_LOCAL_FILE_POST_TYPE, postId, user.id);
-    //     if (currentAutosave && ! previousAutosave) {
-    //         previousAutosave = currentAutosave;
-    //     }
-    //     if (!previousAutosave || previousAutosave === currentAutosave) {
-    //         return;
-    //     }
+			const blockMarkup = updatedPost.content.raw;
+			const blocks = parse(blockMarkup);
 
-    //     if (currentAutosave && currentAutosave.content.raw !== previousAutosave?.content?.raw) {
-    //         const blockMarkup = currentAutosave.content.raw;
-    //         const blocks = parse(blockMarkup);
-    //         previousAutosave = currentAutosave;
+			dispatch(blockEditorStore).resetBlocks(blocks);
+		}
+	});
 
-    //         dispatch(blockEditorStore).resetBlocks(blocks);
-	// 	}
-    // });
+	// Uncomment this to replace the editor content on autosave.
+	let lastStoredAutosave = select(coreStore).getAutosave(
+		WP_LOCAL_FILE_POST_TYPE,
+		select(editorStore).getCurrentPostId(),
+		select(coreStore).getCurrentUser().id
+	);
+	subscribe(() => {
+		const postId = select(editorStore).getCurrentPostId();
+		const user = select(coreStore).getCurrentUser();
+
+		const updatedAutosave = select(coreStore).getAutosave(
+			WP_LOCAL_FILE_POST_TYPE,
+			postId,
+			user.id
+		);
+		if (updatedAutosave && !lastStoredAutosave) {
+			lastStoredAutosave = updatedAutosave;
+		}
+		if (!lastStoredAutosave || lastStoredAutosave === updatedAutosave) {
+			return;
+		}
+
+		const currentEditorBlocks = select(blockEditorStore).getBlocks();
+		const currentEditorContent = serialize(currentEditorBlocks);
+
+		if (
+			!updatedAutosave ||
+			updatedAutosave.content.raw === lastStoredAutosave?.content?.raw ||
+			updatedAutosave.content.raw === currentEditorContent
+		) {
+			return;
+		}
+
+		const mergedBlockMarkup = threeWayMerge(
+			lastStoredAutosave.content.raw.trim(),
+			currentEditorContent.trim(),
+			updatedAutosave.content.raw.trim(),
+			validateMergedBlockMarkup
+        );
+        
+		lastStoredAutosave = updatedAutosave;
+
+		const finalBlockMarkup = mergedBlockMarkup.hasConflicts
+			? currentEditorContent
+			: mergedBlockMarkup.mergedContent;
+
+		const blocks = parse(finalBlockMarkup);
+		dispatch(blockEditorStore).resetBlocks(blocks);
+	});
 };
 
 replaceEditorContentOnEntityChange();
-
-
-/*
-window.wp.data.dispatch(window.wp.blockEditor.store).resetBlocks(window.wp.blocks.parse(`<!-- wp:heading {"level":3} -->
-<h3>Devex</h3><!-- /wp:heading -->
-<!-- wp:list {"ordered":false} -->
-<ul class="wp-block-list"><!-- wp:list-item -->
-<li>Easy PHP plugin testing inside Playground – mount the plugin files from a local directory. That must happen in the UI and we need an "override" button somewhere. Ideally that would be a Blueprints builder, but maybe we can start with a list of resources and "override" buttons in the site details in Playground?</li><!-- /wp:list-item -->
-</ul><!-- /wp:list -->`))
-*/
-
-

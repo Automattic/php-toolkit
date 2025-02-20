@@ -107,12 +107,7 @@ class MarkdownConsumer implements DataFormatConsumer {
 						break;
 
 					case ExtensionBlock\Heading::class:
-						$this->push_block(
-							'heading',
-							array(
-								'level' => $node->getLevel(),
-							)
-						);
+						$this->push_block( 'heading' );
 						$this->append_content( '<h' . $node->getLevel() . ' class="wp-block-heading">' );
 						break;
 
