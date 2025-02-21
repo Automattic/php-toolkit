@@ -29,7 +29,11 @@ class GitDataSource implements DataSource {
         
         $repo     = new GitRepository( $local_fs );
         $repo->add_remote( 'origin', $config['gitRepo'] );
+        if(!$repo->branch_exists( $config['selectedBranch'] )) {
+            $repo->create_branch( $config['selectedBranch'] );
+        }
         $repo->set_branch_tip( 'HEAD', 'ref: refs/heads/' . $config['selectedBranch'] );
+        $repo->checkout( $config['selectedBranch'] );
         $repo->set_config_value( 'user.name', $config['gitUserName'] );
         $repo->set_config_value( 'user.email', $config['gitUserEmail'] );
 
@@ -57,7 +61,7 @@ class GitDataSource implements DataSource {
 
     public function pull_updates() {
         $this->remote->pull( $this->full_branch_name, [
-            'path' => $this->subdirectory,
+            // 'path' => $this->subdirectory,
         ] );
     }
 

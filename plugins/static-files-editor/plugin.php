@@ -83,7 +83,6 @@ class WP_Static_Files_Editor_Plugin {
 	private static $data_source;
 
 	public static function is_data_source_configured() {
-		return true;
 		$config = static::get_settings();
 
 		return $config['gitRepo'] && $config['selectedBranch'];
@@ -91,9 +90,9 @@ class WP_Static_Files_Editor_Plugin {
 
 	private static function get_data_source() {
 		if ( ! self::$data_source ) {
-			return new LocalDirectoryDataSource(
-				LocalFilesystem::create( __DIR__ . '/notes' )
-			);
+			// return new LocalDirectoryDataSource(
+			// 	LocalFilesystem::create( __DIR__ . '/notes' )
+			// );
 
 			if ( ! self::is_data_source_configured() ) {
 				throw new RuntimeException( 'No data source configured' );
@@ -644,6 +643,19 @@ class WP_Static_Files_Editor_Plugin {
 					return $processed_post;
 				}
 
+				/**
+				 * Update the local files if we're using a remote datasource.
+				 * 
+				 * @TODO: Introduce an "eager" mode where this check runs.
+				 *        It is expensive and running it every 5 seconds seems excessive –
+				 *        How often would another person actually edit the note while we are editing it?
+				 *        How often would it matter for us to see their changes live?
+				 *        Most of the time we don't care. We could do it during a purposeful collaborative
+				 *        editing session, but running it implicitly on the 5-second autosave interval
+				 *        is just wasteful
+				 */
+				// self::get_data_source()->pull_updates();
+
 				$post_id = $creating_revision ? $processed_post['post_parent'] : $unprocessed_post['ID'];
 
 				$is_running_wp_insert_post_data = true;
@@ -802,7 +814,7 @@ class WP_Static_Files_Editor_Plugin {
 			$post_entity['post_content'],
 			array(
 				'post_title' => array( $post_entity['post_title'] ),
-				'post_date_gmt' => array( $post_entity['post_date_gmt'] ),
+				// 'post_date_gmt' => array( $post_entity['post_date_gmt'] ),
 				'menu_order' => array( $post_entity['menu_order'] ),
 			)
 		);
@@ -992,7 +1004,7 @@ class WP_Static_Files_Editor_Plugin {
 		return array(
 			'post_content'  => $new_content,
 			'post_title'    => $converter->get_first_meta_value( 'post_title' ) ?? '',
-			'post_date_gmt' => $converter->get_first_meta_value( 'post_date_gmt' ) ?? '',
+			// 'post_date_gmt' => $converter->get_first_meta_value( 'post_date_gmt' ) ?? '',
 			'menu_order'    => $converter->get_first_meta_value( 'menu_order' ) ?? '',
 			// 'meta_input' => $converter->get_all_metadata(),
 		);
@@ -1799,10 +1811,6 @@ class WP_Static_Files_Editor_Plugin {
 			),
 			array_filter( $settings )
 		);
-
-		if ( str_starts_with( $settings['selectedBranch'], 'refs/heads/' ) ) {
-			$settings['selectedBranch'] = substr( $settings['selectedBranch'], strlen( 'refs/heads/' ) );
-		}
 
 		return $settings;
 	}

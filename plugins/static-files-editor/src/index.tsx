@@ -602,8 +602,8 @@ const replaceEditorContentOnEntityChange = () => {
 			currentPostId
 		);
 		const postContent =
-			typeof post?.content?.raw === 'string' && post.content.raw.trim();
-		const editedPostContent = getPostContent(editedPost).trim();
+            typeof post?.content?.raw === 'string' && post.content.raw.trim();
+		const editedPostContent = (getPostContent(editedPost) || "").trim();
 		const hasEdits = postContent !== editedPostContent;
 		if (hasEdits) {
 			// Make sure the post content is up to date before autosaving.

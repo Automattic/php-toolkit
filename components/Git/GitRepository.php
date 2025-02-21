@@ -289,15 +289,15 @@ class GitRepository {
 		return $this->fs->rm( $path );
 	}
 
-	public function checkout( $branch_name ) {
-		if ( ! $this->has_object( $branch_name ) ) {
+	public function checkout( $branch_name_or_commit_hash ) {
+		if ( ! $this->has_object( $branch_name_or_commit_hash ) ) {
 			// Symref
-			$branch_name = 'ref: ' . $branch_name;
+			$branch_name_or_commit_hash = 'ref: ' . $branch_name_or_commit_hash;
 		}
-		$this->set_branch_tip( 'HEAD', $branch_name );
+		$this->set_branch_tip( 'HEAD', $branch_name_or_commit_hash );
 	}
 
-	public function create_branch( $branch_name, $head_oid ) {
+	public function create_branch( $branch_name, $head_oid = Commit::NULL_HASH ) {
 		if ( $this->branch_exists( $branch_name ) ) {
 			throw new GitException( 'Branch already exists: ' . $branch_name );
 		}
