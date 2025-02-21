@@ -29,6 +29,9 @@ use WP_HTML_Tag_Processor;
  * * Consider implementing a dedicated markdown parser – similarly how we have
  *   a small, dedicated, and fast XML, HTML, etc. parsers. It would solve for
  *   code complexity, bundle size, performance, PHP compatibility, etc.
+ * * Serialize blocks with unrepresentable attributes as fenced code blocks,
+ *   e.g. a paragraph with a custom class would become code instead of a markdown
+ *   paragraph.
  */
 class MarkdownConsumer implements DataFormatConsumer {
 
@@ -107,11 +110,17 @@ class MarkdownConsumer implements DataFormatConsumer {
 						break;
 
 					case ExtensionBlock\Heading::class:
-						$this->push_block( 'heading' );
 						$level = $node->getLevel();
 						if ( ! $level ) {
 							$level = 3;
 						}
+                        $attrs = [];
+                        // 2 is the default level and the editor-produced markup won't contain this attribute, leading to
+                        // permanent client-side three-way merges.
+                        if($level !== 2) {
+                            $attrs['level'] = $level;
+                        }
+						$this->push_block( 'heading', $attrs );
 						$this->append_content( '<h' . $level . ' class="wp-block-heading">' );
 						break;
 

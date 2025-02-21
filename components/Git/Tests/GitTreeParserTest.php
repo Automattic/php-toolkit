@@ -38,7 +38,7 @@ class GitTreeParserTest extends \PHPUnit\Framework\TestCase {
 
 		$parser->next_body_chunk();
 		$tree_parser->append_bytes( $parser->get_body_chunk() );
-		for ( $i = 0; $i < 8; $i ++ ) {
+		for ( $i = 0; $i < 8; $i++ ) {
 			$this->assertTrue( $tree_parser->next() );
 		}
 		$this->assertFalse( $tree_parser->next() );

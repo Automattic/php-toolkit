@@ -17,15 +17,14 @@ class BlockMarkupMergeValidatorTest extends \PHPUnit\Framework\TestCase {
 	}
 
 	public function corruptedMergeResultsProvider() {
-		$testCases      = [];
+		$testCases      = array();
 		$testCasesPaths = glob( __DIR__ . '/test-data/corrupted-merge-results/*' );
 		foreach ( $testCasesPaths as $path ) {
-			$testCases[ basename( $path ) ] = [
+			$testCases[ basename( $path ) ] = array(
 				file_get_contents( $path ),
-			];
+			);
 		}
 
 		return $testCases;
 	}
-
 }

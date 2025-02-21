@@ -160,5 +160,4 @@ class Diff {
 
 		return $formatted_diff;
 	}
-
 }

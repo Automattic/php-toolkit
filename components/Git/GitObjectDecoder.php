@@ -100,7 +100,7 @@ class GitObjectDecoder extends BaseByteReadStream {
 		$header = '';
 		$byte   = '';
 		while ( $this->upstream->pull( 1 ) ) {
-			$byte   = $this->upstream->consume( 1 );
+			$byte    = $this->upstream->consume( 1 );
 			$header .= $byte;
 			if ( "\x00" === $byte ) {
 				break;

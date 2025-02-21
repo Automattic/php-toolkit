@@ -37,7 +37,7 @@ class MergeResult {
 	}
 
 	public function get_conflicts(): array {
-		$conflicts = [];
+		$conflicts = array();
 		foreach ( $this->results as $result ) {
 			if ( $result instanceof MergeConflict ) {
 				$conflicts[] = $result;
@@ -46,5 +46,4 @@ class MergeResult {
 
 		return $conflicts;
 	}
-
 }

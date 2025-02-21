@@ -292,7 +292,7 @@ class GitRepositoryTest extends \PHPUnit\Framework\TestCase {
 
 		$result = $repo->merge( 'refs/heads/branch_b' );
 		$this->assertEquals( 40, strlen( $result['new_head'] ) );
-		$this->assertEquals( [], $result['conflicts'] );
+		$this->assertEquals( array(), $result['conflicts'] );
 		$this->assertEquals( 'Updated content of file2 in branch B', $repo->read_object_by_path( '/dir2/file2.txt' )->consume_all() );
 		$this->assertEquals( 'Updated content of file1 in branch A', $repo->read_object_by_path( '/dir1/file1.txt' )->consume_all() );
 		$this->assertEquals( 'New content of file3 in branch A', $repo->read_object_by_path( '/dir1/subdir1/file3.txt' )->consume_all() );
@@ -335,6 +335,6 @@ class GitRepositoryTest extends \PHPUnit\Framework\TestCase {
 
 		$result = $repo->merge( 'refs/heads/branch_b' );
 		$this->assertEquals( 40, strlen( $result['new_head'] ) );
-		$this->assertEquals( [ '/dir1/file1.txt' ], $result['conflicts'] );
+		$this->assertEquals( array( '/dir1/file1.txt' ), $result['conflicts'] );
 	}
 }

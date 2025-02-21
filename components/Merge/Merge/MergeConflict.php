@@ -11,7 +11,7 @@ class MergeConflict {
 	public function __construct(
 		string $ours,
 		string $theirs,
-		$options = []
+		$options = array()
 	) {
 		$this->ours    = $ours;
 		$this->theirs  = $theirs;
@@ -21,5 +21,4 @@ class MergeConflict {
 	public function get_message() {
 		return $this->options['message'] ?? '';
 	}
-
 }

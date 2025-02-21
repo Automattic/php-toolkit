@@ -6,17 +6,17 @@ use Rector\Config\RectorConfig;
 use Rector\Set\ValueObject\DowngradeLevelSetList;
 
 return RectorConfig::configure()
-                   ->withPaths(
-	                   array(
-		                   __DIR__ . '/vendor-patched',
-	                   )
-                   )
-                   ->withDowngradeSets(
-	                   false,
-	                   false,
-	                   false,
-	                   false,
-	                   false,
-	                   true
-                   )
-                   ->withTypeCoverageLevel( 0 );
+					->withPaths(
+						array(
+							__DIR__ . '/vendor-patched',
+						)
+					)
+					->withDowngradeSets(
+						false,
+						false,
+						false,
+						false,
+						false,
+						true
+					)
+					->withTypeCoverageLevel( 0 );

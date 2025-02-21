@@ -10,12 +10,11 @@ class Chunk {
 
 	public function __construct(
 		string $base,
-		string $inserted = "",
+		string $inserted = '',
 		bool $deleted = false,
-    ) {
+	) {
 		$this->base     = $base;
 		$this->inserted = $inserted;
 		$this->deleted  = $deleted;
 	}
-
 }

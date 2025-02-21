@@ -83,7 +83,7 @@ class ProtocolDemultiplexerTest extends \PHPUnit\Framework\TestCase {
 			if ( ! isset( $chunks_counts[ $demuxer->get_stream_code() ] ) ) {
 				$chunks_counts[ $demuxer->get_stream_code() ] = 0;
 			}
-			++ $chunks_counts[ $demuxer->get_stream_code() ];
+			++$chunks_counts[ $demuxer->get_stream_code() ];
 		}
 		$reader->close_reading();
 		$this->assertEquals(
@@ -104,7 +104,7 @@ class ProtocolDemultiplexerTest extends \PHPUnit\Framework\TestCase {
 			if ( ! isset( $chunks_counts[ $demuxer->get_stream_code() ] ) ) {
 				$chunks_counts[ $demuxer->get_stream_code() ] = 0;
 			}
-			++ $chunks_counts[ $demuxer->get_stream_code() ];
+			++$chunks_counts[ $demuxer->get_stream_code() ];
 		}
 		$reader->close_reading();
 		$this->assertEquals(

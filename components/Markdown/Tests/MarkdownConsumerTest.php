@@ -123,9 +123,17 @@ HTML
 				'markdown' => 'An inline image: ![An image](https://w.org/logo.png)',
 				'expected' => '<!-- wp:paragraph --><p>An inline image: <img alt="An image" src="https://w.org/logo.png"></p><!-- /wp:paragraph -->',
 			),
-			'A heading' => array(
+			'A heading - level 4' => array(
 				'markdown' => '#### A simple heading',
 				'expected' => '<!-- wp:heading --><h4 class="wp-block-heading">A simple heading</h4><!-- /wp:heading -->',
+			),
+			'A heading - level 2' => array(
+				'markdown' => '## A simple heading',
+				'expected' => '<!-- wp:heading --><h2 class="wp-block-heading">A simple heading</h2><!-- /wp:heading -->',
+			),
+			'A heading - level 1' => array(
+				'markdown' => '# A simple heading',
+				'expected' => '<!-- wp:heading --><h1 class="wp-block-heading">A simple heading</h1><!-- /wp:heading -->',
 			),
 			'A link inside a paragraph' => array(
 				'markdown' => 'A simple paragraph with a [link](https://wordpress.org)',

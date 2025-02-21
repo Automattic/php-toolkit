@@ -250,9 +250,9 @@ class GitRemote {
 		return $blobs_oids;
 	}
 
-	public function pull( $full_branch_name=null, $options = array() ) {
-        $full_branch_name = $full_branch_name ?? $this->repository->get_current_branch_name();
-		$path = $options['path'] ?? '/';
+	public function pull( $full_branch_name = null, $options = array() ) {
+		$full_branch_name = $full_branch_name ?? $this->repository->get_current_branch_name();
+		$path             = $options['path'] ?? '/';
 
 		if ( isset( $options['path'] ) && $options['path'] ) {
 			// Sparse pull
@@ -349,7 +349,7 @@ class GitRemote {
 		} finally {
 			// Make double sure we have all the relevant objects from the remote commit.
 			// @TODO: investigate why sometimes the root tree is missing and address the
-			//        root cause instead of plugging the hole with a bandaid.
+			// root cause instead of plugging the hole with a bandaid.
 			if ( ! $this->repository->has_all_objects_from_commit( $remote_head ) ) {
 				$this->git_upload_pack(
 					array(
@@ -375,18 +375,20 @@ class GitRemote {
 		$this->git_upload_pack(
 			array(
 				'want_refs' => array( $remote_commit_hash ),
-				'have_refs' => $this->repository->get_ancestors_hashes( [
-					'commit_hash' => $local_commit_hash,
+				'have_refs' => $this->repository->get_ancestors_hashes(
+					array(
+						'commit_hash' => $local_commit_hash,
 
-					// Arbitrary number of ancestors to send to the remote server.
-					// Hopefully one of them is also an ancestor of the remote commit.
-					// @TODO: Find an exact solution instead of handwaving.
-					'count'       => 100,
+						// Arbitrary number of ancestors to send to the remote server.
+						// Hopefully one of them is also an ancestor of the remote commit.
+						// @TODO: Find an exact solution instead of handwaving.
+						'count'       => 100,
 
-					// Just get as many parents as we have. Don't enforce having
-					// exactly 100 hashes available.
-					'on_missing'  => 'return-early',
-				] ),
+						// Just get as many parents as we have. Don't enforce having
+						// exactly 100 hashes available.
+						'on_missing'  => 'return-early',
+					)
+				),
 				// Only fetch the commits. Ignore any associated trees and blobs.
 				// We're answering a question about a common ancestor in the commit
 				// graph. We don't need all the extra downloads to do that.
@@ -437,12 +439,12 @@ class GitRemote {
 		}
 		$want_refs    = $options['want_refs'];
 		$packet_lines = array();
-		for ( $i = 0; $i < count( $want_refs ); $i ++ ) {
+		for ( $i = 0; $i < count( $want_refs ); $i++ ) {
 			$packet_line = "want {$want_refs[$i]}";
 			if ( $i === 0 ) {
 				$packet_line .= ' multi_ack_detailed no-done side-band-64k ofs-delta agent=git/2.37.3 filter push-options';
 			}
-			$packet_line    .= "\n";
+			$packet_line   .= "\n";
 			$packet_lines[] = $packet_line;
 		}
 

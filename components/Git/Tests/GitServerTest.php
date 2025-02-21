@@ -414,8 +414,8 @@ RESPONSE
 		foreach ( $test_cases as $name => $test ) {
 			/** @var BufferingResponseWriter */
 			$response    = $this->getMockBuilder( BufferingResponseWriter::class )
-			                    ->onlyMethods( array( 'close_writing' ) )
-			                    ->getMock();
+								->onlyMethods( array( 'close_writing' ) )
+								->getMock();
 			$git_encoder = new GitProtocolEncoderPipe( $response );
 			$this->server->handle_fetch_request( $test['request'], $git_encoder );
 
@@ -544,8 +544,8 @@ RESPONSE
 		foreach ( $test_cases as $name => $test ) {
 			/** @var BufferingResponseWriter */
 			$response = $this->getMockBuilder( BufferingResponseWriter::class )
-			                 ->onlyMethods( array( 'close_writing' ) )
-			                 ->getMock();
+							->onlyMethods( array( 'close_writing' ) )
+							->getMock();
 
 			$git_encoder = new GitProtocolEncoderPipe( $response );
 			$this->server->handle_push_request( $test['request'], $git_encoder );

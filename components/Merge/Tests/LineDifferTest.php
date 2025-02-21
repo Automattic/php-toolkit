@@ -22,26 +22,27 @@ class LineDifferTest extends \PHPUnit\Framework\TestCase {
         Line 4: consectetur adipiscing elit.
         EOT;
 
-		$expected_diff = [
-			[ Diff::DIFF_EQUAL, "Line 1: The quick brown fox\n" ],
-			[ Diff::DIFF_DELETE, "Line 2: jumps over the lazy dog.\n" ],
-			[ Diff::DIFF_INSERT, "Line 2: jumps over the lazy cat.\n" ],
-			[ Diff::DIFF_INSERT, "Line 3: Lorem ipsum dolor sit amet,\n" ],
-			[ Diff::DIFF_EQUAL, "Line 4: consectetur adipiscing elit.\n" ],
-		];
+		$expected_diff = array(
+			array( Diff::DIFF_EQUAL, "Line 1: The quick brown fox\n" ),
+			array( Diff::DIFF_DELETE, "Line 2: jumps over the lazy dog.\n" ),
+			array( Diff::DIFF_INSERT, "Line 2: jumps over the lazy cat.\n" ),
+			array( Diff::DIFF_INSERT, "Line 3: Lorem ipsum dolor sit amet,\n" ),
+			array( Diff::DIFF_EQUAL, "Line 4: consectetur adipiscing elit.\n" ),
+		);
 		$actual_diff   = ( new LineDiffer() )->diff( $base, $updated )->get_changes();
 		$this->assertEquals( $expected_diff, $actual_diff );
 	}
 
 	public function test_evaluate_diff() {
-		$diff = new Diff( [
-			[ Diff::DIFF_EQUAL, "Line 1: The quick brown fox\n" ],
-			[ Diff::DIFF_DELETE, "Line 2: jumps over the lazy dog.\n" ],
-		] );
+		$diff = new Diff(
+			array(
+				array( Diff::DIFF_EQUAL, "Line 1: The quick brown fox\n" ),
+				array( Diff::DIFF_DELETE, "Line 2: jumps over the lazy dog.\n" ),
+			)
+		);
 
 		$expected = "Line 1: The quick brown fox\n";
 		$actual   = $diff->get_new_document();
 		$this->assertEquals( $expected, $actual );
 	}
-
 }

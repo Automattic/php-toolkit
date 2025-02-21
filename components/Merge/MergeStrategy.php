@@ -23,9 +23,9 @@ class MergeStrategy {
 	/**
 	 * Performs a three-way merge between a common base and two branches.
 	 *
-	 * @param  string  $base  The common base version
-	 * @param  string  $branchA  First branch version
-	 * @param  string  $branchB  Second branch version
+	 * @param  string $base  The common base version
+	 * @param  string $branchA  First branch version
+	 * @param  string $branchB  Second branch version
 	 *
 	 * @return MergeResult The merged result
 	 */
@@ -44,18 +44,19 @@ class MergeStrategy {
 		try {
 			$this->validator->validate( $merge_result->get_merged_content() );
 		} catch ( InvalidMergeException $e ) {
-            return new MergeResult([
-                new MergeConflict(
-                    $branchA,
-                    $branchB,
-                    [
-                        'message' => $e->getMessage(),
-                    ]
-                )
-            ]);
+			return new MergeResult(
+				array(
+					new MergeConflict(
+						$branchA,
+						$branchB,
+						array(
+							'message' => $e->getMessage(),
+						)
+					),
+				)
+			);
 		}
 
 		return $merge_result;
 	}
-
 }

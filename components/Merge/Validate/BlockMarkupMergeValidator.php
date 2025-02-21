@@ -17,18 +17,20 @@ class BlockMarkupMergeValidator implements MergeValidator {
 			$error = $block_markup_processor->get_last_error();
 			if ( $error ) {
 				throw new InvalidMergeException(
-                    sprintf('Merge resulted in invalid block markup: %s', $error->getMessage() ),
-                    0,
-                    $error
-                );
+					sprintf( 'Merge resulted in invalid block markup: %s', $error->getMessage() ),
+					0,
+					$error
+				);
 			}
 		}
 
 		if ( count( $block_markup_processor->get_block_breadcrumbs() ) > 0 ) {
-			throw new InvalidMergeException( sprintf(
-				'Merge resulted in an unclosed blocks: %s',
-				implode( ' > ', $block_markup_processor->get_block_breadcrumbs() )
-			) );
+			throw new InvalidMergeException(
+				sprintf(
+					'Merge resulted in an unclosed blocks: %s',
+					implode( ' > ', $block_markup_processor->get_block_breadcrumbs() )
+				)
+			);
 		}
 
 		/**
@@ -51,25 +53,25 @@ class BlockMarkupMergeValidator implements MergeValidator {
 	}
 
 	private function assert_html_is_structurally_sound( $html ) {
-		$html               .= '<TERMINATE-PROCESSING>';
-		$html_processor     = WP_HTML_Processor::create_fragment( $html );
+		$html          .= '<TERMINATE-PROCESSING>';
+		$html_processor = WP_HTML_Processor::create_fragment( $html );
 
-        /**
-         * Make the is_virtual() method public to enable deeper inspection.
-         *
-         * @TODO: Review the visibility in the HTML processor class.
-         */
-		$reflection = new \ReflectionClass($html_processor);
-		$is_virtual = $reflection->getMethod('is_virtual');
-		$is_virtual->setAccessible(true);
+		/**
+		 * Make the is_virtual() method public to enable deeper inspection.
+		 *
+		 * @TODO: Review the visibility in the HTML processor class.
+		 */
+		$reflection = new \ReflectionClass( $html_processor );
+		$is_virtual = $reflection->getMethod( 'is_virtual' );
+		$is_virtual->setAccessible( true );
 
 		$seen_terminate_tag = false;
 		while ( $html_processor->next_token() ) {
 			$error = $html_processor->get_last_error();
 			if ( $error ) {
-                $source = $html_processor->get_unsupported_exception();
+				$source = $html_processor->get_unsupported_exception();
 				throw new InvalidMergeException(
-					sprintf('Merge resulted in invalid block markup: %s', $source ? $source->getMessage() : '' ),
+					sprintf( 'Merge resulted in invalid block markup: %s', $source ? $source->getMessage() : '' ),
 					0,
 					$source
 				);
@@ -81,8 +83,9 @@ class BlockMarkupMergeValidator implements MergeValidator {
 			 *
 			 * @TODO: is_virtual() is private. Let's review this with Dennis Snell.
 			 */
-			if ( $is_virtual->invoke($html_processor) ) {
-				throw new InvalidMergeException( <<<MESSAGE
+			if ( $is_virtual->invoke( $html_processor ) ) {
+				throw new InvalidMergeException(
+					<<<MESSAGE
                     "Merge resulted in a non-normative block markup. The inputs are assumed to be normative,
                     which means the merge result is likely corrupted.
                 MESSAGE
@@ -102,12 +105,14 @@ class BlockMarkupMergeValidator implements MergeValidator {
 			if ( $html_processor->get_tag() === 'TERMINATE-PROCESSING' ) {
 				$seen_terminate_tag = true;
 				$breadcrumbs        = $html_processor->get_breadcrumbs();
-				if ( $breadcrumbs !== [ 'HTML', 'BODY', 'TERMINATE-PROCESSING' ] ) {
+				if ( $breadcrumbs !== array( 'HTML', 'BODY', 'TERMINATE-PROCESSING' ) ) {
 					array_pop( $breadcrumbs );
-					throw new InvalidMergeException( sprintf(
-						'Merge resulted in unclosed tags – the document likely got corrupted: %s',
-						implode( ' > ', $breadcrumbs )
-					) );
+					throw new InvalidMergeException(
+						sprintf(
+							'Merge resulted in unclosed tags – the document likely got corrupted: %s',
+							implode( ' > ', $breadcrumbs )
+						)
+					);
 				}
 				break;
 			}
@@ -123,5 +128,4 @@ class BlockMarkupMergeValidator implements MergeValidator {
 			throw new InvalidMergeException( 'Merging resulted in a structurally corrupted document.' );
 		}
 	}
-
 }

@@ -1,7 +1,7 @@
 <?php
 /**
  * A PHP implementation of merge.spec.ts
- * 
+ *
  * Keep in sync with the TypeScript version.
  */
 
@@ -29,21 +29,21 @@ class BlockMarkupMergeTest extends \PHPUnit\Framework\TestCase {
 	}
 
 	public function threeWayMergeDataProvider() {
-		return [
-			'Block attributes: (A) Adds new attribute (B) Updates an existing attribute' => [
+		return array(
+			'Block attributes: (A) Adds new attribute (B) Updates an existing attribute' => array(
 				'parent'   => '{"level":1}',
 				'branch1'  => '{"newattribute": "before", "level":1}',
 				'branch2'  => '{"level":2}',
 				'expected' => '{"newattribute": "before", "level":2}',
-			],
-		];
+			),
+		);
 	}
 
 	/**
 	 * @dataProvider corruptedResolutionCasesProvider
 	 */
 	public function test_corrupted_block_markup( $parent, $changeA, $changeB ) {
-		$strategy = new MergeStrategy(
+		$strategy     = new MergeStrategy(
 			new MyersDiffer(),
 			new ChunkMerger(),
 			new BlockMarkupMergeValidator()
@@ -60,7 +60,7 @@ class BlockMarkupMergeTest extends \PHPUnit\Framework\TestCase {
 	 * @dataProvider conflictingMergeCasesProvider
 	 */
 	public function test_conflicting_merge_cases( $parent, $changeA, $changeB ) {
-		$strategy = new MergeStrategy(
+		$strategy     = new MergeStrategy(
 			new MyersDiffer(),
 			new ChunkMerger(),
 			new BlockMarkupMergeValidator()
@@ -90,16 +90,16 @@ class BlockMarkupMergeTest extends \PHPUnit\Framework\TestCase {
 				new MyersDiffer(),
 				$chunk_merger
 			);
-            /**
-             * In this test, we're largely diffing structured text where we can trim whitespace.
-             * This is not true for all document formats. Do not use this approach when trailing
-             * whitespace matters.
-             */
+			/**
+			 * In this test, we're largely diffing structured text where we can trim whitespace.
+			 * This is not true for all document formats. Do not use this approach when trailing
+			 * whitespace matters.
+			 */
 			$merge_result = $strategy->merge(
-                trim( $parent ),
-                trim( $changeA ),
-                trim( $changeB )
-            );
+				trim( $parent ),
+				trim( $changeA ),
+				trim( $changeB )
+			);
 			$this->assertEquals( trim( $expected ), $merge_result->get_merged_content() );
 		} catch ( MergeException $e ) {
 			print_diff_chunks( $chunk_merger->chunksA, $chunk_merger->chunksB );
@@ -114,11 +114,11 @@ class BlockMarkupMergeTest extends \PHPUnit\Framework\TestCase {
 	}
 
 	private function getTestCasesFromDirectory( $subdirectoryName ) {
-		$cases = [];
+		$cases = array();
 
 		// @TODO: Only test the block markup files, create a separate driver for
-		//        merging markdown other formats. Or don't and just convert everything
-		//        to block markup before merging.
+		// merging markdown other formats. Or don't and just convert everything
+		// to block markup before merging.
 		$testCases = glob( __DIR__ . '/test-data/' . $subdirectoryName . '/*_parent.*' );
 		foreach ( $testCases as $parentFile ) {
 			$caseId = preg_replace( '/_parent\.txt$/', '', basename( $parentFile ) );
@@ -128,15 +128,14 @@ class BlockMarkupMergeTest extends \PHPUnit\Framework\TestCase {
 			$changeB  = file_get_contents( str_replace( '_parent.', '_changeB.', $parentFile ) );
 			$expected = file_get_contents( str_replace( '_parent.', '_merge_result.', $parentFile ) );
 
-			$cases[ $caseId ] = [
+			$cases[ $caseId ] = array(
 				'parent'   => $parent,
 				'changeA'  => $changeA,
 				'changeB'  => $changeB,
 				'expected' => $expected,
-			];
+			);
 		}
 
 		return $cases;
 	}
-
 }

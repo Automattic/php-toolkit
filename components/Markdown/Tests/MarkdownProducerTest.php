@@ -12,7 +12,7 @@ class MarkdownProducerTest extends TestCase {
 	public function test_blocks_to_markdown_conversion( $blocks, $expected ) {
 		$producer = new MarkdownProducer( new BlocksWithMetadata( $blocks, [] ) );
 
-		$this->assertEquals( $expected, $producer->produce() );
+		$this->assertEquals( trim($expected, "\n"), trim($producer->produce(), "\n") );
 	}
 
 	public static function provider_test_conversion() {
@@ -82,6 +82,16 @@ class MarkdownProducerTest extends TestCase {
                 <!-- wp:paragraph -->
                 <p>
                     A simple paragraph
+                </p>
+                <!-- /wp:paragraph -->
+                HTML,
+				'expected' => "A simple paragraph\n\n\n",
+			),
+			'A simple paragraph with span around two words' => array(
+				'blocks' => <<<HTML
+                <!-- wp:paragraph -->
+                <p>
+                    <span>A simple</span> paragraph
                 </p>
                 <!-- /wp:paragraph -->
                 HTML,

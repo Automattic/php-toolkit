@@ -2,7 +2,6 @@ import React, { useMemo } from 'react';
 import { useEffect, createRoot } from '@wordpress/element';
 import { FileNode, FilePickerTree } from './components/FilePickerTree';
 import { MobileMenu } from './components/MobileMenu/index';
-import { parse } from '@wordpress/blocks';
 import { store as editorStore, ErrorBoundary } from '@wordpress/editor';
 import { store as preferencesStore } from '@wordpress/preferences';
 import {
@@ -20,7 +19,7 @@ import {
 	addLocalFilesTab,
 } from './add-local-files-tab';
 import { store as blockEditorStore } from '@wordpress/block-editor';
-import { serialize } from '@wordpress/blocks';
+import { parse, serialize } from '@wordpress/blocks';
 import { Spinner } from '@wordpress/components';
 import { store as coreStore } from '@wordpress/core-data';
 import css from './style.module.css';
@@ -31,7 +30,7 @@ import {
 	WP_LOCAL_FILE_POST_TYPE,
 	isPreviewableAssetPath,
 } from './store';
-import { createDiff, threeWayMerge, validateMergedBlockMarkup } from './merge';
+import { threeWayMerge, validateMergedBlockMarkup } from './merge';
 
 // Register middleware to log any 500 error responses for easier
 // debugging in development mode.
@@ -755,14 +754,13 @@ const replaceEditorContentOnEntityChange = () => {
 			'postType',
 			WP_LOCAL_FILE_POST_TYPE,
 			currentPostId
-        );
-        // if (typeof options?.data?.content?.raw === 'string') {
-        //     options.data.content.raw = removeEmptyTextNodesFromHTML(options.data.content.raw);
-        // }
-		const contentWhenSaveStarted =
-			typeof options?.data?.content?.raw === 'string'
-				? options.data.content.raw.trim()
-				: getPostContent(postWhenSaveStarted);
+		);
+		// if (typeof options?.data?.content?.raw === 'string') {
+		//     options.data.content.raw = removeEmptyTextNodesFromHTML(options.data.content.raw);
+		// }
+		const contentWhenSaveStarted = getPostContent(
+			options.data || postWhenSaveStarted
+		);
 
 		let response = (await next(options)) as Response;
 		const postEditedSinceSaveStarted = select(
@@ -801,8 +799,8 @@ const replaceEditorContentOnEntityChange = () => {
 		postFromTheServer,
 		wasGetRequest = false
 	) {
-		const serverContent = getPostContent(postFromTheServer);
-		const postEditedContent = getPostContent(postEditedSinceSaveStarted);
+		let serverContent = getPostContent(postFromTheServer);
+		let postEditedContent = getPostContent(postEditedSinceSaveStarted);
 
 		/**
 		 * No merge needed if we've started with an empty post.
@@ -811,14 +809,12 @@ const replaceEditorContentOnEntityChange = () => {
 		if (false === serverContent || false === postEditedContent) {
 			return;
 		}
-        console.log({
-            serverContent,
-            postEditedContent,
-            contentWhenSaveStarted,
-            'contentWhenSaveStarted === serverContent': blockMarkupEquals(contentWhenSaveStarted, serverContent),
-            'postEditedContent === serverContent': blockMarkupEquals(postEditedContent, serverContent),
-            'contentWhenSaveStarted === postEditedContent': blockMarkupEquals(contentWhenSaveStarted, postEditedContent),
-        });
+
+		contentWhenSaveStarted = consistentBlockMarkupFormatting(
+			contentWhenSaveStarted
+		);
+		serverContent = consistentBlockMarkupFormatting(serverContent);
+		postEditedContent = consistentBlockMarkupFormatting(postEditedContent);
 
 		const currentPostId = postWhenSaveStarted.id;
 
@@ -831,10 +827,10 @@ const replaceEditorContentOnEntityChange = () => {
 		 * post entity, but let's not touch the block editor content as it
 		 * is up to date.
 		 */
-        if (blockMarkupEquals(contentWhenSaveStarted, serverContent)) {
-            console.log("Branch 1")
+		if (blockMarkupEquals(contentWhenSaveStarted, serverContent)) {
+			console.log('Branch 1');
 			if (!blockMarkupEquals(contentWhenSaveStarted, postEditedContent)) {
-                console.log("Branch 1.1")
+				console.log('Branch 1.1');
 				setTimeout(() => {
 					storeMarkupEdits(currentPostId, postEditedContent);
 				}, 5);
@@ -848,14 +844,31 @@ const replaceEditorContentOnEntityChange = () => {
 		 * with the server response.
 		 */
 		if (blockMarkupEquals(contentWhenSaveStarted, postEditedContent)) {
-            console.log("Branch 2")
-            setTimeout(() => {
-                console.log("Branch 2.1")
+			console.log('Branch 2');
+			setTimeout(() => {
+				console.log('Branch 2.1');
 				dispatch(blockEditorStore).resetBlocks(parse(serverContent));
 			}, 5);
 			return;
 		}
 
+		console.log({
+			serverContent,
+			postEditedContent,
+			contentWhenSaveStarted,
+			'contentWhenSaveStarted === serverContent': blockMarkupEquals(
+				contentWhenSaveStarted,
+				serverContent
+			),
+			'postEditedContent === serverContent': blockMarkupEquals(
+				postEditedContent,
+				serverContent
+			),
+			'contentWhenSaveStarted === postEditedContent': blockMarkupEquals(
+				contentWhenSaveStarted,
+				postEditedContent
+			),
+		});
 		/**
 		 * Otherwise, the server reply contains edits from
 		 * another party that we did not perform in the editor.
@@ -887,7 +900,7 @@ const replaceEditorContentOnEntityChange = () => {
 			!mergedBlockMarkup.hasConflicts &&
 			finalBlockMarkup === postEditedContent
 		) {
-            console.log("Branch 3")
+			console.log('Branch 3');
 			console.log('three way merge no conflicts');
 			return;
 		}
@@ -906,7 +919,7 @@ const replaceEditorContentOnEntityChange = () => {
 		 * we already have.
 		 */
 		setTimeout(() => {
-            console.log("Branch 4")
+			console.log('Branch 4');
 			console.log('!Reconciling edits');
 			if (!wasGetRequest) {
 				storeMarkupEdits(currentPostId, finalBlockMarkup);
@@ -931,42 +944,69 @@ const replaceEditorContentOnEntityChange = () => {
 		// had it before the request.
 	}
 
-    function blockMarkupEquals(a, b) {
-        const cleanedA = removeEmptyTextNodesFromHTML(a);
-        const cleanedB = removeEmptyTextNodesFromHTML(b);
-        return cleanedA === cleanedB;
-    }
-    
-    function removeEmptyTextNodesFromHTML(htmlString) {
-        // Create a temporary DOM element to parse the HTML string
-        const tempDiv = document.createElement('div');
-        tempDiv.innerHTML = htmlString;
-    
-        // Function to remove empty text nodes
-        function removeEmptyTextNodes(node) {
-            const childNodes = node.childNodes;
-    
-            // Iterate over the child nodes backwards to avoid issues with live node list
-            for (let i = childNodes.length - 1; i >= 0; i--) {
-                const child = childNodes[i];
-    
-                if (child.nodeType === Node.TEXT_NODE) {
-                    if (!/\S/.test(child.nodeValue)) {
-                        node.removeChild(child);
-                    }
-                } else if (child.nodeType === Node.ELEMENT_NODE) {
-                    removeEmptyTextNodes(child);
-                }
-            }
-        }
-    
-        // Remove empty text nodes from the parsed HTML
-        removeEmptyTextNodes(tempDiv);
-    
-        // Return the processed HTML string
-        return tempDiv.innerHTML;
-    }
-        
+	/**
+	 * Ensures that HTML tags, whitespaces, tag closers etc are formatted
+	 * in a consistent way that can be compared for equality and three-way merged.
+	 *
+	 * This doesn't matter when working with block markup as the server preserves
+	 * the formatting provided by the client. It's only relevant when storing
+	 * the post content as markdown where the exact formatting is lost.
+	 *
+	 * For example, Markdown transformation can turn
+	 *
+	 * ```html
+	 * <!-- /wp:paragraph --></blockquote>
+	 * ```
+	 *
+	 * into
+	 *
+	 * ```html
+	 * <!-- /wp:paragraph -->
+	 *
+	 * </blockquote>
+	 * ```
+	 *
+	 * This function ensures the formatting remains consistent for diffing and merging.
+	 */
+    function consistentBlockMarkupFormatting(htmlString) {
+        return serialize(parse(htmlString));
+	}
+
+	function blockMarkupEquals(a, b) {
+		const cleanedA = removeEmptyTextNodesFromHTML(a);
+		const cleanedB = removeEmptyTextNodesFromHTML(b);
+		return cleanedA === cleanedB;
+	}
+
+	function removeEmptyTextNodesFromHTML(htmlString) {
+		// Create a temporary DOM element to parse the HTML string
+		const tempDiv = document.createElement('div');
+		tempDiv.innerHTML = htmlString;
+
+		// Function to remove empty text nodes
+		function removeEmptyTextNodes(node) {
+			const childNodes = node.childNodes;
+
+			// Iterate over the child nodes backwards to avoid issues with live node list
+			for (let i = childNodes.length - 1; i >= 0; i--) {
+				const child = childNodes[i];
+
+				if (child.nodeType === Node.TEXT_NODE) {
+					if (!/\S/.test(child.nodeValue)) {
+						node.removeChild(child);
+					}
+				} else if (child.nodeType === Node.ELEMENT_NODE) {
+					removeEmptyTextNodes(child);
+				}
+			}
+		}
+
+		// Remove empty text nodes from the parsed HTML
+		removeEmptyTextNodes(tempDiv);
+
+		// Return the processed HTML string
+		return tempDiv.innerHTML;
+	}
 
 	function getPostContent(post) {
 		const contentField = post.content;
