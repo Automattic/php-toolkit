@@ -4,8 +4,6 @@ namespace WordPress\Merge\Merge;
 
 use WordPress\Merge\Diff\Diff;
 
-use function WordPress\Merge\Merge\Strategy\sort;
-
 class ChunkMerger implements Merger {
 
 	public $chunksA;

@@ -202,7 +202,7 @@ class MarkdownProducer implements DataFormatProducer {
 				array_push(
 					$this->state['listStyle'],
 					array(
-						'style' => isset( $attributes['ordered'] ) ? ( $attributes['type'] ?? 'decimal' ) : '-',
+						'style' => isset( $attributes['ordered'] ) && $attributes['ordered'] ? ( $attributes['type'] ?? 'decimal' ) : '-',
 						'count' => $attributes['start'] ?? 1,
 					)
 				);
@@ -341,14 +341,19 @@ class MarkdownProducer implements DataFormatProducer {
 				case 'BR':
 					$markdown .= "\n";
 					break;
+
+                case 'IMG':
+                    $markdown .= '![' . $processor->get_attribute( 'alt' ) . '](' . $processor->get_attribute( 'src' ) . ')';
+                    break;
 			}
 		}
 
 		// The HTML processor gives us all the whitespace verbatim
 		// as it was encountered in the byte stream.
 		// Let's normalize it to a single space.
-		$markdown = trim( $markdown, "\n " );
-		$markdown = preg_replace( '/ +/', ' ', $markdown );
+		$markdown = trim( $markdown, "\n" );
+		$markdown = ltrim( $markdown, "\n " );
+		// $markdown = preg_replace( '/ +/', ' ', $markdown );
 		$markdown = preg_replace( '/\n+/', "\n", $markdown );
 		return $markdown;
 	}

@@ -581,9 +581,20 @@ class WP_Static_Files_Editor_Plugin {
                      */
                     $merge_result = $merge_strategy->merge(
                         trim(self::post_entity_to_annotated_block_markup((array)$db_post)),
+                        trim(self::post_entity_to_annotated_block_markup(wp_unslash((array)$unprocessed_post))),
                         trim(self::post_entity_to_annotated_block_markup($fs_post)),
-                        trim(self::post_entity_to_annotated_block_markup(wp_unslash((array)$unprocessed_post)))
                     );
+
+                    if(str_contains($processed_post['post_content'], 'pisze i pisze asupe')) {
+                        // var_dump($db_post);
+                        // var_dump($fs_post);
+                        // var_dump($merge_result);
+                        var_dump(trim(self::post_entity_to_annotated_block_markup((array)$db_post)));
+                        var_dump(trim(self::post_entity_to_annotated_block_markup($fs_post)));
+                        var_dump(trim(self::post_entity_to_annotated_block_markup(wp_unslash((array)$unprocessed_post))));
+                        var_dump($merge_result);
+                        die();
+                    }
 
                     if($merge_result->has_conflicts()) {
                         /**

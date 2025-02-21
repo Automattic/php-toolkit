@@ -204,6 +204,10 @@ class MarkdownConsumer implements DataFormatConsumer {
 						break;
 
 					case Inline\Text::class:
+                        /**
+                         * Trailing whitespace is getting lost in the commonmark parser.
+                         * @TODO: Patch the commonmark parser OR use a diffent parser.
+                         */
 						$this->append_content( $node->getLiteral() );
 						break;
 
