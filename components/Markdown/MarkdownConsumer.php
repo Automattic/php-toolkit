@@ -108,7 +108,11 @@ class MarkdownConsumer implements DataFormatConsumer {
 
 					case ExtensionBlock\Heading::class:
 						$this->push_block( 'heading' );
-						$this->append_content( '<h' . $node->getLevel() . ' class="wp-block-heading">' );
+						$level = $node->getLevel();
+						if ( ! $level ) {
+							$level = 3;
+						}
+						$this->append_content( '<h' . $level . ' class="wp-block-heading">' );
 						break;
 
 					case ExtensionBlock\ListBlock::class:
@@ -291,7 +295,11 @@ BLOCK;
 						$this->pop_block();
 						break;
 					case ExtensionBlock\Heading::class:
-						$this->append_content( '</h' . $node->getLevel() . '>' );
+						$level = $node->getLevel();
+						if ( ! $level ) {
+							$level = 3;
+						}
+						$this->append_content( '</h' . $level . '>' );
 						$this->pop_block();
 						break;
 					case ExtensionInline\Strong::class:

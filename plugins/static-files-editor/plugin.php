@@ -444,15 +444,17 @@ class WP_Static_Files_Editor_Plugin {
 		} );
 
         /**
-         * Shorten the autosave interval to 5 seconds to remove the need
-         * for clicking the "Save" button.
+         * Shorten the autosave interval to 100 days to remove the dichotomy
+         * between posts with edits and autosaves. These are two different
+         * entity types and reconciling changes is much more difficult when
+         * they're both involved. We'll rely on regular saves instead.
          *
          * @param array $settings
          * @return array
          */
         add_filter('block_editor_settings_all', function($settings, $context) {
             if(isset($context->post) && $context->post->post_type === WP_LOCAL_FILE_POST_TYPE) {
-                $settings['autosaveInterval'] = 5;
+                $settings['autosaveInterval'] = 86400 * 100;
             }
             return $settings;
         }, 10, 2);

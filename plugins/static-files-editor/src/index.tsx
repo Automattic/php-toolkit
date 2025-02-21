@@ -31,7 +31,7 @@ import {
 	WP_LOCAL_FILE_POST_TYPE,
 	isPreviewableAssetPath,
 } from './store';
-import { threeWayMerge, validateMergedBlockMarkup } from './merge';
+import { createDiff, threeWayMerge, validateMergedBlockMarkup } from './merge';
 
 // Register middleware to log any 500 error responses for easier
 // debugging in development mode.
@@ -544,6 +544,117 @@ closeInserterOnBlockInsert();
 
 // Subscribe to the entity record and resetBlocks() whenever it changes
 const replaceEditorContentOnEntityChange = () => {
+	let lastPostId = select(editorStore).getCurrentPostId();
+	let lastContent = select(editorStore).getEditedPostContent();
+	const scheduledSaves = new Map<number, NodeJS.Timeout>();
+
+	/**
+	 * Mode 1: Save the post content after 5 seconds of inactivity.
+	 */
+	// subscribe(() => {
+	// 	const currentPostId = select(editorStore).getCurrentPostId();
+	// 	const currentContent = select(editorStore).getEditedPostContent();
+
+	// 	if (currentPostId !== lastPostId) {
+	// 		lastPostId = currentPostId;
+	// 		lastContent = currentContent;
+	// 		return;
+	// 	}
+
+	// 	if (currentContent === lastContent) {
+	// 		return;
+	// 	}
+	// 	lastContent = currentContent;
+
+	// 	// Clear any existing timeout for this postId
+	// 	if (scheduledSaves.has(currentPostId)) {
+	// 		clearTimeout(scheduledSaves.get(currentPostId));
+	// 		scheduledSaves.delete(currentPostId);
+	// 	}
+
+	// 	// Schedule a new save in 5 seconds
+	// 	// @TODO: Don't start the next one until this one is finished.
+	// 	const timeoutId = setTimeout(async () => {
+	// 		scheduledSaves.delete(currentPostId);
+	// 		await dispatch(coreStore).saveEditedEntityRecord(
+	// 			'postType',
+	// 			WP_LOCAL_FILE_POST_TYPE,
+	// 			currentPostId,
+	// 			{ throwOnError: true }
+	// 		);
+	// 	}, 5000);
+
+	// 	scheduledSaves.set(currentPostId, timeoutId);
+	// });
+
+	/**
+	 * Mode 2: Save/refresh the post content every 5 seconds, regardless of user activity.
+	 */
+	setInterval(async () => {
+		const currentPostId = select(editorStore).getCurrentPostId();
+		const post = select(coreStore).getEntityRecord(
+			'postType',
+			WP_LOCAL_FILE_POST_TYPE,
+			currentPostId
+		);
+		const editedPost = select(coreStore).getEditedEntityRecord(
+			'postType',
+			WP_LOCAL_FILE_POST_TYPE,
+			currentPostId
+		);
+		const postContent =
+			typeof post?.content?.raw === 'string' && post.content.raw.trim();
+		const editedPostContent = getPostEditedContent(editedPost).trim();
+		const hasEdits = postContent !== editedPostContent;
+		if (hasEdits) {
+			// Make sure the post content is up to date before autosaving.
+			await dispatch(coreStore).editEntityRecord(
+				'postType',
+				WP_LOCAL_FILE_POST_TYPE,
+				currentPostId,
+				{ content: { raw: editedPostContent } }
+			);
+			await dispatch(coreStore).saveEditedEntityRecord(
+				'postType',
+				WP_LOCAL_FILE_POST_TYPE,
+				currentPostId,
+				{ throwOnError: true }
+			);
+		} else {
+			const response = await apiFetch({
+				path: `/wp/v2/${WP_LOCAL_FILE_POST_TYPE}/${currentPostId}?context=edit`,
+			});
+
+			/**
+			 * @TODO: Fix occasional data loss when the user keeps typing after the save have been
+			 *        initiated. We likely need to keep track of any edits made after the saveEditedEntityRecord()
+			 *        call and store them upon receiveEntityRecords.
+			 *
+			 *        Note that, in the unlikely case of a concurrent edit while we were typing,
+			 *        we'll need to diff the saved markup with the received markup and rebase the edits.
+			 */
+			dispatch(coreStore).receiveEntityRecords(
+				'postType',
+				WP_LOCAL_FILE_POST_TYPE,
+				[response],
+				undefined,
+				true
+			);
+		}
+	}, 5000);
+
+	/**
+	 * Reconcile any changes to the post content with the current editor content.
+	 *
+	 * Approach 1: Subscribe to the store changes, merge the changes, and adjust the editor content
+	 *             accordingly.
+	 *
+	 * Upsides: Works regardless of the exact method of updating the store.
+	 * Downsides: It does not have access to the last post content before the save request was made
+	 *            and thus may lead losing the delta typed between the save started and the save completed.
+	 *
+	 * @TODO: Restore the cursor position after calling resetBlocks().
+	 */
 	let lastSavedPost = select(coreStore).getEntityRecord(
 		'postType',
 		WP_LOCAL_FILE_POST_TYPE,
@@ -560,72 +671,380 @@ const replaceEditorContentOnEntityChange = () => {
 		if (updatedPost && !lastSavedPost) {
 			lastSavedPost = updatedPost;
 		}
-		if (!lastSavedPost || lastSavedPost === updatedPost) {
+		if (!lastSavedPost?.content?.raw || lastSavedPost === updatedPost) {
 			return;
 		}
 
 		if (
 			updatedPost &&
-			updatedPost.content.raw !== lastSavedPost?.content?.raw
+			updatedPost?.content?.raw?.trim() !==
+				lastSavedPost?.content?.raw?.trim()
 		) {
 			lastSavedPost = updatedPost;
+			// Idea 1.1 – merge the document when we notice the post entity have changed.
+			// const currentEditorBlocks = select(blockEditorStore).getBlocks();
+			// const currentEditorContent = serialize(currentEditorBlocks);
 
-			const blockMarkup = updatedPost.content.raw;
-			const blocks = parse(blockMarkup);
+			// let finalBlockMarkup = '';
+			// if (lastSavedPost?.content?.raw) {
+			//     const mergedBlockMarkup = threeWayMerge(
+			//         lastSavedPost.content.raw.trim(),
+			//         currentEditorContent.trim(),
+			//         updatedPost.content.raw.trim(),
+			//         validateMergedBlockMarkup
+			//     );
+			//     lastSavedPost = updatedPost;
 
-			dispatch(blockEditorStore).resetBlocks(blocks);
+			//     finalBlockMarkup = mergedBlockMarkup.hasConflicts
+			//         ? currentEditorContent
+			//         : mergedBlockMarkup.mergedContent;
+			// } else {
+			//     finalBlockMarkup = updatedPost.content.raw;
+			// }
+			// if(finalBlockMarkup === currentEditorContent) {
+			//     return;
+			// }
+
+			// Idea 1.2 – assume the merge was done somewhere else and simplyt
+			//            repopulate the editor with the updated post content.
+			// Downside:  It runs more often than necessary, pausing the writing
+			//            experience by moving focus out of the current block.
+			// const post = select(coreStore).getEditedEntityRecord(
+			//     'postType',
+			//     WP_LOCAL_FILE_POST_TYPE,
+			//     postId
+			// );
+			// if(!post) {
+			//     return;
+			// }
+
+			// const blocks = parse(post.content);
+			// dispatch(blockEditorStore).resetBlocks(blocks);
+
+			// Idea 1.3 – handle everything in apiFetch() as a substitute for
+			//            patching saveEntityRecord().
 		}
 	});
 
-	// Uncomment this to replace the editor content on autosave.
-	let lastStoredAutosave = select(coreStore).getAutosave(
-		WP_LOCAL_FILE_POST_TYPE,
-		select(editorStore).getCurrentPostId(),
-		select(coreStore).getCurrentUser().id
-	);
-	subscribe(() => {
-		const postId = select(editorStore).getCurrentPostId();
-		const user = select(coreStore).getCurrentUser();
-
-		const updatedAutosave = select(coreStore).getAutosave(
-			WP_LOCAL_FILE_POST_TYPE,
-			postId,
-			user.id
-		);
-		if (updatedAutosave && !lastStoredAutosave) {
-			lastStoredAutosave = updatedAutosave;
-		}
-		if (!lastStoredAutosave || lastStoredAutosave === updatedAutosave) {
-			return;
-		}
-
-		const currentEditorBlocks = select(blockEditorStore).getBlocks();
-		const currentEditorContent = serialize(currentEditorBlocks);
-
+	/**
+	 * Reconcile any changes to the post content with the current editor content.
+	 *
+	 * Approach 2: Observe all the network traffic to/from server and reconcile the post content based
+	 *             on the datastore at request time, response time, and response information.
+	 *
+	 * Upsides: We have all the information we need to perform a merge and rebase.
+	 * Downsides: Not all requests lead to a post update so we may sometimes update the editor content
+	 *            when the user does not expect it.
+	 *
+	 * @TODO: Restore the cursor position after calling resetBlocks().
+	 */
+	apiFetch.use(async (options, next) => {
+		const currentPostId = select(editorStore).getCurrentPostId();
 		if (
-			!updatedAutosave ||
-			updatedAutosave.content.raw === lastStoredAutosave?.content?.raw ||
-			updatedAutosave.content.raw === currentEditorContent
+			!options.path.startsWith(
+				`/wp/v2/${WP_LOCAL_FILE_POST_TYPE}/${currentPostId}`
+			)
+		) {
+			return next(options);
+		}
+
+		const isGetRequest =
+			options.method === 'GET' || options.method === undefined;
+
+		const postWhenSaveStarted = select(coreStore).getEntityRecord(
+			'postType',
+			WP_LOCAL_FILE_POST_TYPE,
+			currentPostId
+		);
+		const contentWhenSaveStarted =
+			typeof options?.data?.content?.raw === 'string'
+				? options.data.content.raw.trim()
+				: typeof postWhenSaveStarted?.content?.raw === 'string'
+					? postWhenSaveStarted?.content?.raw?.trim()
+					: '';
+
+		let response = (await next(options)) as Response;
+		const postEditedSinceSaveStarted = select(
+			coreStore
+		).getEditedEntityRecord(
+			'postType',
+			WP_LOCAL_FILE_POST_TYPE,
+			currentPostId
+		);
+
+		let postFromTheServer = null;
+		if (response instanceof Response) {
+			const [responseToConsume, responseToReturn] = teeResponse(response);
+			postFromTheServer = await responseToConsume.json();
+			response = responseToReturn;
+		} else if (typeof response === 'object') {
+			postFromTheServer = response;
+		} else {
+			return response;
+		}
+
+		preserveEditsSinceSaveStarted(
+			contentWhenSaveStarted,
+			postWhenSaveStarted,
+			postEditedSinceSaveStarted,
+			postFromTheServer,
+			isGetRequest
+		);
+		return response;
+	});
+
+	function preserveEditsSinceSaveStarted(
+		contentWhenSaveStarted,
+		postWhenSaveStarted,
+		postEditedSinceSaveStarted,
+		postFromTheServer,
+		wasGetRequest = false
+	) {
+		const serverContent = postFromTheServer.content.raw.trim();
+		/**
+		 * No merge needed if we've started with an empty post.
+		 * The server response is our source of truth.
+		 */
+		if (
+			typeof postWhenSaveStarted?.content?.raw !== 'string' ||
+			!postWhenSaveStarted?.content?.raw?.trim()
 		) {
 			return;
 		}
 
+		/**
+		 * No need to merge the post content if the server replied with the
+		 * same content we currently have in the editor.
+		 */
+		const postEditedContent = getPostEditedContent(
+			postEditedSinceSaveStarted
+		).trim();
+		if (postEditedContent === serverContent) {
+			console.log('postEditedContent === serverContent');
+			console.log({ postEditedContent });
+			return;
+		}
+
+		const currentPostId = postWhenSaveStarted.id;
+
+		/**
+		 * No need to merge the post content if we haven't made any edits
+		 * since the save was initiated. Just overwrite the post editor content
+		 * with the server response.
+		 */
+		if (postEditedContent === contentWhenSaveStarted) {
+			setTimeout(() => {
+				dispatch(blockEditorStore).resetBlocks(parse(serverContent));
+			}, 5);
+			return;
+		}
+
+		/**
+		 * When the server replied with the post we saved, the data layer
+		 * will overwrite the current post content with the server response.
+		 *
+		 * We know the user made some changes since the save was initiated,
+		 * let's store them in the data layer as edits on top of the new
+		 * post entity, but let's not touch the block editor content as it
+		 * is up to date.
+		 */
+		if (contentWhenSaveStarted === serverContent) {
+			console.log('storeMarkupEdits', {
+				currentPostId,
+				postEditedContent,
+			});
+			setTimeout(() => {
+				storeMarkupEdits(currentPostId, postEditedContent);
+			}, 5);
+			return;
+		}
+
+		/**
+		 * Otherwise, the server reply contains edits from
+		 * another party that we did not perform in the editor.
+		 *
+		 * Let's run a three-way merge to reconcile those edits with everything
+		 * the user may have typed in the editor since the save started.
+		 */
+		// Merge the post content with the edits and the server content.
 		const mergedBlockMarkup = threeWayMerge(
-			lastStoredAutosave.content.raw.trim(),
-			currentEditorContent.trim(),
-			updatedAutosave.content.raw.trim(),
+			contentWhenSaveStarted,
+			postEditedContent,
+			serverContent,
 			validateMergedBlockMarkup
-        );
-        
-		lastStoredAutosave = updatedAutosave;
+		);
 
+		/**
+		 * @TODO: Support merging post meta as well – the post title at a very least
+		 *        for the MVP.
+		 * @TODO: Analyze what does a conflict mean in practice in this context.
+		 *        Decide how to handle it – potentially tell the user and add an
+		 *        undo entry? Or is ignoring it and overwriting with the current
+		 *        editor content fine in most scenarios?
+		 */
 		const finalBlockMarkup = mergedBlockMarkup.hasConflicts
-			? currentEditorContent
-			: mergedBlockMarkup.mergedContent;
+			? postEditedContent
+			: mergedBlockMarkup.mergedContent.trim();
 
-		const blocks = parse(finalBlockMarkup);
-		dispatch(blockEditorStore).resetBlocks(blocks);
-	});
+		if (
+			!mergedBlockMarkup.hasConflicts &&
+			finalBlockMarkup === postEditedContent
+		) {
+			console.log('three way merge no conflicts');
+			return;
+		}
+
+		/**
+		 * Data loss prevention.
+		 *
+		 * Preserve the delta between mergedBlockMarkup and currentEditorContent as post edits to ensure:
+		 *
+		 * * The next save operation will submit them to the server.
+		 * * The next "update" operation will merge them with the server content.
+		 *
+		 * Ideally this would happen synchronously, but for the MVP we're using a setTimeout() call.
+		 * Note there's a slight chance of getting a keyboard event between handling the request and
+		 * our setTimeout(), which would wrongly place the next user edit **before** the delta that
+		 * we already have.
+		 */
+		setTimeout(() => {
+			console.log('!Reconciling edits');
+			if (!wasGetRequest) {
+				storeMarkupEdits(currentPostId, finalBlockMarkup);
+			}
+
+			// If we're here, the server responded with a document we haven't
+			// seen before which likely means there have been concurrent edits.
+			// Let's populate the editor with the final merged outcome.
+			console.log('resetBlocks', parse(finalBlockMarkup));
+			console.log({
+				contentWhenSaveStarted,
+				serverContent,
+				'contentWhenSaveStarted === serverContent':
+					contentWhenSaveStarted === serverContent,
+			});
+			dispatch(blockEditorStore).resetBlocks(parse(finalBlockMarkup));
+		}, 5);
+
+		// @TODO: Adjust cursor position:
+		// Diff and rebase the edits to restore the cursor position where
+		// the user expects it. Also, restore focus to the same block that
+		// had it before the request.
+	}
+
+	function getPostEditedContent(post) {
+		const contentField = post.content;
+		const contentString = post.blocks
+			? /**
+			   * Post edits are saved primarily in the `blocks` field so
+			   * let's try that first.
+			   */
+			  serialize(post.blocks)
+			: /**
+			   * No blocks? Let's try the `content` field.
+			   * It may either be a string, when overwritten explicitly, or
+			   * an object with a `raw` property, when it reflects the unedited
+			   * entity record.
+			   */
+			  (typeof contentField === 'string'
+					? contentField
+					: contentField?.raw) || '';
+		return contentString.trim();
+	}
+
+	function storeMarkupEdits(postId, content) {
+		console.log('storeMarkupEdits', { content });
+		dispatch(coreStore).editEntityRecord(
+			'postType',
+			WP_LOCAL_FILE_POST_TYPE,
+			postId,
+			{
+				content: {
+					raw: content,
+				},
+			}
+		);
+	}
+
+	function teeResponse(response: Response) {
+		const [body1, body2] = response.body.tee();
+		return [
+			new Response(body1, {
+				status: response.status,
+				statusText: response.statusText,
+				headers: response.headers,
+			}),
+			new Response(body2, {
+				status: response.status,
+				statusText: response.statusText,
+				headers: response.headers,
+			}),
+		];
+	}
+
+	// const originalSaveEntityRecord = dispatch(coreStore).saveEditedEntityRecord;
+	// dispatch(coreStore).saveEditedEntityRecord = async (type, name, id, ...rest) => {
+	//     await originalSaveEntityRecord(type, name, id, ...rest);
+	//     const currentPostId = select(editorStore).getCurrentPostId();
+	//     if (type === 'postType' && name === WP_LOCAL_FILE_POST_TYPE && currentPostId === id) {
+	//         const currentContent = select(editorStore).getEditedPostContent();
+	//         const hasEdits = select(coreStore).hasEditsForEntityRecord(
+	//             'postType',
+	//             WP_LOCAL_FILE_POST_TYPE,
+	//             currentPostId
+	//         );
+	//     }
+	// };
+
+	// Uncomment this to replace the editor content on autosave.
+	// let lastStoredAutosave = select(coreStore).getAutosave(
+	// 	WP_LOCAL_FILE_POST_TYPE,
+	// 	select(editorStore).getCurrentPostId(),
+	// 	select(coreStore).getCurrentUser().id
+	// );
+	// subscribe(() => {
+	// 	const postId = select(editorStore).getCurrentPostId();
+	// 	const user = select(coreStore).getCurrentUser();
+
+	// 	const updatedAutosave = select(coreStore).getAutosave(
+	// 		WP_LOCAL_FILE_POST_TYPE,
+	// 		postId,
+	// 		user.id
+	// 	);
+	// 	if (updatedAutosave && !lastStoredAutosave) {
+	// 		lastStoredAutosave = updatedAutosave;
+	// 	}
+	// 	if (!lastStoredAutosave || lastStoredAutosave === updatedAutosave) {
+	// 		return;
+	// 	}
+
+	// 	const currentEditorBlocks = select(blockEditorStore).getBlocks();
+	// 	const currentEditorContent = serialize(currentEditorBlocks);
+
+	// 	if (
+	// 		!updatedAutosave ||
+	// 		updatedAutosave.content.raw === lastStoredAutosave?.content?.raw ||
+	// 		updatedAutosave.content.raw === currentEditorContent
+	// 	) {
+	// 		return;
+	// 	}
+
+	// 	const mergedBlockMarkup = threeWayMerge(
+	// 		lastStoredAutosave.content.raw.trim(),
+	// 		currentEditorContent.trim(),
+	// 		updatedAutosave.content.raw.trim(),
+	// 		validateMergedBlockMarkup
+	//     );
+
+	// 	lastStoredAutosave = updatedAutosave;
+
+	// 	const finalBlockMarkup = mergedBlockMarkup.hasConflicts
+	// 		? currentEditorContent
+	// 		: mergedBlockMarkup.mergedContent;
+
+	// 	const blocks = parse(finalBlockMarkup);
+	// 	dispatch(blockEditorStore).resetBlocks(blocks);
+	// });
 };
 
 replaceEditorContentOnEntityChange();
