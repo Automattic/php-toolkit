@@ -7,7 +7,7 @@ use WordPress\Git\GitException;
 class Commit {
 
 	public const NULL_HASH = '0000000000000000000000000000000000000000';
-	public const DATE_FORMAT = 'Y-m-d H:i:s +Z';
+	public const DATE_FORMAT = 'U +0000';
 
 	/**
 	 * The commit hash
@@ -87,13 +87,13 @@ class Commit {
 			$this->author = 'Admin <adam@adamziel.com>';
 		}
 		if(!isset($this->author_date)) {
-			$this->author_date = time() . ' +0000'; //date(self::DATE_FORMAT);
+			$this->author_date = date(self::DATE_FORMAT);
 		}
 		if(!isset($this->committer)) {
 			$this->committer = 'Admin <adam@adamziel.com>';
 		}
 		if(!isset($this->committer_date)) {
-			$this->committer_date = time() . ' +0000'; //date(self::DATE_FORMAT);
+			$this->committer_date = date(self::DATE_FORMAT);
 		}
 	}
 
@@ -106,6 +106,9 @@ class Commit {
 	}
 
 	public function get_commit_string() {
+		if ( ! $this->message ) {
+			throw new GitException( 'Cannot create a commit string when the "message" field is empty' );
+		}
 		$commit_message     = array();
 		$commit_message[]   = 'tree ' . $this->tree;
 		if ( isset( $this->parents ) ) {
@@ -116,6 +119,8 @@ class Commit {
 		$commit_message[] = 'author ' . $this->author . ' ' . $this->author_date;
 		$commit_message[] = 'committer ' . $this->committer . ' ' . $this->committer_date;
 		$commit_message[] = "\n" . $this->message;
+
+		var_dump(implode("\n", $commit_message));
 
 		return implode( "\n", $commit_message );
 	}

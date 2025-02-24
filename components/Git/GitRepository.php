@@ -890,9 +890,9 @@ class GitRepository {
 		return new Commit( [
 			...$options,
 			'author' => $options['author'] ?? ( $this->get_config_value( 'user.name' ) . ' <' . $this->get_config_value( 'user.email' ) . '>' ),
-			'author_date' => $options['author_date'] ?? date( 'Y-m-d H:i:s' ) . ' +0000',
+			'author_date' => $options['author_date'] ?? null,
 			'committer' => $options['committer'] ?? ( $this->get_config_value( 'user.name' ) . ' <' . $this->get_config_value( 'user.email' ) . '>' ),
-			'committer_date' => $options['committer_date'] ?? date( 'Y-m-d H:i:s' ) . ' +0000',
+			'committer_date' => $options['committer_date'] ?? null,
 			'message' => $options['message'] ?? 'Changes',			
 		] );
 	}
