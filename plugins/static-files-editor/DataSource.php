@@ -55,6 +55,7 @@ class GitDataSource implements DataSource {
                 'root'      => $this->subdirectory,
                 'auto_push' => true,
                 'remote'    => $this->remote,
+				'amend_time_window' => 300,
             ]
         );
     }

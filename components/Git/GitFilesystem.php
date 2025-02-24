@@ -8,7 +8,6 @@ use WordPress\Filesystem\FilesystemException;
 use WordPress\Filesystem\Layer\ChrootLayer;
 use WordPress\Filesystem\Mixin\BufferedWriteStreamViaPutContents;
 use WordPress\Filesystem\Mixin\CopyRecursiveViaStreaming;
-use WordPress\Filesystem\Mixin\RenameFileViaCopyAndRm;
 
 class GitFilesystem implements Filesystem {
 
@@ -25,6 +24,7 @@ class GitFilesystem implements Filesystem {
 	 */
 	private $remote;
 	private $write_stream;
+	private $amend_time_window;
 
 	public static function create( GitRepository $repo, $options = array() ) {
 		return new ChrootLayer(
@@ -42,6 +42,7 @@ class GitFilesystem implements Filesystem {
 	) {
 		$this->repo      = $repo;
 		$this->auto_push = $options['auto_push'] ?? false;
+		$this->amend_time_window = $options['amend_time_window'] ?? false;
 		if ( $this->auto_push ) {
 			$this->remote = $options['remote'] ?? null;
 			if ( ! $this->remote ) {
@@ -171,19 +172,16 @@ class GitFilesystem implements Filesystem {
 	}
 
 	private function commit( $options ) {
-		$this->repo->commit( $options );
+		$should_amend = false;//$this->should_amend();
+		$this->repo->commit( [
+			...$options,
+			// 'amend' => $should_amend,
+		] );
 
 		/**
-		 * Auto push if enabled
-		 *
-		 * This is a risky, best-effort PoC for automatic synchronization
-		 * of changes with the remote repository. There's no conflict
-		 * resolution here, only force overwriting of changes both locally
-		 * and in the remote repository.
-		 *
-		 * Let's re-work this once the notes management prototype is more mature.
+		 * Push if auto-push is enabled
 		 */
-		if ( $this->auto_push ) {
+		if ( $this->auto_push && !$should_amend ) {
 			try {
 				$this->remote->push();
 			} catch ( GitException $e ) {
@@ -198,5 +196,29 @@ class GitFilesystem implements Filesystem {
 		}
 
 		return true;
+	}
+
+	private function should_amend() {
+		if ( false === $this->amend_time_window ) {
+			return false;
+		}
+
+		try {
+			$head_commit_hash = $this->repo->get_branch_tip( 'HEAD' );
+		} catch ( GitException $e ) {
+			// die("Error getting branch tip: " . $e->getMessage());
+			return false;
+		}
+
+		$head_commit = $this->repo->read_object( $head_commit_hash )->as_commit();
+		try {
+			$head_commit_time = new \DateTime( $head_commit->author_date );
+		} catch ( \DateMalformedStringException $e ) {
+			// die("Error parsing author date: " . $e->getMessage());
+			return false;
+		}
+
+		$time_since_commit = time() - $head_commit_time->getTimestamp();
+		return $time_since_commit <= $this->amend_time_window;
 	}
 }

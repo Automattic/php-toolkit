@@ -314,6 +314,10 @@ class GitRepository {
 		return $name;
 	}
 
+	/**
+	 * @return string Commit hash of the branch tip or the symref branch
+	 *                if $options['follow_symrefs'] is false.
+	 */
 	public function get_branch_tip( $branch_name = 'HEAD', $options = array() ) {
 		while ( true ) {
 			if ( $this->has_object( $branch_name ) ) {
@@ -469,7 +473,9 @@ class GitRepository {
 
 		$new_commit_hash = $this->commit(
 			array(
-				'message' => 'Merge commit ' . $commit_hash2 . ' into ' . $commit_hash1,
+				'commit' => array(
+					'message' => 'Merge commit ' . $commit_hash2 . ' into ' . $commit_hash1,
+				),
 				'updates' => $updates,
 				'deletes' => $deletes,
 				'parents' => array(
@@ -685,17 +691,20 @@ class GitRepository {
 		}
 
 		// Create a new commit object
-		$options['tree'] = $root_tree_oid;
-		if ( ! isset( $options['parents'] ) && $this->get_branch_tip( 'HEAD' ) ) {
-			$options['parents'] = array( $head );
+		$commit_options = $options['commit'] ?? array();
+		$commit_options['tree'] = $root_tree_oid;
+		if ( ! isset( $commit_options['parents'] ) && $this->get_branch_tip( 'HEAD' ) ) {
+			$commit_options['parents'] = array( $head );
 		}
 
 		if ( $is_amend && ! $options['message'] ) {
-			$options['message'] = $this->read_object( $head )->as_commit()->message;
+			$commit_options['message'] = $this->read_object( $head )->as_commit()->message;
 		}
+		
+		$commit_message = $this->create_commit( $commit_options )->get_commit_string();
 		$commit_oid = $this->add_object(
 			'commit',
-			$this->create_commit_string( $options )
+			$commit_message
 		);
 
 		// Update HEAD
@@ -706,8 +715,8 @@ class GitRepository {
 			$this->set_branch_tip( 'HEAD', $commit_oid );
 		}
 
-		if ( isset( $options['amend'] ) && $options['amend'] && isset( $options['parents'] ) ) {
-			$commit_oid = $this->squash( $commit_oid, $options['parents'][0] );
+		if ( isset( $options['amend'] ) && $options['amend'] && isset( $commit_options['parents'] ) ) {
+			$commit_oid = $this->squash( $commit_oid, $commit_options['parents'][0] );
 		}
 
 		return $commit_oid;
@@ -813,7 +822,6 @@ class GitRepository {
 
 	public function squash( $squash_into_commit_oid, $squash_until_ancestor_oid ) {
 		// Find the parent of the squashed range
-		$this->read_object( $squash_until_ancestor_oid );
 		$new_base_oid = $this->read_object( $squash_until_ancestor_oid )->as_commit()->get_first_parent_hash();
 
 		// Reparent the commits from HEAD until $squash_into_commit_oid onto the parent
@@ -836,39 +844,18 @@ class GitRepository {
 	 * It just changes the parent of the specified commit range to $new_base_oid.
 	 */
 	public function reparent_commit_range( $head_oid, $last_ancestor_oid, $new_base_oid ) {
-		// @TODO: Error handling. Exceptions would make it very convenient – maybe let's
-		// use them internally?
-		$commits_to_rebase = array();
-		$moving_head       = $head_oid;
-		while ( true ) {
-			$hash                = $this->find_hash_by_path( $moving_head );
-			$commits_to_rebase[] = $hash;
-			if ( $hash === $last_ancestor_oid ) {
-				break;
-			}
-			$parent = $this->read_object( $moving_head )->as_commit()->get_first_parent_hash();
-			if ( Commit::is_null_hash( $parent ) ) {
-				throw new GitException(
-					'$last_ancestor_oid must be an ancestor of $head_oid for reparenting to work, but ' . $last_ancestor_oid . ' is not an ancestor of ' . $hash . '.',
-				);
-			}
-			$moving_head = $parent;
-		}
+		$commits_to_rebase = $this->get_commits_range( $head_oid, $last_ancestor_oid );
 
 		// Rebase $squash_into_commit_oid and its descenrants onto the parent
 		// of the squashed range.
 		$new_parent_oid = $new_base_oid;
 		for ( $i = count( $commits_to_rebase ) - 1; $i >= 0; $i-- ) {
-			$this->read_object( $commits_to_rebase[ $i ] );
 			$parsed_old_commit = $this->read_object( $commits_to_rebase[ $i ] )->as_commit();
-			$new_parent_oid    = $this->add_object(
+			$updated_commit = clone $parsed_old_commit;
+			$updated_commit->parents = array( $new_parent_oid );
+			$new_parent_oid = $this->add_object(
 				'commit',
-				$this->derive_commit_string(
-					$parsed_old_commit,
-					array(
-						'parents' => array( $new_parent_oid ),
-					)
-				)
+				$updated_commit->get_commit_string()
 			);
 		}
 		$new_head_oid = $new_parent_oid;
@@ -876,57 +863,38 @@ class GitRepository {
 		return $new_head_oid;
 	}
 
-	private function derive_commit_string( $parsed_commit, $updates ) {
-		/**
-		 * Keep the author and author_date as they are.
-		 *
-		 * The Git Book says:
-		 *
-		 * > You may be wondering what the difference is between author and committer. The
-		 * > author is the person who originally wrote the patch, whereas the committer is
-		 * > the person who last applied the patch. So, if you send in a patch to a project
-		 * > and one of the core members applies the patch, both of you get credit — you as
-		 * > the author and the core member as the committer
-		 *
-		 * See http://git-scm.com/book/ch2-3.html for more information.
-		 */
-		unset( $updates['author'] );
-		unset( $updates['author_date'] );
-
-		return $this->create_commit_string( array_merge( $parsed_commit, $updates ) );
+	public function get_commits_range( $head_oid, $last_ancestor_oid ) {
+		$commits = array();
+		$current_oid = $head_oid;
+		while ( true ) {
+			$commits[] = $current_oid;
+			if ( $current_oid === $last_ancestor_oid ) {
+				break;
+			}
+			$current_oid = $this->read_object( $current_oid )->as_commit()->get_first_parent_hash();
+			if(null === $current_oid) {
+				throw new GitException(
+					'$last_ancestor_oid must be an ancestor of $head_oid for reparenting to work, but ' . $last_ancestor_oid . ' is not an ancestor of ' . $head_oid . '.',
+				);
+			}
+		}
+		return $commits;
 	}
 
-	private function create_commit_string( $options ) {
+	private function create_commit( $options ) {
 		if ( ! isset( $options['tree'] ) ) {
 			_doing_it_wrong( __METHOD__, '"tree" commit meta field is required', '1.0.0' );
 
 			return false;
 		}
-		if ( ! isset( $options['author'] ) ) {
-			$options['author'] = $this->get_config_value( 'user.name' ) . ' <' . $this->get_config_value( 'user.email' ) . '>';
-		}
-		if ( ! isset( $options['author_date'] ) ) {
-			$options['author_date'] = time() . ' +0000';
-		}
-		if ( ! isset( $options['committer'] ) ) {
-			$options['committer'] = $this->get_config_value( 'user.name' ) . ' <' . $this->get_config_value( 'user.email' ) . '>';
-		}
-		if ( ! isset( $options['committer_date'] ) ) {
-			$options['committer_date'] = time() . ' +0000';
-		}
-		$options['message'] = $options['message'] ?? 'Changes';
-		$commit_message     = array();
-		$commit_message[]   = 'tree ' . $options['tree'];
-		if ( isset( $options['parents'] ) ) {
-			foreach ( $options['parents'] as $parent ) {
-				$commit_message[] = 'parent ' . $parent;
-			}
-		}
-		$commit_message[] = 'author ' . $options['author'] . ' ' . $options['author_date'];
-		$commit_message[] = 'committer ' . $options['committer'] . ' ' . $options['committer_date'];
-		$commit_message[] = "\n" . $options['message'];
-
-		return implode( "\n", $commit_message );
+		return new Commit( [
+			...$options,
+			'author' => $options['author'] ?? ( $this->get_config_value( 'user.name' ) . ' <' . $this->get_config_value( 'user.email' ) . '>' ),
+			'author_date' => $options['author_date'] ?? date( 'Y-m-d H:i:s' ) . ' +0000',
+			'committer' => $options['committer'] ?? ( $this->get_config_value( 'user.name' ) . ' <' . $this->get_config_value( 'user.email' ) . '>' ),
+			'committer_date' => $options['committer_date'] ?? date( 'Y-m-d H:i:s' ) . ' +0000',
+			'message' => $options['message'] ?? 'Changes',			
+		] );
 	}
 
 	private function mark_tree_path_changed( &$changed_trees, $path ) {

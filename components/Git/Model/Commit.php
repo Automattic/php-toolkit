@@ -7,6 +7,7 @@ use WordPress\Git\GitException;
 class Commit {
 
 	public const NULL_HASH = '0000000000000000000000000000000000000000';
+	public const DATE_FORMAT = 'Y-m-d H:i:s +Z';
 
 	/**
 	 * The commit hash
@@ -82,6 +83,18 @@ class Commit {
 			}
 			$this->$key = $value;
 		}
+		if(!isset($this->author)) {
+			$this->author = 'Admin <adam@adamziel.com>';
+		}
+		if(!isset($this->author_date)) {
+			$this->author_date = time() . ' +0000'; //date(self::DATE_FORMAT);
+		}
+		if(!isset($this->committer)) {
+			$this->committer = 'Admin <adam@adamziel.com>';
+		}
+		if(!isset($this->committer_date)) {
+			$this->committer_date = time() . ' +0000'; //date(self::DATE_FORMAT);
+		}
 	}
 
 	public function get_first_parent_hash() {
@@ -90,5 +103,20 @@ class Commit {
 		}
 
 		return $this->parents;
+	}
+
+	public function get_commit_string() {
+		$commit_message     = array();
+		$commit_message[]   = 'tree ' . $this->tree;
+		if ( isset( $this->parents ) ) {
+			foreach ( $this->parents as $parent ) {
+				$commit_message[] = 'parent ' . $parent;
+			}
+		}
+		$commit_message[] = 'author ' . $this->author . ' ' . $this->author_date;
+		$commit_message[] = 'committer ' . $this->committer . ' ' . $this->committer_date;
+		$commit_message[] = "\n" . $this->message;
+
+		return implode( "\n", $commit_message );
 	}
 }
