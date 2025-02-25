@@ -720,7 +720,7 @@ closeInserterOnBlockInsert();
 // Subscribe to the entity record and resetBlocks() whenever it changes
 const SAVE_AFTER_INACTIVITY_MS = 5000;
 const SAVE_NO_LATER_THAN_MS = 30000;
-const SYNC_EVERY_MS = 1000 * 60 * 5; // 10 minutes
+const SYNC_EVERY_MS = 1000 * 60 * 10; // 10 minutes
 const replaceEditorContentOnEntityChange = () => {
 	/**
 	 * Mode 1: Collaborative editing.
@@ -1322,6 +1322,7 @@ async function syncDataSource() {
 	try {
 		await dispatch(uiStore).syncDataSource();
 	} catch (error) {
+		console.error(error);
 		dispatch(noticesStore).createErrorNotice(
 			'Error syncing data source. You may be offline.',
 			{

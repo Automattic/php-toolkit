@@ -221,7 +221,7 @@ export const uiStore = createReduxStore(STORE_NAME, {
 			};
 		},
 		syncDataSource() {
-			return async ({ dispatch }) => {
+			return async ({ dispatch, select, registry }) => {
 				dispatch({
 					type: 'SET_IS_SYNCING_DATA_SOURCE',
 					isSyncing: true,
@@ -248,6 +248,24 @@ export const uiStore = createReduxStore(STORE_NAME, {
 						type: 'SET_IS_SYNCING_DATA_SOURCE',
 						isSyncing: false,
 					});
+				}
+
+				const files = registry
+					.select(coreStore)
+					.getEntityRecords('static-files-editor', 'files', {
+						per_page: -1,
+					});
+				for (const file of files) {
+					if (!file.post_id) {
+						continue;
+					}
+					registry
+						.dispatch(coreStore)
+						.invalidateResolution('getEntityRecord', [
+							'postType',
+							WP_LOCAL_FILE_POST_TYPE,
+							file.post_id,
+						]);
 				}
 			};
 		},
