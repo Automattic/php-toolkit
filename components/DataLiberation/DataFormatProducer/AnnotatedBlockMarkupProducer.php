@@ -56,6 +56,7 @@ class AnnotatedBlockMarkupProducer {
 						$value = json_encode( $value );
 					}
 					$p->set_attribute( 'content', $value );
+					$p->set_attribute( 'type', gettype($value) );
 					$this->result .= $p->get_updated_html() . "\n";
 				}
 			}

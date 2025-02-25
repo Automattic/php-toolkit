@@ -747,6 +747,8 @@ class WP_Static_Files_Editor_Plugin {
 						);
 
 						if ( $merge_result->has_conflicts() ) {
+							// @TODO: Log all the the merge conflicts for inspection later.
+
 							/**
 							 * We could not resolve the conflicts.
 							 *
@@ -856,7 +858,7 @@ class WP_Static_Files_Editor_Plugin {
 			array(
 				'post_title' => array( $post_entity['post_title'] ),
 				// 'post_date_gmt' => array( $post_entity['post_date_gmt'] ),
-				'menu_order' => array( (int) $post_entity['menu_order'] ),
+				'menu_order' => array( $post_entity['menu_order'] ),
 			)
 		);
 	}

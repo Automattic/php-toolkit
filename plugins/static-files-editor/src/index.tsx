@@ -30,6 +30,7 @@ import { FileSubtree } from 'components/FilePickerTree/types';
 import './blocks/diff';
 import {
 	uiStore,
+	getPostContent,
 	WP_LOCAL_FILE_POST_TYPE,
 	isPreviewableAssetPath,
 } from './store';
@@ -837,6 +838,7 @@ const replaceEditorContentOnEntityChange = () => {
 		) {
 			// If nothing changed since the last setInterval call, don't do anything. Just
 			// let the scheduled save run.
+			await syncIfItsTime();
 			return;
 		}
 		if (postSaveDetails[currentPostId]) {
@@ -1258,20 +1260,6 @@ const replaceEditorContentOnEntityChange = () => {
 
 		// Return the processed HTML string
 		return tempDiv.innerHTML;
-	}
-
-	function getPostContent(post) {
-		const contentField = post.content;
-		if (post.blocks) {
-			return serialize(post.blocks);
-		}
-		if (typeof contentField === 'string') {
-			return contentField.trim();
-		}
-		if (typeof contentField?.raw === 'string') {
-			return contentField.raw.trim();
-		}
-		return false;
 	}
 
 	function storeMarkupEdits(postId, content) {

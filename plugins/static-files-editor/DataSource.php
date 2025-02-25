@@ -5,6 +5,9 @@ use WordPress\Filesystem\LocalFilesystem;
 use WordPress\Git\GitFilesystem;
 use WordPress\Git\GitRemote;
 use WordPress\Git\GitRepository;
+use WordPress\Merge\Diff\MyersDiffer;
+use WordPress\Merge\Merge\ChunkMerger;
+use WordPress\Merge\Validate\BlockMarkupMergeValidator;
 
 interface DataSource {
 	public function sync();
@@ -28,6 +31,11 @@ class GitDataSource implements DataSource {
 
 		$local_fs = LocalFilesystem::create( $dot_git_path );
 
+		/**
+		 * @TODO: Use a merge strategy that understands which files
+		 *        are posts and then performs a three-way merge in the
+		 *        block markup domain.
+		 */
 		$repo = new GitRepository( $local_fs );
 		$repo->add_remote( 'origin', $config['gitRepo'] );
 		if ( ! $repo->branch_exists( $config['selectedBranch'] ) ) {
