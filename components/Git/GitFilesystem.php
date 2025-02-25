@@ -2,6 +2,7 @@
 
 namespace WordPress\Git;
 
+use DateTime;
 use WordPress\ByteStream\ReadStream\ByteReadStream;
 use WordPress\Filesystem\Filesystem;
 use WordPress\Filesystem\FilesystemException;
@@ -40,9 +41,12 @@ class GitFilesystem implements Filesystem {
 		GitRepository $repo,
 		$options = array()
 	) {
-		$this->repo      = $repo;
-		$this->auto_push = $options['auto_push'] ?? false;
+		$this->repo              = $repo;
+		$this->auto_push         = $options['auto_push'] ?? false;
 		$this->amend_time_window = $options['amend_time_window'] ?? false;
+		// if ( false !== amend_time_window ) {
+
+		// }
 		if ( $this->auto_push ) {
 			$this->remote = $options['remote'] ?? null;
 			if ( ! $this->remote ) {
@@ -172,33 +176,42 @@ class GitFilesystem implements Filesystem {
 	}
 
 	private function commit( $options ) {
-		$should_amend = false;//$this->should_amend();
-		$this->repo->commit( [
-			...$options,
-			// 'amend' => $should_amend,
-		] );
-
-		/**
-		 * Push if auto-push is enabled
-		 */
-		if ( $this->auto_push && !$should_amend ) {
-			try {
-				$this->remote->push();
-			} catch ( GitException $e ) {
-				// If push failed, pull and retry
-				$this->remote->pull(
-					$this->get_repository()->get_current_branch_name()
-				);
-
-				// If pull succeeded, try pushing again
-				$this->remote->push();
-			}
+		if ( ! $this->auto_push ) {
+			$this->repo->commit($options);
+			return true;
 		}
+
+		$should_amend = $this->should_amend_last_commit();
+		if ( ! $should_amend ) {
+			$this->graceful_push();
+			$this->repo->commit($options);
+			return true;
+		}
+
+		$this->repo->commit(
+			array(
+				...$options,
+				'amend' => true,
+			)
+		);
 
 		return true;
 	}
 
-	private function should_amend() {
+	private function graceful_push() {
+		try {
+			$this->remote->push();
+		} catch ( GitRemoteException $e ) {
+			// If push failed, there could be new remote commits.
+			// Pull and retry.
+			$this->remote->pull();
+
+			// If pull succeeded, try pushing again
+			$this->remote->push();
+		}
+	}
+
+	private function should_amend_last_commit() {
 		if ( false === $this->amend_time_window ) {
 			return false;
 		}
@@ -206,19 +219,39 @@ class GitFilesystem implements Filesystem {
 		try {
 			$head_commit_hash = $this->repo->get_branch_tip( 'HEAD' );
 		} catch ( GitException $e ) {
-			// die("Error getting branch tip: " . $e->getMessage());
 			return false;
 		}
 
 		$head_commit = $this->repo->read_object( $head_commit_hash )->as_commit();
-		try {
-			$head_commit_time = new \DateTime( $head_commit->author_date );
-		} catch ( \DateMalformedStringException $e ) {
-			// die("Error parsing author date: " . $e->getMessage());
+		/**
+		 * Amending merge commits in auto_push mode is not supported yet. It seems to involve
+		 * additional complexity for no apparent benefit. We can just create a new commit instead.
+		 */
+		if(count($head_commit->parents) > 1) {
 			return false;
 		}
 
-		$time_since_commit = time() - $head_commit_time->getTimestamp();
-		return $time_since_commit <= $this->amend_time_window;
+		try {
+			$head_commit_time = $head_commit->get_author_date_time();
+		} catch ( \DateMalformedStringException $e ) {
+			return false;
+		}
+		$now = new \DateTime();
+		$time_since_commit = (float)$now->format('U') - (float)$head_commit_time->format('U');
+		if($time_since_commit > $this->amend_time_window) {
+			return false;
+		}
+
+		$full_branch_name = $this->get_repository()->get_current_branch_name();
+		$short_branch_name = str_starts_with($full_branch_name, 'refs/heads/') ? substr($full_branch_name, 11) : $full_branch_name;
+		$remote_name = $this->remote->get_name();
+		$remote_branch_name = "refs/remotes/{$remote_name}/{$short_branch_name}";
+		$remote_branch_hash = $this->get_repository()->get_branch_tip($remote_branch_name);
+
+		// Very naively check whether we've already pushed this commit to the remote.
+		// @TODO: Either improve the graph algebra here or use "Draft: " prefix in these
+		//        amended commits (and remove it before pushing?)
+		return $remote_branch_hash !== $head_commit_hash;
 	}
+
 }

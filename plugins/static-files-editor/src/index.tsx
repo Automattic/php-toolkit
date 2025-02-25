@@ -543,104 +543,175 @@ closeInserterOnBlockInsert();
 
 // Subscribe to the entity record and resetBlocks() whenever it changes
 const replaceEditorContentOnEntityChange = () => {
-	let lastPostId = select(editorStore).getCurrentPostId();
-	let lastContent = select(editorStore).getEditedPostContent();
-	const scheduledSaves = new Map<number, NodeJS.Timeout>();
-
 	/**
-	 * Mode 1: Save the post content after 5 seconds of inactivity.
+	 * Mode 1: Collaborative editing.
+	 *         Save/refresh the post content every 5 seconds, regardless of user activity.
 	 */
-	// subscribe(() => {
+	// setInterval(async () => {
 	// 	const currentPostId = select(editorStore).getCurrentPostId();
-	// 	const currentContent = select(editorStore).getEditedPostContent();
-
-	// 	if (currentPostId !== lastPostId) {
-	// 		lastPostId = currentPostId;
-	// 		lastContent = currentContent;
-	// 		return;
-	// 	}
-
-	// 	if (currentContent === lastContent) {
-	// 		return;
-	// 	}
-	// 	lastContent = currentContent;
-
-	// 	// Clear any existing timeout for this postId
-	// 	if (scheduledSaves.has(currentPostId)) {
-	// 		clearTimeout(scheduledSaves.get(currentPostId));
-	// 		scheduledSaves.delete(currentPostId);
-	// 	}
-
-	// 	// Schedule a new save in 5 seconds
-	// 	// @TODO: Don't start the next one until this one is finished.
-	// 	const timeoutId = setTimeout(async () => {
-	// 		scheduledSaves.delete(currentPostId);
+	// 	const post = select(coreStore).getEntityRecord(
+	// 		'postType',
+	// 		WP_LOCAL_FILE_POST_TYPE,
+	// 		currentPostId
+	// 	);
+	// 	const editedPost = select(coreStore).getEditedEntityRecord(
+	// 		'postType',
+	// 		WP_LOCAL_FILE_POST_TYPE,
+	// 		currentPostId
+	// 	);
+	// 	const postContent =
+	//         typeof post?.content?.raw === 'string' && post.content.raw.trim();
+	// 	const editedPostContent = (getPostContent(editedPost) || "").trim();
+	// 	const hasEdits = postContent !== editedPostContent;
+	// 	if (hasEdits) {
+	// 		// Make sure the post content is up to date before autosaving.
+	// 		await dispatch(coreStore).editEntityRecord(
+	// 			'postType',
+	// 			WP_LOCAL_FILE_POST_TYPE,
+	// 			currentPostId,
+	// 			{ content: { raw: editedPostContent } }
+	// 		);
 	// 		await dispatch(coreStore).saveEditedEntityRecord(
 	// 			'postType',
 	// 			WP_LOCAL_FILE_POST_TYPE,
 	// 			currentPostId,
 	// 			{ throwOnError: true }
 	// 		);
-	// 	}, 5000);
+	// 	} else {
+	// 		const response = await apiFetch({
+	// 			path: `/wp/v2/${WP_LOCAL_FILE_POST_TYPE}/${currentPostId}?context=edit`,
+	// 		});
 
-	// 	scheduledSaves.set(currentPostId, timeoutId);
-	// });
+	// 		/**
+	// 		 * @TODO: Fix occasional data loss when the user keeps typing after the save have been
+	// 		 *        initiated. We likely need to keep track of any edits made after the saveEditedEntityRecord()
+	// 		 *        call and store them upon receiveEntityRecords.
+	// 		 *
+	// 		 *        Note that, in the unlikely case of a concurrent edit while we were typing,
+	// 		 *        we'll need to diff the saved markup with the received markup and rebase the edits.
+	// 		 */
+	// 		dispatch(coreStore).receiveEntityRecords(
+	// 			'postType',
+	// 			WP_LOCAL_FILE_POST_TYPE,
+	// 			[response],
+	// 			undefined,
+	// 			true
+	// 		);
+	// 	}
+	// }, 5000);
 
 	/**
-	 * Mode 2: Save/refresh the post content every 5 seconds, regardless of user activity.
+	 * Mode 2: Everyday solo editing without having to explicitly hit the "save" button.
+	 *
+	 * Wait for edits, then save the post content after 5 seconds of inactivity. Rinse and repeat.
 	 */
+	const SAVE_AFTER_INACTIVITY_MS = 5000;
+	const SAVE_NO_LATER_THAN_MS = 30000;
+	let postSaveDetails: Record<
+		number,
+		{
+			firstEditAt: number;
+			timeoutId: NodeJS.Timeout;
+		}
+	> = {};
 	setInterval(async () => {
 		const currentPostId = select(editorStore).getCurrentPostId();
+
 		const post = select(coreStore).getEntityRecord(
 			'postType',
 			WP_LOCAL_FILE_POST_TYPE,
 			currentPostId
 		);
+		if (!post) {
+			return;
+		}
+		const postContent = getPostContent(post).trim();
+
 		const editedPost = select(coreStore).getEditedEntityRecord(
 			'postType',
 			WP_LOCAL_FILE_POST_TYPE,
 			currentPostId
 		);
-		const postContent =
-            typeof post?.content?.raw === 'string' && post.content.raw.trim();
-		const editedPostContent = (getPostContent(editedPost) || "").trim();
+		const editedPostContent = (getPostContent(editedPost) || '').trim();
 		const hasEdits = postContent !== editedPostContent;
-		if (hasEdits) {
-			// Make sure the post content is up to date before autosaving.
-			await dispatch(coreStore).editEntityRecord(
-				'postType',
-				WP_LOCAL_FILE_POST_TYPE,
-				currentPostId,
-				{ content: { raw: editedPostContent } }
-			);
-			await dispatch(coreStore).saveEditedEntityRecord(
-				'postType',
-				WP_LOCAL_FILE_POST_TYPE,
-				currentPostId,
-				{ throwOnError: true }
-			);
-		} else {
-			const response = await apiFetch({
-				path: `/wp/v2/${WP_LOCAL_FILE_POST_TYPE}/${currentPostId}?context=edit`,
-			});
 
+		if (!hasEdits) {
 			/**
-			 * @TODO: Fix occasional data loss when the user keeps typing after the save have been
-			 *        initiated. We likely need to keep track of any edits made after the saveEditedEntityRecord()
-			 *        call and store them upon receiveEntityRecords.
+			 * Short-circuit if there are no edits.
 			 *
-			 *        Note that, in the unlikely case of a concurrent edit while we were typing,
-			 *        we'll need to diff the saved markup with the received markup and rebase the edits.
+			 * This code branch may occasionally run when the user edited the post content,
+			 * triggered a save, and then rolled back the edits before the save completed.
+			 *
+			 * That's okay – the first setInterval pass after the save is completed will
+			 * notice that and schedule a new save.
 			 */
-			dispatch(coreStore).receiveEntityRecords(
-				'postType',
-				WP_LOCAL_FILE_POST_TYPE,
-				[response],
-				undefined,
-				true
-			);
+			return;
 		}
-	}, 5000);
+		if (postSaveDetails[currentPostId]) {
+			const msSinceFirstEdit =
+				Date.now() - postSaveDetails[currentPostId].firstEditAt;
+			if (msSinceFirstEdit > SAVE_NO_LATER_THAN_MS) {
+				// Let the scheduled save run.
+				return;
+			}
+			// Ensure only one save is scheduled at any given time.
+			clearTimeout(postSaveDetails[currentPostId].timeoutId);
+		}
+		postSaveDetails[currentPostId] = {
+			firstEditAt:
+				postSaveDetails[currentPostId]?.firstEditAt || Date.now(),
+			timeoutId: setTimeout(async () => {
+				delete postSaveDetails[currentPostId];
+				// If the save is in progress we can skip this function call.
+				// The next setInterval pass will schedule a new save if needed.
+				const saveInProgress = select(coreStore).isSavingEntityRecord(
+					'postType',
+					WP_LOCAL_FILE_POST_TYPE,
+					currentPostId
+				);
+				if (saveInProgress) {
+					return;
+				}
+
+				const post = select(coreStore).getEntityRecord(
+					'postType',
+					WP_LOCAL_FILE_POST_TYPE,
+					currentPostId
+				);
+				if (!post) {
+					return;
+				}
+				const postContent = getPostContent(post).trim();
+
+				const editedPost = select(coreStore).getEditedEntityRecord(
+					'postType',
+					WP_LOCAL_FILE_POST_TYPE,
+					currentPostId
+				);
+				const editedPostContent = (
+					getPostContent(editedPost) || ''
+				).trim();
+				if (postContent === editedPostContent) {
+					return;
+				}
+
+				await dispatch(coreStore).editEntityRecord(
+					'postType',
+					WP_LOCAL_FILE_POST_TYPE,
+					currentPostId,
+					{
+						content: { raw: editedPostContent },
+					}
+				);
+				await dispatch(coreStore).saveEditedEntityRecord(
+					'postType',
+					WP_LOCAL_FILE_POST_TYPE,
+					currentPostId,
+					{ throwOnError: true }
+				);
+			}, SAVE_AFTER_INACTIVITY_MS),
+		};
+	}, 40);
 
 	/**
 	 * Reconcile any changes to the post content with the current editor content.
@@ -654,76 +725,76 @@ const replaceEditorContentOnEntityChange = () => {
 	 *
 	 * @TODO: Restore the cursor position after calling resetBlocks().
 	 */
-	let lastSavedPost = select(coreStore).getEntityRecord(
-		'postType',
-		WP_LOCAL_FILE_POST_TYPE,
-		select(editorStore).getCurrentPostId()
-	);
-	subscribe(() => {
-		const postId = select(editorStore).getCurrentPostId();
-		const updatedPost = select(coreStore).getEntityRecord(
-			'postType',
-			WP_LOCAL_FILE_POST_TYPE,
-			postId
-		);
+	// let lastSavedPost = select(coreStore).getEntityRecord(
+	// 	'postType',
+	// 	WP_LOCAL_FILE_POST_TYPE,
+	// 	select(editorStore).getCurrentPostId()
+	// );
+	// subscribe(() => {
+	// 	const postId = select(editorStore).getCurrentPostId();
+	// 	const updatedPost = select(coreStore).getEntityRecord(
+	// 		'postType',
+	// 		WP_LOCAL_FILE_POST_TYPE,
+	// 		postId
+	// 	);
 
-		if (updatedPost && !lastSavedPost) {
-			lastSavedPost = updatedPost;
-		}
-		if (!lastSavedPost?.content?.raw || lastSavedPost === updatedPost) {
-			return;
-		}
+	// 	if (updatedPost && !lastSavedPost) {
+	// 		lastSavedPost = updatedPost;
+	// 	}
+	// 	if (!lastSavedPost?.content?.raw || lastSavedPost === updatedPost) {
+	// 		return;
+	// 	}
 
-		if (
-			updatedPost &&
-			updatedPost?.content?.raw?.trim() !==
-				lastSavedPost?.content?.raw?.trim()
-		) {
-			lastSavedPost = updatedPost;
-			// Idea 1.1 – merge the document when we notice the post entity have changed.
-			// const currentEditorBlocks = select(blockEditorStore).getBlocks();
-			// const currentEditorContent = serialize(currentEditorBlocks);
+	// 	if (
+	// 		updatedPost &&
+	// 		updatedPost?.content?.raw?.trim() !==
+	// 			lastSavedPost?.content?.raw?.trim()
+	// 	) {
+	// 		lastSavedPost = updatedPost;
+	// 		// Idea 1.1 – merge the document when we notice the post entity have changed.
+	// 		// const currentEditorBlocks = select(blockEditorStore).getBlocks();
+	// 		// const currentEditorContent = serialize(currentEditorBlocks);
 
-			// let finalBlockMarkup = '';
-			// if (lastSavedPost?.content?.raw) {
-			//     const mergedBlockMarkup = threeWayMerge(
-			//         lastSavedPost.content.raw.trim(),
-			//         currentEditorContent.trim(),
-			//         updatedPost.content.raw.trim(),
-			//         validateMergedBlockMarkup
-			//     );
-			//     lastSavedPost = updatedPost;
+	// 		// let finalBlockMarkup = '';
+	// 		// if (lastSavedPost?.content?.raw) {
+	// 		//     const mergedBlockMarkup = threeWayMerge(
+	// 		//         lastSavedPost.content.raw.trim(),
+	// 		//         currentEditorContent.trim(),
+	// 		//         updatedPost.content.raw.trim(),
+	// 		//         validateMergedBlockMarkup
+	// 		//     );
+	// 		//     lastSavedPost = updatedPost;
 
-			//     finalBlockMarkup = mergedBlockMarkup.hasConflicts
-			//         ? currentEditorContent
-			//         : mergedBlockMarkup.mergedContent;
-			// } else {
-			//     finalBlockMarkup = updatedPost.content.raw;
-			// }
-			// if(finalBlockMarkup === currentEditorContent) {
-			//     return;
-			// }
+	// 		//     finalBlockMarkup = mergedBlockMarkup.hasConflicts
+	// 		//         ? currentEditorContent
+	// 		//         : mergedBlockMarkup.mergedContent;
+	// 		// } else {
+	// 		//     finalBlockMarkup = updatedPost.content.raw;
+	// 		// }
+	// 		// if(finalBlockMarkup === currentEditorContent) {
+	// 		//     return;
+	// 		// }
 
-			// Idea 1.2 – assume the merge was done somewhere else and simplyt
-			//            repopulate the editor with the updated post content.
-			// Downside:  It runs more often than necessary, pausing the writing
-			//            experience by moving focus out of the current block.
-			// const post = select(coreStore).getEditedEntityRecord(
-			//     'postType',
-			//     WP_LOCAL_FILE_POST_TYPE,
-			//     postId
-			// );
-			// if(!post) {
-			//     return;
-			// }
+	// 		// Idea 1.2 – assume the merge was done somewhere else and simplyt
+	// 		//            repopulate the editor with the updated post content.
+	// 		// Downside:  It runs more often than necessary, pausing the writing
+	// 		//            experience by moving focus out of the current block.
+	// 		// const post = select(coreStore).getEditedEntityRecord(
+	// 		//     'postType',
+	// 		//     WP_LOCAL_FILE_POST_TYPE,
+	// 		//     postId
+	// 		// );
+	// 		// if(!post) {
+	// 		//     return;
+	// 		// }
 
-			// const blocks = parse(post.content);
-			// dispatch(blockEditorStore).resetBlocks(blocks);
+	// 		// const blocks = parse(post.content);
+	// 		// dispatch(blockEditorStore).resetBlocks(blocks);
 
-			// Idea 1.3 – handle everything in apiFetch() as a substitute for
-			//            patching saveEntityRecord().
-		}
-	});
+	// 		// Idea 1.3 – handle everything in apiFetch() as a substitute for
+	// 		//            patching saveEntityRecord().
+	// 	}
+	// });
 
 	/**
 	 * Reconcile any changes to the post content with the current editor content.
@@ -738,12 +809,13 @@ const replaceEditorContentOnEntityChange = () => {
 	 * @TODO: Restore the cursor position after calling resetBlocks().
 	 */
 	apiFetch.use(async (options, next) => {
-		const currentPostId = select(editorStore).getCurrentPostId();
-		if (
-			!options.path.startsWith(
-				`/wp/v2/${WP_LOCAL_FILE_POST_TYPE}/${currentPostId}`
-			)
-		) {
+		const expectedPrefix = `/wp/v2/${WP_LOCAL_FILE_POST_TYPE}/`;
+		if (!options.path.startsWith(expectedPrefix)) {
+			return next(options);
+		}
+
+		const savedPostId = options.path.substring(expectedPrefix.length).split('/')[0];
+		if (!savedPostId) {
 			return next(options);
 		}
 
@@ -753,14 +825,13 @@ const replaceEditorContentOnEntityChange = () => {
 		const postWhenSaveStarted = select(coreStore).getEntityRecord(
 			'postType',
 			WP_LOCAL_FILE_POST_TYPE,
-			currentPostId
+			savedPostId
 		);
-		// if (typeof options?.data?.content?.raw === 'string') {
-		//     options.data.content.raw = removeEmptyTextNodesFromHTML(options.data.content.raw);
-		// }
-		const contentWhenSaveStarted = getPostContent(
-			options.data || postWhenSaveStarted
-		);
+		const savedPost = options.data || postWhenSaveStarted;
+		if (!savedPost) {
+			return next(options);
+		}
+		const contentWhenSaveStarted = getPostContent(savedPost);
 
 		let response = (await next(options)) as Response;
 		const postEditedSinceSaveStarted = select(
@@ -768,7 +839,7 @@ const replaceEditorContentOnEntityChange = () => {
 		).getEditedEntityRecord(
 			'postType',
 			WP_LOCAL_FILE_POST_TYPE,
-			currentPostId
+			savedPostId
 		);
 
 		let postFromTheServer = null;
@@ -816,7 +887,7 @@ const replaceEditorContentOnEntityChange = () => {
 		serverContent = consistentBlockMarkupFormatting(serverContent);
 		postEditedContent = consistentBlockMarkupFormatting(postEditedContent);
 
-		const currentPostId = postWhenSaveStarted.id;
+		const savedPostId = postWhenSaveStarted.id;
 
 		/**
 		 * When the server replied with the post we saved, the data layer
@@ -828,11 +899,9 @@ const replaceEditorContentOnEntityChange = () => {
 		 * is up to date.
 		 */
 		if (blockMarkupEquals(contentWhenSaveStarted, serverContent)) {
-			console.log('Branch 1');
 			if (!blockMarkupEquals(contentWhenSaveStarted, postEditedContent)) {
-				console.log('Branch 1.1');
 				setTimeout(() => {
-					storeMarkupEdits(currentPostId, postEditedContent);
+					storeMarkupEdits(savedPostId, postEditedContent);
 				}, 5);
 			}
 			return;
@@ -844,31 +913,17 @@ const replaceEditorContentOnEntityChange = () => {
 		 * with the server response.
 		 */
 		if (blockMarkupEquals(contentWhenSaveStarted, postEditedContent)) {
-			console.log('Branch 2');
 			setTimeout(() => {
-				console.log('Branch 2.1');
+				const postIdSelectedNow =
+					select(editorStore).getCurrentPostId();
+				if (postIdSelectedNow !== savedPostId) {
+					return;
+				}
 				dispatch(blockEditorStore).resetBlocks(parse(serverContent));
 			}, 5);
 			return;
 		}
 
-		console.log({
-			serverContent,
-			postEditedContent,
-			contentWhenSaveStarted,
-			'contentWhenSaveStarted === serverContent': blockMarkupEquals(
-				contentWhenSaveStarted,
-				serverContent
-			),
-			'postEditedContent === serverContent': blockMarkupEquals(
-				postEditedContent,
-				serverContent
-			),
-			'contentWhenSaveStarted === postEditedContent': blockMarkupEquals(
-				contentWhenSaveStarted,
-				postEditedContent
-			),
-		});
 		/**
 		 * Otherwise, the server reply contains edits from
 		 * another party that we did not perform in the editor.
@@ -900,8 +955,6 @@ const replaceEditorContentOnEntityChange = () => {
 			!mergedBlockMarkup.hasConflicts &&
 			finalBlockMarkup === postEditedContent
 		) {
-			console.log('Branch 3');
-			console.log('three way merge no conflicts');
 			return;
 		}
 
@@ -919,22 +972,17 @@ const replaceEditorContentOnEntityChange = () => {
 		 * we already have.
 		 */
 		setTimeout(() => {
-			console.log('Branch 4');
-			console.log('!Reconciling edits');
 			if (!wasGetRequest) {
-				storeMarkupEdits(currentPostId, finalBlockMarkup);
+				storeMarkupEdits(savedPostId, finalBlockMarkup);
 			}
 
+			const postIdSelectedNow = select(editorStore).getCurrentPostId();
+			if (postIdSelectedNow !== savedPostId) {
+				return;
+			}
 			// If we're here, the server responded with a document we haven't
 			// seen before which likely means there have been concurrent edits.
 			// Let's populate the editor with the final merged outcome.
-			console.log('resetBlocks', parse(finalBlockMarkup));
-			console.log({
-				contentWhenSaveStarted,
-				serverContent,
-				'contentWhenSaveStarted === serverContent':
-					contentWhenSaveStarted === serverContent,
-			});
 			dispatch(blockEditorStore).resetBlocks(parse(finalBlockMarkup));
 		}, 5);
 
@@ -968,8 +1016,8 @@ const replaceEditorContentOnEntityChange = () => {
 	 *
 	 * This function ensures the formatting remains consistent for diffing and merging.
 	 */
-    function consistentBlockMarkupFormatting(htmlString) {
-        return serialize(parse(htmlString));
+	function consistentBlockMarkupFormatting(htmlString) {
+		return serialize(parse(htmlString));
 	}
 
 	function blockMarkupEquals(a, b) {
@@ -1050,70 +1098,6 @@ const replaceEditorContentOnEntityChange = () => {
 			}),
 		];
 	}
-
-	// const originalSaveEntityRecord = dispatch(coreStore).saveEditedEntityRecord;
-	// dispatch(coreStore).saveEditedEntityRecord = async (type, name, id, ...rest) => {
-	//     await originalSaveEntityRecord(type, name, id, ...rest);
-	//     const currentPostId = select(editorStore).getCurrentPostId();
-	//     if (type === 'postType' && name === WP_LOCAL_FILE_POST_TYPE && currentPostId === id) {
-	//         const currentContent = select(editorStore).getEditedPostContent();
-	//         const hasEdits = select(coreStore).hasEditsForEntityRecord(
-	//             'postType',
-	//             WP_LOCAL_FILE_POST_TYPE,
-	//             currentPostId
-	//         );
-	//     }
-	// };
-
-	// Uncomment this to replace the editor content on autosave.
-	// let lastStoredAutosave = select(coreStore).getAutosave(
-	// 	WP_LOCAL_FILE_POST_TYPE,
-	// 	select(editorStore).getCurrentPostId(),
-	// 	select(coreStore).getCurrentUser().id
-	// );
-	// subscribe(() => {
-	// 	const postId = select(editorStore).getCurrentPostId();
-	// 	const user = select(coreStore).getCurrentUser();
-
-	// 	const updatedAutosave = select(coreStore).getAutosave(
-	// 		WP_LOCAL_FILE_POST_TYPE,
-	// 		postId,
-	// 		user.id
-	// 	);
-	// 	if (updatedAutosave && !lastStoredAutosave) {
-	// 		lastStoredAutosave = updatedAutosave;
-	// 	}
-	// 	if (!lastStoredAutosave || lastStoredAutosave === updatedAutosave) {
-	// 		return;
-	// 	}
-
-	// 	const currentEditorBlocks = select(blockEditorStore).getBlocks();
-	// 	const currentEditorContent = serialize(currentEditorBlocks);
-
-	// 	if (
-	// 		!updatedAutosave ||
-	// 		updatedAutosave.content.raw === lastStoredAutosave?.content?.raw ||
-	// 		updatedAutosave.content.raw === currentEditorContent
-	// 	) {
-	// 		return;
-	// 	}
-
-	// 	const mergedBlockMarkup = threeWayMerge(
-	// 		lastStoredAutosave.content.raw.trim(),
-	// 		currentEditorContent.trim(),
-	// 		updatedAutosave.content.raw.trim(),
-	// 		validateMergedBlockMarkup
-	//     );
-
-	// 	lastStoredAutosave = updatedAutosave;
-
-	// 	const finalBlockMarkup = mergedBlockMarkup.hasConflicts
-	// 		? currentEditorContent
-	// 		: mergedBlockMarkup.mergedContent;
-
-	// 	const blocks = parse(finalBlockMarkup);
-	// 	dispatch(blockEditorStore).resetBlocks(blocks);
-	// });
 };
 
 replaceEditorContentOnEntityChange();

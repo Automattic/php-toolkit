@@ -150,7 +150,7 @@ class GitRepository {
 		if ( ! $this->fs->is_file( $object_path ) ) {
 			throw new GitException(
 				sprintf(
-					'Object %s not found',
+					'Object %s not available in the local repository',
 					$oid
 				)
 			);
@@ -309,6 +309,10 @@ class GitRepository {
 		if ( $this->has_object( $name ) ) {
 			// Commit hash, not a branch name
 			return false;
+		}
+
+		if(substr($name, 0, 5) === 'ref: ') {
+			$name = trim(substr($name, 5));
 		}
 
 		return $name;
@@ -564,6 +568,7 @@ class GitRepository {
 
 		$found_parents    = array();
 		$enqueued_parents = array( $commit_hash );
+		$parent_to_child  = array();
 		while ( ! empty( $enqueued_parents ) ) {
 			$next_parent_hash = array_pop( $enqueued_parents );
 			if ( Commit::is_null_hash( $next_parent_hash ) ) {
@@ -572,13 +577,23 @@ class GitRepository {
 
 			if ( ! $this->has_object( $next_parent_hash ) ) {
 				if ( $on_missing === 'throw' ) {
-					throw new GitException( 'Parent commit of ' . $next_parent_hash . ' not found.' );
+					throw new GitException(
+						sprintf(
+							'Commit %s (parent of %s) is not available in the local repository.',
+							$next_parent_hash,
+							$parent_to_child[ $next_parent_hash ] ?? '<branch tip – not a parent>'
+						)
+					);
 				} else {
 					continue;
 				}
 			}
 
-			$parents = $this->read_object( $next_parent_hash )->as_commit()->parents;
+			$child   = $next_parent_hash;
+			$parents = $this->read_object( $child )->as_commit()->parents;
+			foreach ( $parents as $parent ) {
+				$parent_to_child[ $parent ] = $child;
+			}
 
 			$found_parents = array_merge(
 				$found_parents,
@@ -691,18 +706,27 @@ class GitRepository {
 		}
 
 		// Create a new commit object
-		$commit_options = $options['commit'] ?? array();
+		$commit_options         = $options['commit'] ?? array();
 		$commit_options['tree'] = $root_tree_oid;
 		if ( ! isset( $commit_options['parents'] ) && $this->get_branch_tip( 'HEAD' ) ) {
 			$commit_options['parents'] = array( $head );
 		}
 
-		if ( $is_amend && ! $options['message'] ) {
-			$commit_options['message'] = $this->read_object( $head )->as_commit()->message;
+		if ( $is_amend ) {
+			$previous_commit = $this->read_object( $head )->as_commit();
+			if ( ! isset( $options['message'] ) ) {
+				$commit_options['message'] = $previous_commit->message;
+			}
+			if ( ! isset( $options['author'] ) ) {
+				$commit_options['author'] = $previous_commit->author;
+			}
+			if ( ! isset( $options['author_date'] ) ) {
+				$commit_options['author_date'] = $previous_commit->author_date;
+			}
 		}
-		
+
 		$commit_message = $this->create_commit( $commit_options )->get_commit_string();
-		$commit_oid = $this->add_object(
+		$commit_oid     = $this->add_object(
 			'commit',
 			$commit_message
 		);
@@ -850,10 +874,10 @@ class GitRepository {
 		// of the squashed range.
 		$new_parent_oid = $new_base_oid;
 		for ( $i = count( $commits_to_rebase ) - 1; $i >= 0; $i-- ) {
-			$parsed_old_commit = $this->read_object( $commits_to_rebase[ $i ] )->as_commit();
-			$updated_commit = clone $parsed_old_commit;
+			$parsed_old_commit       = $this->read_object( $commits_to_rebase[ $i ] )->as_commit();
+			$updated_commit          = clone $parsed_old_commit;
 			$updated_commit->parents = array( $new_parent_oid );
-			$new_parent_oid = $this->add_object(
+			$new_parent_oid          = $this->add_object(
 				'commit',
 				$updated_commit->get_commit_string()
 			);
@@ -864,7 +888,7 @@ class GitRepository {
 	}
 
 	public function get_commits_range( $head_oid, $last_ancestor_oid ) {
-		$commits = array();
+		$commits     = array();
 		$current_oid = $head_oid;
 		while ( true ) {
 			$commits[] = $current_oid;
@@ -872,7 +896,7 @@ class GitRepository {
 				break;
 			}
 			$current_oid = $this->read_object( $current_oid )->as_commit()->get_first_parent_hash();
-			if(null === $current_oid) {
+			if ( null === $current_oid ) {
 				throw new GitException(
 					'$last_ancestor_oid must be an ancestor of $head_oid for reparenting to work, but ' . $last_ancestor_oid . ' is not an ancestor of ' . $head_oid . '.',
 				);
@@ -887,14 +911,16 @@ class GitRepository {
 
 			return false;
 		}
-		return new Commit( [
-			...$options,
-			'author' => $options['author'] ?? ( $this->get_config_value( 'user.name' ) . ' <' . $this->get_config_value( 'user.email' ) . '>' ),
-			'author_date' => $options['author_date'] ?? null,
-			'committer' => $options['committer'] ?? ( $this->get_config_value( 'user.name' ) . ' <' . $this->get_config_value( 'user.email' ) . '>' ),
-			'committer_date' => $options['committer_date'] ?? null,
-			'message' => $options['message'] ?? 'Changes',			
-		] );
+		return new Commit(
+			array(
+				...$options,
+				'author' => $options['author'] ?? ( $this->get_config_value( 'user.name' ) . ' <' . $this->get_config_value( 'user.email' ) . '>' ),
+				'author_date' => $options['author_date'] ?? null,
+				'committer' => $options['committer'] ?? ( $this->get_config_value( 'user.name' ) . ' <' . $this->get_config_value( 'user.email' ) . '>' ),
+				'committer_date' => $options['committer_date'] ?? null,
+				'message' => $options['message'] ?? 'Changes',
+			)
+		);
 	}
 
 	private function mark_tree_path_changed( &$changed_trees, $path ) {

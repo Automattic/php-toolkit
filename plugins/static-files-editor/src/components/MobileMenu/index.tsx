@@ -73,7 +73,7 @@ const MobileMenu: React.FC = () => {
 				}}
 				className={css.menuItem}
 			>
-				{isPulling ? <Spinner /> : 'Pull changes'}
+				{isPulling ? <Spinner /> : 'Sync changes'}
 			</a>
 			<a href="/wp-admin/" className={css.menuItem}>
 				WP Admin

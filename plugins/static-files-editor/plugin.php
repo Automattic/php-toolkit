@@ -101,11 +101,11 @@ class WP_Static_Files_Editor_Plugin {
 				static::get_settings()
 			);
 
-			// Update the local index once every 10 minutes
+			// Synchronize the data with the remote data source once every 10 minutes
 			$last_reindex_time = get_transient( 'wp_static_files_reindex_time' );
 			if ( ! $last_reindex_time ) {
 				set_transient( 'wp_static_files_reindex_time', time(), 10 * MINUTE_IN_SECONDS );
-				self::$data_source->pull_updates();
+				self::$data_source->sync();
 			}
 		}
 
@@ -130,7 +130,7 @@ class WP_Static_Files_Editor_Plugin {
 
 		if ( empty( $posts ) ) {
 			try {
-				self::get_data_source()->pull_updates();
+				self::get_data_source()->sync();
 				wp_redirect( admin_url( 'post-new.php?post_type=' . WP_LOCAL_FILE_POST_TYPE ) );
 				exit;
 			} catch ( Exception $e ) {
@@ -423,7 +423,7 @@ class WP_Static_Files_Editor_Plugin {
 					'/git/refresh-index',
 					array(
 						'methods'             => 'POST',
-						'callback'            => array( self::class, 'local_files_pull_updates' ),
+						'callback'            => array( self::class, 'local_files_sync_data' ),
 						'permission_callback' => function () {
 							return current_user_can( 'edit_posts' );
 						},
@@ -645,7 +645,7 @@ class WP_Static_Files_Editor_Plugin {
 
 				/**
 				 * Update the local files if we're using a remote datasource.
-				 * 
+				 *
 				 * @TODO: Introduce an "eager" mode where this check runs.
 				 *        It is expensive and running it every 5 seconds seems excessive –
 				 *        How often would another person actually edit the note while we are editing it?
@@ -1778,13 +1778,13 @@ class WP_Static_Files_Editor_Plugin {
 		return new WP_REST_Response( 'Settings saved successfully', 200 );
 	}
 
-	public static function local_files_pull_updates( $request ) {
+	public static function local_files_sync_data( $request ) {
 		try {
 			if ( ! self::acquire_synchronization_lock() ) {
 				return new WP_REST_Response( 'Failed to acquire synchronization lock', 500 );
 			}
 			try {
-				self::get_data_source()->pull_updates();
+				self::get_data_source()->sync();
 			} catch ( Exception $e ) {
 				return new WP_REST_Response( 'Refreshing index failed: ' . $e->getMessage(), 500 );
 			}
@@ -1804,7 +1804,7 @@ class WP_Static_Files_Editor_Plugin {
 			array(
 				'gitRepo'        => '',
 				'selectedBranch' => '',
-				'subdirectory'     => '/',
+				'subdirectory'   => '/',
 				'localRepoPath'  => $uploads_dir['basedir'] . '/static-files-editor',
 				'gitUserName'    => $user->display_name ?? 'WordPress User',
 				'gitUserEmail'   => $user->user_email ?? 'wordpress.admin@localhost',

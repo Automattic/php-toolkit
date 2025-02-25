@@ -77,10 +77,14 @@ class GitRemote {
 		return $refs;
 	}
 
+	public function get_name() {
+		return $this->remote_name;
+	}
+
 	public function get_remote_head( $full_branch_name ) {
 		$remote_refs = $this->ls_refs( $full_branch_name );
 		if ( ! isset( $remote_refs[ $full_branch_name ] ) ) {
-			throw new GitException( 'Branch "' . $full_branch_name . '" not found on remote ' . $this->remote_name );
+			throw new GitRemoteException( 'Branch "' . $full_branch_name . '" not found on remote ' . $this->remote_name );
 		}
 
 		return $remote_refs[ $full_branch_name ];
@@ -124,7 +128,7 @@ class GitRemote {
 		}
 
 		// @TODO: Respect a subpath
-		$common_ancestor = $this->resolve_first_common_ancestor( $push_commit, $remote_commit );
+		$common_ancestor = $this->resolve_first_common_ancestor( $remote_commit, $push_commit );
 		$delta           = $this->repository->find_objects_added_since( $push_commit, $common_ancestor );
 		if ( ! count( $delta ) ) {
 			// Don't push empty commits
@@ -164,7 +168,7 @@ class GitRemote {
 			'ok refs/heads/' . $short_branch_name,
 		);
 		if ( $data_packets != $expected_response ) {
-			throw new GitException( 'Push failed:' . var_export( $data_packets, true ) );
+			throw new GitRemoteException( 'Push failed:' . var_export( $data_packets, true ) );
 		}
 
 		$this->repository->set_branch_tip( 'refs/remotes/' . $this->remote_name . '/' . $short_branch_name, $push_commit );
@@ -252,14 +256,12 @@ class GitRemote {
 
 	public function pull( $full_branch_name = null, $options = array() ) {
 		$full_branch_name = $full_branch_name ?? $this->repository->get_current_branch_name();
-		$path             = $options['path'] ?? '/';
-
 		if ( isset( $options['path'] ) && $options['path'] ) {
 			// Sparse pull
 			$remote_head = $this->fetch(
 				$full_branch_name,
 				array(
-					'path'    => $path,
+					'path'    => $options['path'],
 					'shallow' => $options['shallow'] ?? false,
 				)
 			);
@@ -288,6 +290,7 @@ class GitRemote {
 			$local_head
 		);
 		$required_commits = array( $remote_head, $common_ancestor );
+		$path             = $options['path'] ?? '/';
 		foreach ( $required_commits as $commit ) {
 			if ( ! $this->repository->has_all_objects_from_commit( $commit, $path ) ) {
 				$this->git_upload_pack(
@@ -313,6 +316,9 @@ class GitRemote {
 		} catch ( GitException $e ) {
 			$last_fetched_head_ref = Commit::NULL_HASH;
 		}
+		if ( ! $this->repository->has_object( $last_fetched_head_ref ) ) {
+			$last_fetched_head_ref = Commit::NULL_HASH;
+		}
 
 		$remote_head = $this->get_remote_head( 'refs/heads/' . $branch_name );
 		try {
@@ -321,7 +327,7 @@ class GitRemote {
 			}
 			if ( isset( $options['path'] ) && $options['path'] ) {
 				if ( ! isset( $options['shallow'] ) || $options['shallow'] !== true ) {
-					throw new GitException( 'When you pass a "path" to fetch(), you must also set the "shallow" option to true. Deep partial fetches are not supported.' );
+					throw new GitRemoteException( 'When you pass a "path" to fetch(), you must also set the "shallow" option to true. Deep partial fetches are not supported.' );
 				}
 				$missing_oids = $this->resolve_missing_blobs_oids(
 					$remote_head,
@@ -425,7 +431,7 @@ class GitRemote {
 				$local_commit_hash
 			);
 		} catch ( GitException $e ) {
-			throw new GitException(
+			throw new GitRemoteException(
 				"Remote commit $remote_commit_hash has no common ancestors with the local commit $local_commit_hash.",
 				0,
 				$e
@@ -435,7 +441,7 @@ class GitRemote {
 
 	public function git_upload_pack( $options = array() ) {
 		if ( empty( $options['want_refs'] ) ) {
-			throw new GitException( '$want_refs argument was empty. At least one commit hash must be provided.' );
+			throw new GitRemoteException( '$want_refs argument was empty. At least one commit hash must be provided.' );
 		}
 		$want_refs    = $options['want_refs'];
 		$packet_lines = array();
@@ -499,7 +505,7 @@ class GitRemote {
 	private function http_request( $path, $postData = null, $headers = array() ) {
 		$remote = $this->repository->get_remote( $this->remote_name );
 		if ( ! $remote ) {
-			throw new GitException( 'Remote "' . $this->remote_name . '" not found' );
+			throw new GitRemoteException( 'Remote "' . $this->remote_name . '" not found' );
 		}
 		$url = $remote['url'] . $path;
 
@@ -518,7 +524,7 @@ class GitRemote {
 		$response = $reader->await_response();
 		if ( $response->status_code > 299 || $response->status_code < 200 ) {
 			$reader->pull( 100 );
-			throw new GitException( 'HTTP request failed with status code ' . $response->status_code . '. First 100 body bytes: ' . $reader->peek( 100 ) );
+			throw new GitRemoteException( 'HTTP request failed with status code ' . $response->status_code . '. First 100 body bytes: ' . $reader->peek( 100 ) );
 		}
 
 		return $reader;

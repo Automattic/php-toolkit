@@ -7,7 +7,7 @@ use WordPress\Git\GitRemote;
 use WordPress\Git\GitRepository;
 
 interface DataSource {
-    public function pull_updates();
+    public function sync();
     public function get_filesystem(): Filesystem;
 }
 
@@ -26,7 +26,7 @@ class GitDataSource implements DataSource {
         }
 
         $local_fs = LocalFilesystem::create( $dot_git_path );
-        
+
         $repo     = new GitRepository( $local_fs );
         $repo->add_remote( 'origin', $config['gitRepo'] );
         if(!$repo->branch_exists( $config['selectedBranch'] )) {
@@ -60,10 +60,11 @@ class GitDataSource implements DataSource {
         );
     }
 
-    public function pull_updates() {
+    public function sync() {
         $this->remote->pull( $this->full_branch_name, [
             // 'path' => $this->subdirectory,
         ] );
+		$this->remote->push();
     }
 
     public function get_filesystem(): Filesystem {
@@ -79,7 +80,7 @@ class LocalDirectoryDataSource implements DataSource {
         $this->local_filesystem = $local_filesystem;
     }
 
-    public function pull_updates() {
+    public function sync() {
         // No op
     }
 
