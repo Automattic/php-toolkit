@@ -625,14 +625,14 @@ const replaceEditorContentOnEntityChange = () => {
 		if (!post) {
 			return;
 		}
-		const postContent = getPostContent(post).trim();
+		const postContent = getPostContent(post);
 
 		const editedPost = select(coreStore).getEditedEntityRecord(
 			'postType',
 			WP_LOCAL_FILE_POST_TYPE,
 			currentPostId
 		);
-		const editedPostContent = (getPostContent(editedPost) || '').trim();
+		const editedPostContent = getPostContent(editedPost);
 		const hasEdits = postContent !== editedPostContent;
 
 		if (!hasEdits) {
@@ -681,16 +681,14 @@ const replaceEditorContentOnEntityChange = () => {
 				if (!post) {
 					return;
 				}
-				const postContent = getPostContent(post).trim();
+				const postContent = getPostContent(post);
 
 				const editedPost = select(coreStore).getEditedEntityRecord(
 					'postType',
 					WP_LOCAL_FILE_POST_TYPE,
 					currentPostId
 				);
-				const editedPostContent = (
-					getPostContent(editedPost) || ''
-				).trim();
+				const editedPostContent = getPostContent(editedPost).trim();
 				if (postContent === editedPostContent) {
 					return;
 				}
@@ -814,7 +812,9 @@ const replaceEditorContentOnEntityChange = () => {
 			return next(options);
 		}
 
-		const savedPostId = options.path.substring(expectedPrefix.length).split('/')[0];
+		const savedPostId = options.path
+			.substring(expectedPrefix.length)
+			.split('/')[0];
 		if (!savedPostId) {
 			return next(options);
 		}
@@ -1067,7 +1067,7 @@ const replaceEditorContentOnEntityChange = () => {
 		if (typeof contentField?.raw === 'string') {
 			return contentField.raw.trim();
 		}
-		return false;
+		return '';
 	}
 
 	function storeMarkupEdits(postId, content) {

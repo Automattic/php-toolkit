@@ -311,8 +311,8 @@ class GitRepository {
 			return false;
 		}
 
-		if(substr($name, 0, 5) === 'ref: ') {
-			$name = trim(substr($name, 5));
+		if ( substr( $name, 0, 5 ) === 'ref: ' ) {
+			$name = trim( substr( $name, 5 ) );
 		}
 
 		return $name;

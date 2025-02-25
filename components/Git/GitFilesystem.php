@@ -177,14 +177,14 @@ class GitFilesystem implements Filesystem {
 
 	private function commit( $options ) {
 		if ( ! $this->auto_push ) {
-			$this->repo->commit($options);
+			$this->repo->commit( $options );
 			return true;
 		}
 
 		$should_amend = $this->should_amend_last_commit();
 		if ( ! $should_amend ) {
 			$this->graceful_push();
-			$this->repo->commit($options);
+			$this->repo->commit( $options );
 			return true;
 		}
 
@@ -227,7 +227,7 @@ class GitFilesystem implements Filesystem {
 		 * Amending merge commits in auto_push mode is not supported yet. It seems to involve
 		 * additional complexity for no apparent benefit. We can just create a new commit instead.
 		 */
-		if(count($head_commit->parents) > 1) {
+		if ( count( $head_commit->parents ) > 1 ) {
 			return false;
 		}
 
@@ -236,22 +236,21 @@ class GitFilesystem implements Filesystem {
 		} catch ( \DateMalformedStringException $e ) {
 			return false;
 		}
-		$now = new \DateTime();
-		$time_since_commit = (float)$now->format('U') - (float)$head_commit_time->format('U');
-		if($time_since_commit > $this->amend_time_window) {
+		$now               = new \DateTime();
+		$time_since_commit = (float) $now->format( 'U' ) - (float) $head_commit_time->format( 'U' );
+		if ( $time_since_commit > $this->amend_time_window ) {
 			return false;
 		}
 
-		$full_branch_name = $this->get_repository()->get_current_branch_name();
-		$short_branch_name = str_starts_with($full_branch_name, 'refs/heads/') ? substr($full_branch_name, 11) : $full_branch_name;
-		$remote_name = $this->remote->get_name();
+		$full_branch_name   = $this->get_repository()->get_current_branch_name();
+		$short_branch_name  = str_starts_with( $full_branch_name, 'refs/heads/' ) ? substr( $full_branch_name, 11 ) : $full_branch_name;
+		$remote_name        = $this->remote->get_name();
 		$remote_branch_name = "refs/remotes/{$remote_name}/{$short_branch_name}";
-		$remote_branch_hash = $this->get_repository()->get_branch_tip($remote_branch_name);
+		$remote_branch_hash = $this->get_repository()->get_branch_tip( $remote_branch_name );
 
 		// Very naively check whether we've already pushed this commit to the remote.
 		// @TODO: Either improve the graph algebra here or use "Draft: " prefix in these
-		//        amended commits (and remove it before pushing?)
+		// amended commits (and remove it before pushing?)
 		return $remote_branch_hash !== $head_commit_hash;
 	}
-
 }

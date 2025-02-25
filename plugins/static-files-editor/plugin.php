@@ -1464,7 +1464,9 @@ class WP_Static_Files_Editor_Plugin {
 			if ( ! self::acquire_synchronization_lock() ) {
 				return;
 			}
-			$from_path = wp_canonicalize_path( $request->get_param( 'id' ) );
+			// Need to rawurldecode() because PHP only decodes query parameters automatically.
+			// Paths need manual treatment.
+			$from_path = wp_canonicalize_path( rawurldecode( $request->get_param( 'id' ) ) );
 			$from_path = rtrim( $from_path, '/' );
 
 			$to_path = $request->get_param( 'path' );
