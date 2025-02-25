@@ -11,15 +11,18 @@ import {
 	resolveSelect,
 	subscribe,
 	useSelect,
+	useDispatch,
 } from '@wordpress/data';
 import apiFetch from '@wordpress/api-fetch';
 import { store as noticesStore } from '@wordpress/notices';
 import {
+	injectSingleClickSaveButton,
 	addComponentToEditorContentArea,
 	addLocalFilesTab,
 } from './add-local-files-tab';
 import { store as blockEditorStore } from '@wordpress/block-editor';
 import { parse, serialize } from '@wordpress/blocks';
+import { Button } from '@wordpress/components';
 import { Spinner } from '@wordpress/components';
 import { store as coreStore } from '@wordpress/core-data';
 import css from './style.module.css';
@@ -484,6 +487,78 @@ function PostLoadingOverlay() {
 
 addComponentToEditorContentArea(<PostLoadingOverlay />);
 
+function SingleClickSaveButton() {
+	const { saveEditedEntityRecord } = useDispatch(coreStore);
+	const isSaving = useSelect((select) => {
+		const entitiesBeingSaved =
+			select(coreStore).__experimentalGetEntitiesBeingSaved();
+		return entitiesBeingSaved.some(
+			(entity) =>
+				entity.kind === 'postType' &&
+				entity.name === WP_LOCAL_FILE_POST_TYPE
+		);
+	}, []);
+
+	const dirtyFiles = useSelect((select) => {
+		const dirtyEntityRecords =
+			select(coreStore).__experimentalGetDirtyEntityRecords();
+		return dirtyEntityRecords.filter(
+			(entity) =>
+				entity.kind === 'postType' &&
+				entity.name === WP_LOCAL_FILE_POST_TYPE
+		);
+	}, []);
+
+	if (isSaving) {
+		return (
+			<Button
+				className={`components-button is-primary is-compact ${css.syncButton}`}
+				disabled
+			>
+				<span
+					className={'dashicons dashicons-cloud ' + css.iconFade}
+					style={{ marginRight: '5px' }}
+				></span>
+				<span className={css.iconFade}>Syncing</span>
+			</Button>
+		);
+	}
+
+	if (dirtyFiles.length === 0) {
+		return (
+			<Button
+				className={`components-button is-primary is-compact ${css.syncButton}`}
+				disabled
+			>
+				Synced
+			</Button>
+		);
+	}
+
+	return (
+		<Button
+			className={`components-button is-primary is-compact ${css.syncButton}`}
+			onClick={() => {
+				for (const file of dirtyFiles) {
+					saveEditedEntityRecord(
+						'postType',
+						WP_LOCAL_FILE_POST_TYPE,
+						file.key
+					);
+				}
+			}}
+		>
+			<span
+				className="dashicons dashicons-cloud"
+				style={{ marginRight: '5px' }}
+			></span>
+			Sync now
+		</Button>
+	);
+}
+
+injectSingleClickSaveButton(SingleClickSaveButton);
+
 dispatch(preferencesStore).set('welcomeGuide', false);
 dispatch(preferencesStore).set('enableChoosePatternModal', false);
 dispatch(editorStore).setIsListViewOpened(true);
@@ -610,6 +685,7 @@ const replaceEditorContentOnEntityChange = () => {
 	let postSaveDetails: Record<
 		number,
 		{
+			lastEditedContent: string;
 			firstEditAt: number;
 			timeoutId: NodeJS.Timeout;
 		}
@@ -633,7 +709,7 @@ const replaceEditorContentOnEntityChange = () => {
 			currentPostId
 		);
 		const editedPostContent = getPostContent(editedPost);
-		if(false === postContent || false === editedPostContent) {
+		if (false === postContent || false === editedPostContent) {
 			return;
 		}
 		const hasEdits = postContent !== editedPostContent;
@@ -650,6 +726,15 @@ const replaceEditorContentOnEntityChange = () => {
 			 */
 			return;
 		}
+		if (
+			postSaveDetails[currentPostId] &&
+			editedPostContent ===
+				postSaveDetails[currentPostId].lastEditedContent
+		) {
+			// If nothing changed since the last setInterval call, don't do anything. Just
+			// let the scheduled save run.
+			return;
+		}
 		if (postSaveDetails[currentPostId]) {
 			const msSinceFirstEdit =
 				Date.now() - postSaveDetails[currentPostId].firstEditAt;
@@ -663,6 +748,7 @@ const replaceEditorContentOnEntityChange = () => {
 		postSaveDetails[currentPostId] = {
 			firstEditAt:
 				postSaveDetails[currentPostId]?.firstEditAt || Date.now(),
+			lastEditedContent: editedPostContent,
 			timeoutId: setTimeout(async () => {
 				delete postSaveDetails[currentPostId];
 				// If the save is in progress we can skip this function call.
@@ -673,6 +759,7 @@ const replaceEditorContentOnEntityChange = () => {
 					currentPostId
 				);
 				if (saveInProgress) {
+					console.log('save in progress');
 					return;
 				}
 
@@ -682,6 +769,7 @@ const replaceEditorContentOnEntityChange = () => {
 					currentPostId
 				);
 				if (!post) {
+					console.log('no post');
 					return;
 				}
 				const postContent = getPostContent(post);
@@ -693,9 +781,11 @@ const replaceEditorContentOnEntityChange = () => {
 				);
 				const editedPostContent = getPostContent(editedPost).trim();
 				if (postContent === editedPostContent) {
+					console.log('no edits');
 					return;
 				}
 
+				console.log('saving the edits!');
 				await dispatch(coreStore).editEntityRecord(
 					'postType',
 					WP_LOCAL_FILE_POST_TYPE,
@@ -835,7 +925,7 @@ const replaceEditorContentOnEntityChange = () => {
 			return next(options);
 		}
 		const contentWhenSaveStarted = getPostContent(savedPost);
-		if(false === contentWhenSaveStarted) {
+		if (false === contentWhenSaveStarted) {
 			return next(options);
 		}
 
@@ -878,7 +968,7 @@ const replaceEditorContentOnEntityChange = () => {
 	) {
 		let serverContent = getPostContent(postFromTheServer);
 		let postEditedContent = getPostContent(postEditedSinceSaveStarted);
-		if(false === serverContent || false === postEditedContent) {
+		if (false === serverContent || false === postEditedContent) {
 			return;
 		}
 

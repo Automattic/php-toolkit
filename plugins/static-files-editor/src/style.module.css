@@ -12,6 +12,16 @@
     bottom: 104px !important;
 }
 
+/**
+ * Hide the post editor UI elements that are not useful in the
+ * static files editor
+ */
+:global(.editor-preview-dropdown),
+:global(.components-dropdown:has([aria-label="Tools"])),
+:global([aria-label="View Local File"]) {
+    display: none !important;
+}
+
 .file-picker-tree-container,
 .file-picker-tree-container > div {
 	flex-grow: 1;
@@ -21,4 +31,22 @@
 
 .file-picker-tree-container > div > div[role='application'] {
 	flex-grow: 1;
+}
+
+@keyframes fadeInOut {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.2;
+    }
+}
+
+.icon-fade {
+    animation: fadeInOut 2s infinite;
+}
+
+.sync-button {
+	justify-content: center;
+	min-width: 120px;
 }

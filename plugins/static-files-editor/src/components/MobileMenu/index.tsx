@@ -1,47 +1,16 @@
-import React, { useCallback, useState } from 'react';
+import React, { useState } from 'react';
 import classNames from 'classnames';
 import css from './style.module.css';
 import { store as editorStore } from '@wordpress/editor';
 import { useSelect, dispatch } from '@wordpress/data'; // <-- Added useSelect here
-import apiFetch from '@wordpress/api-fetch';
-import { Spinner } from '@wordpress/components';
-import { store as noticesStore } from '@wordpress/notices';
 
 const MobileMenu: React.FC = () => {
-	const [isPulling, setIsPulling] = useState(false);
-
 	// Get the current list view state from the editorStore.
 	// It's assumed that the editor store has a selector "getIsListViewOpened".
 	const isListViewOpened = useSelect(
 		(select) => select(editorStore).isListViewOpened(),
 		[]
 	);
-
-	const forcePull = useCallback(async () => {
-		setIsPulling(true);
-		try {
-			await apiFetch({
-				path: '/static-files-editor/v1/git/refresh-index',
-				method: 'POST',
-			});
-			dispatch(noticesStore).createSuccessNotice(
-				'Force pull completed successfully',
-				{
-					type: 'snackbar',
-				}
-			);
-			window.location.reload();
-		} catch (error) {
-			dispatch(noticesStore).createErrorNotice(
-				'Force pull failed. Please try again.',
-				{
-					type: 'snackbar',
-				}
-			);
-		} finally {
-			setIsPulling(false);
-		}
-	}, []);
 
 	return (
 		<div className={css.mobileMenu}>
@@ -64,16 +33,6 @@ const MobileMenu: React.FC = () => {
 				})}
 			>
 				Editor
-			</a>
-			<a
-				href="#"
-				onClick={(e) => {
-					e.preventDefault();
-					forcePull();
-				}}
-				className={css.menuItem}
-			>
-				{isPulling ? <Spinner /> : 'Sync changes'}
 			</a>
 			<a href="/wp-admin/" className={css.menuItem}>
 				WP Admin
