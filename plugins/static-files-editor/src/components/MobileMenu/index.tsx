@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import classNames from 'classnames';
 import css from './style.module.css';
 import { store as editorStore } from '@wordpress/editor';

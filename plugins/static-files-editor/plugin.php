@@ -113,10 +113,9 @@ class WP_Static_Files_Editor_Plugin {
 			}
 
 			// Synchronize the data with the remote data source once every 10 minutes
-			$last_reindex_time = get_transient( 'wp_static_files_reindex_time' );
-			if ( ! $last_reindex_time ) {
-				set_transient( 'wp_static_files_reindex_time', time(), 10 * MINUTE_IN_SECONDS );
-				self::$data_source->sync();
+			$last_sync_time = self::get_sync_info()['lastSyncTime'];
+			if ( time() - $last_sync_time > 10 * MINUTE_IN_SECONDS ) {
+				self::sync_data_source();
 			}
 		}
 
@@ -141,7 +140,7 @@ class WP_Static_Files_Editor_Plugin {
 
 		if ( empty( $posts ) ) {
 			try {
-				self::get_data_source()->sync();
+				self::sync_data_source();
 				wp_redirect( admin_url( 'post-new.php?post_type=' . WP_LOCAL_FILE_POST_TYPE ) );
 				exit;
 			} catch ( Exception $e ) {
@@ -395,7 +394,10 @@ class WP_Static_Files_Editor_Plugin {
 					'wp.apiFetch.use(wp.apiFetch.createPreloadingMiddleware({
                 "/static-files-editor/v1/files?per_page=-1": {
                     body: ' . json_encode( WP_Static_Files_Editor_Plugin::get_files_list_endpoint() ) . ',
-                }
+                },
+                "/static-files-editor/v1/data-source/sync-info": {
+                    body: ' . json_encode( WP_Static_Files_Editor_Plugin::get_sync_info() ) . ',
+                },
             }));',
 					'after'
 				);
@@ -407,7 +409,7 @@ class WP_Static_Files_Editor_Plugin {
 			function () {
 				register_rest_route(
 					'static-files-editor/v1',
-					'/git/branches',
+					'/data-source/branches',
 					array(
 						'methods'             => 'POST',
 						'callback'            => array( self::class, 'get_git_branches_endpoint' ),
@@ -419,7 +421,7 @@ class WP_Static_Files_Editor_Plugin {
 
 				register_rest_route(
 					'static-files-editor/v1',
-					'/git/files',
+					'/data-source/files',
 					array(
 						'methods'             => 'POST',
 						'callback'            => array( self::class, 'get_git_files_endpoint' ),
@@ -431,10 +433,22 @@ class WP_Static_Files_Editor_Plugin {
 
 				register_rest_route(
 					'static-files-editor/v1',
-					'/git/refresh-index',
+					'/data-source/sync',
 					array(
 						'methods'             => 'POST',
-						'callback'            => array( self::class, 'local_files_sync_data' ),
+						'callback'            => array( self::class, 'data_source_sync_endpoint' ),
+						'permission_callback' => function () {
+							return current_user_can( 'edit_posts' );
+						},
+					)
+				);
+
+				register_rest_route(
+					'static-files-editor/v1',
+					'/data-source/sync-info',
+					array(
+						'methods'             => 'GET',
+						'callback'            => array( self::class, 'get_sync_info' ),
 						'permission_callback' => function () {
 							return current_user_can( 'edit_posts' );
 						},
@@ -1791,21 +1805,54 @@ class WP_Static_Files_Editor_Plugin {
 		return new WP_REST_Response( 'Settings saved successfully', 200 );
 	}
 
-	public static function local_files_sync_data( $request ) {
+	public static function data_source_sync_endpoint() {
 		try {
 			if ( ! self::acquire_synchronization_lock() ) {
 				return new WP_REST_Response( 'Failed to acquire synchronization lock', 500 );
 			}
-			try {
-				self::get_data_source()->sync();
-			} catch ( Exception $e ) {
-				return new WP_REST_Response( 'Refreshing index failed: ' . $e->getMessage(), 500 );
-			}
 
-			return new WP_REST_Response( 'Index refreshed', 200 );
+			try {
+				self::sync_data_source();
+				return new WP_REST_Response( self::get_sync_info(), 200 );
+			} catch ( Exception $e ) {
+				error_log( 'Failed to sync: ' . $e->getMessage() );
+				return new WP_REST_Response( json_encode( array(
+					'error' => true,
+				) ), 500 );
+			}
 		} finally {
 			self::release_synchronization_lock();
 		}
+	}
+
+	private static function sync_data_source() {
+		$data_source = self::get_data_source();
+		try {
+			$data_source->sync();
+			update_site_option( 'wp_sync_details', array(
+				'lastSyncTime' => time(),
+				'version' => $data_source->get_current_version(),
+			) );
+		} catch ( Exception $e ) {
+			$sync_details = self::get_sync_info();
+			// @TODO: Expose some kind of error message, not just a boolean yes/no.
+			//        At the same time, do not reveal too much about the internals –
+			//        there is a chance the error message would expose a private
+			//        detail or a piece of security-related information.
+			$sync_details['error'] = true;
+			update_site_option( 'wp_sync_details', $sync_details );
+			throw new Exception( 'Failed to sync', 0, $e );
+		}
+	}
+
+	public static function get_sync_info() {
+		$sync_details = get_site_option( 'wp_sync_details' ) ?? array(
+			'lastSyncTime' => 0,
+			'version' => null,
+		);
+		$data_source = self::get_data_source();
+		$sync_details['hasUnsyncedChanges'] = $data_source->get_current_version() !== $sync_details['version'];
+		return $sync_details;
 	}
 
 	public static function get_settings() {

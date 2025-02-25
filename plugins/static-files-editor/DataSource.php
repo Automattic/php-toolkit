@@ -8,6 +8,7 @@ use WordPress\Git\GitRepository;
 
 interface DataSource {
 	public function sync();
+	public function get_current_version();
 	public function get_filesystem(): Filesystem;
 }
 
@@ -54,11 +55,7 @@ class GitDataSource implements DataSource {
 		$this->git_repository   = $git_repository;
 		$this->git_filesystem   = GitFilesystem::create(
 			$this->git_repository,
-			array(
-				'root'      => $this->subdirectory,
-				'auto_push' => true,
-				'remote'    => $this->remote,
-			)
+			array( 'root' => $this->subdirectory )
 		);
 	}
 
@@ -70,6 +67,10 @@ class GitDataSource implements DataSource {
 			)
 		);
 		$this->remote->push();
+	}
+
+	public function get_current_version() {
+		return $this->git_repository->get_branch_tip();
 	}
 
 	public function get_filesystem(): Filesystem {
@@ -91,5 +92,9 @@ class LocalDirectoryDataSource implements DataSource {
 
 	public function get_filesystem(): Filesystem {
 		return $this->local_filesystem;
+	}
+
+	public function get_current_version() {
+		return null;
 	}
 }

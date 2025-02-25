@@ -22,8 +22,7 @@ import {
 } from './add-local-files-tab';
 import { store as blockEditorStore } from '@wordpress/block-editor';
 import { parse, serialize } from '@wordpress/blocks';
-import { Button } from '@wordpress/components';
-import { Spinner } from '@wordpress/components';
+import { Button, Spinner, Icon } from '@wordpress/components';
 import { store as coreStore } from '@wordpress/core-data';
 import css from './style.module.css';
 import { FileSubtree } from 'components/FilePickerTree/types';
@@ -34,6 +33,7 @@ import {
 	isPreviewableAssetPath,
 } from './store';
 import { threeWayMerge, validateMergedBlockMarkup } from './merge';
+import { useIsOnline } from './use-is-online';
 
 // Register middleware to log any 500 error responses for easier
 // debugging in development mode.
@@ -488,6 +488,7 @@ function PostLoadingOverlay() {
 addComponentToEditorContentArea(<PostLoadingOverlay />);
 
 function SingleClickSaveButton() {
+	const isOnline = useIsOnline();
 	const { saveEditedEntityRecord } = useDispatch(coreStore);
 	const isSaving = useSelect((select) => {
 		const entitiesBeingSaved =
@@ -509,53 +510,128 @@ function SingleClickSaveButton() {
 		);
 	}, []);
 
-	if (isSaving) {
+	const { lastDataSourceSyncInfo, isSyncingDataSource } = useSelect(
+		(select) => ({
+			lastDataSourceSyncInfo: select(uiStore).getDataSourceSyncInfo(),
+			isSyncingDataSource: select(uiStore).isSyncingDataSource(),
+		}),
+		[]
+	);
+	const buttonClassName = `components-button is-primary is-compact ${css.syncButton}`;
+
+	if (isSaving || isSyncingDataSource) {
 		return (
-			<Button
-				className={`components-button is-primary is-compact ${css.syncButton}`}
-				disabled
-			>
-				<span
-					className={'dashicons dashicons-cloud ' + css.iconFade}
-					style={{ marginRight: '5px' }}
-				></span>
-				<span className={css.iconFade}>Syncing</span>
+			<Button className={buttonClassName} disabled>
+				<div
+					className={css.iconFade}
+					style={{
+						display: 'flex',
+						alignItems: 'center',
+						justifyContent: 'center',
+					}}
+				>
+					<Icon
+						icon={CloudIcon}
+						style={{ width: '20px', marginRight: '5px' }}
+					/>
+					{isSyncingDataSource ? 'Syncing' : 'Saving files'}
+				</div>
 			</Button>
 		);
 	}
 
-	if (dirtyFiles.length === 0) {
+	if (dirtyFiles.length > 0) {
 		return (
 			<Button
-				className={`components-button is-primary is-compact ${css.syncButton}`}
-				disabled
+				className={buttonClassName}
+				onClick={async () => {
+					await Promise.all(
+						dirtyFiles.map(async (file) => {
+							await saveEditedEntityRecord(
+								'postType',
+								WP_LOCAL_FILE_POST_TYPE,
+								file.key
+							);
+						})
+					);
+				}}
 			>
-				Synced
+				<Icon
+					icon={DotIcon}
+					style={{ width: '20px', marginRight: '2px' }}
+				/>
+				Save now
+			</Button>
+		);
+	}
+
+	if (lastDataSourceSyncInfo?.hasUnsyncedChanges) {
+		if (!isOnline) {
+			return (
+				<Button className={buttonClassName} disabled>
+					<Icon
+						icon={OfflineCloudIcon}
+						style={{ width: '20px', marginRight: '5px' }}
+					/>
+					Offline – cannot sync
+				</Button>
+			);
+		}
+
+		return (
+			<Button className={buttonClassName} onClick={syncDataSource}>
+				<Icon
+					icon={CloudIcon}
+					style={{ width: '20px', marginRight: '5px' }}
+				/>
+				Sync now
 			</Button>
 		);
 	}
 
 	return (
-		<Button
-			className={`components-button is-primary is-compact ${css.syncButton}`}
-			onClick={() => {
-				for (const file of dirtyFiles) {
-					saveEditedEntityRecord(
-						'postType',
-						WP_LOCAL_FILE_POST_TYPE,
-						file.key
-					);
-				}
-			}}
-		>
-			<span
-				className="dashicons dashicons-cloud"
-				style={{ marginRight: '5px' }}
-			></span>
-			Sync now
+		<Button className={buttonClassName} disabled>
+			Synced
 		</Button>
 	);
 }
+const DotIcon = (
+	<svg
+		fill="currentColor"
+		viewBox="0 0 512 512"
+		xmlns="http://www.w3.org/2000/svg"
+	>
+		<circle cx="256" cy="256" r="100" />
+	</svg>
+);
+
+const CloudIcon = (
+	<svg
+		fill="currentColor"
+		viewBox="0 0 512 512"
+		xmlns="http://www.w3.org/2000/svg"
+	>
+		<path d="M396,432H136c-36.44,0-70.36-12.57-95.51-35.41C14.38,372.88,0,340,0,304c0-36.58,13.39-68.12,38.72-91.22,19.93-18.19,47.12-30.56,77.38-35.37a156.42,156.42,0,0,1,45.22-63.61C187.76,91.69,220.5,80,256,80a153.57,153.57,0,0,1,107.14,42.9c27.06,26.06,44.59,61.28,51.11,102.46C463.56,232.66,512,266.15,512,328c0,33.39-12.24,60.78-35.41,79.23C456.23,423.43,428.37,432,396,432Z" />
+	</svg>
+);
+
+const OfflineCloudIcon = (
+	<svg
+		fill="currentColor"
+		viewBox="0 0 512 512"
+		xmlns="http://www.w3.org/2000/svg"
+	>
+		<rect
+			x="240"
+			y="-31.53"
+			width="32"
+			height="575.06"
+			transform="translate(-106.04 256) rotate(-45)"
+		/>
+		<path d="M38.72,212.78C13.39,235.88,0,267.42,0,304c0,36,14.38,68.88,40.49,92.59C65.64,419.43,99.56,432,136,432H364.12L110.51,178.39C82.5,183.78,57.42,195.72,38.72,212.78Z" />
+		<path d="M476.59,407.23C499.76,388.78,512,361.39,512,328c0-61.85-48.44-95.34-97.75-102.64-6.52-41.18-24.05-76.4-51.11-102.46A153.57,153.57,0,0,0,256,80c-30.47,0-58.9,8.62-83.07,25L475.75,407.86C476,407.65,476.32,407.45,476.59,407.23Z" />
+	</svg>
+);
 
 injectSingleClickSaveButton(SingleClickSaveButton);
 
@@ -617,6 +693,9 @@ const closeInserterOnBlockInsert = () => {
 closeInserterOnBlockInsert();
 
 // Subscribe to the entity record and resetBlocks() whenever it changes
+const SAVE_AFTER_INACTIVITY_MS = 5000;
+const SAVE_NO_LATER_THAN_MS = 30000;
+const SYNC_EVERY_MS = 1000 * 60 * 5; // 10 minutes
 const replaceEditorContentOnEntityChange = () => {
 	/**
 	 * Mode 1: Collaborative editing.
@@ -680,8 +759,6 @@ const replaceEditorContentOnEntityChange = () => {
 	 *
 	 * Wait for edits, then save the post content after 5 seconds of inactivity. Rinse and repeat.
 	 */
-	const SAVE_AFTER_INACTIVITY_MS = 5000;
-	const SAVE_NO_LATER_THAN_MS = 30000;
 	let postSaveDetails: Record<
 		number,
 		{
@@ -710,6 +787,7 @@ const replaceEditorContentOnEntityChange = () => {
 		);
 		const editedPostContent = getPostContent(editedPost);
 		if (false === postContent || false === editedPostContent) {
+			await syncIfItsTime();
 			return;
 		}
 		const hasEdits = postContent !== editedPostContent;
@@ -724,6 +802,7 @@ const replaceEditorContentOnEntityChange = () => {
 			 * That's okay – the first setInterval pass after the save is completed will
 			 * notice that and schedule a new save.
 			 */
+			await syncIfItsTime();
 			return;
 		}
 		if (
@@ -759,7 +838,6 @@ const replaceEditorContentOnEntityChange = () => {
 					currentPostId
 				);
 				if (saveInProgress) {
-					console.log('save in progress');
 					return;
 				}
 
@@ -769,7 +847,6 @@ const replaceEditorContentOnEntityChange = () => {
 					currentPostId
 				);
 				if (!post) {
-					console.log('no post');
 					return;
 				}
 				const postContent = getPostContent(post);
@@ -781,11 +858,9 @@ const replaceEditorContentOnEntityChange = () => {
 				);
 				const editedPostContent = getPostContent(editedPost).trim();
 				if (postContent === editedPostContent) {
-					console.log('no edits');
 					return;
 				}
 
-				console.log('saving the edits!');
 				await dispatch(coreStore).editEntityRecord(
 					'postType',
 					WP_LOCAL_FILE_POST_TYPE,
@@ -800,6 +875,8 @@ const replaceEditorContentOnEntityChange = () => {
 					currentPostId,
 					{ throwOnError: true }
 				);
+
+				await syncIfItsTime();
 			}, SAVE_AFTER_INACTIVITY_MS),
 		};
 	}, 40);
@@ -930,6 +1007,9 @@ const replaceEditorContentOnEntityChange = () => {
 		}
 
 		let response = (await next(options)) as Response;
+		if (options.method === 'POST' || options.method === 'PUT') {
+			dispatch(uiStore).setHasUnsyncedChanges(true);
+		}
 		const postEditedSinceSaveStarted = select(
 			coreStore
 		).getEditedEntityRecord(
@@ -1199,4 +1279,30 @@ const replaceEditorContentOnEntityChange = () => {
 	}
 };
 
+/**
+ * Runs the data source sync (e.g. git push) if SYNC_EVERY_MS milliseconds have passed
+ * since the last sync.
+ */
+async function syncIfItsTime() {
+	const syncInfo = select(uiStore).getDataSourceSyncInfo();
+	if (
+		syncInfo?.hasUnsyncedChanges &&
+		syncInfo.lastSyncTime > Date.now() - SYNC_EVERY_MS
+	) {
+		syncDataSource();
+	}
+}
+
+async function syncDataSource() {
+	try {
+		await dispatch(uiStore).syncDataSource();
+	} catch (error) {
+		dispatch(noticesStore).createErrorNotice(
+			'Error syncing data source. You may be offline.',
+			{
+				type: 'snackbar',
+			}
+		);
+	}
+}
 replaceEditorContentOnEntityChange();

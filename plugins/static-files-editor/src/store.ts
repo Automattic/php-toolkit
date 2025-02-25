@@ -37,6 +37,8 @@ export const uiStore = createReduxStore(STORE_NAME, {
 			selectedPath: undefined,
 			isListViewOpened: true,
 			isPostIdResolving: false,
+			dataSourceSyncInfo: undefined,
+			isSyncingDataSource: false,
 		},
 		action
 	) {
@@ -45,6 +47,18 @@ export const uiStore = createReduxStore(STORE_NAME, {
 				return { ...state, selectedPath: action.path };
 			case 'SET_POST_ID_RESOLVING':
 				return { ...state, isPostIdResolving: action.isResolving };
+			case 'SET_LAST_DATA_SOURCE_SYNC_INFO':
+				return { ...state, dataSourceSyncInfo: action.syncInfo };
+			case 'UPDATE_LAST_DATA_SOURCE_SYNC_INFO':
+				return {
+					...state,
+					dataSourceSyncInfo: {
+						...state.dataSourceSyncInfo,
+						...action.syncInfo,
+					},
+				};
+			case 'SET_IS_SYNCING_DATA_SOURCE':
+				return { ...state, isSyncingDataSource: action.isSyncing };
 			default:
 				return state;
 		}
@@ -65,9 +79,9 @@ export const uiStore = createReduxStore(STORE_NAME, {
 		},
 
 		setSelectedPath(path) {
-            return async ({ dispatch, registry, select }) => {
-                dispatch({ type: 'SET_SELECTED_PATH', path });
-                
+			return async ({ dispatch, registry, select }) => {
+				dispatch({ type: 'SET_SELECTED_PATH', path });
+
 				const node = registry
 					.select(coreStore)
 					.getEntityRecord('static-files-editor', 'files', path);
@@ -198,6 +212,45 @@ export const uiStore = createReduxStore(STORE_NAME, {
 				}
 			};
 		},
+		setHasUnsyncedChanges(hasUnsyncedChanges) {
+			return {
+				type: 'UPDATE_LAST_DATA_SOURCE_SYNC_INFO',
+				syncInfo: {
+					hasUnsyncedChanges,
+				},
+			};
+		},
+		syncDataSource() {
+			return async ({ dispatch }) => {
+				dispatch({
+					type: 'SET_IS_SYNCING_DATA_SOURCE',
+					isSyncing: true,
+				});
+				try {
+					const syncInfo = await apiFetch({
+						path: '/static-files-editor/v1/data-source/sync',
+						method: 'POST',
+					});
+					dispatch({
+						type: 'SET_LAST_DATA_SOURCE_SYNC_INFO',
+						syncInfo,
+					});
+				} catch (error) {
+					dispatch({
+						type: 'UPDATE_LAST_DATA_SOURCE_SYNC_INFO',
+						syncInfo: {
+							error: true,
+						},
+					});
+					throw error;
+				} finally {
+					dispatch({
+						type: 'SET_IS_SYNCING_DATA_SOURCE',
+						isSyncing: false,
+					});
+				}
+			};
+		},
 	},
 	selectors: {
 		isFileListLoading(state) {
@@ -206,16 +259,20 @@ export const uiStore = createReduxStore(STORE_NAME, {
 		isPostIdResolving(state) {
 			return state.isPostIdResolving;
 		},
-        getSelectedPath(state) {
+		getSelectedPath(state) {
 			return state.selectedPath;
 		},
 		getParentNode(state, path) {
 			const parentPath = path.split('/').slice(0, -1).join('/') || '/';
 			return state.files.find((node) => node.path === parentPath);
-        },
-        getSelectedNode(state) {
-            return select(coreStore).getEntityRecord('static-files-editor', 'files', state.selectedPath);
-        },
+		},
+		getSelectedNode(state) {
+			return select(coreStore).getEntityRecord(
+				'static-files-editor',
+				'files',
+				state.selectedPath
+			);
+		},
 		listFiles(state, path) {
 			const parentNode = this.getParentNode(state, path);
 			if (parentNode) {
@@ -223,8 +280,34 @@ export const uiStore = createReduxStore(STORE_NAME, {
 			}
 			return state.files.filter((node) => isTopLevelPath(node.path));
 		},
+		getDataSourceSyncInfo(state): SyncInfo | undefined {
+			return state.dataSourceSyncInfo;
+		},
+		isSyncingDataSource(state) {
+			return state.isSyncingDataSource;
+		},
+	},
+	resolvers: {
+		getDataSourceSyncInfo:
+			() =>
+			async ({ dispatch }) => {
+				const syncInfo = await apiFetch({
+					path: '/static-files-editor/v1/data-source/sync-info',
+					method: 'GET',
+				});
+				dispatch({
+					type: 'SET_LAST_DATA_SOURCE_SYNC_INFO',
+					syncInfo,
+				});
+			},
 	},
 });
+
+type SyncInfo = {
+	lastSyncTime: number;
+	version: string;
+	hasUnsyncedChanges: boolean;
+};
 
 function isTopLevelPath(path: string) {
 	return path.match(/^\/[^/]+$/);

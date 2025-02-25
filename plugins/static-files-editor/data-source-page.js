@@ -50,7 +50,7 @@ const { state, actions } = store('staticFiles', {
         },
         async fetchBranches() {
             const response = await apiFetch({
-                path: '/static-files-editor/v1/git/branches',
+                path: '/static-files-editor/v1/data-source/branches',
                 method: 'POST',
                 data: {
                     gitRepo: state.gitRepo,
@@ -61,7 +61,7 @@ const { state, actions } = store('staticFiles', {
         },
         async fetchFiles() {
             const response = await apiFetch({
-                path: '/static-files-editor/v1/git/files',
+                path: '/static-files-editor/v1/data-source/files',
                 method: 'POST',
                 data: {
                     gitRepo: state.gitRepo,
@@ -97,7 +97,7 @@ const { state, actions } = store('staticFiles', {
         async forcePull() {
             try {
                 const response = await apiFetch({
-                    path: '/static-files-editor/v1/git/refresh-index',
+                    path: '/static-files-editor/v1/data-source/sync',
                     method: 'POST',
                 });
                 state.notices.push({
