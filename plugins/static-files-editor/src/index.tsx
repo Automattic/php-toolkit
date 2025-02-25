@@ -633,6 +633,9 @@ const replaceEditorContentOnEntityChange = () => {
 			currentPostId
 		);
 		const editedPostContent = getPostContent(editedPost);
+		if(false === postContent || false === editedPostContent) {
+			return;
+		}
 		const hasEdits = postContent !== editedPostContent;
 
 		if (!hasEdits) {
@@ -832,6 +835,9 @@ const replaceEditorContentOnEntityChange = () => {
 			return next(options);
 		}
 		const contentWhenSaveStarted = getPostContent(savedPost);
+		if(false === contentWhenSaveStarted) {
+			return next(options);
+		}
 
 		let response = (await next(options)) as Response;
 		const postEditedSinceSaveStarted = select(
@@ -872,6 +878,9 @@ const replaceEditorContentOnEntityChange = () => {
 	) {
 		let serverContent = getPostContent(postFromTheServer);
 		let postEditedContent = getPostContent(postEditedSinceSaveStarted);
+		if(false === serverContent || false === postEditedContent) {
+			return;
+		}
 
 		/**
 		 * No merge needed if we've started with an empty post.
@@ -1067,7 +1076,7 @@ const replaceEditorContentOnEntityChange = () => {
 		if (typeof contentField?.raw === 'string') {
 			return contentField.raw.trim();
 		}
-		return '';
+		return false;
 	}
 
 	function storeMarkupEdits(postId, content) {

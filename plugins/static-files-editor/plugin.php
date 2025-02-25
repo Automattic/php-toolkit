@@ -85,21 +85,32 @@ class WP_Static_Files_Editor_Plugin {
 	public static function is_data_source_configured() {
 		$config = static::get_settings();
 
-		return $config['gitRepo'] && $config['selectedBranch'];
+		switch ( $config['dataSourceType'] ) {
+			case 'local_directory':
+				return (bool) $config['localDirectory'];
+			case 'git_repo':
+				return $config['gitRepo'] && $config['selectedBranch'];
+		}
+
+		return false;
 	}
 
-	private static function get_data_source() {
+	public static function get_data_source() {
 		if ( ! self::$data_source ) {
-			// return new LocalDirectoryDataSource(
-			// 	LocalFilesystem::create( __DIR__ . '/notes' )
-			// );
-
 			if ( ! self::is_data_source_configured() ) {
 				throw new RuntimeException( 'No data source configured' );
 			}
-			self::$data_source = GitDataSource::create(
-				static::get_settings()
-			);
+			$settings = static::get_settings();
+			switch ( $settings['dataSourceType'] ) {
+				case 'local_directory':
+					self::$data_source = new LocalDirectoryDataSource(
+						LocalFilesystem::create( $settings['localDirectory'] )
+					);
+					break;
+				case 'git_repo':
+					self::$data_source = GitDataSource::create( $settings );
+					break;
+			}
 
 			// Synchronize the data with the remote data source once every 10 minutes
 			$last_reindex_time = get_transient( 'wp_static_files_reindex_time' );
@@ -1768,14 +1779,12 @@ class WP_Static_Files_Editor_Plugin {
 	}
 
 	public static function save_settings_endpoint( WP_REST_Request $request ) {
-		$gitRepo        = $request->get_param( 'gitRepo' );
-		$selectedBranch = $request->get_param( 'selectedBranch' );
-		$subdirectory   = $request->get_param( 'subdirectory' );
-
 		$new_settings = array(
-			'gitRepo'        => $gitRepo,
-			'selectedBranch' => $selectedBranch,
-			'subdirectory'     => $subdirectory,
+			'gitRepo'        => $request->get_param( 'gitRepo' ),
+			'selectedBranch' => $request->get_param( 'selectedBranch' ),
+			'subdirectory'   => $request->get_param( 'subdirectory' ),
+			'localDirectory' => $request->get_param( 'localDirectory' ),
+			'dataSourceType' => $request->get_param( 'dataSourceType' ),
 		);
 		update_option( 'static_files_editor_settings', $new_settings );
 

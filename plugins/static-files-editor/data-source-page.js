@@ -4,7 +4,14 @@ const { dispatch } = window.wp.data;
 const apiFetch = window.wp.apiFetch;
 
 const { state, actions } = store('staticFiles', {
-    state: {},
+	state: {
+		get isLocalDirectory() {
+			return state.dataSourceType === 'local_directory';
+		},
+		get isGitRepo() {
+			return state.dataSourceType === 'git_repo';
+		},
+	},
     callbacks: {
         bindSelectedBranch(e) {
             const { ref } = getElement();
@@ -20,6 +27,13 @@ const { state, actions } = store('staticFiles', {
         },
         updateSubdirectory(e) {
             state.subdirectory = e.target.value;
+        },
+        updateLocalDirectory(e) {
+            state.localDirectory = e.target.value;
+        },
+        updateDataSourceType(e) {
+			state.dataSourceType = e.target.value;
+			console.log(state.dataSourceType);
         },
         async onGitRepoInputEnter(e) {
             if(e.key === 'Enter') {
@@ -65,6 +79,8 @@ const { state, actions } = store('staticFiles', {
                         gitRepo: state.gitRepo,
                         selectedBranch: state.selectedBranch,
                         subdirectory: state.subdirectory,
+                        localDirectory: state.localDirectory,
+                        dataSourceType: state.dataSourceType,
                     },
                 });
                 state.notices.push({
