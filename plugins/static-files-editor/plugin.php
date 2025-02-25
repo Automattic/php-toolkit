@@ -147,32 +147,42 @@ class WP_Static_Files_Editor_Plugin {
 		if ( empty( $posts ) ) {
 			try {
 				self::sync_data_source();
-				wp_redirect( admin_url( 'post-new.php?post_type=' . WP_LOCAL_FILE_POST_TYPE ) );
-				exit;
+				$posts = get_posts(
+					array(
+						'post_type'      => WP_LOCAL_FILE_POST_TYPE,
+						'posts_per_page' => 2,
+						'orderby'        => 'ID',
+						'order'          => 'ASC',
+					)
+				);
+				if ( empty( $posts ) ) {
+					wp_redirect( admin_url( 'post-new.php?post_type=' . WP_LOCAL_FILE_POST_TYPE ) );
+					exit;
+				}
 			} catch ( Exception $e ) {
 				// There are more ways to get here than just the new Exception above.
 				wp_redirect( admin_url( 'admin.php?page=static_files_editor-data-source&error=no_data_source' ) );
 				exit( 'Please configure a data source in the settings page before continuing.' );
 			}
-		} else {
-			// Look for the first post that's not the default "my-first-note.md"
-			$post_id = null;
-			foreach ( $posts as $post ) {
-				$path = get_post_meta( $post->ID, 'local_file_path', true );
-				if ( $path !== '/my-first-note.md' ) {
-					$post_id = $post->ID;
-					break;
-				}
-			}
-			// Fallback to first post if no other found
-			if ( $post_id === null ) {
-				$post_id = $posts[0]->ID;
-			}
-
-			$edit_url = admin_url( 'post.php?post=' . $post_id . '&action=edit' );
-			wp_redirect( $edit_url );
-			exit;
 		}
+		
+		// Look for the first post that's not the default "my-first-note.md"
+		$post_id = null;
+		foreach ( $posts as $post ) {
+			$path = get_post_meta( $post->ID, 'local_file_path', true );
+			if ( $path !== '/my-first-note.md' ) {
+				$post_id = $post->ID;
+				break;
+			}
+		}
+		// Fallback to first post if no other found
+		if ( $post_id === null ) {
+			$post_id = $posts[0]->ID;
+		}
+
+		$edit_url = admin_url( 'post.php?post=' . $post_id . '&action=edit' );
+		wp_redirect( $edit_url );
+		exit;
 	}
 
 	public static function initialize() {

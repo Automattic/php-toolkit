@@ -653,10 +653,16 @@ const OfflineCloudIcon = (
 
 injectSingleClickSaveButton(SingleClickSaveButton);
 
-dispatch(preferencesStore).set('welcomeGuide', false);
-dispatch(preferencesStore).set('enableChoosePatternModal', false);
-dispatch(editorStore).setIsListViewOpened(true);
-dispatch(editPostStore).closeGeneralSidebar();
+setTimeout(() => {
+	dispatch(preferencesStore).set('welcomeGuide', false);
+	dispatch(preferencesStore).set('enableChoosePatternModal', false);
+	dispatch(editPostStore).closeGeneralSidebar();
+	dispatch(editPostStore).closeModal();
+	
+	if (window.innerWidth > 768) {
+		dispatch(editorStore).setIsListViewOpened(true);
+	}
+}, 10);
 
 function MobileMenuContainer() {
 	useEffect(() => {
