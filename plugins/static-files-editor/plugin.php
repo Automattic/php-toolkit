@@ -165,7 +165,7 @@ class WP_Static_Files_Editor_Plugin {
 				exit( 'Please configure a data source in the settings page before continuing.' );
 			}
 		}
-		
+
 		// Look for the first post that's not the default "my-first-note.md"
 		$post_id = null;
 		foreach ( $posts as $post ) {
@@ -856,7 +856,7 @@ class WP_Static_Files_Editor_Plugin {
 			array(
 				'post_title' => array( $post_entity['post_title'] ),
 				// 'post_date_gmt' => array( $post_entity['post_date_gmt'] ),
-				'menu_order' => array( $post_entity['menu_order'] ),
+				'menu_order' => array( (int) $post_entity['menu_order'] ),
 			)
 		);
 	}
