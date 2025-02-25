@@ -97,11 +97,9 @@
             "type": "composer-plugin",
             "extra": {
                 "class": "PHPCSStandards\\Composer\\Plugin\\Installers\\PHPCodeSniffer\\Plugin"
-                "class": "PHPCSStandards\\Composer\\Plugin\\Installers\\PHPCodeSniffer\\Plugin"
             },
             "autoload": {
                 "psr-4": {
-                    "PHPCSStandards\\Composer\\Plugin\\Installers\\PHPCodeSniffer\\": "src/"
                     "PHPCSStandards\\Composer\\Plugin\\Installers\\PHPCodeSniffer\\": "src/"
                 }
             },
@@ -118,7 +116,7 @@
                 },
                 {
                     "name": "Contributors",
-                    "homepage": "https://github.com/PHPCSStandards/composer-installer/graphs/contributors"
+                    "homepage": "https://github.com/PHPCSStandards/composer-installer/graphs/contributors",
                     "name": "Franck Nijhof",
                     "email": "franck.nijhof@dealerdirect.com",
                     "homepage": "http://www.frenck.nl",
@@ -172,11 +170,7 @@
             "support": {
                 "issues": "https://github.com/PHPCSStandards/composer-installer/issues",
                 "source": "https://github.com/PHPCSStandards/composer-installer"
-                "issues": "https://github.com/PHPCSStandards/composer-installer/issues",
-                "source": "https://github.com/PHPCSStandards/composer-installer"
             },
-            "time": "2023-01-05T11:28:13+00:00"
-        },
             "time": "2023-01-05T11:28:13+00:00"
         },
         {
@@ -185,7 +179,6 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/doctrine/instantiator.git",
-                "reference": "23d5820752e39d44928d296b0c2f86b7aaed1f33"
                 "reference": "23d5820752e39d44928d296b0c2f86b7aaed1f33"
             },
             "dist": {
@@ -250,7 +243,6 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2025-02-03T18:46:24+00:00"
             "time": "2025-02-03T18:46:24+00:00"
         },
         {
@@ -1457,7 +1449,6 @@
                 "type": "git",
                 "url": "https://github.com/sebastianbergmann/phpunit.git",
                 "reference": "686314788336f040e27ec9e8ac90b1b414669bf2"
-                "reference": "686314788336f040e27ec9e8ac90b1b414669bf2"
             },
             "dist": {
                 "type": "zip",
@@ -1614,7 +1605,6 @@
                     "type": "github"
                 }
             ],
-            "time": "2025-02-05T08:49:36+00:00"
             "time": "2025-01-30T07:06:21+00:00"
         },
         {

@@ -23,6 +23,7 @@ import {
 import { store as blockEditorStore } from '@wordpress/block-editor';
 import { parse, serialize } from '@wordpress/blocks';
 import { Button, Spinner, Icon } from '@wordpress/components';
+import { store as editPostStore } from '@wordpress/edit-post';
 import { store as coreStore } from '@wordpress/core-data';
 import css from './style.module.css';
 import { FileSubtree } from 'components/FilePickerTree/types';
@@ -655,6 +656,7 @@ injectSingleClickSaveButton(SingleClickSaveButton);
 dispatch(preferencesStore).set('welcomeGuide', false);
 dispatch(preferencesStore).set('enableChoosePatternModal', false);
 dispatch(editorStore).setIsListViewOpened(true);
+dispatch(editPostStore).closeGeneralSidebar();
 
 function MobileMenuContainer() {
 	useEffect(() => {
@@ -1323,3 +1325,4 @@ async function syncDataSource() {
 	}
 }
 replaceEditorContentOnEntityChange();
+

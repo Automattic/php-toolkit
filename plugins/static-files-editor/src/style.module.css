@@ -18,7 +18,9 @@
  */
 :global(.editor-preview-dropdown),
 :global(.components-dropdown:has([aria-label="Tools"])),
-:global([aria-label="View Local File"]) {
+:global([aria-label="View Local File"]),
+/** Hide the "Welcome to the block editor" modal */
+:global(.components-modal__screen-overlay:has(.components-modal__screen-overlay)) {
     display: none !important;
 }
 

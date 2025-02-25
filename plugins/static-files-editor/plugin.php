@@ -1425,7 +1425,7 @@ class WP_Static_Files_Editor_Plugin {
 		}
 
 		return array(
-			'post_id' => $post->id,
+			'post_id' => $post->ID,
 		);
 	}
 
@@ -1854,10 +1854,10 @@ class WP_Static_Files_Editor_Plugin {
 	}
 
 	public static function get_sync_info() {
-		$sync_details = get_site_option( 'wp_sync_details' ) ?? array(
+		$sync_details = get_site_option( 'wp_sync_details', array(
 			'lastSyncTime' => 0,
 			'version' => null,
-		);
+		) );
 		$data_source = self::get_data_source();
 		$sync_details['hasUnsyncedChanges'] = $data_source->get_current_version() !== $sync_details['version'];
 		return $sync_details;
