@@ -115,7 +115,13 @@ class WP_Static_Files_Editor_Plugin {
 			// Synchronize the data with the remote data source once every 10 minutes
 			$last_sync_time = self::get_sync_info()['lastSyncTime'];
 			if ( time() - $last_sync_time > 10 * MINUTE_IN_SECONDS ) {
-				self::sync_data_source();
+				try {
+					self::sync_data_source();
+				} catch ( Exception $e ) {
+					// Tolerate the failure during the periodic sync. We may just be offline,
+					// it's not a big deal – we'll just sync later on when the connection is
+					// restored.
+				}
 			}
 		}
 
@@ -1404,22 +1410,22 @@ class WP_Static_Files_Editor_Plugin {
 				return new WP_Error( 'missing_path', 'File path is required' );
 			}
 
-			$post_id = self::get_or_create_post_for_file( $file_path, $create_file );
+			$post = self::get_or_create_post_for_file( $file_path, $create_file );
 
-			if ( is_wp_error( $post_id ) ) {
-				return $post_id;
+			if ( is_wp_error( $post ) ) {
+				return $post;
 			}
 		} finally {
 			self::release_synchronization_lock();
 		}
 
-		$refreshed_post = self::refresh_post_from_local_file( get_post( $post_id ) );
+		$refreshed_post = self::refresh_post_from_local_file( $post );
 		if ( is_wp_error( $refreshed_post ) ) {
 			return $refreshed_post;
 		}
 
 		return array(
-			'post_id' => $post_id,
+			'post_id' => $post->id,
 		);
 	}
 
@@ -1437,7 +1443,7 @@ class WP_Static_Files_Editor_Plugin {
 			)
 		);
 		if ( ! empty( $existing_posts ) ) {
-			return $existing_posts[0]->ID;
+			return $existing_posts[0];
 		}
 		$post_data = array(
 			'post_title'   => basename( $file_path ),
@@ -1453,7 +1459,7 @@ class WP_Static_Files_Editor_Plugin {
 			return new WP_Error( 'failed_to_update_local_file_path', 'Failed to update local file path' );
 		}
 
-		return $post_id;
+		return get_post( $post_id );
 	}
 
 	public static function get_files_list_endpoint() {
@@ -1472,12 +1478,13 @@ class WP_Static_Files_Editor_Plugin {
 				$fs->mkdir( dirname( $path ), array( 'recursive' => true ) );
 			}
 			$fs->put_contents( $path, $content );
-			$post_id = self::get_or_create_post_for_file( $path, false );
+			$post = self::get_or_create_post_for_file( $path, false );
 
 			return array(
 				'id' => $path,
-				'post_id' => $post_id,
+				'post_id' => $post->ID,
 				'path' => $path,
+				'post_title' => $post->post_title,
 			);
 		} finally {
 			self::release_synchronization_lock();
@@ -1841,6 +1848,7 @@ class WP_Static_Files_Editor_Plugin {
 			//        detail or a piece of security-related information.
 			$sync_details['error'] = true;
 			update_site_option( 'wp_sync_details', $sync_details );
+			error_log( 'Error synchronizing data source: ' . $e->getMessage() );
 			throw new Exception( 'Failed to sync', 0, $e );
 		}
 	}

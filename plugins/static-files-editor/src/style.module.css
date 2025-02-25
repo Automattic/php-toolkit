@@ -22,6 +22,15 @@
     display: none !important;
 }
 
+/**
+ * Naively hide all the warnings just to get rid of the one
+ * that says "The backup of this post in your browser is not available."
+ */
+:global(.components-notice.is-warning.is-dismissible) {
+    display: none !important;
+}
+
+
 .file-picker-tree-container,
 .file-picker-tree-container > div {
 	flex-grow: 1;

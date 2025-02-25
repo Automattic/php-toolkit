@@ -117,17 +117,34 @@ function ConnectedFilePickerTree() {
 						file.id
 					)
 				)
-				.map((file) => ({
-					...file,
-					name:
-						select(coreStore).getEditedEntityRecord(
+				.map((file) => {
+					let name = undefined;
+					if (file.post_id) {
+						const isResolved = select(
+							coreStore
+						).hasFinishedResolution('getEntityRecord', [
 							'postType',
 							WP_LOCAL_FILE_POST_TYPE,
-							file.post_id
-						)?.title ||
-						file.path.split('/').pop() ||
-						'',
-				}))
+							file.post_id,
+						]);
+						if (isResolved) {
+							name = select(coreStore).getEditedEntityRecord(
+								'postType',
+								WP_LOCAL_FILE_POST_TYPE,
+								file.post_id
+							)?.title;
+						} else {
+							name = file.post_title;
+						}
+					}
+					if (name === undefined) {
+						name = file.path.split('/').pop() || '';
+					}
+					return {
+						...file,
+						name,
+					};
+				})
 				.filter((file) => !file.isDeleted);
 			return {
 				selectedPath: select(uiStore).getSelectedPath(),
@@ -984,7 +1001,7 @@ const replaceEditorContentOnEntityChange = () => {
 
 		const savedPostId = options.path
 			.substring(expectedPrefix.length)
-			.split('/')[0];
+			.match(/^\d+/)?.[0];
 		if (!savedPostId) {
 			return next(options);
 		}
