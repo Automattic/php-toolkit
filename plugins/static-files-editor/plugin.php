@@ -1724,7 +1724,9 @@ class WP_Static_Files_Editor_Plugin {
 	}
 
 	public static function delete_file_endpoint( $request ) {
-		$path = wp_canonicalize_path( $request->get_param( 'id' ) );
+		// Need to rawurldecode() because PHP only decodes query parameters automatically.
+		// Paths need manual treatment.
+		$path = wp_canonicalize_path( rawurldecode( $request->get_param( 'id' ) ) );
 		if ( ! $path ) {
 			return new WP_Error( 'missing_path', 'File path is required' );
 		}
@@ -1754,7 +1756,7 @@ class WP_Static_Files_Editor_Plugin {
 					return new WP_Error( 'delete_failed', 'Failed to delete directory' );
 				}
 			} elseif ( ! $fs->rm( $path ) ) {
-					return new WP_Error( 'delete_failed', 'Failed to delete file' );
+				return new WP_Error( 'delete_failed', 'Failed to delete file' );
 			}
 
 			return array( 'success' => true );
