@@ -19,96 +19,89 @@ use Symfony\Component\VarDumper\Caster\ClassStub;
 /**
  * @author Fabien Potencier <fabien@symfony.com>
  */
-class WrappedListener
-{
-    private $listener;
-    private $name;
-    private $called;
-    private $stoppedPropagation;
-    private $stopwatch;
-    private $dispatcher;
-    private $pretty;
-    private $stub;
-    private static $hasClassStub;
+class WrappedListener {
 
-    public function __construct($listener, $name, Stopwatch $stopwatch, EventDispatcherInterface $dispatcher = null)
-    {
-        $this->listener = $listener;
-        $this->name = $name;
-        $this->stopwatch = $stopwatch;
-        $this->dispatcher = $dispatcher;
-        $this->called = false;
-        $this->stoppedPropagation = false;
+	private $listener;
+	private $name;
+	private $called;
+	private $stoppedPropagation;
+	private $stopwatch;
+	private $dispatcher;
+	private $pretty;
+	private $stub;
+	private static $hasClassStub;
 
-        if (is_array($listener)) {
-            $this->name = is_object($listener[0]) ? get_class($listener[0]) : $listener[0];
-            $this->pretty = $this->name.'::'.$listener[1];
-        } elseif ($listener instanceof \Closure) {
-            $this->pretty = $this->name = 'closure';
-        } elseif (is_string($listener)) {
-            $this->pretty = $this->name = $listener;
-        } else {
-            $this->name = get_class($listener);
-            $this->pretty = $this->name.'::__invoke';
-        }
+	public function __construct( $listener, $name, Stopwatch $stopwatch, EventDispatcherInterface $dispatcher = null ) {
+		$this->listener           = $listener;
+		$this->name               = $name;
+		$this->stopwatch          = $stopwatch;
+		$this->dispatcher         = $dispatcher;
+		$this->called             = false;
+		$this->stoppedPropagation = false;
 
-        if (null !== $name) {
-            $this->name = $name;
-        }
+		if ( is_array( $listener ) ) {
+			$this->name   = is_object( $listener[0] ) ? get_class( $listener[0] ) : $listener[0];
+			$this->pretty = $this->name . '::' . $listener[1];
+		} elseif ( $listener instanceof \Closure ) {
+			$this->pretty = $this->name = 'closure';
+		} elseif ( is_string( $listener ) ) {
+			$this->pretty = $this->name = $listener;
+		} else {
+			$this->name   = get_class( $listener );
+			$this->pretty = $this->name . '::__invoke';
+		}
 
-        if (null === self::$hasClassStub) {
-            self::$hasClassStub = class_exists(ClassStub::class);
-        }
-    }
+		if ( null !== $name ) {
+			$this->name = $name;
+		}
 
-    public function getWrappedListener()
-    {
-        return $this->listener;
-    }
+		if ( null === self::$hasClassStub ) {
+			self::$hasClassStub = class_exists( ClassStub::class );
+		}
+	}
 
-    public function wasCalled()
-    {
-        return $this->called;
-    }
+	public function getWrappedListener() {
+		return $this->listener;
+	}
 
-    public function stoppedPropagation()
-    {
-        return $this->stoppedPropagation;
-    }
+	public function wasCalled() {
+		return $this->called;
+	}
 
-    public function getPretty()
-    {
-        return $this->pretty;
-    }
+	public function stoppedPropagation() {
+		return $this->stoppedPropagation;
+	}
 
-    public function getInfo($eventName)
-    {
-        if (null === $this->stub) {
-            $this->stub = self::$hasClassStub ? new ClassStub($this->pretty.'()', $this->listener) : $this->pretty.'()';
-        }
+	public function getPretty() {
+		return $this->pretty;
+	}
 
-        return array(
-            'event' => $eventName,
-            'priority' => null !== $this->dispatcher ? $this->dispatcher->getListenerPriority($eventName, $this->listener) : null,
-            'pretty' => $this->pretty,
-            'stub' => $this->stub,
-        );
-    }
+	public function getInfo( $eventName ) {
+		if ( null === $this->stub ) {
+			$this->stub = self::$hasClassStub ? new ClassStub( $this->pretty . '()', $this->listener ) : $this->pretty . '()';
+		}
 
-    public function __invoke(Event $event, $eventName, EventDispatcherInterface $dispatcher)
-    {
-        $this->called = true;
+		return array(
+			'event' => $eventName,
+			'priority' => null !== $this->dispatcher ? $this->dispatcher->getListenerPriority( $eventName, $this->listener ) : null,
+			'pretty' => $this->pretty,
+			'stub' => $this->stub,
+		);
+	}
 
-        $e = $this->stopwatch->start($this->name, 'event_listener');
+	public function __invoke( Event $event, $eventName, EventDispatcherInterface $dispatcher ) {
+		$this->called = true;
 
-        call_user_func($this->listener, $event, $eventName, $this->dispatcher ?: $dispatcher);
+		$e = $this->stopwatch->start( $this->name, 'event_listener' );
 
-        if ($e->isStarted()) {
-            $e->stop();
-        }
+		call_user_func( $this->listener, $event, $eventName, $this->dispatcher ?: $dispatcher );
 
-        if ($event->isPropagationStopped()) {
-            $this->stoppedPropagation = true;
-        }
-    }
+		if ( $e->isStarted() ) {
+			$e->stop();
+		}
+
+		if ( $event->isPropagationStopped() ) {
+			$this->stoppedPropagation = true;
+		}
+	}
 }

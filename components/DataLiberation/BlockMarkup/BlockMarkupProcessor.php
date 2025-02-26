@@ -2,7 +2,7 @@
 
 namespace WordPress\DataLiberation\BlockMarkup;
 
-use \WP_Block_Parser_Error;
+use WP_Block_Parser_Error;
 use WP_HTML_Tag_Processor;
 
 /**
@@ -274,9 +274,9 @@ class BlockMarkupProcessor extends WP_HTML_Tag_Processor {
 	 * @return bool Whether a token was parsed.
 	 */
 	public function next_token(): bool {
-        if($this->has_bookmark('block-delimiter')) {
-            $this->release_bookmark('block-delimiter');
-        }
+		if ( $this->has_bookmark( 'block-delimiter' ) ) {
+			$this->release_bookmark( 'block-delimiter' );
+		}
 		$this->get_updated_html();
 
 		$this->block_name                = null;
@@ -346,10 +346,10 @@ class BlockMarkupProcessor extends WP_HTML_Tag_Processor {
 		$name_length = strspn( $text, 'abcdefghijklmnopqrstuwxvyzABCDEFGHIJKLMNOPRQSTUWXVYZ0123456789_-', $at );
 		if ( $name_length === 0 ) {
 			// This wasn't a block after all, just a regular comment.
-            $this->last_block_error = new WP_Block_Parser_Error( 
-                sprintf( 'An HTML comment started with "wp:" that was not followed by a valid block name: %s', $text ),
-                WP_Block_Parser_Error::TYPE_SUSPICIOUS_DELIMITER
-            );
+			$this->last_block_error = new WP_Block_Parser_Error(
+				sprintf( 'An HTML comment started with "wp:" that was not followed by a valid block name: %s', $text ),
+				WP_Block_Parser_Error::TYPE_SUSPICIOUS_DELIMITER
+			);
 			return true;
 		}
 		$name = substr( $text, $name_starts_at, $name_length + 3 );
@@ -387,10 +387,10 @@ class BlockMarkupProcessor extends WP_HTML_Tag_Processor {
 				if ( null === $attributes || ! is_array( $attributes ) ) {
 					// This comment looked like a block comment, but the attributes didn't
 					// parse as a JSON array. This means it wasn't a block after all.
-                    $this->last_block_error = new WP_Block_Parser_Error( 
-                        sprintf( '%s could be parsed as a delimiter but JSON attributes were malformed: %s.', $name, $json_maybe ),
-                        WP_Block_Parser_Error::TYPE_SUSPICIOUS_DELIMITER
-                    );
+					$this->last_block_error = new WP_Block_Parser_Error(
+						sprintf( '%s could be parsed as a delimiter but JSON attributes were malformed: %s.', $name, $json_maybe ),
+						WP_Block_Parser_Error::TYPE_SUSPICIOUS_DELIMITER
+					);
 					return true;
 				}
 			}
@@ -405,39 +405,39 @@ class BlockMarkupProcessor extends WP_HTML_Tag_Processor {
 		if ( $this->block_closer ) {
 			$popped = array_pop( $this->stack_of_open_blocks );
 			if ( $popped !== $name ) {
-				$this->last_block_error = new WP_Block_Parser_Error( 
-                    sprintf( 'Block closer %s does not match the last opened block %s.', $name, $popped ),
-                    WP_Block_Parser_Error::TYPE_MISMATCHED_CLOSER
-                );
+				$this->last_block_error = new WP_Block_Parser_Error(
+					sprintf( 'Block closer %s does not match the last opened block %s.', $name, $popped ),
+					WP_Block_Parser_Error::TYPE_MISMATCHED_CLOSER
+				);
 				return false;
 			}
 		} elseif ( ! $this->self_closing_flag ) {
 			array_push( $this->stack_of_open_blocks, $name );
 		}
 
-        $this->set_bookmark('block-delimiter');
+		$this->set_bookmark( 'block-delimiter' );
 
 		return true;
 	}
 
-    public function get_block_delimiter_span() {
-        if(!$this->has_bookmark('block-delimiter')) {
-            return false;
-        }
-        return $this->bookmarks['block-delimiter'];
-    }
+	public function get_block_delimiter_span() {
+		if ( ! $this->has_bookmark( 'block-delimiter' ) ) {
+			return false;
+		}
+		return $this->bookmarks['block-delimiter'];
+	}
 
-    public function next_block_delimiter() {
-        while($this->next_token()) {
-            if($this->get_token_type() === '#block-comment') {
-                break;
-            }
-        }
-        if($this->get_token_type() !== '#block-comment') {
-            return false;
-        }
-        return true;
-    }
+	public function next_block_delimiter() {
+		while ( $this->next_token() ) {
+			if ( $this->get_token_type() === '#block-comment' ) {
+				break;
+			}
+		}
+		if ( $this->get_token_type() !== '#block-comment' ) {
+			return false;
+		}
+		return true;
+	}
 
 	/**
 	 * @inheritDoc

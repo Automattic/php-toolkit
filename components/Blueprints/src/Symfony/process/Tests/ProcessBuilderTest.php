@@ -14,213 +14,196 @@ namespace Symfony\Component\Process\Tests;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Process\ProcessBuilder;
 
-class ProcessBuilderTest extends TestCase
-{
-    /**
-     * @group legacy
-     */
-    public function testInheritEnvironmentVars()
-    {
-        $proc = ProcessBuilder::create()
-            ->add('foo')
-            ->getProcess();
+class ProcessBuilderTest extends TestCase {
 
-        $this->assertTrue($proc->areEnvironmentVariablesInherited());
+	/**
+	 * @group legacy
+	 */
+	public function testInheritEnvironmentVars() {
+		$proc = ProcessBuilder::create()
+			->add( 'foo' )
+			->getProcess();
 
-        $proc = ProcessBuilder::create()
-            ->add('foo')
-            ->inheritEnvironmentVariables(false)
-            ->getProcess();
+		$this->assertTrue( $proc->areEnvironmentVariablesInherited() );
 
-        $this->assertFalse($proc->areEnvironmentVariablesInherited());
-    }
+		$proc = ProcessBuilder::create()
+			->add( 'foo' )
+			->inheritEnvironmentVariables( false )
+			->getProcess();
 
-    public function testAddEnvironmentVariables()
-    {
-        $pb = new ProcessBuilder();
-        $env = array(
-            'foo' => 'bar',
-            'foo2' => 'bar2',
-        );
-        $proc = $pb
-            ->add('command')
-            ->setEnv('foo', 'bar2')
-            ->addEnvironmentVariables($env)
-            ->getProcess()
-        ;
+		$this->assertFalse( $proc->areEnvironmentVariablesInherited() );
+	}
 
-        $this->assertSame($env, $proc->getEnv());
-    }
+	public function testAddEnvironmentVariables() {
+		$pb   = new ProcessBuilder();
+		$env  = array(
+			'foo' => 'bar',
+			'foo2' => 'bar2',
+		);
+		$proc = $pb
+			->add( 'command' )
+			->setEnv( 'foo', 'bar2' )
+			->addEnvironmentVariables( $env )
+			->getProcess();
 
-    /**
-     * @expectedException \Symfony\Component\Process\Exception\InvalidArgumentException
-     */
-    public function testNegativeTimeoutFromSetter()
-    {
-        $pb = new ProcessBuilder();
-        $pb->setTimeout(-1);
-    }
+		$this->assertSame( $env, $proc->getEnv() );
+	}
 
-    public function testNullTimeout()
-    {
-        $pb = new ProcessBuilder();
-        $pb->setTimeout(10);
-        $pb->setTimeout(null);
+	/**
+	 * @expectedException \Symfony\Component\Process\Exception\InvalidArgumentException
+	 */
+	public function testNegativeTimeoutFromSetter() {
+		$pb = new ProcessBuilder();
+		$pb->setTimeout( -1 );
+	}
 
-        $r = new \ReflectionObject($pb);
-        $p = $r->getProperty('timeout');
-        $p->setAccessible(true);
+	public function testNullTimeout() {
+		$pb = new ProcessBuilder();
+		$pb->setTimeout( 10 );
+		$pb->setTimeout( null );
 
-        $this->assertNull($p->getValue($pb));
-    }
+		$r = new \ReflectionObject( $pb );
+		$p = $r->getProperty( 'timeout' );
+		$p->setAccessible( true );
 
-    public function testShouldSetArguments()
-    {
-        $pb = new ProcessBuilder(array('initial'));
-        $pb->setArguments(array('second'));
+		$this->assertNull( $p->getValue( $pb ) );
+	}
 
-        $proc = $pb->getProcess();
+	public function testShouldSetArguments() {
+		$pb = new ProcessBuilder( array( 'initial' ) );
+		$pb->setArguments( array( 'second' ) );
 
-        $this->assertContains('second', $proc->getCommandLine());
-    }
+		$proc = $pb->getProcess();
 
-    public function testPrefixIsPrependedToAllGeneratedProcess()
-    {
-        $pb = new ProcessBuilder();
-        $pb->setPrefix('/usr/bin/php');
+		$this->assertContains( 'second', $proc->getCommandLine() );
+	}
 
-        $proc = $pb->setArguments(array('-v'))->getProcess();
-        if ('\\' === DIRECTORY_SEPARATOR) {
-            $this->assertEquals('"/usr/bin/php" -v', $proc->getCommandLine());
-        } else {
-            $this->assertEquals("'/usr/bin/php' '-v'", $proc->getCommandLine());
-        }
+	public function testPrefixIsPrependedToAllGeneratedProcess() {
+		$pb = new ProcessBuilder();
+		$pb->setPrefix( '/usr/bin/php' );
 
-        $proc = $pb->setArguments(array('-i'))->getProcess();
-        if ('\\' === DIRECTORY_SEPARATOR) {
-            $this->assertEquals('"/usr/bin/php" -i', $proc->getCommandLine());
-        } else {
-            $this->assertEquals("'/usr/bin/php' '-i'", $proc->getCommandLine());
-        }
-    }
+		$proc = $pb->setArguments( array( '-v' ) )->getProcess();
+		if ( '\\' === DIRECTORY_SEPARATOR ) {
+			$this->assertEquals( '"/usr/bin/php" -v', $proc->getCommandLine() );
+		} else {
+			$this->assertEquals( "'/usr/bin/php' '-v'", $proc->getCommandLine() );
+		}
 
-    public function testArrayPrefixesArePrependedToAllGeneratedProcess()
-    {
-        $pb = new ProcessBuilder();
-        $pb->setPrefix(array('/usr/bin/php', 'composer.phar'));
+		$proc = $pb->setArguments( array( '-i' ) )->getProcess();
+		if ( '\\' === DIRECTORY_SEPARATOR ) {
+			$this->assertEquals( '"/usr/bin/php" -i', $proc->getCommandLine() );
+		} else {
+			$this->assertEquals( "'/usr/bin/php' '-i'", $proc->getCommandLine() );
+		}
+	}
 
-        $proc = $pb->setArguments(array('-v'))->getProcess();
-        if ('\\' === DIRECTORY_SEPARATOR) {
-            $this->assertEquals('"/usr/bin/php" composer.phar -v', $proc->getCommandLine());
-        } else {
-            $this->assertEquals("'/usr/bin/php' 'composer.phar' '-v'", $proc->getCommandLine());
-        }
+	public function testArrayPrefixesArePrependedToAllGeneratedProcess() {
+		$pb = new ProcessBuilder();
+		$pb->setPrefix( array( '/usr/bin/php', 'composer.phar' ) );
 
-        $proc = $pb->setArguments(array('-i'))->getProcess();
-        if ('\\' === DIRECTORY_SEPARATOR) {
-            $this->assertEquals('"/usr/bin/php" composer.phar -i', $proc->getCommandLine());
-        } else {
-            $this->assertEquals("'/usr/bin/php' 'composer.phar' '-i'", $proc->getCommandLine());
-        }
-    }
+		$proc = $pb->setArguments( array( '-v' ) )->getProcess();
+		if ( '\\' === DIRECTORY_SEPARATOR ) {
+			$this->assertEquals( '"/usr/bin/php" composer.phar -v', $proc->getCommandLine() );
+		} else {
+			$this->assertEquals( "'/usr/bin/php' 'composer.phar' '-v'", $proc->getCommandLine() );
+		}
 
-    public function testShouldEscapeArguments()
-    {
-        $pb = new ProcessBuilder(array('%path%', 'foo " bar', '%baz%baz'));
-        $proc = $pb->getProcess();
+		$proc = $pb->setArguments( array( '-i' ) )->getProcess();
+		if ( '\\' === DIRECTORY_SEPARATOR ) {
+			$this->assertEquals( '"/usr/bin/php" composer.phar -i', $proc->getCommandLine() );
+		} else {
+			$this->assertEquals( "'/usr/bin/php' 'composer.phar' '-i'", $proc->getCommandLine() );
+		}
+	}
 
-        if ('\\' === DIRECTORY_SEPARATOR) {
-            $this->assertSame('""^%"path"^%"" "foo "" bar" ""^%"baz"^%"baz"', $proc->getCommandLine());
-        } else {
-            $this->assertSame("'%path%' 'foo \" bar' '%baz%baz'", $proc->getCommandLine());
-        }
-    }
+	public function testShouldEscapeArguments() {
+		$pb   = new ProcessBuilder( array( '%path%', 'foo " bar', '%baz%baz' ) );
+		$proc = $pb->getProcess();
 
-    public function testShouldEscapeArgumentsAndPrefix()
-    {
-        $pb = new ProcessBuilder(array('arg'));
-        $pb->setPrefix('%prefix%');
-        $proc = $pb->getProcess();
+		if ( '\\' === DIRECTORY_SEPARATOR ) {
+			$this->assertSame( '""^%"path"^%"" "foo "" bar" ""^%"baz"^%"baz"', $proc->getCommandLine() );
+		} else {
+			$this->assertSame( "'%path%' 'foo \" bar' '%baz%baz'", $proc->getCommandLine() );
+		}
+	}
 
-        if ('\\' === DIRECTORY_SEPARATOR) {
-            $this->assertSame('""^%"prefix"^%"" arg', $proc->getCommandLine());
-        } else {
-            $this->assertSame("'%prefix%' 'arg'", $proc->getCommandLine());
-        }
-    }
+	public function testShouldEscapeArgumentsAndPrefix() {
+		$pb = new ProcessBuilder( array( 'arg' ) );
+		$pb->setPrefix( '%prefix%' );
+		$proc = $pb->getProcess();
 
-    /**
-     * @expectedException \Symfony\Component\Process\Exception\LogicException
-     */
-    public function testShouldThrowALogicExceptionIfNoPrefixAndNoArgument()
-    {
-        ProcessBuilder::create()->getProcess();
-    }
+		if ( '\\' === DIRECTORY_SEPARATOR ) {
+			$this->assertSame( '""^%"prefix"^%"" arg', $proc->getCommandLine() );
+		} else {
+			$this->assertSame( "'%prefix%' 'arg'", $proc->getCommandLine() );
+		}
+	}
 
-    public function testShouldNotThrowALogicExceptionIfNoArgument()
-    {
-        $process = ProcessBuilder::create()
-            ->setPrefix('/usr/bin/php')
-            ->getProcess();
+	/**
+	 * @expectedException \Symfony\Component\Process\Exception\LogicException
+	 */
+	public function testShouldThrowALogicExceptionIfNoPrefixAndNoArgument() {
+		ProcessBuilder::create()->getProcess();
+	}
 
-        if ('\\' === DIRECTORY_SEPARATOR) {
-            $this->assertEquals('"/usr/bin/php"', $process->getCommandLine());
-        } else {
-            $this->assertEquals("'/usr/bin/php'", $process->getCommandLine());
-        }
-    }
+	public function testShouldNotThrowALogicExceptionIfNoArgument() {
+		$process = ProcessBuilder::create()
+			->setPrefix( '/usr/bin/php' )
+			->getProcess();
 
-    public function testShouldNotThrowALogicExceptionIfNoPrefix()
-    {
-        $process = ProcessBuilder::create(array('/usr/bin/php'))
-            ->getProcess();
+		if ( '\\' === DIRECTORY_SEPARATOR ) {
+			$this->assertEquals( '"/usr/bin/php"', $process->getCommandLine() );
+		} else {
+			$this->assertEquals( "'/usr/bin/php'", $process->getCommandLine() );
+		}
+	}
 
-        if ('\\' === DIRECTORY_SEPARATOR) {
-            $this->assertEquals('"/usr/bin/php"', $process->getCommandLine());
-        } else {
-            $this->assertEquals("'/usr/bin/php'", $process->getCommandLine());
-        }
-    }
+	public function testShouldNotThrowALogicExceptionIfNoPrefix() {
+		$process = ProcessBuilder::create( array( '/usr/bin/php' ) )
+			->getProcess();
 
-    public function testShouldReturnProcessWithDisabledOutput()
-    {
-        $process = ProcessBuilder::create(array('/usr/bin/php'))
-            ->disableOutput()
-            ->getProcess();
+		if ( '\\' === DIRECTORY_SEPARATOR ) {
+			$this->assertEquals( '"/usr/bin/php"', $process->getCommandLine() );
+		} else {
+			$this->assertEquals( "'/usr/bin/php'", $process->getCommandLine() );
+		}
+	}
 
-        $this->assertTrue($process->isOutputDisabled());
-    }
+	public function testShouldReturnProcessWithDisabledOutput() {
+		$process = ProcessBuilder::create( array( '/usr/bin/php' ) )
+			->disableOutput()
+			->getProcess();
 
-    public function testShouldReturnProcessWithEnabledOutput()
-    {
-        $process = ProcessBuilder::create(array('/usr/bin/php'))
-            ->disableOutput()
-            ->enableOutput()
-            ->getProcess();
+		$this->assertTrue( $process->isOutputDisabled() );
+	}
 
-        $this->assertFalse($process->isOutputDisabled());
-    }
+	public function testShouldReturnProcessWithEnabledOutput() {
+		$process = ProcessBuilder::create( array( '/usr/bin/php' ) )
+			->disableOutput()
+			->enableOutput()
+			->getProcess();
 
-    /**
-     * @expectedException \Symfony\Component\Process\Exception\InvalidArgumentException
-     * @expectedExceptionMessage Symfony\Component\Process\ProcessBuilder::setInput only accepts strings, Traversable objects or stream resources.
-     */
-    public function testInvalidInput()
-    {
-        $builder = ProcessBuilder::create();
-        $builder->setInput(array());
-    }
+		$this->assertFalse( $process->isOutputDisabled() );
+	}
 
-    public function testDoesNotPrefixExec()
-    {
-        if ('\\' === DIRECTORY_SEPARATOR) {
-            $this->markTestSkipped('This test cannot run on Windows.');
-        }
+	/**
+	 * @expectedException \Symfony\Component\Process\Exception\InvalidArgumentException
+	 * @expectedExceptionMessage Symfony\Component\Process\ProcessBuilder::setInput only accepts strings, Traversable objects or stream resources.
+	 */
+	public function testInvalidInput() {
+		$builder = ProcessBuilder::create();
+		$builder->setInput( array() );
+	}
 
-        $builder = ProcessBuilder::create(array('command', '-v', 'ls'));
-        $process = $builder->getProcess();
-        $process->run();
+	public function testDoesNotPrefixExec() {
+		if ( '\\' === DIRECTORY_SEPARATOR ) {
+			$this->markTestSkipped( 'This test cannot run on Windows.' );
+		}
 
-        $this->assertTrue($process->isSuccessful());
-    }
+		$builder = ProcessBuilder::create( array( 'command', '-v', 'ls' ) );
+		$process = $builder->getProcess();
+		$process->run();
+
+		$this->assertTrue( $process->isSuccessful() );
+	}
 }

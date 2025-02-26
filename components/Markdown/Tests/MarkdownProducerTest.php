@@ -10,20 +10,20 @@ class MarkdownProducerTest extends TestCase {
 	 * @dataProvider provider_test_conversion
 	 */
 	public function test_blocks_to_markdown_conversion( $blocks, $expected ) {
-		$producer = new MarkdownProducer( new BlocksWithMetadata( $blocks, [] ) );
+		$producer = new MarkdownProducer( new BlocksWithMetadata( $blocks, array() ) );
 
-		$this->assertEquals( trim($expected, "\n"), trim($producer->produce(), "\n") );
+		$this->assertEquals( trim( $expected, "\n" ), trim( $producer->produce(), "\n" ) );
 	}
 
 	public static function provider_test_conversion() {
 		return array(
-            /*
-             * All these whitespace-related tests are absolutely critical for editing and
-             * three-way merging of static files. If whitespaces are lost during the HTML->Markdown
-             * conversion, the diff engine will get multiple whitespaces from the editor,
-             * singular whitespaces from the server, and conclude parts of the document were
-             * deleted.
-             */
+			/*
+			 * All these whitespace-related tests are absolutely critical for editing and
+			 * three-way merging of static files. If whitespaces are lost during the HTML->Markdown
+			 * conversion, the diff engine will get multiple whitespaces from the editor,
+			 * singular whitespaces from the server, and conclude parts of the document were
+			 * deleted.
+			 */
 			'A simple paragraph – no blank text nodes' => array(
 				'blocks' => '<!-- wp:paragraph --><p>A simple paragraph</p><!-- /wp:paragraph -->',
 				'expected' => "A simple paragraph\n\n",
@@ -40,35 +40,35 @@ class MarkdownProducerTest extends TestCase {
                 HTML,
 				'expected' => "A simple paragraph\n\n\n",
 			),
-            /**
-             * We must preserve the space at the end of the sentence to avoid a scenario such as:
-             *
-             * Server DB:   "Hello world "
-             * Editor:      "Hello world and another sentence"
-             * Static file: "Hello world"
-             *
-             * Delta DB<->Editor:      =12+and another sentence
-             * Delta DB<->static file: =11\t-1
-             *
-             * Three way merge:
-             * * Preserve "Hello world"
-             * * Note the space was deleted in the static file
-             * * Ignore the "and another sentence" insertion from the editor
-             * * End up with "Hello world"
-             *
-             * The user experience would be quite frustrating:
-             * 
-             * 1. They would type "Hello world "
-             * 2. The save spinner would show up as autosave happens
-             * 3. They would keep typing and add "and another sentence" to the document
-             * 4. The server would respons with just "Hello world" without the final space
-             * 5. The client-side three-way merge would notice the server replied with something
-             *    else than we've sent and attempt to merge the documents
-             * 6. The resulting three-way merge would cut "Hello world and another sentence" to just
-             *    "Hello world", destroying the user's last sentence.
-             *
-             * To avoid that, we need to be very careful about the whitespace treatment.
-             */
+			/**
+			 * We must preserve the space at the end of the sentence to avoid a scenario such as:
+			 *
+			 * Server DB:   "Hello world "
+			 * Editor:      "Hello world and another sentence"
+			 * Static file: "Hello world"
+			 *
+			 * Delta DB<->Editor:      =12+and another sentence
+			 * Delta DB<->static file: =11\t-1
+			 *
+			 * Three way merge:
+			 * * Preserve "Hello world"
+			 * * Note the space was deleted in the static file
+			 * * Ignore the "and another sentence" insertion from the editor
+			 * * End up with "Hello world"
+			 *
+			 * The user experience would be quite frustrating:
+			 *
+			 * 1. They would type "Hello world "
+			 * 2. The save spinner would show up as autosave happens
+			 * 3. They would keep typing and add "and another sentence" to the document
+			 * 4. The server would respons with just "Hello world" without the final space
+			 * 5. The client-side three-way merge would notice the server replied with something
+			 *    else than we've sent and attempt to merge the documents
+			 * 6. The resulting three-way merge would cut "Hello world and another sentence" to just
+			 *    "Hello world", destroying the user's last sentence.
+			 *
+			 * To avoid that, we need to be very careful about the whitespace treatment.
+			 */
 			'A simple paragraph – regular block markup formatting – single space at the end' => array(
 				'blocks' => <<<HTML
                 <!-- wp:paragraph -->

@@ -8,10 +8,10 @@ use WordPress\DataLiberation\DataLiberationHTMLProcessor;
 
 /**
  * Converts WordPress blocks and metadata to Markdown with frontmatter.
- * 
+ *
  * Note that converting HTML -> Markdown -> HTML will yield a different
  * string than the original HTML:
- * 
+ *
  * * Markdown won't preserve all the tiny syntactic details such as
  *   <hr> vs <hr />.
  * * Some block attributes, such as class, are lost in the conversion process.
@@ -351,9 +351,9 @@ class MarkdownProducer implements DataFormatProducer {
 					$markdown .= "\n";
 					break;
 
-                case 'IMG':
-                    $markdown .= '![' . $processor->get_attribute( 'alt' ) . '](' . $processor->get_attribute( 'src' ) . ')';
-                    break;
+				case 'IMG':
+					$markdown .= '![' . $processor->get_attribute( 'alt' ) . '](' . $processor->get_attribute( 'src' ) . ')';
+					break;
 			}
 		}
 
@@ -362,9 +362,9 @@ class MarkdownProducer implements DataFormatProducer {
 		// Let's normalize it to a single space.
 		$markdown = trim( $markdown, "\n" );
 
-        // The ltrim() here is arbitrary and potentially wrong,
-        // @TODO: Investigate this further and potentially remove
-        //        all trimming of space characters.
+		// The ltrim() here is arbitrary and potentially wrong,
+		// @TODO: Investigate this further and potentially remove
+		// all trimming of space characters.
 		$markdown = ltrim( $markdown, "\n " );
 		$markdown = preg_replace( '/\n+/', "\n", $markdown );
 		return $markdown;

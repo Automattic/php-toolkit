@@ -18,89 +18,91 @@ use Symfony\Component\EventDispatcher\ImmutableEventDispatcher;
 /**
  * @author Bernhard Schussek <bschussek@gmail.com>
  */
-class ImmutableEventDispatcherTest extends TestCase
-{
-    /**
-     * @var \PHPUnit_Framework_MockObject_MockObject
-     */
-    private $innerDispatcher;
+class ImmutableEventDispatcherTest extends TestCase {
 
-    /**
-     * @var ImmutableEventDispatcher
-     */
-    private $dispatcher;
+	/**
+	 * @var \PHPUnit_Framework_MockObject_MockObject
+	 */
+	private $innerDispatcher;
 
-    protected function setUp()
-    {
-        $this->innerDispatcher = $this->getMockBuilder('Symfony\Component\EventDispatcher\EventDispatcherInterface')->getMock();
-        $this->dispatcher = new ImmutableEventDispatcher($this->innerDispatcher);
-    }
+	/**
+	 * @var ImmutableEventDispatcher
+	 */
+	private $dispatcher;
 
-    public function testDispatchDelegates()
-    {
-        $event = new Event();
+	protected function setUp() {
+		$this->innerDispatcher = $this->getMockBuilder( 'Symfony\Component\EventDispatcher\EventDispatcherInterface' )->getMock();
+		$this->dispatcher      = new ImmutableEventDispatcher( $this->innerDispatcher );
+	}
 
-        $this->innerDispatcher->expects($this->once())
-            ->method('dispatch')
-            ->with('event', $event)
-            ->will($this->returnValue('result'));
+	public function testDispatchDelegates() {
+		$event = new Event();
 
-        $this->assertSame('result', $this->dispatcher->dispatch('event', $event));
-    }
+		$this->innerDispatcher->expects( $this->once() )
+			->method( 'dispatch' )
+			->with( 'event', $event )
+			->will( $this->returnValue( 'result' ) );
 
-    public function testGetListenersDelegates()
-    {
-        $this->innerDispatcher->expects($this->once())
-            ->method('getListeners')
-            ->with('event')
-            ->will($this->returnValue('result'));
+		$this->assertSame( 'result', $this->dispatcher->dispatch( 'event', $event ) );
+	}
 
-        $this->assertSame('result', $this->dispatcher->getListeners('event'));
-    }
+	public function testGetListenersDelegates() {
+		$this->innerDispatcher->expects( $this->once() )
+			->method( 'getListeners' )
+			->with( 'event' )
+			->will( $this->returnValue( 'result' ) );
 
-    public function testHasListenersDelegates()
-    {
-        $this->innerDispatcher->expects($this->once())
-            ->method('hasListeners')
-            ->with('event')
-            ->will($this->returnValue('result'));
+		$this->assertSame( 'result', $this->dispatcher->getListeners( 'event' ) );
+	}
 
-        $this->assertSame('result', $this->dispatcher->hasListeners('event'));
-    }
+	public function testHasListenersDelegates() {
+		$this->innerDispatcher->expects( $this->once() )
+			->method( 'hasListeners' )
+			->with( 'event' )
+			->will( $this->returnValue( 'result' ) );
 
-    /**
-     * @expectedException \BadMethodCallException
-     */
-    public function testAddListenerDisallowed()
-    {
-        $this->dispatcher->addListener('event', function () { return 'foo'; });
-    }
+		$this->assertSame( 'result', $this->dispatcher->hasListeners( 'event' ) );
+	}
 
-    /**
-     * @expectedException \BadMethodCallException
-     */
-    public function testAddSubscriberDisallowed()
-    {
-        $subscriber = $this->getMockBuilder('Symfony\Component\EventDispatcher\EventSubscriberInterface')->getMock();
+	/**
+	 * @expectedException \BadMethodCallException
+	 */
+	public function testAddListenerDisallowed() {
+		$this->dispatcher->addListener(
+			'event',
+			function () {
+				return 'foo';
+			}
+		);
+	}
 
-        $this->dispatcher->addSubscriber($subscriber);
-    }
+	/**
+	 * @expectedException \BadMethodCallException
+	 */
+	public function testAddSubscriberDisallowed() {
+		$subscriber = $this->getMockBuilder( 'Symfony\Component\EventDispatcher\EventSubscriberInterface' )->getMock();
 
-    /**
-     * @expectedException \BadMethodCallException
-     */
-    public function testRemoveListenerDisallowed()
-    {
-        $this->dispatcher->removeListener('event', function () { return 'foo'; });
-    }
+		$this->dispatcher->addSubscriber( $subscriber );
+	}
 
-    /**
-     * @expectedException \BadMethodCallException
-     */
-    public function testRemoveSubscriberDisallowed()
-    {
-        $subscriber = $this->getMockBuilder('Symfony\Component\EventDispatcher\EventSubscriberInterface')->getMock();
+	/**
+	 * @expectedException \BadMethodCallException
+	 */
+	public function testRemoveListenerDisallowed() {
+		$this->dispatcher->removeListener(
+			'event',
+			function () {
+				return 'foo';
+			}
+		);
+	}
 
-        $this->dispatcher->removeSubscriber($subscriber);
-    }
+	/**
+	 * @expectedException \BadMethodCallException
+	 */
+	public function testRemoveSubscriberDisallowed() {
+		$subscriber = $this->getMockBuilder( 'Symfony\Component\EventDispatcher\EventSubscriberInterface' )->getMock();
+
+		$this->dispatcher->removeSubscriber( $subscriber );
+	}
 }

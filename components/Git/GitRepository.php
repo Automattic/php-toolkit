@@ -256,10 +256,14 @@ class GitRepository {
 		$new_objects_oids = array();
 		// Optimization – don't process the same tree more than once.
 		$processed_trees = array();
-		$range = $this->get_commits_range($new_commit_hash, $old_commit_hash, [
-			'include_ancestor' => false,
-		]);
-		foreach($range as $new_commit_hash) {
+		$range           = $this->get_commits_range(
+			$new_commit_hash,
+			$old_commit_hash,
+			array(
+				'include_ancestor' => false,
+			)
+		);
+		foreach ( $range as $new_commit_hash ) {
 			$new_commit                           = $this->read_object( $new_commit_hash )->as_commit();
 			$new_objects_oids[ $new_commit_hash ] = true;
 			$tree_oid                             = $new_commit->tree;
@@ -524,33 +528,33 @@ class GitRepository {
 		// Use two queues to traverse the commit history of both refs.
 		$visited1 = array();
 		$visited2 = array();
-		$queue1 = array($commit_hash1);
-		$queue2 = array($commit_hash2);
+		$queue1   = array( $commit_hash1 );
+		$queue2   = array( $commit_hash2 );
 
-		while ( !empty($queue1) || !empty($queue2) ) {
-			if ( !empty($queue1) ) {
-				$current1 = array_shift($queue1);
-				if ( isset($visited2[$current1]) ) {
+		while ( ! empty( $queue1 ) || ! empty( $queue2 ) ) {
+			if ( ! empty( $queue1 ) ) {
+				$current1 = array_shift( $queue1 );
+				if ( isset( $visited2[ $current1 ] ) ) {
 					return $current1;
 				}
-				$visited1[$current1] = true;
-				$commit1 = $this->read_object($current1)->as_commit();
-				foreach ($commit1->parents as $parent) {
-					if ( !isset($visited1[$parent]) ) {
+				$visited1[ $current1 ] = true;
+				$commit1               = $this->read_object( $current1 )->as_commit();
+				foreach ( $commit1->parents as $parent ) {
+					if ( ! isset( $visited1[ $parent ] ) ) {
 						$queue1[] = $parent;
 					}
 				}
 			}
 
-			if ( !empty($queue2) ) {
-				$current2 = array_shift($queue2);
-				if ( isset($visited1[$current2]) ) {
+			if ( ! empty( $queue2 ) ) {
+				$current2 = array_shift( $queue2 );
+				if ( isset( $visited1[ $current2 ] ) ) {
 					return $current2;
 				}
-				$visited2[$current2] = true;
-				$commit2 = $this->read_object($current2)->as_commit();
-				foreach ($commit2->parents as $parent) {
-					if ( !isset($visited2[$parent]) ) {
+				$visited2[ $current2 ] = true;
+				$commit2               = $this->read_object( $current2 )->as_commit();
+				foreach ( $commit2->parents as $parent ) {
+					if ( ! isset( $visited2[ $parent ] ) ) {
 						$queue2[] = $parent;
 					}
 				}
@@ -904,40 +908,40 @@ class GitRepository {
 
 	public function get_commits_range( string $head_oid, string $last_ancestor_oid, $options = array() ) {
 		$commits = array();
-		$queue = array(array($head_oid));
+		$queue   = array( array( $head_oid ) );
 		$visited = array();
 
-		while (!empty($queue)) {
-			$path = array_shift($queue);
-			$current_oid = end($path);
+		while ( ! empty( $queue ) ) {
+			$path        = array_shift( $queue );
+			$current_oid = end( $path );
 
-			if (isset($visited[$current_oid])) {
+			if ( isset( $visited[ $current_oid ] ) ) {
 				continue;
 			}
-			$visited[$current_oid] = true;
+			$visited[ $current_oid ] = true;
 
 			$commits[] = $current_oid;
-			if ($current_oid === $last_ancestor_oid) {
+			if ( $current_oid === $last_ancestor_oid ) {
 				break;
 			}
 
-			$commit = $this->read_object($current_oid)->as_commit();
-			foreach ($commit->parents as $parent_hash) {
-				$new_path = $path;
+			$commit = $this->read_object( $current_oid )->as_commit();
+			foreach ( $commit->parents as $parent_hash ) {
+				$new_path   = $path;
 				$new_path[] = $parent_hash;
-				$queue[] = $new_path;
+				$queue[]    = $new_path;
 			}
 		}
 
-		if (!in_array($last_ancestor_oid, $commits)) {
+		if ( ! in_array( $last_ancestor_oid, $commits ) ) {
 			throw new GitException(
 				"$last_ancestor_oid is not an ancestor of $head_oid.",
 			);
 		}
 
 		$include_ancestor = $options['include_ancestor'] ?? true;
-		if (!$include_ancestor) {
-			array_pop($commits);
+		if ( ! $include_ancestor ) {
+			array_pop( $commits );
 		}
 		return $commits;
 	}

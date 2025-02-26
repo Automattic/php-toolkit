@@ -26,90 +26,89 @@ use Symfony\Component\Filesystem\Exception\IOException;
  * @author Romain Neutron <imprec@gmail.com>
  * @author Nicolas Grekas <p@tchwork.com>
  */
-class LockHandler
-{
-    private $file;
-    private $handle;
+class LockHandler {
 
-    /**
-     * @param string      $name     The lock name
-     * @param string|null $lockPath The directory to store the lock. Default values will use temporary directory
-     *
-     * @throws IOException If the lock directory could not be created or is not writable
-     */
-    public function __construct($name, $lockPath = null)
-    {
-        $lockPath = $lockPath ?: sys_get_temp_dir();
+	private $file;
+	private $handle;
 
-        if (!is_dir($lockPath)) {
-            $fs = new Filesystem();
-            $fs->mkdir($lockPath);
-        }
+	/**
+	 * @param string      $name     The lock name
+	 * @param string|null $lockPath The directory to store the lock. Default values will use temporary directory
+	 *
+	 * @throws IOException If the lock directory could not be created or is not writable
+	 */
+	public function __construct( $name, $lockPath = null ) {
+		$lockPath = $lockPath ?: sys_get_temp_dir();
 
-        if (!is_writable($lockPath)) {
-            throw new IOException(sprintf('The directory "%s" is not writable.', $lockPath), 0, null, $lockPath);
-        }
+		if ( ! is_dir( $lockPath ) ) {
+			$fs = new Filesystem();
+			$fs->mkdir( $lockPath );
+		}
 
-        $this->file = sprintf('%s/sf.%s.%s.lock', $lockPath, preg_replace('/[^a-z0-9\._-]+/i', '-', $name), hash('sha256', $name));
-    }
+		if ( ! is_writable( $lockPath ) ) {
+			throw new IOException( sprintf( 'The directory "%s" is not writable.', $lockPath ), 0, null, $lockPath );
+		}
 
-    /**
-     * Lock the resource.
-     *
-     * @param bool $blocking wait until the lock is released
-     *
-     * @return bool Returns true if the lock was acquired, false otherwise
-     *
-     * @throws IOException If the lock file could not be created or opened
-     */
-    public function lock($blocking = false)
-    {
-        if ($this->handle) {
-            return true;
-        }
+		$this->file = sprintf( '%s/sf.%s.%s.lock', $lockPath, preg_replace( '/[^a-z0-9\._-]+/i', '-', $name ), hash( 'sha256', $name ) );
+	}
 
-        $error = null;
+	/**
+	 * Lock the resource.
+	 *
+	 * @param bool $blocking wait until the lock is released
+	 *
+	 * @return bool Returns true if the lock was acquired, false otherwise
+	 *
+	 * @throws IOException If the lock file could not be created or opened
+	 */
+	public function lock( $blocking = false ) {
+		if ( $this->handle ) {
+			return true;
+		}
 
-        // Silence error reporting
-        set_error_handler(function ($errno, $msg) use (&$error) {
-            $error = $msg;
-        });
+		$error = null;
 
-        if (!$this->handle = fopen($this->file, 'r')) {
-            if ($this->handle = fopen($this->file, 'x')) {
-                chmod($this->file, 0444);
-            } elseif (!$this->handle = fopen($this->file, 'r')) {
-                usleep(100); // Give some time for chmod() to complete
-                $this->handle = fopen($this->file, 'r');
-            }
-        }
-        restore_error_handler();
+		// Silence error reporting
+		set_error_handler(
+			function ( $errno, $msg ) use ( &$error ) {
+				$error = $msg;
+			}
+		);
 
-        if (!$this->handle) {
-            throw new IOException($error, 0, null, $this->file);
-        }
+		if ( ! $this->handle = fopen( $this->file, 'r' ) ) {
+			if ( $this->handle = fopen( $this->file, 'x' ) ) {
+				chmod( $this->file, 0444 );
+			} elseif ( ! $this->handle = fopen( $this->file, 'r' ) ) {
+				usleep( 100 ); // Give some time for chmod() to complete
+				$this->handle = fopen( $this->file, 'r' );
+			}
+		}
+		restore_error_handler();
 
-        // On Windows, even if PHP doc says the contrary, LOCK_NB works, see
-        // https://bugs.php.net/54129
-        if (!flock($this->handle, LOCK_EX | ($blocking ? 0 : LOCK_NB))) {
-            fclose($this->handle);
-            $this->handle = null;
+		if ( ! $this->handle ) {
+			throw new IOException( $error, 0, null, $this->file );
+		}
 
-            return false;
-        }
+		// On Windows, even if PHP doc says the contrary, LOCK_NB works, see
+		// https://bugs.php.net/54129
+		if ( ! flock( $this->handle, LOCK_EX | ( $blocking ? 0 : LOCK_NB ) ) ) {
+			fclose( $this->handle );
+			$this->handle = null;
 
-        return true;
-    }
+			return false;
+		}
 
-    /**
-     * Release the resource.
-     */
-    public function release()
-    {
-        if ($this->handle) {
-            flock($this->handle, LOCK_UN | LOCK_NB);
-            fclose($this->handle);
-            $this->handle = null;
-        }
-    }
+		return true;
+	}
+
+	/**
+	 * Release the resource.
+	 */
+	public function release() {
+		if ( $this->handle ) {
+			flock( $this->handle, LOCK_UN | LOCK_NB );
+			fclose( $this->handle );
+			$this->handle = null;
+		}
+	}
 }

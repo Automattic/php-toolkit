@@ -31,47 +31,43 @@ use Pimple\Container;
 use Pimple\Psr11\Container as PsrContainer;
 use Pimple\Tests\Fixtures\Service;
 
-class ContainerTest extends TestCase
-{
-    public function testGetReturnsExistingService()
-    {
-        $pimple = new Container();
-        $pimple['service'] = function () {
-            return new Service();
-        };
-        $psr = new PsrContainer($pimple);
+class ContainerTest extends TestCase {
 
-        $this->assertSame($pimple['service'], $psr->get('service'));
-    }
+	public function testGetReturnsExistingService() {
+		$pimple            = new Container();
+		$pimple['service'] = function () {
+			return new Service();
+		};
+		$psr               = new PsrContainer( $pimple );
 
-    /**
-     * @expectedException \Psr\Container\NotFoundExceptionInterface
-     * @expectedExceptionMessage Identifier "service" is not defined.
-     */
-    public function testGetThrowsExceptionIfServiceIsNotFound()
-    {
-        $pimple = new Container();
-        $psr = new PsrContainer($pimple);
+		$this->assertSame( $pimple['service'], $psr->get( 'service' ) );
+	}
 
-        $psr->get('service');
-    }
+	/**
+	 * @expectedException \Psr\Container\NotFoundExceptionInterface
+	 * @expectedExceptionMessage Identifier "service" is not defined.
+	 */
+	public function testGetThrowsExceptionIfServiceIsNotFound() {
+		$pimple = new Container();
+		$psr    = new PsrContainer( $pimple );
 
-    public function testHasReturnsTrueIfServiceExists()
-    {
-        $pimple = new Container();
-        $pimple['service'] = function () {
-            return new Service();
-        };
-        $psr = new PsrContainer($pimple);
+		$psr->get( 'service' );
+	}
 
-        $this->assertTrue($psr->has('service'));
-    }
+	public function testHasReturnsTrueIfServiceExists() {
+		$pimple            = new Container();
+		$pimple['service'] = function () {
+			return new Service();
+		};
+		$psr               = new PsrContainer( $pimple );
 
-    public function testHasReturnsFalseIfServiceDoesNotExist()
-    {
-        $pimple = new Container();
-        $psr = new PsrContainer($pimple);
+		$this->assertTrue( $psr->has( 'service' ) );
+	}
 
-        $this->assertFalse($psr->has('service'));
-    }
+	public function testHasReturnsFalseIfServiceDoesNotExist() {
+		$pimple = new Container();
+		$psr    = new PsrContainer( $pimple );
+
+		$this->assertFalse( $psr->has( 'service' ) );
+	}
 }

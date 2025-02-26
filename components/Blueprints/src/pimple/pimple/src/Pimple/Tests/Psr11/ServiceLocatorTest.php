@@ -36,99 +36,98 @@ use Pimple\Tests\Fixtures;
  *
  * @author Pascal Luna <skalpa@zetareticuli.org>
  */
-class ServiceLocatorTest extends TestCase
-{
-    public function testCanAccessServices()
-    {
-        $pimple = new Container();
-        $pimple['service'] = function () {
-            return new Fixtures\Service();
-        };
-        $locator = new ServiceLocator($pimple, array('service'));
+class ServiceLocatorTest extends TestCase {
 
-        $this->assertSame($pimple['service'], $locator->get('service'));
-    }
+	public function testCanAccessServices() {
+		$pimple            = new Container();
+		$pimple['service'] = function () {
+			return new Fixtures\Service();
+		};
+		$locator           = new ServiceLocator( $pimple, array( 'service' ) );
 
-    public function testCanAccessAliasedServices()
-    {
-        $pimple = new Container();
-        $pimple['service'] = function () {
-            return new Fixtures\Service();
-        };
-        $locator = new ServiceLocator($pimple, array('alias' => 'service'));
+		$this->assertSame( $pimple['service'], $locator->get( 'service' ) );
+	}
 
-        $this->assertSame($pimple['service'], $locator->get('alias'));
-    }
+	public function testCanAccessAliasedServices() {
+		$pimple            = new Container();
+		$pimple['service'] = function () {
+			return new Fixtures\Service();
+		};
+		$locator           = new ServiceLocator( $pimple, array( 'alias' => 'service' ) );
 
-    /**
-     * @expectedException \Pimple\Exception\UnknownIdentifierException
-     * @expectedExceptionMessage Identifier "service" is not defined.
-     */
-    public function testCannotAccessAliasedServiceUsingRealIdentifier()
-    {
-        $pimple = new Container();
-        $pimple['service'] = function () {
-            return new Fixtures\Service();
-        };
-        $locator = new ServiceLocator($pimple, array('alias' => 'service'));
+		$this->assertSame( $pimple['service'], $locator->get( 'alias' ) );
+	}
 
-        $service = $locator->get('service');
-    }
+	/**
+	 * @expectedException \Pimple\Exception\UnknownIdentifierException
+	 * @expectedExceptionMessage Identifier "service" is not defined.
+	 */
+	public function testCannotAccessAliasedServiceUsingRealIdentifier() {
+		$pimple            = new Container();
+		$pimple['service'] = function () {
+			return new Fixtures\Service();
+		};
+		$locator           = new ServiceLocator( $pimple, array( 'alias' => 'service' ) );
 
-    /**
-     * @expectedException \Pimple\Exception\UnknownIdentifierException
-     * @expectedExceptionMessage Identifier "foo" is not defined.
-     */
-    public function testGetValidatesServiceCanBeLocated()
-    {
-        $pimple = new Container();
-        $pimple['service'] = function () {
-            return new Fixtures\Service();
-        };
-        $locator = new ServiceLocator($pimple, array('alias' => 'service'));
+		$service = $locator->get( 'service' );
+	}
 
-        $service = $locator->get('foo');
-    }
+	/**
+	 * @expectedException \Pimple\Exception\UnknownIdentifierException
+	 * @expectedExceptionMessage Identifier "foo" is not defined.
+	 */
+	public function testGetValidatesServiceCanBeLocated() {
+		$pimple            = new Container();
+		$pimple['service'] = function () {
+			return new Fixtures\Service();
+		};
+		$locator           = new ServiceLocator( $pimple, array( 'alias' => 'service' ) );
 
-    /**
-     * @expectedException \Pimple\Exception\UnknownIdentifierException
-     * @expectedExceptionMessage Identifier "invalid" is not defined.
-     */
-    public function testGetValidatesTargetServiceExists()
-    {
-        $pimple = new Container();
-        $pimple['service'] = function () {
-            return new Fixtures\Service();
-        };
-        $locator = new ServiceLocator($pimple, array('alias' => 'invalid'));
+		$service = $locator->get( 'foo' );
+	}
 
-        $service = $locator->get('alias');
-    }
+	/**
+	 * @expectedException \Pimple\Exception\UnknownIdentifierException
+	 * @expectedExceptionMessage Identifier "invalid" is not defined.
+	 */
+	public function testGetValidatesTargetServiceExists() {
+		$pimple            = new Container();
+		$pimple['service'] = function () {
+			return new Fixtures\Service();
+		};
+		$locator           = new ServiceLocator( $pimple, array( 'alias' => 'invalid' ) );
 
-    public function testHasValidatesServiceCanBeLocated()
-    {
-        $pimple = new Container();
-        $pimple['service1'] = function () {
-            return new Fixtures\Service();
-        };
-        $pimple['service2'] = function () {
-            return new Fixtures\Service();
-        };
-        $locator = new ServiceLocator($pimple, array('service1'));
+		$service = $locator->get( 'alias' );
+	}
 
-        $this->assertTrue($locator->has('service1'));
-        $this->assertFalse($locator->has('service2'));
-    }
+	public function testHasValidatesServiceCanBeLocated() {
+		$pimple             = new Container();
+		$pimple['service1'] = function () {
+			return new Fixtures\Service();
+		};
+		$pimple['service2'] = function () {
+			return new Fixtures\Service();
+		};
+		$locator            = new ServiceLocator( $pimple, array( 'service1' ) );
 
-    public function testHasChecksIfTargetServiceExists()
-    {
-        $pimple = new Container();
-        $pimple['service'] = function () {
-            return new Fixtures\Service();
-        };
-        $locator = new ServiceLocator($pimple, array('foo' => 'service', 'bar' => 'invalid'));
+		$this->assertTrue( $locator->has( 'service1' ) );
+		$this->assertFalse( $locator->has( 'service2' ) );
+	}
 
-        $this->assertTrue($locator->has('foo'));
-        $this->assertFalse($locator->has('bar'));
-    }
+	public function testHasChecksIfTargetServiceExists() {
+		$pimple            = new Container();
+		$pimple['service'] = function () {
+			return new Fixtures\Service();
+		};
+		$locator           = new ServiceLocator(
+			$pimple,
+			array(
+				'foo' => 'service',
+				'bar' => 'invalid',
+			)
+		);
+
+		$this->assertTrue( $locator->has( 'foo' ) );
+		$this->assertFalse( $locator->has( 'bar' ) );
+	}
 }

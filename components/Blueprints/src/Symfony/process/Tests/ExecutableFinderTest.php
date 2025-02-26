@@ -17,117 +17,108 @@ use Symfony\Component\Process\ExecutableFinder;
 /**
  * @author Chris Smith <chris@cs278.org>
  */
-class ExecutableFinderTest extends TestCase
-{
-    private $path;
+class ExecutableFinderTest extends TestCase {
 
-    protected function tearDown()
-    {
-        if ($this->path) {
-            // Restore path if it was changed.
-            putenv('PATH='.$this->path);
-        }
-    }
+	private $path;
 
-    private function setPath($path)
-    {
-        $this->path = getenv('PATH');
-        putenv('PATH='.$path);
-    }
+	protected function tearDown() {
+		if ( $this->path ) {
+			// Restore path if it was changed.
+			putenv( 'PATH=' . $this->path );
+		}
+	}
 
-    public function testFind()
-    {
-        if (ini_get('open_basedir')) {
-            $this->markTestSkipped('Cannot test when open_basedir is set');
-        }
+	private function setPath( $path ) {
+		$this->path = getenv( 'PATH' );
+		putenv( 'PATH=' . $path );
+	}
 
-        $this->setPath(dirname(PHP_BINARY));
+	public function testFind() {
+		if ( ini_get( 'open_basedir' ) ) {
+			$this->markTestSkipped( 'Cannot test when open_basedir is set' );
+		}
 
-        $finder = new ExecutableFinder();
-        $result = $finder->find($this->getPhpBinaryName());
+		$this->setPath( dirname( PHP_BINARY ) );
 
-        $this->assertSamePath(PHP_BINARY, $result);
-    }
+		$finder = new ExecutableFinder();
+		$result = $finder->find( $this->getPhpBinaryName() );
 
-    public function testFindWithDefault()
-    {
-        if (ini_get('open_basedir')) {
-            $this->markTestSkipped('Cannot test when open_basedir is set');
-        }
+		$this->assertSamePath( PHP_BINARY, $result );
+	}
 
-        $expected = 'defaultValue';
+	public function testFindWithDefault() {
+		if ( ini_get( 'open_basedir' ) ) {
+			$this->markTestSkipped( 'Cannot test when open_basedir is set' );
+		}
 
-        $this->setPath('');
+		$expected = 'defaultValue';
 
-        $finder = new ExecutableFinder();
-        $result = $finder->find('foo', $expected);
+		$this->setPath( '' );
 
-        $this->assertEquals($expected, $result);
-    }
+		$finder = new ExecutableFinder();
+		$result = $finder->find( 'foo', $expected );
 
-    public function testFindWithExtraDirs()
-    {
-        if (ini_get('open_basedir')) {
-            $this->markTestSkipped('Cannot test when open_basedir is set');
-        }
+		$this->assertEquals( $expected, $result );
+	}
 
-        $this->setPath('');
+	public function testFindWithExtraDirs() {
+		if ( ini_get( 'open_basedir' ) ) {
+			$this->markTestSkipped( 'Cannot test when open_basedir is set' );
+		}
 
-        $extraDirs = array(dirname(PHP_BINARY));
+		$this->setPath( '' );
 
-        $finder = new ExecutableFinder();
-        $result = $finder->find($this->getPhpBinaryName(), null, $extraDirs);
+		$extraDirs = array( dirname( PHP_BINARY ) );
 
-        $this->assertSamePath(PHP_BINARY, $result);
-    }
+		$finder = new ExecutableFinder();
+		$result = $finder->find( $this->getPhpBinaryName(), null, $extraDirs );
 
-    public function testFindWithOpenBaseDir()
-    {
-        if ('\\' === DIRECTORY_SEPARATOR) {
-            $this->markTestSkipped('Cannot run test on windows');
-        }
+		$this->assertSamePath( PHP_BINARY, $result );
+	}
 
-        if (ini_get('open_basedir')) {
-            $this->markTestSkipped('Cannot test when open_basedir is set');
-        }
+	public function testFindWithOpenBaseDir() {
+		if ( '\\' === DIRECTORY_SEPARATOR ) {
+			$this->markTestSkipped( 'Cannot run test on windows' );
+		}
 
-        $this->iniSet('open_basedir', dirname(PHP_BINARY).(!defined('HHVM_VERSION') || HHVM_VERSION_ID >= 30800 ? PATH_SEPARATOR.'/' : ''));
+		if ( ini_get( 'open_basedir' ) ) {
+			$this->markTestSkipped( 'Cannot test when open_basedir is set' );
+		}
 
-        $finder = new ExecutableFinder();
-        $result = $finder->find($this->getPhpBinaryName());
+		$this->iniSet( 'open_basedir', dirname( PHP_BINARY ) . ( ! defined( 'HHVM_VERSION' ) || HHVM_VERSION_ID >= 30800 ? PATH_SEPARATOR . '/' : '' ) );
 
-        $this->assertSamePath(PHP_BINARY, $result);
-    }
+		$finder = new ExecutableFinder();
+		$result = $finder->find( $this->getPhpBinaryName() );
 
-    public function testFindProcessInOpenBasedir()
-    {
-        if (ini_get('open_basedir')) {
-            $this->markTestSkipped('Cannot test when open_basedir is set');
-        }
-        if ('\\' === DIRECTORY_SEPARATOR) {
-            $this->markTestSkipped('Cannot run test on windows');
-        }
+		$this->assertSamePath( PHP_BINARY, $result );
+	}
 
-        $this->setPath('');
-        $this->iniSet('open_basedir', PHP_BINARY.(!defined('HHVM_VERSION') || HHVM_VERSION_ID >= 30800 ? PATH_SEPARATOR.'/' : ''));
+	public function testFindProcessInOpenBasedir() {
+		if ( ini_get( 'open_basedir' ) ) {
+			$this->markTestSkipped( 'Cannot test when open_basedir is set' );
+		}
+		if ( '\\' === DIRECTORY_SEPARATOR ) {
+			$this->markTestSkipped( 'Cannot run test on windows' );
+		}
 
-        $finder = new ExecutableFinder();
-        $result = $finder->find($this->getPhpBinaryName(), false);
+		$this->setPath( '' );
+		$this->iniSet( 'open_basedir', PHP_BINARY . ( ! defined( 'HHVM_VERSION' ) || HHVM_VERSION_ID >= 30800 ? PATH_SEPARATOR . '/' : '' ) );
 
-        $this->assertSamePath(PHP_BINARY, $result);
-    }
+		$finder = new ExecutableFinder();
+		$result = $finder->find( $this->getPhpBinaryName(), false );
 
-    private function assertSamePath($expected, $tested)
-    {
-        if ('\\' === DIRECTORY_SEPARATOR) {
-            $this->assertEquals(strtolower($expected), strtolower($tested));
-        } else {
-            $this->assertEquals($expected, $tested);
-        }
-    }
+		$this->assertSamePath( PHP_BINARY, $result );
+	}
 
-    private function getPhpBinaryName()
-    {
-        return basename(PHP_BINARY, '\\' === DIRECTORY_SEPARATOR ? '.exe' : '');
-    }
+	private function assertSamePath( $expected, $tested ) {
+		if ( '\\' === DIRECTORY_SEPARATOR ) {
+			$this->assertEquals( strtolower( $expected ), strtolower( $tested ) );
+		} else {
+			$this->assertEquals( $expected, $tested );
+		}
+	}
+
+	private function getPhpBinaryName() {
+		return basename( PHP_BINARY, '\\' === DIRECTORY_SEPARATOR ? '.exe' : '' );
+	}
 }

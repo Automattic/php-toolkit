@@ -93,7 +93,7 @@ class MarkupProcessorConsumer implements DataFormatConsumer {
 					if ( ! array_key_exists( $key, $this->metadata ) ) {
 						$this->metadata[ $key ] = array();
 					}
-					switch ($html->get_attribute('type')) {
+					switch ( $html->get_attribute( 'type' ) ) {
 						case 'integer':
 							$value = (int) $value;
 							break;

@@ -18,37 +18,37 @@ use Symfony\Component\Process\Process;
  *
  * @author Johannes M. Schmitt <schmittjoh@gmail.com>
  */
-class ProcessFailedException extends RuntimeException
-{
-    private $process;
+class ProcessFailedException extends RuntimeException {
 
-    public function __construct(Process $process)
-    {
-        if ($process->isSuccessful()) {
-            throw new InvalidArgumentException('Expected a failed process, but the given process was successful.');
-        }
+	private $process;
 
-        $error = sprintf('The command "%s" failed.'."\n\nExit Code: %s(%s)\n\nWorking directory: %s",
-            $process->getCommandLine(),
-            $process->getExitCode(),
-            $process->getExitCodeText(),
-            $process->getWorkingDirectory()
-        );
+	public function __construct( Process $process ) {
+		if ( $process->isSuccessful() ) {
+			throw new InvalidArgumentException( 'Expected a failed process, but the given process was successful.' );
+		}
 
-        if (!$process->isOutputDisabled()) {
-            $error .= sprintf("\n\nOutput:\n================\n%s\n\nError Output:\n================\n%s",
-                $process->getOutput(),
-                $process->getErrorOutput()
-            );
-        }
+		$error = sprintf(
+			'The command "%s" failed.' . "\n\nExit Code: %s(%s)\n\nWorking directory: %s",
+			$process->getCommandLine(),
+			$process->getExitCode(),
+			$process->getExitCodeText(),
+			$process->getWorkingDirectory()
+		);
 
-        parent::__construct($error);
+		if ( ! $process->isOutputDisabled() ) {
+			$error .= sprintf(
+				"\n\nOutput:\n================\n%s\n\nError Output:\n================\n%s",
+				$process->getOutput(),
+				$process->getErrorOutput()
+			);
+		}
 
-        $this->process = $process;
-    }
+		parent::__construct( $error );
 
-    public function getProcess()
-    {
-        return $this->process;
-    }
+		$this->process = $process;
+	}
+
+	public function getProcess() {
+		return $this->process;
+	}
 }

@@ -97,7 +97,7 @@ MD;
 				'expected' => '<!-- wp:paragraph --><p>A simple    paragraph</p><!-- /wp:paragraph -->',
 			),
 			'A simple paragraph – no blank text nodes – single space at the end' => array(
-				'markdown' => "A simple paragraph ",
+				'markdown' => 'A simple paragraph ',
 				'expected' => '<!-- wp:paragraph --><p>A simple paragraph </p><!-- /wp:paragraph -->',
 			),
 			'A simple paragraph – regular block markup formatting – no space at the end' => array(

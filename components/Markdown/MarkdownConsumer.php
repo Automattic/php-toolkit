@@ -114,12 +114,12 @@ class MarkdownConsumer implements DataFormatConsumer {
 						if ( ! $level ) {
 							$level = 3;
 						}
-                        $attrs = [];
-                        // 2 is the default level and the editor-produced markup won't contain this attribute, leading to
-                        // permanent client-side three-way merges.
-                        if($level !== 2) {
-                            $attrs['level'] = $level;
-                        }
+						$attrs = array();
+						// 2 is the default level and the editor-produced markup won't contain this attribute, leading to
+						// permanent client-side three-way merges.
+						if ( $level !== 2 ) {
+							$attrs['level'] = $level;
+						}
 						$this->push_block( 'heading', $attrs );
 						$this->append_content( '<h' . $level . ' class="wp-block-heading">' );
 						break;
@@ -213,10 +213,11 @@ class MarkdownConsumer implements DataFormatConsumer {
 						break;
 
 					case Inline\Text::class:
-                        /**
-                         * Trailing whitespace is getting lost in the commonmark parser.
-                         * @TODO: Patch the commonmark parser OR use a diffent parser.
-                         */
+						/**
+						 * Trailing whitespace is getting lost in the commonmark parser.
+						 *
+						 * @TODO: Patch the commonmark parser OR use a diffent parser.
+						 */
 						$this->append_content( $node->getLiteral() );
 						break;
 

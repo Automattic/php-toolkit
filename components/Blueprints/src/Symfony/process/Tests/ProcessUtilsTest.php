@@ -17,37 +17,35 @@ use Symfony\Component\Process\ProcessUtils;
 /**
  * @group legacy
  */
-class ProcessUtilsTest extends TestCase
-{
-    /**
-     * @dataProvider dataArguments
-     */
-    public function testEscapeArgument($result, $argument)
-    {
-        $this->assertSame($result, ProcessUtils::escapeArgument($argument));
-    }
+class ProcessUtilsTest extends TestCase {
 
-    public function dataArguments()
-    {
-        if ('\\' === DIRECTORY_SEPARATOR) {
-            return array(
-                array('"\"php\" \"-v\""', '"php" "-v"'),
-                array('"foo bar"', 'foo bar'),
-                array('^%"path"^%', '%path%'),
-                array('"<|>\\" \\"\'f"', '<|>" "\'f'),
-                array('""', ''),
-                array('"with\trailingbs\\\\"', 'with\trailingbs\\'),
-            );
-        }
+	/**
+	 * @dataProvider dataArguments
+	 */
+	public function testEscapeArgument( $result, $argument ) {
+		$this->assertSame( $result, ProcessUtils::escapeArgument( $argument ) );
+	}
 
-        return array(
-            array("'\"php\" \"-v\"'", '"php" "-v"'),
-            array("'foo bar'", 'foo bar'),
-            array("'%path%'", '%path%'),
-            array("'<|>\" \"'\\''f'", '<|>" "\'f'),
-            array("''", ''),
-            array("'with\\trailingbs\\'", 'with\trailingbs\\'),
-            array("'withNonAsciiAccentLikeéÉèÈàÀöä'", 'withNonAsciiAccentLikeéÉèÈàÀöä'),
-        );
-    }
+	public function dataArguments() {
+		if ( '\\' === DIRECTORY_SEPARATOR ) {
+			return array(
+				array( '"\"php\" \"-v\""', '"php" "-v"' ),
+				array( '"foo bar"', 'foo bar' ),
+				array( '^%"path"^%', '%path%' ),
+				array( '"<|>\\" \\"\'f"', '<|>" "\'f' ),
+				array( '""', '' ),
+				array( '"with\trailingbs\\\\"', 'with\trailingbs\\' ),
+			);
+		}
+
+		return array(
+			array( "'\"php\" \"-v\"'", '"php" "-v"' ),
+			array( "'foo bar'", 'foo bar' ),
+			array( "'%path%'", '%path%' ),
+			array( "'<|>\" \"'\\''f'", '<|>" "\'f' ),
+			array( "''", '' ),
+			array( "'with\\trailingbs\\'", 'with\trailingbs\\' ),
+			array( "'withNonAsciiAccentLikeéÉèÈàÀöä'", 'withNonAsciiAccentLikeéÉèÈàÀöä' ),
+		);
+	}
 }

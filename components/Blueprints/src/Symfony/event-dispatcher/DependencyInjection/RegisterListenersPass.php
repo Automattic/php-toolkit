@@ -22,114 +22,116 @@ use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 /**
  * Compiler pass to register tagged services for an event dispatcher.
  */
-class RegisterListenersPass implements CompilerPassInterface
-{
-    /**
-     * @var string
-     */
-    protected $dispatcherService;
+class RegisterListenersPass implements CompilerPassInterface {
 
-    /**
-     * @var string
-     */
-    protected $listenerTag;
+	/**
+	 * @var string
+	 */
+	protected $dispatcherService;
 
-    /**
-     * @var string
-     */
-    protected $subscriberTag;
+	/**
+	 * @var string
+	 */
+	protected $listenerTag;
 
-    /**
-     * Constructor.
-     *
-     * @param string $dispatcherService Service name of the event dispatcher in processed container
-     * @param string $listenerTag       Tag name used for listener
-     * @param string $subscriberTag     Tag name used for subscribers
-     */
-    public function __construct($dispatcherService = 'event_dispatcher', $listenerTag = 'kernel.event_listener', $subscriberTag = 'kernel.event_subscriber')
-    {
-        $this->dispatcherService = $dispatcherService;
-        $this->listenerTag = $listenerTag;
-        $this->subscriberTag = $subscriberTag;
-    }
+	/**
+	 * @var string
+	 */
+	protected $subscriberTag;
 
-    public function process(ContainerBuilder $container)
-    {
-        if (!$container->hasDefinition($this->dispatcherService) && !$container->hasAlias($this->dispatcherService)) {
-            return;
-        }
+	/**
+	 * Constructor.
+	 *
+	 * @param string $dispatcherService Service name of the event dispatcher in processed container
+	 * @param string $listenerTag       Tag name used for listener
+	 * @param string $subscriberTag     Tag name used for subscribers
+	 */
+	public function __construct( $dispatcherService = 'event_dispatcher', $listenerTag = 'kernel.event_listener', $subscriberTag = 'kernel.event_subscriber' ) {
+		$this->dispatcherService = $dispatcherService;
+		$this->listenerTag       = $listenerTag;
+		$this->subscriberTag     = $subscriberTag;
+	}
 
-        $definition = $container->findDefinition($this->dispatcherService);
+	public function process( ContainerBuilder $container ) {
+		if ( ! $container->hasDefinition( $this->dispatcherService ) && ! $container->hasAlias( $this->dispatcherService ) ) {
+			return;
+		}
 
-        foreach ($container->findTaggedServiceIds($this->listenerTag, true) as $id => $events) {
-            $def = $container->getDefinition($id);
+		$definition = $container->findDefinition( $this->dispatcherService );
 
-            foreach ($events as $event) {
-                $priority = isset($event['priority']) ? $event['priority'] : 0;
+		foreach ( $container->findTaggedServiceIds( $this->listenerTag, true ) as $id => $events ) {
+			$def = $container->getDefinition( $id );
 
-                if (!isset($event['event'])) {
-                    throw new InvalidArgumentException(sprintf('Service "%s" must define the "event" attribute on "%s" tags.', $id, $this->listenerTag));
-                }
+			foreach ( $events as $event ) {
+				$priority = isset( $event['priority'] ) ? $event['priority'] : 0;
 
-                if (!isset($event['method'])) {
-                    $event['method'] = 'on'.preg_replace_callback(array(
-                        '/(?<=\b)[a-z]/i',
-                        '/[^a-z0-9]/i',
-                    ), function ($matches) { return strtoupper($matches[0]); }, $event['event']);
-                    $event['method'] = preg_replace('/[^a-z0-9]/i', '', $event['method']);
-                }
+				if ( ! isset( $event['event'] ) ) {
+					throw new InvalidArgumentException( sprintf( 'Service "%s" must define the "event" attribute on "%s" tags.', $id, $this->listenerTag ) );
+				}
 
-                $definition->addMethodCall('addListener', array($event['event'], array(new ServiceClosureArgument(new Reference($id)), $event['method']), $priority));
-            }
-        }
+				if ( ! isset( $event['method'] ) ) {
+					$event['method'] = 'on' . preg_replace_callback(
+						array(
+							'/(?<=\b)[a-z]/i',
+							'/[^a-z0-9]/i',
+						),
+						function ( $matches ) {
+							return strtoupper( $matches[0] );
+						},
+						$event['event']
+					);
+					$event['method'] = preg_replace( '/[^a-z0-9]/i', '', $event['method'] );
+				}
 
-        $extractingDispatcher = new ExtractingEventDispatcher();
+				$definition->addMethodCall( 'addListener', array( $event['event'], array( new ServiceClosureArgument( new Reference( $id ) ), $event['method'] ), $priority ) );
+			}
+		}
 
-        foreach ($container->findTaggedServiceIds($this->subscriberTag, true) as $id => $attributes) {
-            $def = $container->getDefinition($id);
+		$extractingDispatcher = new ExtractingEventDispatcher();
 
-            // We must assume that the class value has been correctly filled, even if the service is created by a factory
-            $class = $container->getParameterBag()->resolveValue($def->getClass());
-            $interface = 'Symfony\Component\EventDispatcher\EventSubscriberInterface';
+		foreach ( $container->findTaggedServiceIds( $this->subscriberTag, true ) as $id => $attributes ) {
+			$def = $container->getDefinition( $id );
 
-            if (!is_subclass_of($class, $interface)) {
-                if (!class_exists($class, false)) {
-                    throw new InvalidArgumentException(sprintf('Class "%s" used for service "%s" cannot be found.', $class, $id));
-                }
+			// We must assume that the class value has been correctly filled, even if the service is created by a factory
+			$class     = $container->getParameterBag()->resolveValue( $def->getClass() );
+			$interface = 'Symfony\Component\EventDispatcher\EventSubscriberInterface';
 
-                throw new InvalidArgumentException(sprintf('Service "%s" must implement interface "%s".', $id, $interface));
-            }
-            $container->addObjectResource($class);
+			if ( ! is_subclass_of( $class, $interface ) ) {
+				if ( ! class_exists( $class, false ) ) {
+					throw new InvalidArgumentException( sprintf( 'Class "%s" used for service "%s" cannot be found.', $class, $id ) );
+				}
 
-            ExtractingEventDispatcher::$subscriber = $class;
-            $extractingDispatcher->addSubscriber($extractingDispatcher);
-            foreach ($extractingDispatcher->listeners as $args) {
-                $args[1] = array(new ServiceClosureArgument(new Reference($id)), $args[1]);
-                $definition->addMethodCall('addListener', $args);
-            }
-            $extractingDispatcher->listeners = array();
-        }
-    }
+				throw new InvalidArgumentException( sprintf( 'Service "%s" must implement interface "%s".', $id, $interface ) );
+			}
+			$container->addObjectResource( $class );
+
+			ExtractingEventDispatcher::$subscriber = $class;
+			$extractingDispatcher->addSubscriber( $extractingDispatcher );
+			foreach ( $extractingDispatcher->listeners as $args ) {
+				$args[1] = array( new ServiceClosureArgument( new Reference( $id ) ), $args[1] );
+				$definition->addMethodCall( 'addListener', $args );
+			}
+			$extractingDispatcher->listeners = array();
+		}
+	}
 }
 
 /**
  * @internal
  */
-class ExtractingEventDispatcher extends EventDispatcher implements EventSubscriberInterface
-{
-    public $listeners = array();
+class ExtractingEventDispatcher extends EventDispatcher implements EventSubscriberInterface {
 
-    public static $subscriber;
+	public $listeners = array();
 
-    public function addListener($eventName, $listener, $priority = 0)
-    {
-        $this->listeners[] = array($eventName, $listener[1], $priority);
-    }
+	public static $subscriber;
 
-    public static function getSubscribedEvents()
-    {
-        $callback = array(self::$subscriber, 'getSubscribedEvents');
+	public function addListener( $eventName, $listener, $priority = 0 ) {
+		$this->listeners[] = array( $eventName, $listener[1], $priority );
+	}
 
-        return $callback();
-    }
+	public static function getSubscribedEvents() {
+		$callback = array( self::$subscriber, 'getSubscribedEvents' );
+
+		return $callback();
+	}
 }

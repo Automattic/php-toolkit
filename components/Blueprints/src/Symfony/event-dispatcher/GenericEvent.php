@@ -18,169 +18,157 @@ namespace Symfony\Component\EventDispatcher;
  *
  * @author Drak <drak@zikula.org>
  */
-class GenericEvent extends Event implements \ArrayAccess, \IteratorAggregate
-{
-    /**
-     * Event subject.
-     *
-     * @var mixed usually object or callable
-     */
-    protected $subject;
+class GenericEvent extends Event implements \ArrayAccess, \IteratorAggregate {
 
-    /**
-     * Array of arguments.
-     *
-     * @var array
-     */
-    protected $arguments;
+	/**
+	 * Event subject.
+	 *
+	 * @var mixed usually object or callable
+	 */
+	protected $subject;
 
-    /**
-     * Encapsulate an event with $subject and $args.
-     *
-     * @param mixed $subject   The subject of the event, usually an object
-     * @param array $arguments Arguments to store in the event
-     */
-    public function __construct($subject = null, array $arguments = array())
-    {
-        $this->subject = $subject;
-        $this->arguments = $arguments;
-    }
+	/**
+	 * Array of arguments.
+	 *
+	 * @var array
+	 */
+	protected $arguments;
 
-    /**
-     * Getter for subject property.
-     *
-     * @return mixed $subject The observer subject
-     */
-    public function getSubject()
-    {
-        return $this->subject;
-    }
+	/**
+	 * Encapsulate an event with $subject and $args.
+	 *
+	 * @param mixed $subject   The subject of the event, usually an object
+	 * @param array $arguments Arguments to store in the event
+	 */
+	public function __construct( $subject = null, array $arguments = array() ) {
+		$this->subject   = $subject;
+		$this->arguments = $arguments;
+	}
 
-    /**
-     * Get argument by key.
-     *
-     * @param string $key Key
-     *
-     * @return mixed Contents of array key
-     *
-     * @throws \InvalidArgumentException If key is not found.
-     */
-    public function getArgument($key)
-    {
-        if ($this->hasArgument($key)) {
-            return $this->arguments[$key];
-        }
+	/**
+	 * Getter for subject property.
+	 *
+	 * @return mixed $subject The observer subject
+	 */
+	public function getSubject() {
+		return $this->subject;
+	}
 
-        throw new \InvalidArgumentException(sprintf('Argument "%s" not found.', $key));
-    }
+	/**
+	 * Get argument by key.
+	 *
+	 * @param string $key Key
+	 *
+	 * @return mixed Contents of array key
+	 *
+	 * @throws \InvalidArgumentException If key is not found.
+	 */
+	public function getArgument( $key ) {
+		if ( $this->hasArgument( $key ) ) {
+			return $this->arguments[ $key ];
+		}
 
-    /**
-     * Add argument to event.
-     *
-     * @param string $key   Argument name
-     * @param mixed  $value Value
-     *
-     * @return $this
-     */
-    public function setArgument($key, $value)
-    {
-        $this->arguments[$key] = $value;
+		throw new \InvalidArgumentException( sprintf( 'Argument "%s" not found.', $key ) );
+	}
 
-        return $this;
-    }
+	/**
+	 * Add argument to event.
+	 *
+	 * @param string $key   Argument name
+	 * @param mixed  $value Value
+	 *
+	 * @return $this
+	 */
+	public function setArgument( $key, $value ) {
+		$this->arguments[ $key ] = $value;
 
-    /**
-     * Getter for all arguments.
-     *
-     * @return array
-     */
-    public function getArguments()
-    {
-        return $this->arguments;
-    }
+		return $this;
+	}
 
-    /**
-     * Set args property.
-     *
-     * @param array $args Arguments
-     *
-     * @return $this
-     */
-    public function setArguments(array $args = array())
-    {
-        $this->arguments = $args;
+	/**
+	 * Getter for all arguments.
+	 *
+	 * @return array
+	 */
+	public function getArguments() {
+		return $this->arguments;
+	}
 
-        return $this;
-    }
+	/**
+	 * Set args property.
+	 *
+	 * @param array $args Arguments
+	 *
+	 * @return $this
+	 */
+	public function setArguments( array $args = array() ) {
+		$this->arguments = $args;
 
-    /**
-     * Has argument.
-     *
-     * @param string $key Key of arguments array
-     *
-     * @return bool
-     */
-    public function hasArgument($key)
-    {
-        return array_key_exists($key, $this->arguments);
-    }
+		return $this;
+	}
 
-    /**
-     * ArrayAccess for argument getter.
-     *
-     * @param string $key Array key
-     *
-     * @return mixed
-     *
-     * @throws \InvalidArgumentException If key does not exist in $this->args.
-     */
-    public function offsetGet($key)
-    {
-        return $this->getArgument($key);
-    }
+	/**
+	 * Has argument.
+	 *
+	 * @param string $key Key of arguments array
+	 *
+	 * @return bool
+	 */
+	public function hasArgument( $key ) {
+		return array_key_exists( $key, $this->arguments );
+	}
 
-    /**
-     * ArrayAccess for argument setter.
-     *
-     * @param string $key   Array key to set
-     * @param mixed  $value Value
-     */
-    public function offsetSet($key, $value)
-    {
-        $this->setArgument($key, $value);
-    }
+	/**
+	 * ArrayAccess for argument getter.
+	 *
+	 * @param string $key Array key
+	 *
+	 * @return mixed
+	 *
+	 * @throws \InvalidArgumentException If key does not exist in $this->args.
+	 */
+	public function offsetGet( $key ) {
+		return $this->getArgument( $key );
+	}
 
-    /**
-     * ArrayAccess for unset argument.
-     *
-     * @param string $key Array key
-     */
-    public function offsetUnset($key)
-    {
-        if ($this->hasArgument($key)) {
-            unset($this->arguments[$key]);
-        }
-    }
+	/**
+	 * ArrayAccess for argument setter.
+	 *
+	 * @param string $key   Array key to set
+	 * @param mixed  $value Value
+	 */
+	public function offsetSet( $key, $value ) {
+		$this->setArgument( $key, $value );
+	}
 
-    /**
-     * ArrayAccess has argument.
-     *
-     * @param string $key Array key
-     *
-     * @return bool
-     */
-    public function offsetExists($key)
-    {
-        return $this->hasArgument($key);
-    }
+	/**
+	 * ArrayAccess for unset argument.
+	 *
+	 * @param string $key Array key
+	 */
+	public function offsetUnset( $key ) {
+		if ( $this->hasArgument( $key ) ) {
+			unset( $this->arguments[ $key ] );
+		}
+	}
 
-    /**
-     * IteratorAggregate for iterating over the object like an array.
-     *
-     * @return \ArrayIterator
-     */
-    public function getIterator()
-    {
-        return new \ArrayIterator($this->arguments);
-    }
+	/**
+	 * ArrayAccess has argument.
+	 *
+	 * @param string $key Array key
+	 *
+	 * @return bool
+	 */
+	public function offsetExists( $key ) {
+		return $this->hasArgument( $key );
+	}
+
+	/**
+	 * IteratorAggregate for iterating over the object like an array.
+	 *
+	 * @return \ArrayIterator
+	 */
+	public function getIterator() {
+		return new \ArrayIterator( $this->arguments );
+	}
 }

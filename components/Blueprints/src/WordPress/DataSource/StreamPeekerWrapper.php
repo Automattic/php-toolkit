@@ -11,17 +11,19 @@ class StreamPeekerWrapper extends StreamWrapper {
 
 	const SCHEME = 'peek';
 
-	public static function wrap( $response_stream, $on_data, $on_close=null ) {
-		return parent::create_resource( [
-			'stream' => $response_stream,
-			'on_data' => $on_data,
-			'on_close' => $on_close
-		] );
+	public static function wrap( $response_stream, $on_data, $on_close = null ) {
+		return parent::create_resource(
+			array(
+				'stream' => $response_stream,
+				'on_data' => $on_data,
+				'on_close' => $on_close,
+			)
+		);
 	}
 
 	protected function do_initialize() {
-		$this->stream = $this->wrapper_data['stream'];
-		$this->on_data = $this->wrapper_data['on_data'] ?? function ( $data ) {};
+		$this->stream   = $this->wrapper_data['stream'];
+		$this->on_data  = $this->wrapper_data['on_data'] ?? function ( $data ) {};
 		$this->on_close = $this->wrapper_data['on_close'] ?? function () {};
 		$this->position = 0;
 	}
@@ -47,11 +49,11 @@ class StreamPeekerWrapper extends StreamWrapper {
 
 	// Closes the stream
 	public function stream_close() {
-		if(is_resource($this->stream)) {
+		if ( is_resource( $this->stream ) ) {
 			fclose( $this->stream );
 		}
 		$this->stream = null;
-		$onClose = $this->on_close;
+		$onClose      = $this->on_close;
 		$onClose();
 	}
 

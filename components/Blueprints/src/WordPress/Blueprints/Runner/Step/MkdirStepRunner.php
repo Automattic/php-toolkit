@@ -14,7 +14,7 @@ class MkdirStepRunner extends BaseStepRunner {
 	 */
 	function run( MkdirStep $input ) {
 		$resolved_path = $this->getRuntime()->resolvePath( $input->path );
-		$filesystem   = new Filesystem();
+		$filesystem    = new Filesystem();
 		if ( $filesystem->exists( $resolved_path ) ) {
 			throw new BlueprintException( "Failed to create \"$resolved_path\": the directory exists." );
 		}

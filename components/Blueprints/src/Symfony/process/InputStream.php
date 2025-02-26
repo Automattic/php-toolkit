@@ -18,73 +18,68 @@ use Symfony\Component\Process\Exception\RuntimeException;
  *
  * @author Nicolas Grekas <p@tchwork.com>
  */
-class InputStream implements \IteratorAggregate
-{
-    private $onEmpty = null;
-    private $input = array();
-    private $open = true;
+class InputStream implements \IteratorAggregate {
 
-    /**
-     * Sets a callback that is called when the write buffer becomes empty.
-     */
-    public function onEmpty(callable $onEmpty = null)
-    {
-        $this->onEmpty = $onEmpty;
-    }
+	private $onEmpty = null;
+	private $input   = array();
+	private $open    = true;
 
-    /**
-     * Appends an input to the write buffer.
-     *
-     * @param resource|scalar|\Traversable|null The input to append as stream resource, scalar or \Traversable
-     */
-    public function write($input)
-    {
-        if (null === $input) {
-            return;
-        }
-        if ($this->isClosed()) {
-            throw new RuntimeException(sprintf('%s is closed', static::class));
-        }
-        $this->input[] = ProcessUtils::validateInput(__METHOD__, $input);
-    }
+	/**
+	 * Sets a callback that is called when the write buffer becomes empty.
+	 */
+	public function onEmpty( callable $onEmpty = null ) {
+		$this->onEmpty = $onEmpty;
+	}
 
-    /**
-     * Closes the write buffer.
-     */
-    public function close()
-    {
-        $this->open = false;
-    }
+	/**
+	 * Appends an input to the write buffer.
+	 *
+	 * @param resource|scalar|\Traversable|null The input to append as stream resource, scalar or \Traversable
+	 */
+	public function write( $input ) {
+		if ( null === $input ) {
+			return;
+		}
+		if ( $this->isClosed() ) {
+			throw new RuntimeException( sprintf( '%s is closed', static::class ) );
+		}
+		$this->input[] = ProcessUtils::validateInput( __METHOD__, $input );
+	}
 
-    /**
-     * Tells whether the write buffer is closed or not.
-     */
-    public function isClosed()
-    {
-        return !$this->open;
-    }
+	/**
+	 * Closes the write buffer.
+	 */
+	public function close() {
+		$this->open = false;
+	}
 
-    public function getIterator()
-    {
-        $this->open = true;
+	/**
+	 * Tells whether the write buffer is closed or not.
+	 */
+	public function isClosed() {
+		return ! $this->open;
+	}
 
-        while ($this->open || $this->input) {
-            if (!$this->input) {
-                yield '';
-                continue;
-            }
-            $current = array_shift($this->input);
+	public function getIterator() {
+		$this->open = true;
 
-            if ($current instanceof \Iterator) {
-                foreach ($current as $cur) {
-                    yield $cur;
-                }
-            } else {
-                yield $current;
-            }
-            if (!$this->input && $this->open && null !== $onEmpty = $this->onEmpty) {
-                $this->write($onEmpty($this));
-            }
-        }
-    }
+		while ( $this->open || $this->input ) {
+			if ( ! $this->input ) {
+				yield '';
+				continue;
+			}
+			$current = array_shift( $this->input );
+
+			if ( $current instanceof \Iterator ) {
+				foreach ( $current as $cur ) {
+					yield $cur;
+				}
+			} else {
+				yield $current;
+			}
+			if ( ! $this->input && $this->open && null !== $onEmpty = $this->onEmpty ) {
+				$this->write( $onEmpty( $this ) );
+			}
+		}
+	}
 }

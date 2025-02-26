@@ -25,34 +25,32 @@ namespace Symfony\Component\EventDispatcher;
  * @author Roman Borschel <roman@code-factory.org>
  * @author Bernhard Schussek <bschussek@gmail.com>
  */
-class Event
-{
-    /**
-     * @var bool Whether no further event listeners should be triggered
-     */
-    private $propagationStopped = false;
+class Event {
 
-    /**
-     * Returns whether further event listeners should be triggered.
-     *
-     * @see Event::stopPropagation()
-     *
-     * @return bool Whether propagation was already stopped for this event
-     */
-    public function isPropagationStopped()
-    {
-        return $this->propagationStopped;
-    }
+	/**
+	 * @var bool Whether no further event listeners should be triggered
+	 */
+	private $propagationStopped = false;
 
-    /**
-     * Stops the propagation of the event to further event listeners.
-     *
-     * If multiple event listeners are connected to the same event, no
-     * further event listener will be triggered once any trigger calls
-     * stopPropagation().
-     */
-    public function stopPropagation()
-    {
-        $this->propagationStopped = true;
-    }
+	/**
+	 * Returns whether further event listeners should be triggered.
+	 *
+	 * @see Event::stopPropagation()
+	 *
+	 * @return bool Whether propagation was already stopped for this event
+	 */
+	public function isPropagationStopped() {
+		return $this->propagationStopped;
+	}
+
+	/**
+	 * Stops the propagation of the event to further event listeners.
+	 *
+	 * If multiple event listeners are connected to the same event, no
+	 * further event listener will be triggered once any trigger calls
+	 * stopPropagation().
+	 */
+	public function stopPropagation() {
+		$this->propagationStopped = true;
+	}
 }

@@ -396,29 +396,31 @@ class BlockMarkupProcessorTest extends TestCase {
 		);
 	}
 
-    public function test_get_block_delimiter_offset() {
-        $p = new BlockMarkupProcessor(<<<'HTML'
+	public function test_get_block_delimiter_offset() {
+		$p = new BlockMarkupProcessor(
+			<<<'HTML'
         Here's some text before the block.
         <div> And an element
         <!-- wp:paragraph {"class": "wp-bold"} -->Hello, there
         <!-- /wp:paragraph -->More text after the block.
-        HTML);
-        while($p->next_token()) {
-            if($p->get_token_type() === '#block-comment') {
-                break;
-            }
-        }
-        $span = $p->get_block_delimiter_span();
-        $this->assertEquals( 56, $span->start, 'Failed to find the block start offset' );
-        $this->assertEquals( 42, $span->length, 'Failed to find the block end offset' );
+        HTML
+		);
+		while ( $p->next_token() ) {
+			if ( $p->get_token_type() === '#block-comment' ) {
+				break;
+			}
+		}
+		$span = $p->get_block_delimiter_span();
+		$this->assertEquals( 56, $span->start, 'Failed to find the block start offset' );
+		$this->assertEquals( 42, $span->length, 'Failed to find the block end offset' );
 
-        while($p->next_token()) {
-            if($p->get_token_type() === '#block-comment') {
-                break;
-            }
-        }
-        $span = $p->get_block_delimiter_span();
-        $this->assertEquals( 111, $span->start, 'Failed to find the block start offset' );
-        $this->assertEquals( 22, $span->length, 'Failed to find the block end offset' );
-    }
+		while ( $p->next_token() ) {
+			if ( $p->get_token_type() === '#block-comment' ) {
+				break;
+			}
+		}
+		$span = $p->get_block_delimiter_span();
+		$this->assertEquals( 111, $span->start, 'Failed to find the block start offset' );
+		$this->assertEquals( 22, $span->length, 'Failed to find the block end offset' );
+	}
 }

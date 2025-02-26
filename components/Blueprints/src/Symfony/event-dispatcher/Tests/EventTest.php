@@ -17,39 +17,35 @@ use Symfony\Component\EventDispatcher\Event;
 /**
  * Test class for Event.
  */
-class EventTest extends TestCase
-{
-    /**
-     * @var \Symfony\Component\EventDispatcher\Event
-     */
-    protected $event;
+class EventTest extends TestCase {
 
-    /**
-     * Sets up the fixture, for example, opens a network connection.
-     * This method is called before a test is executed.
-     */
-    protected function setUp()
-    {
-        $this->event = new Event();
-    }
+	/**
+	 * @var \Symfony\Component\EventDispatcher\Event
+	 */
+	protected $event;
 
-    /**
-     * Tears down the fixture, for example, closes a network connection.
-     * This method is called after a test is executed.
-     */
-    protected function tearDown()
-    {
-        $this->event = null;
-    }
+	/**
+	 * Sets up the fixture, for example, opens a network connection.
+	 * This method is called before a test is executed.
+	 */
+	protected function setUp() {
+		$this->event = new Event();
+	}
 
-    public function testIsPropagationStopped()
-    {
-        $this->assertFalse($this->event->isPropagationStopped());
-    }
+	/**
+	 * Tears down the fixture, for example, closes a network connection.
+	 * This method is called after a test is executed.
+	 */
+	protected function tearDown() {
+		$this->event = null;
+	}
 
-    public function testStopPropagationAndIsPropagationStopped()
-    {
-        $this->event->stopPropagation();
-        $this->assertTrue($this->event->isPropagationStopped());
-    }
+	public function testIsPropagationStopped() {
+		$this->assertFalse( $this->event->isPropagationStopped() );
+	}
+
+	public function testStopPropagationAndIsPropagationStopped() {
+		$this->event->stopPropagation();
+		$this->assertTrue( $this->event->isPropagationStopped() );
+	}
 }

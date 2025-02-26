@@ -33,13 +33,12 @@ use Psr\Container\NotFoundExceptionInterface;
  *
  * @author Pascal Luna <skalpa@zetareticuli.org>
  */
-class UnknownIdentifierException extends \InvalidArgumentException implements NotFoundExceptionInterface
-{
-    /**
-     * @param string $id The unknown identifier
-     */
-    public function __construct($id)
-    {
-        parent::__construct(\sprintf('Identifier "%s" is not defined.', $id));
-    }
+class UnknownIdentifierException extends \InvalidArgumentException implements NotFoundExceptionInterface {
+
+	/**
+	 * @param string $id The unknown identifier
+	 */
+	public function __construct( $id ) {
+		parent::__construct( \sprintf( 'Identifier "%s" is not defined.', $id ) );
+	}
 }

@@ -1111,7 +1111,6 @@ class WP_Static_Files_Editor_Plugin {
 			$blocks_with_metadata->get_all_metadata()
 		);
 
-
 		switch ( $format ) {
 			case 'md':
 				$producer = new MarkdownProducer( $blocks_with_metadata );
@@ -1853,9 +1852,14 @@ class WP_Static_Files_Editor_Plugin {
 			} catch ( Exception $e ) {
 				throw $e;
 				error_log( 'Failed to sync: ' . $e->getMessage() );
-				return new WP_REST_Response( json_encode( array(
-					'error' => true,
-				) ), 500 );
+				return new WP_REST_Response(
+					json_encode(
+						array(
+							'error' => true,
+						)
+					),
+					500
+				);
 			}
 		} finally {
 			self::release_synchronization_lock();
@@ -1866,16 +1870,19 @@ class WP_Static_Files_Editor_Plugin {
 		$data_source = self::get_data_source();
 		try {
 			$data_source->sync();
-			update_site_option( 'wp_sync_details', array(
-				'lastSyncTime' => time(),
-				'version' => $data_source->get_current_version(),
-			) );
+			update_site_option(
+				'wp_sync_details',
+				array(
+					'lastSyncTime' => time(),
+					'version' => $data_source->get_current_version(),
+				)
+			);
 		} catch ( Exception $e ) {
 			$sync_details = self::get_sync_info();
 			// @TODO: Expose some kind of error message, not just a boolean yes/no.
-			//        At the same time, do not reveal too much about the internals –
-			//        there is a chance the error message would expose a private
-			//        detail or a piece of security-related information.
+			// At the same time, do not reveal too much about the internals –
+			// there is a chance the error message would expose a private
+			// detail or a piece of security-related information.
 			$sync_details['error'] = true;
 			update_site_option( 'wp_sync_details', $sync_details );
 			error_log( 'Error synchronizing data source: ' . $e->getMessage() );
@@ -1884,11 +1891,14 @@ class WP_Static_Files_Editor_Plugin {
 	}
 
 	public static function get_sync_info() {
-		$sync_details = get_site_option( 'wp_sync_details', array(
-			'lastSyncTime' => 0,
-			'version' => null,
-		) );
-		$data_source = self::get_data_source();
+		$sync_details                       = get_site_option(
+			'wp_sync_details',
+			array(
+				'lastSyncTime' => 0,
+				'version' => null,
+			)
+		);
+		$data_source                        = self::get_data_source();
 		$sync_details['hasUnsyncedChanges'] = $data_source->get_current_version() !== $sync_details['version'];
 		return $sync_details;
 	}

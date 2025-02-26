@@ -20,134 +20,127 @@ use Symfony\Component\Process\Process;
  *
  * @internal
  */
-class UnixPipes extends AbstractPipes
-{
-    /** @var bool */
-    private $ttyMode;
-    /** @var bool */
-    private $ptyMode;
-    /** @var bool */
-    private $haveReadSupport;
+class UnixPipes extends AbstractPipes {
 
-    public function __construct($ttyMode, $ptyMode, $input, $haveReadSupport)
-    {
-        $this->ttyMode = (bool) $ttyMode;
-        $this->ptyMode = (bool) $ptyMode;
-        $this->haveReadSupport = (bool) $haveReadSupport;
+	/** @var bool */
+	private $ttyMode;
+	/** @var bool */
+	private $ptyMode;
+	/** @var bool */
+	private $haveReadSupport;
 
-        parent::__construct($input);
-    }
+	public function __construct( $ttyMode, $ptyMode, $input, $haveReadSupport ) {
+		$this->ttyMode         = (bool) $ttyMode;
+		$this->ptyMode         = (bool) $ptyMode;
+		$this->haveReadSupport = (bool) $haveReadSupport;
 
-    public function __destruct()
-    {
-        $this->close();
-    }
+		parent::__construct( $input );
+	}
 
-    /**
-     * {@inheritdoc}
-     */
-    public function getDescriptors()
-    {
-        if (!$this->haveReadSupport) {
-            $nullstream = fopen('/dev/null', 'c');
+	public function __destruct() {
+		$this->close();
+	}
 
-            return array(
-                array('pipe', 'r'),
-                $nullstream,
-                $nullstream,
-            );
-        }
+	/**
+	 * {@inheritdoc}
+	 */
+	public function getDescriptors() {
+		if ( ! $this->haveReadSupport ) {
+			$nullstream = fopen( '/dev/null', 'c' );
 
-        if ($this->ttyMode) {
-            return array(
-                array('file', '/dev/tty', 'r'),
-                array('file', '/dev/tty', 'w'),
-                array('file', '/dev/tty', 'w'),
-            );
-        }
+			return array(
+				array( 'pipe', 'r' ),
+				$nullstream,
+				$nullstream,
+			);
+		}
 
-        if ($this->ptyMode && Process::isPtySupported()) {
-            return array(
-                array('pty'),
-                array('pty'),
-                array('pty'),
-            );
-        }
+		if ( $this->ttyMode ) {
+			return array(
+				array( 'file', '/dev/tty', 'r' ),
+				array( 'file', '/dev/tty', 'w' ),
+				array( 'file', '/dev/tty', 'w' ),
+			);
+		}
 
-        return array(
-            array('pipe', 'r'),
-            array('pipe', 'w'), // stdout
-            array('pipe', 'w'), // stderr
-        );
-    }
+		if ( $this->ptyMode && Process::isPtySupported() ) {
+			return array(
+				array( 'pty' ),
+				array( 'pty' ),
+				array( 'pty' ),
+			);
+		}
 
-    /**
-     * {@inheritdoc}
-     */
-    public function getFiles()
-    {
-        return array();
-    }
+		return array(
+			array( 'pipe', 'r' ),
+			array( 'pipe', 'w' ), // stdout
+			array( 'pipe', 'w' ), // stderr
+		);
+	}
 
-    /**
-     * {@inheritdoc}
-     */
-    public function readAndWrite($blocking, $close = false)
-    {
-        $this->unblock();
-        $w = $this->write();
+	/**
+	 * {@inheritdoc}
+	 */
+	public function getFiles() {
+		return array();
+	}
 
-        $read = $e = array();
-        $r = $this->pipes;
-        unset($r[0]);
+	/**
+	 * {@inheritdoc}
+	 */
+	public function readAndWrite( $blocking, $close = false ) {
+		$this->unblock();
+		$w = $this->write();
 
-        // let's have a look if something changed in streams
-        if (($r || $w) && false === $n = @stream_select($r, $w, $e, 0, $blocking ? Process::TIMEOUT_PRECISION * 1E6 : 0)) {
-            // if a system call has been interrupted, forget about it, let's try again
-            // otherwise, an error occurred, let's reset pipes
-            if (!$this->hasSystemCallBeenInterrupted()) {
-                $this->pipes = array();
-            }
+		$read = $e = array();
+		$r    = $this->pipes;
+		unset( $r[0] );
 
-            return $read;
-        }
+		// let's have a look if something changed in streams
+		if ( ( $r || $w ) && false === $n = @stream_select( $r, $w, $e, 0, $blocking ? Process::TIMEOUT_PRECISION * 1E6 : 0 ) ) {
+			// if a system call has been interrupted, forget about it, let's try again
+			// otherwise, an error occurred, let's reset pipes
+			if ( ! $this->hasSystemCallBeenInterrupted() ) {
+				$this->pipes = array();
+			}
 
-        foreach ($r as $pipe) {
-            // prior PHP 5.4 the array passed to stream_select is modified and
-            // lose key association, we have to find back the key
-            $read[$type = array_search($pipe, $this->pipes, true)] = '';
+			return $read;
+		}
 
-            do {
-                $data = fread($pipe, self::CHUNK_SIZE);
-                $read[$type] .= $data;
-            } while (isset($data[0]) && ($close || isset($data[self::CHUNK_SIZE - 1])));
+		foreach ( $r as $pipe ) {
+			// prior PHP 5.4 the array passed to stream_select is modified and
+			// lose key association, we have to find back the key
+			$read[ $type = array_search( $pipe, $this->pipes, true ) ] = '';
 
-            if (!isset($read[$type][0])) {
-                unset($read[$type]);
-            }
+			do {
+				$data           = fread( $pipe, self::CHUNK_SIZE );
+				$read[ $type ] .= $data;
+			} while ( isset( $data[0] ) && ( $close || isset( $data[ self::CHUNK_SIZE - 1 ] ) ) );
 
-            if ($close && feof($pipe)) {
-                fclose($pipe);
-                unset($this->pipes[$type]);
-            }
-        }
+			if ( ! isset( $read[ $type ][0] ) ) {
+				unset( $read[ $type ] );
+			}
 
-        return $read;
-    }
+			if ( $close && feof( $pipe ) ) {
+				fclose( $pipe );
+				unset( $this->pipes[ $type ] );
+			}
+		}
 
-    /**
-     * {@inheritdoc}
-     */
-    public function haveReadSupport()
-    {
-        return $this->haveReadSupport;
-    }
+		return $read;
+	}
 
-    /**
-     * {@inheritdoc}
-     */
-    public function areOpen()
-    {
-        return (bool) $this->pipes;
-    }
+	/**
+	 * {@inheritdoc}
+	 */
+	public function haveReadSupport() {
+		return $this->haveReadSupport;
+	}
+
+	/**
+	 * {@inheritdoc}
+	 */
+	public function areOpen() {
+		return (bool) $this->pipes;
+	}
 }
