@@ -25,7 +25,7 @@ jobs:
       phpunit-config: ${{ 'phpunit.xml.dist' }}
 
   test_wasm:
-    name: PHP.wasm 8.0
+    name: PHP.wasm 8.2
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -43,4 +43,4 @@ jobs:
           node-version: '23'
       - name: Run tests
         run: |
-          PHP=8.0 npx -n '--experimental-wasm-jspi --experimental-wasm-stack-switching' @php-wasm/cli vendor/bin/phpunit
+          PHP=8.2 npx -n '--experimental-wasm-jspi --experimental-wasm-stack-switching' @php-wasm/cli vendor/bin/phpunit
