@@ -14,7 +14,7 @@ class RmStepRunner extends BaseStepRunner {
 	 */
 	public function run( RmStep $input ) {
 		$resolved_path = $this->getRuntime()->resolvePath( $input->path );
-		$filesystem    = new Filesystem();
+		$filesystem   = new Filesystem();
 		if ( false === $filesystem->exists( $resolved_path ) ) {
 			throw new BlueprintException( "Failed to remove \"$resolved_path\": the directory or file does not exist." );
 		}

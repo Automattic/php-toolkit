@@ -16,12 +16,12 @@ namespace Symfony\Component\Filesystem\Exception;
  *
  * @author Christian Gärtner <christiangaertner.film@googlemail.com>
  */
-interface IOExceptionInterface extends ExceptionInterface {
-
-	/**
-	 * Returns the associated path for the exception.
-	 *
-	 * @return string The path
-	 */
-	public function getPath();
+interface IOExceptionInterface extends ExceptionInterface
+{
+    /**
+     * Returns the associated path for the exception.
+     *
+     * @return string The path
+     */
+    public function getPath();
 }

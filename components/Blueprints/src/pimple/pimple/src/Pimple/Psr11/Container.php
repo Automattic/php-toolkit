@@ -34,19 +34,22 @@ use Psr\Container\ContainerInterface;
  *
  * @author Pascal Luna <skalpa@zetareticuli.org>
  */
-final class Container implements ContainerInterface {
+final class Container implements ContainerInterface
+{
+    private $pimple;
 
-	private $pimple;
+    public function __construct(PimpleContainer $pimple)
+    {
+        $this->pimple = $pimple;
+    }
 
-	public function __construct( PimpleContainer $pimple ) {
-		$this->pimple = $pimple;
-	}
+    public function get($id)
+    {
+        return $this->pimple[$id];
+    }
 
-	public function get( $id ) {
-		return $this->pimple[ $id ];
-	}
-
-	public function has( $id ) {
-		return isset( $this->pimple[ $id ] );
-	}
+    public function has($id)
+    {
+        return isset($this->pimple[$id]);
+    }
 }

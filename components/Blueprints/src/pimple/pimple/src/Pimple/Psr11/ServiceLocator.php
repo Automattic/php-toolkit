@@ -35,38 +35,41 @@ use Psr\Container\ContainerInterface;
  *
  * @author Pascal Luna <skalpa@zetareticuli.org>
  */
-class ServiceLocator implements ContainerInterface {
+class ServiceLocator implements ContainerInterface
+{
+    private $container;
+    private $aliases = array();
 
-	private $container;
-	private $aliases = array();
+    /**
+     * @param PimpleContainer $container The Container instance used to locate services
+     * @param array           $ids       Array of service ids that can be located. String keys can be used to define aliases
+     */
+    public function __construct(PimpleContainer $container, array $ids)
+    {
+        $this->container = $container;
 
-	/**
-	 * @param PimpleContainer $container The Container instance used to locate services
-	 * @param array           $ids       Array of service ids that can be located. String keys can be used to define aliases
-	 */
-	public function __construct( PimpleContainer $container, array $ids ) {
-		$this->container = $container;
+        foreach ($ids as $key => $id) {
+            $this->aliases[\is_int($key) ? $id : $key] = $id;
+        }
+    }
 
-		foreach ( $ids as $key => $id ) {
-			$this->aliases[ \is_int( $key ) ? $id : $key ] = $id;
-		}
-	}
+    /**
+     * {@inheritdoc}
+     */
+    public function get($id)
+    {
+        if (!isset($this->aliases[$id])) {
+            throw new UnknownIdentifierException($id);
+        }
 
-	/**
-	 * {@inheritdoc}
-	 */
-	public function get( $id ) {
-		if ( ! isset( $this->aliases[ $id ] ) ) {
-			throw new UnknownIdentifierException( $id );
-		}
+        return $this->container[$this->aliases[$id]];
+    }
 
-		return $this->container[ $this->aliases[ $id ] ];
-	}
-
-	/**
-	 * {@inheritdoc}
-	 */
-	public function has( $id ) {
-		return isset( $this->aliases[ $id ] ) && isset( $this->container[ $this->aliases[ $id ] ] );
-	}
+    /**
+     * {@inheritdoc}
+     */
+    public function has($id)
+    {
+        return isset($this->aliases[$id]) && isset($this->container[$this->aliases[$id]]);
+    }
 }
