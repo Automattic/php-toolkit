@@ -136,7 +136,7 @@ class GitRemote {
 		}
 
 		$producer = new GitProtocolEncoderPipe();
-		$producer->append_packet_line( "$remote_commit $push_commit refs/heads/$short_branch_name\0report-status force-update side-band-64k\n" );
+		$producer->append_packet_line( "$remote_commit $push_commit refs/heads/$short_branch_name\0report-status side-band-64k\n" );
 		$producer->append_packet_line( '0000' );
 		$producer->append_packfile( $this->repository, $delta );
 		$producer->close_writing();

@@ -479,13 +479,13 @@ class GitRepository {
 			array(
 				'commit' => array(
 					'message' => 'Merge commit ' . $commit_hash2 . ' into ' . $commit_hash1,
+					'parents' => array(
+						$commit_hash1,
+						$commit_hash2,
+					),
 				),
 				'updates' => $updates,
 				'deletes' => $deletes,
-				'parents' => array(
-					$commit_hash1,
-					$commit_hash2,
-				),
 			)
 		);
 
@@ -768,7 +768,7 @@ class GitRepository {
 				continue;
 			}
 
-			if ( $current_entry->mode !== $previous_entry->mode ) {
+			if ( $current_entry->get_mode_bucket() !== $previous_entry->get_mode_bucket() ) {
 				/*
 				 * @TODO: Account for a scenario when just one text line changes and
 				 *        also the mode changed from executable to non-executable.
@@ -786,7 +786,7 @@ class GitRepository {
 				)
 			);
 
-			if ( $current_entry->mode === TreeEntry::FILE_MODE_DIRECTORY ) {
+			if ( $current_entry->get_mode_bucket() === TreeEntry::FILE_MODE_DIRECTORY ) {
 				$diff[ $name ]->content = $this->diff_trees( $current_entry->hash, $previous_entry->hash );
 			} else {
 				$diff[ $name ]->content = $this->diff_blobs(
@@ -887,7 +887,7 @@ class GitRepository {
 		return $new_head_oid;
 	}
 
-	public function get_commits_range( $head_oid, $last_ancestor_oid ) {
+	public function get_commits_range( string $head_oid, string $last_ancestor_oid, $options = array() ) {
 		$commits     = array();
 		$current_oid = $head_oid;
 		while ( true ) {
@@ -901,6 +901,10 @@ class GitRepository {
 					'$last_ancestor_oid must be an ancestor of $head_oid for reparenting to work, but ' . $last_ancestor_oid . ' is not an ancestor of ' . $head_oid . '.',
 				);
 			}
+		}
+		$include_ancestor = $options['include_ancestor'] ?? true;
+		if(!$include_ancestor) {
+			array_pop($commits);
 		}
 		return $commits;
 	}

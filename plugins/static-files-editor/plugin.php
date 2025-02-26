@@ -1095,6 +1095,7 @@ class WP_Static_Files_Editor_Plugin {
 			$blocks_with_metadata->get_all_metadata()
 		);
 
+
 		switch ( $format ) {
 			case 'md':
 				$producer = new MarkdownProducer( $blocks_with_metadata );

@@ -70,9 +70,6 @@ class GitDataSource implements DataSource {
 	public function sync() {
 		$this->remote->pull(
 			$this->full_branch_name,
-			array(
-				// 'path' => $this->subdirectory,
-			)
 		);
 		$this->remote->push();
 	}
