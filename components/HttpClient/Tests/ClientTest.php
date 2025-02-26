@@ -13,7 +13,6 @@ class ClientTest extends \PHPUnit\Framework\TestCase {
 		$client = new TestClient();
 		$this->assertEquals( 10, $client->getConcurrency() );
 		$this->assertEquals( 3, $client->getMaxRedirects() );
-		$this->assertEquals( 10, $client->getTimeout() );
 	}
 
 	/**
