@@ -25,7 +25,7 @@ jobs:
       phpunit-config: ${{ 'phpunit.xml.dist' }}
 
   test_wasm:
-    name: PHP.wasm / 8.0
+    name: PHP.wasm 8.0
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
