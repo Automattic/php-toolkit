@@ -43,4 +43,4 @@ jobs:
           node-version: '23'
       - name: Run tests
         run: |
-          PHP=8.2 NODE_OPTIONS='--experimental-wasm-jspi --experimental-wasm-stack-switching' npx @php-wasm/cli vendor/bin/phpunit
+          PHP=8.2 NODE_OPTIONS='--experimental-wasm-stack-switching' npx @php-wasm/cli vendor/bin/phpunit
