@@ -19,6 +19,10 @@ class ClientTest extends \PHPUnit\Framework\TestCase {
 	 * @dataProvider gzip_provider
 	 */
 	public function test_streaming_body_with_chunked_encoding( $use_gzip ) {
+		if (extension_loaded('wasm_memory_storage')) {
+			$this->markTestSkipped('Test not supported yet in PHP.wasm');
+		}
+
 		$this->withDevServer(
 			function ( $address ) use ( $use_gzip ) {
 				$client        = new TestClient();
