@@ -82,8 +82,14 @@ class WP_Static_Files_Editor_Plugin {
 	 */
 	private static $data_source;
 
+	private static $is_running_wp_insert_post_data = false;
+
 	public static function is_data_source_configured() {
 		$config = static::get_settings();
+
+		if ( ! isset( $config['dataSourceType'] ) ) {
+			return false;
+		}
 
 		switch ( $config['dataSourceType'] ) {
 			case 'local_directory':
@@ -658,7 +664,6 @@ class WP_Static_Files_Editor_Plugin {
 		 * This is used to reconcile changes made in the block editor with
 		 * changes made in the local file.
 		 */
-		$is_running_wp_insert_post_data = false;
 		add_action(
 			'wp_insert_post_data',
 			function ( $processed_post, $unprocessed_post, $unsanitized_postarr, $update ) use ( &$is_running_wp_insert_post_data ) {
@@ -666,7 +671,7 @@ class WP_Static_Files_Editor_Plugin {
 				 * Make sure we don't run this action recursively as one of the outcomes
 				 * is creating a new post revision.
 				 */
-				if ( $is_running_wp_insert_post_data ) {
+				if ( self::$is_running_wp_insert_post_data ) {
 					return $processed_post;
 				}
 
@@ -808,7 +813,7 @@ class WP_Static_Files_Editor_Plugin {
 					);
 					return $processed_post;
 				} finally {
-					$is_running_wp_insert_post_data = false;
+					self::$is_running_wp_insert_post_data = false;
 				}
 			},
 			10,
@@ -991,16 +996,27 @@ class WP_Static_Files_Editor_Plugin {
 			if ( ! $entity ) {
 				return false;
 			}
-			if ( $entity['post_content'] === $post->post_content ) {
+			if (
+				$entity['post_content'] === $post->post_content
+				&& $entity['post_title'] === $post->post_title
+				&& $entity['menu_order'] === $post->menu_order
+			) {
 				return $post->post_content;
 			}
 
-			$updated = wp_update_post(
-				array(
-					'ID' => $post->ID,
-					...$entity,
-				)
-			);
+			// Avoid triggering three-way merge when overriding
+			// the database post content with the local file content.
+			self::$is_running_wp_insert_post_data = true;
+			try {
+				$updated = wp_update_post(
+					array(
+						'ID' => $post->ID,
+						...$entity,
+					)
+				);
+			} finally {
+				self::$is_running_wp_insert_post_data = false;
+			}
 			if ( is_wp_error( $updated ) ) {
 				return $updated;
 			}
@@ -1835,6 +1851,7 @@ class WP_Static_Files_Editor_Plugin {
 				self::sync_data_source();
 				return new WP_REST_Response( self::get_sync_info(), 200 );
 			} catch ( Exception $e ) {
+				throw $e;
 				error_log( 'Failed to sync: ' . $e->getMessage() );
 				return new WP_REST_Response( json_encode( array(
 					'error' => true,

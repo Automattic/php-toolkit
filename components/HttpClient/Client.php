@@ -111,7 +111,7 @@ class Client {
 	public function __construct( $options = array() ) {
 		$this->concurrency   = $options['concurrency'] ?? 10;
 		$this->max_redirects = $options['max_redirects'] ?? 3;
-		$this->timeout       = $options['timeout'] ?? 10;
+		$this->timeout       = $options['timeout'] ?? 30;
 		$this->requests      = array();
 	}
 
@@ -214,9 +214,9 @@ class Client {
 		$this->event               = null;
 		$this->request             = null;
 		$this->response_body_chunk = null;
-		
+
 		$start_time = microtime(true);
-		$timeout = $query['timeout'] ?? 5000;
+		$timeout = $query['timeout'] ?? $this->timeout * 1000;
 		do {
 			if (false !== $timeout && (microtime(true) - $start_time) * 1000 >= $timeout) {
 				return false;

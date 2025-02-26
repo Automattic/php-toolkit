@@ -609,8 +609,8 @@ function SingleClickSaveButton() {
 	}
 
 	return (
-		<Button className={buttonClassName} disabled>
-			Synced
+		<Button className={buttonClassName} onClick={syncDataSource}>
+			Pull changes
 		</Button>
 	);
 }
@@ -721,7 +721,7 @@ closeInserterOnBlockInsert();
 // Subscribe to the entity record and resetBlocks() whenever it changes
 const SAVE_AFTER_INACTIVITY_MS = 5000;
 const SAVE_NO_LATER_THAN_MS = 30000;
-const SYNC_EVERY_MS = 1000 * 60 * 10; // 10 minutes
+const SYNC_EVERY_MS = 1000 * 60 * 5; // 5 minutes
 const replaceEditorContentOnEntityChange = () => {
 	/**
 	 * Mode 1: Collaborative editing.
@@ -813,7 +813,6 @@ const replaceEditorContentOnEntityChange = () => {
 		);
 		const editedPostContent = getPostContent(editedPost);
 		if (false === postContent || false === editedPostContent) {
-			await syncIfItsTime();
 			return;
 		}
 		const hasEdits = postContent !== editedPostContent;
@@ -828,7 +827,6 @@ const replaceEditorContentOnEntityChange = () => {
 			 * That's okay – the first setInterval pass after the save is completed will
 			 * notice that and schedule a new save.
 			 */
-			await syncIfItsTime();
 			return;
 		}
 		if (
@@ -838,7 +836,6 @@ const replaceEditorContentOnEntityChange = () => {
 		) {
 			// If nothing changed since the last setInterval call, don't do anything. Just
 			// let the scheduled save run.
-			await syncIfItsTime();
 			return;
 		}
 		if (postSaveDetails[currentPostId]) {
@@ -883,7 +880,7 @@ const replaceEditorContentOnEntityChange = () => {
 					WP_LOCAL_FILE_POST_TYPE,
 					currentPostId
 				);
-				const editedPostContent = getPostContent(editedPost).trim();
+				const editedPostContent = getPostContent(editedPost);
 				if (postContent === editedPostContent) {
 					return;
 				}
@@ -902,8 +899,6 @@ const replaceEditorContentOnEntityChange = () => {
 					currentPostId,
 					{ throwOnError: true }
 				);
-
-				await syncIfItsTime();
 			}, SAVE_AFTER_INACTIVITY_MS),
 		};
 	}, 40);
@@ -1056,6 +1051,7 @@ const replaceEditorContentOnEntityChange = () => {
 			return response;
 		}
 
+
 		preserveEditsSinceSaveStarted(
 			contentWhenSaveStarted,
 			postWhenSaveStarted,
@@ -1115,10 +1111,13 @@ const replaceEditorContentOnEntityChange = () => {
 
 		/**
 		 * No need to merge the post content if we haven't made any edits
-		 * since the save was initiated. Just overwrite the post editor content
-		 * with the server response.
+		 * since the save was initiated.
 		 */
 		if (blockMarkupEquals(contentWhenSaveStarted, postEditedContent)) {
+			// Calling this every time leads to an immediate "unsaved" indicator,
+			// but not calling this leads to not displaying some edits received
+			// from the server.
+			// @TODO find a way of resetting blocks without triggering the "unsaved" indicator.
 			setTimeout(() => {
 				const postIdSelectedNow =
 					select(editorStore).getCurrentPostId();
@@ -1144,7 +1143,6 @@ const replaceEditorContentOnEntityChange = () => {
 			serverContent,
 			validateMergedBlockMarkup
 		);
-
 		/**
 		 * @TODO: Support merging post meta as well – the post title at a very least
 		 *        for the MVP.
@@ -1159,7 +1157,7 @@ const replaceEditorContentOnEntityChange = () => {
 
 		if (
 			!mergedBlockMarkup.hasConflicts &&
-			finalBlockMarkup === postEditedContent
+			blockMarkupEquals(finalBlockMarkup, postEditedContent)
 		) {
 			return;
 		}
@@ -1292,6 +1290,8 @@ const replaceEditorContentOnEntityChange = () => {
 	}
 };
 
+replaceEditorContentOnEntityChange();
+
 /**
  * Runs the data source sync (e.g. git push) if SYNC_EVERY_MS milliseconds have passed
  * since the last sync.
@@ -1310,7 +1310,6 @@ async function syncDataSource() {
 	try {
 		await dispatch(uiStore).syncDataSource();
 	} catch (error) {
-		console.error(error);
 		dispatch(noticesStore).createErrorNotice(
 			'Error syncing data source. You may be offline.',
 			{
@@ -1319,5 +1318,5 @@ async function syncDataSource() {
 		);
 	}
 }
-replaceEditorContentOnEntityChange();
 
+setInterval(syncIfItsTime, 10000);

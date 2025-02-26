@@ -256,8 +256,10 @@ class GitRepository {
 		$new_objects_oids = array();
 		// Optimization – don't process the same tree more than once.
 		$processed_trees = array();
-
-		while ( $new_commit_hash !== $old_commit_hash && ! Commit::is_null_hash( $new_commit_hash ) ) {
+		$range = $this->get_commits_range($new_commit_hash, $old_commit_hash, [
+			'include_ancestor' => false,
+		]);
+		foreach($range as $new_commit_hash) {
 			$new_commit                           = $this->read_object( $new_commit_hash )->as_commit();
 			$new_objects_oids[ $new_commit_hash ] = true;
 			$tree_oid                             = $new_commit->tree;
@@ -269,7 +271,6 @@ class GitRepository {
 				}
 			}
 			$processed_trees[ $tree_oid ] = true;
-			$new_commit_hash              = $new_commit->get_first_parent_hash();
 		}
 
 		$diff = array_diff_key( $new_objects_oids, $old_objects_oids );
@@ -389,7 +390,7 @@ class GitRepository {
 		return $object_writer->get_hash();
 	}
 
-	public function get_storage_path( $oid ) {
+	public function get_storage_path( string $oid ) {
 		return 'objects/' . $oid[0] . $oid[1] . '/' . substr( $oid, 2 );
 	}
 
@@ -439,14 +440,14 @@ class GitRepository {
 				$current_entry = $current_branch_diff[ $name ] ?? null;
 				$is_text       = is_array( $incoming_entry->content ) && isset( $incoming_entry->content['type'] ) && $incoming_entry->content['type'] === 'text';
 				if ( $is_text ) {
-					$current_content = $this->read_object_by_path( $path, $common_ancestor_commit_hash )->consume_all();
+					$ancestor_content = $this->read_object_by_path( $path, $common_ancestor_commit_hash )->consume_all();
 					if ( ! $current_entry ) {
 						$updates[ $path ] = $incoming_entry->content['text'];
 						continue;
 					}
 					$merge_result = $merge_function(
 						array(
-							'parent'  => $current_content,
+							'parent'  => $ancestor_content,
 							'branchA' => $current_entry->content['text'],
 							'branchB' => $incoming_entry->content['text'],
 						)
@@ -520,25 +521,39 @@ class GitRepository {
 			return $commit_hash1;
 		}
 
-		// Use two pointers to traverse the commit history of both refs.
-		$visited = array();
-		while ( ! Commit::is_null_hash( $commit_hash1 ) || ! Commit::is_null_hash( $commit_hash2 ) ) {
-			if ( ! Commit::is_null_hash( $commit_hash1 ) ) {
-				if ( isset( $visited[ $commit_hash1 ] ) ) {
-					return $commit_hash1;
+		// Use two queues to traverse the commit history of both refs.
+		$visited1 = array();
+		$visited2 = array();
+		$queue1 = array($commit_hash1);
+		$queue2 = array($commit_hash2);
+
+		while ( !empty($queue1) || !empty($queue2) ) {
+			if ( !empty($queue1) ) {
+				$current1 = array_shift($queue1);
+				if ( isset($visited2[$current1]) ) {
+					return $current1;
 				}
-				$visited[ $commit_hash1 ] = true;
-				$commit1                  = $this->read_object( $commit_hash1 )->as_commit();
-				$commit_hash1             = $commit1->get_first_parent_hash();
+				$visited1[$current1] = true;
+				$commit1 = $this->read_object($current1)->as_commit();
+				foreach ($commit1->parents as $parent) {
+					if ( !isset($visited1[$parent]) ) {
+						$queue1[] = $parent;
+					}
+				}
 			}
 
-			if ( ! Commit::is_null_hash( $commit_hash2 ) ) {
-				if ( isset( $visited[ $commit_hash2 ] ) ) {
-					return $commit_hash2;
+			if ( !empty($queue2) ) {
+				$current2 = array_shift($queue2);
+				if ( isset($visited1[$current2]) ) {
+					return $current2;
 				}
-				$visited[ $commit_hash2 ] = true;
-				$commit2                  = $this->read_object( $commit_hash2 )->as_commit();
-				$commit_hash2             = $commit2->get_first_parent_hash();
+				$visited2[$current2] = true;
+				$commit2 = $this->read_object($current2)->as_commit();
+				foreach ($commit2->parents as $parent) {
+					if ( !isset($visited2[$parent]) ) {
+						$queue2[] = $parent;
+					}
+				}
 			}
 		}
 
@@ -888,22 +903,40 @@ class GitRepository {
 	}
 
 	public function get_commits_range( string $head_oid, string $last_ancestor_oid, $options = array() ) {
-		$commits     = array();
-		$current_oid = $head_oid;
-		while ( true ) {
+		$commits = array();
+		$queue = array(array($head_oid));
+		$visited = array();
+
+		while (!empty($queue)) {
+			$path = array_shift($queue);
+			$current_oid = end($path);
+
+			if (isset($visited[$current_oid])) {
+				continue;
+			}
+			$visited[$current_oid] = true;
+
 			$commits[] = $current_oid;
-			if ( $current_oid === $last_ancestor_oid ) {
+			if ($current_oid === $last_ancestor_oid) {
 				break;
 			}
-			$current_oid = $this->read_object( $current_oid )->as_commit()->get_first_parent_hash();
-			if ( null === $current_oid ) {
-				throw new GitException(
-					'$last_ancestor_oid must be an ancestor of $head_oid for reparenting to work, but ' . $last_ancestor_oid . ' is not an ancestor of ' . $head_oid . '.',
-				);
+
+			$commit = $this->read_object($current_oid)->as_commit();
+			foreach ($commit->parents as $parent_hash) {
+				$new_path = $path;
+				$new_path[] = $parent_hash;
+				$queue[] = $new_path;
 			}
 		}
+
+		if (!in_array($last_ancestor_oid, $commits)) {
+			throw new GitException(
+				"$last_ancestor_oid is not an ancestor of $head_oid.",
+			);
+		}
+
 		$include_ancestor = $options['include_ancestor'] ?? true;
-		if(!$include_ancestor) {
+		if (!$include_ancestor) {
 			array_pop($commits);
 		}
 		return $commits;

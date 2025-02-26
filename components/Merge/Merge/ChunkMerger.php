@@ -28,7 +28,14 @@ class ChunkMerger implements Merger {
 				'inserted' => '',
 			);
 
-			if ( $chunkA['inserted'] !== '' && $chunkB['inserted'] !== '' && $chunkA['inserted'] !== $chunkB['inserted'] ) {
+			if (
+				$chunkA['inserted'] !== '' &&
+				$chunkB['inserted'] !== '' &&
+				!str_starts_with($chunkA['inserted'], $chunkB['inserted']) &&
+				!str_starts_with($chunkB['inserted'], $chunkA['inserted']) &&
+				!str_ends_with($chunkA['inserted'], $chunkB['inserted']) &&
+				!str_ends_with($chunkB['inserted'], $chunkA['inserted'])
+			) {
 				$results[] = new MergeConflict(
 					$chunkA['inserted'],
 					$chunkB['inserted'],
@@ -60,6 +67,15 @@ class ChunkMerger implements Merger {
 			}
 
 			if ( $chunkA['deleted'] || $chunkB['deleted'] ) {
+				if ( $chunkA['inserted'] && $chunkB['inserted'] && (
+					str_starts_with($chunkA['inserted'], $chunkB['inserted']) ||
+					str_starts_with($chunkB['inserted'], $chunkA['inserted']) ||
+					str_ends_with($chunkA['inserted'], $chunkB['inserted']) ||
+					str_ends_with($chunkB['inserted'], $chunkA['inserted'])
+				) ) {
+					$results[] = strlen($chunkA['inserted']) > strlen($chunkB['inserted']) ? $chunkA['inserted'] : $chunkB['inserted'];
+					continue;
+				}
 				if ( $chunkA['deleted'] && $chunkB['deleted'] ) {
 					continue;
 				}
@@ -77,9 +93,15 @@ class ChunkMerger implements Merger {
 							)
 						);
 						continue;
-					} else {
-						$results[] = $deletion['inserted'];
 					}
+
+					$results[] = $deletion['inserted'];
+				} else if( trim($deletion['base'], ' ') === '' && $nonDeletion['inserted'] !== '' ) {
+					// Sometimes branch A is one space short (e.g. due to a trim()) and branch B
+					// adds a meaningful span of text. In this case, we want to ignore the deletion
+					// and keep branch B's text.
+					$results[] = $nonDeletion['base'];
+					$results[] = $nonDeletion['inserted'];
 				}
 				continue;
 			}

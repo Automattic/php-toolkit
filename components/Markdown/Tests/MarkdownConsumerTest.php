@@ -36,6 +36,25 @@ MD;
 		$this->assertEquals( $expected_metadata, $metadata );
 	}
 
+	public function test_metadata_extraction_2() {
+		$markdown          = <<<MD
+---
+post_title: title :)
+menu_order: 0
+---
+
+Content
+MD;
+		$consumer          = new MarkdownConsumer( $markdown );
+		$result            = $consumer->consume();
+		$metadata          = $result->get_all_metadata();
+		$expected_metadata = array(
+			'post_title' => array( 'title :)' ),
+			'menu_order' => array( 0 ),
+		);
+		$this->assertEquals( $expected_metadata, $metadata );
+	}
+
 	/**
 	 * @dataProvider provider_test_conversion
 	 */
@@ -125,7 +144,7 @@ HTML
 			),
 			'A heading - level 4' => array(
 				'markdown' => '#### A simple heading',
-				'expected' => '<!-- wp:heading --><h4 class="wp-block-heading">A simple heading</h4><!-- /wp:heading -->',
+				'expected' => '<!-- wp:heading {"level":4} --><h4 class="wp-block-heading">A simple heading</h4><!-- /wp:heading -->',
 			),
 			'A heading - level 2' => array(
 				'markdown' => '## A simple heading',
@@ -133,7 +152,7 @@ HTML
 			),
 			'A heading - level 1' => array(
 				'markdown' => '# A simple heading',
-				'expected' => '<!-- wp:heading --><h1 class="wp-block-heading">A simple heading</h1><!-- /wp:heading -->',
+				'expected' => '<!-- wp:heading {"level":1} --><h1 class="wp-block-heading">A simple heading</h1><!-- /wp:heading -->',
 			),
 			'A link inside a paragraph' => array(
 				'markdown' => 'A simple paragraph with a [link](https://wordpress.org)',

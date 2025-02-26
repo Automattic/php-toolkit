@@ -2,7 +2,6 @@
 
 namespace WordPress\Git;
 
-use DateTime;
 use WordPress\ByteStream\ReadStream\ByteReadStream;
 use WordPress\Filesystem\Filesystem;
 use WordPress\Filesystem\FilesystemException;

@@ -308,9 +308,8 @@ export const uiStore = createReduxStore(STORE_NAME, {
 					WP_LOCAL_FILE_POST_TYPE,
 					currentPostId
 				);
-				const postContent =
-					typeof post?.content?.raw === 'string' && post.content.raw.trim();
-				const editedPostContent = (getPostContent(editedPost) || "").trim();
+				const postContent = getPostContent(post);
+				const editedPostContent = getPostContent(editedPost);
 				const hasEdits = postContent !== editedPostContent;
 				if (hasEdits) {
 					// Make sure the post content is up to date before autosaving.
