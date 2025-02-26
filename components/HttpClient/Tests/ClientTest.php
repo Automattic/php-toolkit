@@ -110,7 +110,11 @@ class ClientTest extends \PHPUnit\Framework\TestCase {
 			$this->fail( 'Failed to start chunked encoding dev server' );
 		}
 
-		$port    = explode( 'http://127.0.0.1:', $output )[1];
+		if (preg_match('/\d\.\d\.\d\.\d:(\d+)/', $output, $matches)) {
+			$port = $matches[1];
+		} else {
+			$this->fail('Failed to find port in server output');
+		}
 		$port    = substr( $port, 0, strpos( $port, "\n" ) );
 		$address = 'http://127.0.0.1:' . $port;
 
