@@ -41,13 +41,13 @@ const server = http.createServer(
 		// Create a function to write chunks
 		const writeChunks      = (stream) => {
 			stream.write(
-        ` < ! DOCTYPE html >
-				< html lang    = en >
-				< head >
-				< meta charset = 'utf-8' >
-				< title > Chunked transfer encoding test < / title >
-				< / head > \n`
-    );
+				`<!DOCTYPE html>
+<html lang=en>
+<head>
+<meta charset='utf-8'>
+<title>Chunked transfer encoding test</title>
+</head>
+`);
 		stream.write( '<body><h1>Chunked transfer encoding test</h1>\n' );
 		setTimeout(
 		() => {
@@ -99,9 +99,7 @@ const server = http.createServer(
 	}
 );
 
-const port = 3000;
-server.listen(port, () => {
-	console.log(
-		`Server is listening on http:// 127.0.0.1:${port}`);
-		}
-	);
+server.listen(0, '127.0.0.1', () => {
+	const newPort = server.address().port;
+	console.log(`Server is listening on http://127.0.0.1:${newPort}`);
+});

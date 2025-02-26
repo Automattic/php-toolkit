@@ -935,7 +935,7 @@ class GitRepository {
 
 		if ( ! in_array( $last_ancestor_oid, $commits ) ) {
 			throw new GitException(
-				"$last_ancestor_oid is not an ancestor of $head_oid.",
+				"$last_ancestor_oid is not an ancestor of $head_oid."
 			);
 		}
 
@@ -952,16 +952,16 @@ class GitRepository {
 
 			return false;
 		}
-		return new Commit(
+		return new Commit( array_merge(
 			array(
-				...$options,
-				'author' => $options['author'] ?? ( $this->get_config_value( 'user.name' ) . ' <' . $this->get_config_value( 'user.email' ) . '>' ),
-				'author_date' => $options['author_date'] ?? null,
-				'committer' => $options['committer'] ?? ( $this->get_config_value( 'user.name' ) . ' <' . $this->get_config_value( 'user.email' ) . '>' ),
-				'committer_date' => $options['committer_date'] ?? null,
-				'message' => $options['message'] ?? 'Changes',
-			)
-		);
+				'author' => $this->get_config_value( 'user.name' ) . ' <' . $this->get_config_value( 'user.email' ) . '>',
+				'author_date' => null,
+				'committer' => $this->get_config_value( 'user.name' ) . ' <' . $this->get_config_value( 'user.email' ) . '>',
+				'committer_date' => null,
+				'message' => 'Changes',
+			),
+			$options
+		) );
 	}
 
 	private function mark_tree_path_changed( &$changed_trees, $path ) {

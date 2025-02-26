@@ -40,10 +40,9 @@ class GitProtocolDecoder {
 			}
 		} elseif ( $this->will_process_pack ) {
 			throw new GitException(
-				<<<ERROR
-            To process PACK packets, GitProtocolReader requires a 'write_to_repository' option with a GitRepository
-            instance to write the PACKed objects to.
-            ERROR
+				'To process PACK packets, GitProtocolReader requires a ' .
+                "'write_to_repository' option with a GitRepository instance " .
+                'to write the PACKed objects to.'
 			);
 		}
 		$this->demuxer       = new ProtocolDemultiplexer( $upstream );

@@ -3,7 +3,7 @@
 namespace WordPress\Merge\Merge;
 
 class MergeResult {
-	private array $results;
+	private $results;
 
 	public function __construct( array $results ) {
 		$this->results = $results;

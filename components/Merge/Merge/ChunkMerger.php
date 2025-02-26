@@ -3,6 +3,8 @@
 namespace WordPress\Merge\Merge;
 
 use WordPress\Merge\Diff\Diff;
+use function str_starts_with;
+use function str_ends_with;
 
 class ChunkMerger implements Merger {
 

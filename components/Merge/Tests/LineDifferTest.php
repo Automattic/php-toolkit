@@ -10,17 +10,17 @@ class LineDifferTest extends \PHPUnit\Framework\TestCase {
 
 	public function test_lines_diff() {
 		$base = <<<EOT
-        Line 1: The quick brown fox
-        Line 2: jumps over the lazy dog.
-        Line 4: consectetur adipiscing elit.
-        EOT;
+Line 1: The quick brown fox
+Line 2: jumps over the lazy dog.
+Line 4: consectetur adipiscing elit.
+EOT;
 
 		$updated = <<<EOT
-        Line 1: The quick brown fox
-        Line 2: jumps over the lazy cat.
-        Line 3: Lorem ipsum dolor sit amet,
-        Line 4: consectetur adipiscing elit.
-        EOT;
+Line 1: The quick brown fox
+Line 2: jumps over the lazy cat.
+Line 3: Lorem ipsum dolor sit amet,
+Line 4: consectetur adipiscing elit.
+EOT;
 
 		$expected_diff = array(
 			array( Diff::DIFF_EQUAL, "Line 1: The quick brown fox\n" ),

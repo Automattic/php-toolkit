@@ -398,12 +398,12 @@ class BlockMarkupProcessorTest extends TestCase {
 
 	public function test_get_block_delimiter_offset() {
 		$p = new BlockMarkupProcessor(
-			<<<'HTML'
-        Here's some text before the block.
-        <div> And an element
-        <!-- wp:paragraph {"class": "wp-bold"} -->Hello, there
-        <!-- /wp:paragraph -->More text after the block.
-        HTML
+			<<<HTML
+Here's some text before the block.
+<div> And an element
+<!-- wp:paragraph {"class": "wp-bold"} -->Hello, there
+<!-- /wp:paragraph -->More text after the block.
+HTML
 		);
 		while ( $p->next_token() ) {
 			if ( $p->get_token_type() === '#block-comment' ) {

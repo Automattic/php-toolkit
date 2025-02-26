@@ -188,9 +188,11 @@ class GitFilesystem implements Filesystem {
 		}
 
 		$this->repo->commit(
-			array(
-				...$options,
-				'amend' => true,
+			array_merge(
+				$options,
+				array(
+					'amend' => true,
+				)
 			)
 		);
 

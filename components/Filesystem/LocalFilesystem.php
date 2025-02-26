@@ -51,7 +51,7 @@ class LocalFilesystem implements Filesystem {
 		$dh = opendir( $path );
 		if ( false === $dh ) {
 			throw new FilesystemException(
-				sprintf( 'Failed to open directory: %s', $path ),
+				sprintf( 'Failed to open directory: %s', $path )
 			);
 		}
 
@@ -93,7 +93,7 @@ class LocalFilesystem implements Filesystem {
 	public function copy_file( $from_path, $to_path, $options ) {
 		if ( false === copy( $from_path, $to_path ) ) {
 			throw new FilesystemException(
-				sprintf( 'Failed to copy file: %s to %s', $from_path, $to_path ),
+				sprintf( 'Failed to copy file: %s to %s', $from_path, $to_path )
 			);
 		}
 	}
@@ -101,12 +101,12 @@ class LocalFilesystem implements Filesystem {
 	protected function mkdir_single( $path, $options = array() ) {
 		if ( $this->exists( $path ) ) {
 			throw new FilesystemException(
-				sprintf( 'Path already exists: %s', $path ),
+				sprintf( 'Path already exists: %s', $path )
 			);
 		}
 		if ( false === mkdir( $path ) ) {
 			throw new FilesystemException(
-				sprintf( 'Failed to create directory: %s', $path ),
+				sprintf( 'Failed to create directory: %s', $path )
 			);
 		}
 	}
@@ -114,7 +114,7 @@ class LocalFilesystem implements Filesystem {
 	public function rm( $path ) {
 		if ( false === unlink( $path ) ) {
 			throw new FilesystemException(
-				sprintf( 'Failed to remove file: %s', $path ),
+				sprintf( 'Failed to remove file: %s', $path )
 			);
 		}
 	}
@@ -122,7 +122,7 @@ class LocalFilesystem implements Filesystem {
 	protected function rmdir_single( $path, $options = array() ) {
 		if ( false === rmdir( $path ) ) {
 			throw new FilesystemException(
-				sprintf( 'Failed to remove directory: %s', $path ),
+				sprintf( 'Failed to remove directory: %s', $path )
 			);
 		}
 	}
@@ -133,7 +133,7 @@ class LocalFilesystem implements Filesystem {
 			$data
 		) ) {
 			throw new FilesystemException(
-				sprintf( 'Failed to write to file: %s', $path ),
+				sprintf( 'Failed to write to file: %s', $path )
 			);
 		}
 	}

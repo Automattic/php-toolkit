@@ -34,10 +34,11 @@ class MarkdownProducerTest extends TestCase {
 			),
 			'A simple paragraph – regular block markup formatting – no space at the end' => array(
 				'blocks' => <<<HTML
-                <!-- wp:paragraph -->
-                <p>A simple paragraph</p>
-                <!-- /wp:paragraph -->
-                HTML,
+<!-- wp:paragraph -->
+<p>A simple paragraph</p>
+<!-- /wp:paragraph -->
+HTML
+				,
 				'expected' => "A simple paragraph\n\n\n",
 			),
 			/**
@@ -71,30 +72,33 @@ class MarkdownProducerTest extends TestCase {
 			 */
 			'A simple paragraph – regular block markup formatting – single space at the end' => array(
 				'blocks' => <<<HTML
-                <!-- wp:paragraph -->
-                <p>A simple paragraph </p>
-                <!-- /wp:paragraph -->
-                HTML,
+<!-- wp:paragraph -->
+<p>A simple paragraph </p>
+<!-- /wp:paragraph -->
+HTML
+				,
 				'expected' => "A simple paragraph \n\n\n",
 			),
 			'A simple paragraph – regular HTML formatting – no space at the end' => array(
 				'blocks' => <<<HTML
-                <!-- wp:paragraph -->
-                <p>
-                    A simple paragraph
-                </p>
-                <!-- /wp:paragraph -->
-                HTML,
+<!-- wp:paragraph -->
+<p>
+A simple paragraph
+</p>
+<!-- /wp:paragraph -->
+HTML
+				,
 				'expected' => "A simple paragraph\n\n\n",
 			),
 			'A simple paragraph with span around two words' => array(
 				'blocks' => <<<HTML
-                <!-- wp:paragraph -->
-                <p>
-                    <span>A simple</span> paragraph
-                </p>
-                <!-- /wp:paragraph -->
-                HTML,
+<!-- wp:paragraph -->
+<p>
+<span>A simple</span> paragraph
+</p>
+<!-- /wp:paragraph -->
+HTML
+				,
 				'expected' => "A simple paragraph\n\n\n",
 			),
 			'A simple list' => array(

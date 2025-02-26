@@ -65,19 +65,19 @@ class DiffTest extends \PHPUnit\Framework\TestCase {
 		);
 
 		$expected = <<<DIFF
-        diff --git a/string b/string
-        --- a/string
-        +++ b/string
-        @@ -1,5 +1,5 @@  Line 1: The quick brown fox
-        - Line 2: jumps over the lazy dog.
-        + Line 2: jumps over the lazy cat.
-          Line 3: consectetur adipiscing elit.
-          Next line.
-          Next line.
-        @@ -6,2 +6,2 @@  Next line.
-          Next line.
-        + A new line
-        DIFF;
+diff --git a/string b/string
+--- a/string
++++ b/string
+@@ -1,5 +1,5 @@  Line 1: The quick brown fox
+- Line 2: jumps over the lazy dog.
++ Line 2: jumps over the lazy cat.
+  Line 3: consectetur adipiscing elit.
+  Next line.
+  Next line.
+@@ -6,2 +6,2 @@  Next line.
+  Next line.
++ A new line
+DIFF;
 		$actual   = $diff->format_as_git_patch();
 		$this->assertEquals( $expected, $actual );
 	}

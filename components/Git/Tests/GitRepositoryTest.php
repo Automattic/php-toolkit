@@ -93,12 +93,12 @@ class GitRepositoryTest extends \PHPUnit\Framework\TestCase {
 		$commit_oid        = $repo->add_object(
 			'commit',
 			<<<COMMIT
-            tree $root_tree_oid
-            parent $parent_commit_oid
-            author John Doe <john.doe@example.com> 1713542400 +0000
-            committer John Doe <john.doe@example.com> 1713542400 +0000
-            message Hello, world!
-            COMMIT
+tree $root_tree_oid
+parent $parent_commit_oid
+author John Doe <john.doe@example.com> 1713542400 +0000
+committer John Doe <john.doe@example.com> 1713542400 +0000
+message Hello, world!
+COMMIT
 		);
 		$this->assertEquals( $blob_oid, $repo->find_hash_by_path( '/subdirectory/hello-world.txt', $commit_oid ) );
 	}
@@ -142,12 +142,12 @@ class GitRepositoryTest extends \PHPUnit\Framework\TestCase {
 		$commit_oid        = $repo->add_object(
 			'commit',
 			<<<COMMIT
-            tree $root_tree_oid
-            parent $parent_commit_oid
-            author John Doe <john.doe@example.com> 1713542400 +0000
-            committer John Doe <john.doe@example.com> 1713542400 +0000
-            message Hello, world!
-            COMMIT
+tree $root_tree_oid
+parent $parent_commit_oid
+author John Doe <john.doe@example.com> 1713542400 +0000
+committer John Doe <john.doe@example.com> 1713542400 +0000
+message Hello, world!
+COMMIT
 		);
 		$this->assertEquals( 'Hello, world!', $repo->read_object_by_path( '/subdirectory/hello-world.txt', $commit_oid )->consume_all() );
 	}
