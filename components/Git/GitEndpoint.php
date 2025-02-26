@@ -89,7 +89,7 @@ class GitEndpoint {
 		// @TODO: Simplify this with a method such as pipe_to() or
 		// a pulling class such as GitHttpResponse
 		while ( true ) {
-			$available = $git_response->pull( 8192 );
+			$available = $git_response->pull( 65536 );
 			if ( $available === 0 && $git_response->reached_end_of_data() ) {
 				break;
 			}

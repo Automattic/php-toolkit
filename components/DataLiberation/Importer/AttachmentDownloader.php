@@ -92,8 +92,8 @@ class AttachmentDownloader {
 					$stream = $this->source_from_filesystem->open_read_stream( $source_path );
 					$fp     = fopen( $output_path, 'wb' );
 					while ( ! $stream->reached_end_of_data() ) {
-						$stream->pull( 8192 );
-						$chunk = $stream->consume( 8192 );
+						$stream->pull( 65536 );
+						$chunk = $stream->consume( 65536 );
 						fwrite( $fp, $chunk );
 					}
 					fclose( $fp );

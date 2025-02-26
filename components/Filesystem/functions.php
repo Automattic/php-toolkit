@@ -39,7 +39,7 @@ function copy_between_filesystems( array $args ) {
 			try {
 				$chunks_written = 0;
 				while ( ! $from_stream->reached_end_of_data() ) {
-					$available = $from_stream->pull( 8192 );
+					$available = $from_stream->pull( 65536 );
 					$to_stream->append_bytes( $from_stream->consume( $available ), $to_stream );
 					++$chunks_written;
 				}

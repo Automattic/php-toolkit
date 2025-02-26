@@ -18,7 +18,7 @@ class ImportSession {
 	 * @TODO: Make it extendable
 	 * @TODO: Reuse the same entities list as WP_Stream_Importer
 	 */
-	const PROGRESS_ENTITIES                  = array(
+	const PROGRESS_ENTITIES = array(
 		'site_option',
 		'user',
 		'category',
@@ -29,6 +29,7 @@ class ImportSession {
 		'comment',
 		'comment_meta',
 	);
+    
 	const FRONTLOAD_STATUS_AWAITING_DOWNLOAD = 'awaiting_download';
 	const FRONTLOAD_STATUS_IGNORED           = 'ignored';
 	const FRONTLOAD_STATUS_ERROR             = 'error';

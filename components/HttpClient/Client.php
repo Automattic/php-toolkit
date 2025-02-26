@@ -583,7 +583,7 @@ class Client {
 				continue;
 			}
 
-			$available_bytes = $request->upload_body_stream->pull( 8192 );
+			$available_bytes = $request->upload_body_stream->pull( 65536 );
 			if ( $available_bytes === 0 ) {
 				// Not all pull() calls must yield bytes, maybe we just need to wait for the next chunk.
 				// Let's continue and keep trying.
@@ -682,7 +682,7 @@ class Client {
 			$stream = $this->connections[ $request->id ]->decoded_response_stream;
 
 			while ( true ) {
-				$available_bytes = $stream->pull( 8192 );
+				$available_bytes = $stream->pull( 65536 );
 				if ( $available_bytes > 0 ) {
 					$body_chunk                         = $stream->consume( $available_bytes );
 					$request->response->received_bytes += $available_bytes;

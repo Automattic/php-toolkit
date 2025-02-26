@@ -38,7 +38,7 @@ class FilesystemReadStream implements ByteReadStream {
 		return $this->filesystem->read_stream_is_finished( $this->stream_id );
 	}
 
-	public function pull( $n = 8192 ): bool {
+	public function pull( $n = 65536 ): bool {
 		return $this->filesystem->read_stream_next_bytes( $this->stream_id, $n );
 	}
 

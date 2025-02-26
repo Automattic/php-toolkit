@@ -13,7 +13,7 @@ interface InternalizedReadStream {
 	 * @return bool True if the next chunk was retrieved, false otherwise.
 	 * @throws FilesystemException If the next chunk cannot be retrieved.
 	 */
-	public function read_stream_next_bytes( int $stream_id, int $max_bytes = 8192 ): bool;
+	public function read_stream_next_bytes( int $stream_id, int $max_bytes = 65536 ): bool;
 
 	/**
 	 * Get the current chunk of a file.
