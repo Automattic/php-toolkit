@@ -33,6 +33,16 @@ function copy_between_filesystems( array $args ) {
 	$recursive        = $args['recursive'] ?? true;
 
 	if ( $source->is_file( $source_path ) ) {
+		$destination_dir = wp_dirname( $destination_path );
+		if ( ! $destination->is_dir( $destination_dir ) ) {
+			$destination->mkdir(
+				$destination_dir,
+				array(
+					'recursive' => true,
+				)
+			);
+		}
+		
 		$to_stream = $destination->open_write_stream( $destination_path );
 		try {
 			$from_stream = $source->open_read_stream( $source_path );
