@@ -608,34 +608,6 @@ class WP_Static_Files_Editor_Plugin {
 			2
 		);
 
-		// @TODO: the_content and rest_prepare_local_file filters run twice for REST API requests.
-		// find a way of only running them once.
-
-		// Add the filter for 'the_content'
-		// add_filter( 'the_content', function ( $content, $post = null ) {
-		// If no post is provided, try to get it from the global scope
-		// if ( ! $post ) {
-		// global $post;
-		// }
-
-		// Check if this post is of type "local_file"
-		// if ( $post && $post->post_type === WP_LOCAL_FILE_POST_TYPE ) {
-		// Get the latest content from the database first
-		// $content = $post->post_content;
-
-		// Then refresh from file if needed
-		// $new_content = self::refresh_post_from_local_file( $post );
-		// if ( false !== $new_content && ! is_wp_error( $new_content ) ) {
-		// $content = $new_content;
-		// }
-
-		// return $content;
-		// }
-
-		// Return original content for all other post types
-		// return $content;
-		// }, 10, 2 );
-
 		// Add filter for REST API responses
 		add_filter(
 			'rest_prepare_' . WP_LOCAL_FILE_POST_TYPE,
@@ -819,42 +791,6 @@ class WP_Static_Files_Editor_Plugin {
 			10,
 			4
 		);
-
-		/**
-		 * Store autosaves in the data source.
-		 */
-		// add_action( 'wp_creating_autosave', function ( $autosave ) {
-		// try {
-		// if ( ! self::acquire_synchronization_lock() ) {
-		// return;
-		// }
-		// $autosave = (object) $autosave;
-		// if (
-		// empty( $autosave->ID ) ||
-		// $autosave->post_status !== 'inherit' ||
-		// $autosave->post_type !== 'revision'
-		// ) {
-		// return;
-		// }
-		// $parent_post = get_post( $autosave->post_parent );
-		// if ( $parent_post->post_type !== WP_LOCAL_FILE_POST_TYPE ) {
-		// return;
-		// }
-
-		// $content = self::convert_post_to_string( $autosave );
-
-		// $path = get_post_meta( $parent_post->ID, 'local_file_path', true );
-		// $fs = self::get_data_source()->get_filesystem();
-		// if(!$fs->is_file($path)) {
-		// return;
-		// }
-		// $fs->put_contents( $path, $content, [
-		// 'amend' => true,
-		// ] );
-		// } finally {
-		// self::release_synchronization_lock();
-		// }
-		// }, 10, 1 );
 	}
 
 	private static function post_entity_to_blocks_with_metadata( $post_entity ) {
@@ -866,12 +802,6 @@ class WP_Static_Files_Editor_Plugin {
 				'menu_order' => array( $post_entity['menu_order'] ),
 			)
 		);
-	}
-
-	private static function post_entity_to_annotated_block_markup( $post_entity ) {
-		$annotated_block_markup = self::post_entity_to_blocks_with_metadata( $post_entity );
-		$producer               = new AnnotatedBlockMarkupProducer( $annotated_block_markup );
-		return $producer->produce();
 	}
 
 	private static function annotated_block_markup_to_blocks_with_metadata( $annotated_block_markup ) {

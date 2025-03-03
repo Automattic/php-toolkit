@@ -756,6 +756,19 @@ const NodeRow: React.FC<{
 	const isImage = isImagePath(node.name);
 	return (
 		<>
+			{isRoot && sortedChildren?.length === 0 && (
+				<>
+					<TreeGridRow level={1} positionInSet={0} setSize={1}>
+						<TreeGridCell>
+							{() => (
+								<div>
+									<p>No files found</p>
+								</div>
+							)}
+						</TreeGridCell>
+					</TreeGridRow>
+				</>
+			)}
 			{!isRoot && (
 				<TreeGridRow
 					level={level}
@@ -878,7 +891,8 @@ const NodeRow: React.FC<{
 			)}
 			{editedNode &&
 				editedNode.reason === 'create' &&
-				editedNode.parentPath === path && (
+				editedNode.parentPath.replace(/^\//, '') ===
+					path.replace(/^\//, '') && (
 					<TreeGridRow
 						level={level + 1}
 						positionInSet={1}

@@ -1,7 +1,6 @@
 import React, { useMemo } from 'react';
-import { useEffect, createRoot } from '@wordpress/element';
+import { useEffect } from '@wordpress/element';
 import { FileNode, FilePickerTree } from './components/FilePickerTree';
-import { MobileMenu } from './components/MobileMenu/index';
 import { store as editorStore, ErrorBoundary } from '@wordpress/editor';
 import { store as preferencesStore } from '@wordpress/preferences';
 import {
@@ -16,13 +15,27 @@ import {
 import apiFetch from '@wordpress/api-fetch';
 import { store as noticesStore } from '@wordpress/notices';
 import {
-	injectSingleClickSaveButton,
 	addComponentToEditorContentArea,
 	addLocalFilesTab,
+	replaceInterfaceToolbarChildren,
 } from './add-local-files-tab';
 import { store as blockEditorStore } from '@wordpress/block-editor';
 import { parse, serialize } from '@wordpress/blocks';
-import { Button, Spinner, Icon } from '@wordpress/components';
+import {
+	Button,
+	Spinner,
+	Icon,
+	ToolbarButton,
+	ToolbarItem,
+	DropdownMenu,
+} from '@wordpress/components';
+import {
+	undo as undoIcon,
+	redo as redoIcon,
+	chevronLeft,
+	moreVertical,
+	sidebar,
+} from '@wordpress/icons';
 import { store as editPostStore } from '@wordpress/edit-post';
 import { store as coreStore } from '@wordpress/core-data';
 import css from './style.module.css';
@@ -139,7 +152,7 @@ function ConnectedFilePickerTree() {
 							name = file.post_title;
 						}
 					}
-					if (name === undefined) {
+					if (name === undefined || name === '') {
 						name = file.path.split('/').pop() || '';
 					}
 					return {
@@ -148,18 +161,21 @@ function ConnectedFilePickerTree() {
 					};
 				})
 				.filter((file) => !file.isDeleted);
+			const isFileListInitialized =
+				filesList.length ||
+				!select(coreStore).isResolving('getEntityRecords', [
+					'static-files-editor',
+					'files',
+					{
+						per_page: -1,
+					},
+				]);
 			return {
-				selectedPath: select(uiStore).getSelectedPath(),
+				selectedPath:
+					select(uiStore).getSelectedPath() ??
+					(isFileListInitialized ? '' : undefined),
 				filesList,
-				isFileListInitialized:
-					filesList.length ||
-					!select(coreStore).isResolving('getEntityRecords', [
-						'static-files-editor',
-						'files',
-						{
-							per_page: -1,
-						},
-					]),
+				isFileListInitialized,
 			};
 		},
 		[]
@@ -187,7 +203,8 @@ function ConnectedFilePickerTree() {
 
 	const onNavigateToEntityRecord = useSelect(
 		(select) =>
-			select(blockEditorStore).getSettings().onNavigateToEntityRecord
+			select(blockEditorStore).getSettings().onNavigateToEntityRecord,
+		[]
 	);
 
 	const handleNodeDeleted = async (path: string) => {
@@ -652,42 +669,98 @@ const OfflineCloudIcon = (
 	</svg>
 );
 
-injectSingleClickSaveButton(SingleClickSaveButton);
+function EditorToolbar() {
+	const { selectedPath, editedFilePath, hasUndo, hasRedo } = useSelect(
+		(select) => ({
+			selectedPath: select(uiStore).getSelectedPath(),
+			editedFilePath:
+				select(uiStore).getEditedFile()?.meta?.local_file_path || '',
+			hasUndo: select(coreStore).hasUndo(),
+			hasRedo: select(coreStore).hasRedo(),
+		}),
+		[]
+	);
+
+	const { undo, redo } = useDispatch(coreStore);
+	const folderName = editedFilePath?.split('/')?.slice(0, -1)?.pop();
+
+	return (
+		<div className={css.insideEditorToolbar}>
+			<div className={css.editorToolbarLeft}>
+				<ToolbarButton
+					icon={chevronLeft}
+					label="Back"
+					onClick={() => {
+						dispatch(uiStore).openPreviousFile();
+					}}
+					disabled={select(uiStore).getHistoryEntries().length < 2}
+				/>
+				<ToolbarButton
+					icon={sidebar}
+					label="Files list"
+					onClick={() => {
+						dispatch(editorStore).setIsListViewOpened(
+							!select(editorStore).isListViewOpened()
+						);
+					}}
+				/>
+				<ToolbarButton
+					icon={undoIcon}
+					label="Undo"
+					onClick={undo}
+					disabled={!hasUndo}
+				/>
+				<ToolbarButton
+					icon={redoIcon}
+					label="Redo"
+					onClick={redo}
+					disabled={!hasRedo}
+				/>
+				<ToolbarItem
+					as={Button}
+					onClick={() => {
+						if (!select(editorStore).isListViewOpened()) {
+							dispatch(editorStore).setIsListViewOpened(true);
+						}
+						dispatch(uiStore).setSelectedPath(
+							selectedPath.split('/').slice(0, -1).join('/')
+						);
+					}}
+				>
+					{folderName}
+				</ToolbarItem>
+			</div>
+			<div className={css.editorToolbarRight}>
+				<SingleClickSaveButton />
+				<DropdownMenu
+					icon={moreVertical}
+					label="More options"
+					controls={[
+						{
+							title: 'Go to WP admin',
+							onClick: () => {
+								window.location.href = '/wp-admin/';
+							},
+						},
+					]}
+				/>
+			</div>
+		</div>
+	);
+}
+
+replaceInterfaceToolbarChildren(EditorToolbar);
 
 setTimeout(() => {
 	dispatch(preferencesStore).set('welcomeGuide', false);
 	dispatch(preferencesStore).set('enableChoosePatternModal', false);
 	dispatch(editPostStore).closeGeneralSidebar();
 	dispatch(editPostStore).closeModal();
-	
+
 	if (window.innerWidth > 768) {
 		dispatch(editorStore).setIsListViewOpened(true);
 	}
 }, 10);
-
-function MobileMenuContainer() {
-	useEffect(() => {
-		const waitForEditPostLayout = setInterval(() => {
-			const editPostLayout = document.querySelector(
-				'.interface-interface-skeleton__editor'
-			);
-			if (editPostLayout) {
-				clearInterval(waitForEditPostLayout);
-				const mobileMenuContainer = document.createElement('div');
-				editPostLayout.appendChild(mobileMenuContainer);
-
-				const root = createRoot(mobileMenuContainer);
-				root.render(<MobileMenu />);
-			}
-		}, 100);
-
-		return () => clearInterval(waitForEditPostLayout);
-	}, []);
-
-	return null;
-}
-
-addComponentToEditorContentArea(<MobileMenuContainer />);
 
 /**
  * On mobile devices, when a block is inserted when the inserter sidebar is open,
@@ -1051,7 +1124,6 @@ const replaceEditorContentOnEntityChange = () => {
 			return response;
 		}
 
-
 		preserveEditsSinceSaveStarted(
 			contentWhenSaveStarted,
 			postWhenSaveStarted,
@@ -1320,3 +1392,22 @@ async function syncDataSource() {
 }
 
 setInterval(syncIfItsTime, 10000);
+
+function adjustToolbar() {
+	const toolbar = document.querySelector(
+		'.components-accessible-toolbar.block-editor-block-contextual-toolbar.is-unstyled'
+	) as HTMLElement;
+	if (!toolbar) {
+		return;
+	}
+	if (window.visualViewport) {
+		const vv = window.visualViewport;
+		const keyboardHeight = window.innerHeight - vv.height - vv.offsetTop;
+		toolbar.style.transform = `translateY(-${keyboardHeight}px)`;
+	}
+}
+
+// Adjust toolbar when keyboard appears
+window.visualViewport?.addEventListener('resize', adjustToolbar);
+window.visualViewport?.addEventListener('scroll', adjustToolbar);
+setInterval(adjustToolbar, 1000);

@@ -51,6 +51,7 @@ export const uiStore = createReduxStore(STORE_NAME, {
 	reducer(
 		state = {
 			selectedPath: undefined,
+			pathHistory: [] as string[],
 			isListViewOpened: true,
 			isPostIdResolving: false,
 			dataSourceSyncInfo: undefined,
@@ -59,8 +60,36 @@ export const uiStore = createReduxStore(STORE_NAME, {
 		action
 	) {
 		switch (action.type) {
-			case 'SET_SELECTED_PATH':
-				return { ...state, selectedPath: action.path };
+			case 'SET_SELECTED_PATH': {
+				const { path } = action;
+				if (path === state.selectedPath) {
+					return state;
+				}				
+				return { 
+					...state, 
+					selectedPath: path 
+				};
+			}
+			case 'PUSH_HISTORY_ENTRY': {
+				const newHistory = [...state.pathHistory].filter(entry => entry !== action.path);
+				newHistory.push(action.path);
+				// Max 20 history entries
+				while(newHistory.length > 20) {
+					newHistory.shift();
+				}
+				return {
+					...state,
+					pathHistory: newHistory
+				};
+			}
+			case 'POP_HISTORY_ENTRY': {
+				const newHistory = [...state.pathHistory];
+				newHistory.pop();
+				return {
+					...state,
+					pathHistory: newHistory
+				};
+			}
 			case 'SET_POST_ID_RESOLVING':
 				return { ...state, isPostIdResolving: action.isResolving };
 			case 'SET_LAST_DATA_SOURCE_SYNC_INFO':
@@ -95,7 +124,7 @@ export const uiStore = createReduxStore(STORE_NAME, {
 		},
 
 		setSelectedPath(path) {
-			return async ({ dispatch, registry, select }) => {
+			return async ({ dispatch, registry }) => {
 				dispatch({ type: 'SET_SELECTED_PATH', path });
 
 				const node = registry
@@ -103,6 +132,9 @@ export const uiStore = createReduxStore(STORE_NAME, {
 					.getEntityRecord('static-files-editor', 'files', path);
 				if (!node) {
 					return;
+				}
+				if (node.type === 'file') {
+					dispatch({ type: 'PUSH_HISTORY_ENTRY', path });
 				}
 				if (node.type === 'file' && isPreviewableAssetPath(path)) {
 					registry.dispatch(uiStore).closeListViewOnMobile();
@@ -132,6 +164,18 @@ export const uiStore = createReduxStore(STORE_NAME, {
 					});
 					registry.dispatch(uiStore).closeListViewOnMobile();
 				}
+			};
+		},
+		openPreviousFile() {
+			return async ({ dispatch, select, registry }) => {
+				const historyEntries = select.getHistoryEntries();
+				if (historyEntries.length < 2) {
+					return;
+				}
+				dispatch({ type: 'POP_HISTORY_ENTRY' });
+				const historyAfterPop = select.getHistoryEntries();
+				const currentNewestHistoryEntry = historyAfterPop[historyAfterPop.length - 1];
+				registry.dispatch(uiStore).setSelectedPath(currentNewestHistoryEntry);
 			};
 		},
 		createFilesBatch(tree: FileSubtree) {
@@ -360,6 +404,31 @@ export const uiStore = createReduxStore(STORE_NAME, {
 				'files',
 				state.selectedPath
 			);
+		},
+		getEditedFile() {
+			const currentPostId = select(editorStore).getCurrentPostId();
+			if (!currentPostId) {
+				return null;
+			}
+			const file = select(coreStore).getEntityRecord(
+				'postType',
+				WP_LOCAL_FILE_POST_TYPE,
+				currentPostId
+			);
+			if (!file) {
+				return null;
+			}
+			const editedPostContent = getPostContent(file);
+			return {
+				...file,
+				content: editedPostContent,
+			};
+		},
+		hasPathHistoryEntries(state) {
+			return state.pathHistory.length > 0;
+		},
+		getHistoryEntries(state) {
+			return state.pathHistory;
 		},
 		listFiles(state, path) {
 			const parentNode = this.getParentNode(state, path);

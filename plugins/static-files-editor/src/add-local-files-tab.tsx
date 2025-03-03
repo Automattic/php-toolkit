@@ -109,9 +109,7 @@ export function addComponentToEditorContentArea(Component: React.ReactElement) {
 	};
 }
 
-export function injectSingleClickSaveButton(
-	CustomButton: React.ComponentType
-) {
+export function injectSingleClickSaveButton(CustomButton: React.ComponentType) {
 	function patchButtonArguments(args: any[]) {
 		let [type, props, ...children] = args;
 		if (!props || typeof props.className !== 'string') {
@@ -136,5 +134,35 @@ export function injectSingleClickSaveButton(
 	const originalJSX = window.ReactJSXRuntime.jsx;
 	window.ReactJSXRuntime.jsx = (...args: any[]) => {
 		return originalJSX(...patchButtonArguments(args));
+	};
+}
+
+export function replaceInterfaceToolbarChildren(
+	CustomButton: React.ComponentType
+) {
+	function patchElement(args: any[]) {
+		let [type, props, ...children] = args;
+		if (!props || typeof props.className !== 'string') {
+			return [type, props, ...children];
+		}
+		const hasClass = props.className.includes(
+			'interface-interface-skeleton__header'
+		);
+		if (!hasClass) {
+			return [type, props, ...children];
+		}
+		return [CustomButton, props, ...children];
+	}
+
+	// Monkey-patch window.React.createElement
+	const originalCreateElement = window.React.createElement as any;
+	(window.React as any).createElement = function (...args: any[]) {
+		return originalCreateElement(...patchElement(args));
+	};
+
+	// Monkey-patch window.ReactJSXRuntime.jsx
+	const originalJSX = window.ReactJSXRuntime.jsx;
+	window.ReactJSXRuntime.jsx = (...args: any[]) => {
+		return originalJSX(...patchElement(args));
 	};
 }
