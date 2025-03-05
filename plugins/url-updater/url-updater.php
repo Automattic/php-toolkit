@@ -2,7 +2,10 @@
 /**
  * Plugin Name: Remote Plugin Installer
  * Description: Installs a plugin from a given URL and allows updates from a user-defined URL.
+ * Requires Plugins: data-liberation
  */
+
+require_once __DIR__ . '/update_plugin.php';
 
 /**
  * UNSAFE! DO NOT USE IN PRODUCTION!
@@ -33,11 +36,11 @@ function rpi_render_admin_page() {
 
     // Direct update without changing URL
     if (isset($_GET['direct_update']) && $_GET['direct_update'] === 'true') {
-      $installed_plugin_file = rpi_install_plugin_from_url($stored_url, true);
-      if ($installed_plugin_file) {
-        echo '<div class="notice notice-success"><p>Plugin updated successfully.</p></div>';
+      $installed_plugin_file = rpi_install_plugin_from_url($stored_url, true, $plugin_file);
+      if (is_wp_error($installed_plugin_file)) {
+        echo '<div class="notice notice-error"><p>' . esc_html($installed_plugin_file->get_error_message()) . '</p></div>';
       } else {
-        echo '<div class="notice notice-error"><p>Update failed.</p></div>';
+        echo '<div class="notice notice-success"><p>Plugin updated successfully.</p></div>';
       }
       echo '<a href="' . esc_url(admin_url('admin.php?page=remote-installer')) . '" class="button">Back to Plugin List</a>';
       return;
@@ -46,27 +49,27 @@ function rpi_render_admin_page() {
     // If the user just submitted the new URL, do the update
     if (isset($_POST['rpi_new_url'])) {
       $new_url = sanitize_text_field($_POST['rpi_new_url']);
-      $installed_plugin_file = rpi_install_plugin_from_url($new_url, true);
-      if ($installed_plugin_file) {
+      $installed_plugin_file = rpi_install_plugin_from_url($new_url, true, $plugin_file);
+      if (is_wp_error($installed_plugin_file)) {
+        echo '<div class="notice notice-error"><p>' . esc_html($installed_plugin_file->get_error_message()) . '</p></div>';
+      } else {
         rpi_store_plugin_url($installed_plugin_file, $new_url);
         echo '<div class="notice notice-success"><p>Plugin updated successfully.</p></div>';
-      } else {
-        echo '<div class="notice notice-error"><p>Update failed.</p></div>';
       }
       echo '<a href="' . esc_url(admin_url('admin.php?page=remote-installer')) . '" class="button">Back to Plugin List</a>';
-    } else {
-      // Show the form to change the URL
-      echo '<div class="wrap">';
-      echo '<h1>Update Plugin</h1>';
-      echo '<p>You can change the URL here before updating.</p>';
-      echo '<form method="POST">';
-      echo '<input type="text" name="rpi_new_url" value="' . esc_attr($stored_url) . '" style="width: 50%;" />';
-      echo '<br><br><input type="submit" value="Update Plugin" class="button button-primary" />';
-      echo '</form>';
-      echo '<a href="' . esc_url(admin_url('admin.php?page=remote-installer')) . '" class="button">Back to Plugin List</a>';
-      echo '</div>';
+	  return;
     }
-    return;
+	// Show the form to change the URL
+	echo '<div class="wrap">';
+	echo '<h1>Update Plugin</h1>';
+	echo '<p>You can change the URL here before updating.</p>';
+	echo '<form method="POST">';
+	echo '<input type="text" name="rpi_new_url" value="' . esc_attr($stored_url) . '" style="width: 50%;" />';
+	echo '<br><br><input type="submit" value="Update Plugin" class="button button-primary" />';
+	echo '</form>';
+	echo '<a href="' . esc_url(admin_url('admin.php?page=remote-installer')) . '" class="button">Back to Plugin List</a>';
+	echo '</div>';
+	return;
   }
 
   // If we're installing a new plugin
@@ -115,51 +118,142 @@ function rpi_render_admin_page() {
   }
 }
 
-function rpi_install_plugin_from_url(string $url, bool $is_update = false) {
+function rpi_install_plugin_from_url(string $url, bool $is_update = false, string $original_plugin_file = '') {
   require_once ABSPATH . 'wp-admin/includes/file.php';
   require_once ABSPATH . 'wp-admin/includes/misc.php';
   require_once ABSPATH . 'wp-admin/includes/class-wp-upgrader.php';
   require_once ABSPATH . 'wp-admin/includes/plugin.php';
-  
+
+  $parsed_url = wp_parse_url($url);
+  $path = isset($parsed_url['path']) ? $parsed_url['path'] : '';
+  $file_extension = pathinfo($path, PATHINFO_EXTENSION);
+  $base_name = $original_plugin_file ? basename(dirname($original_plugin_file)) : basename($path, '.' . $file_extension);
+
   $cache_busting_url = add_query_arg('_cache_buster', time(), $url);
   $tmp_file = download_url($cache_busting_url);
   if (is_wp_error($tmp_file)) {
-    return false;
+    return new WP_Error('download_failed', $tmp_file->get_error_message());
   }
 
-  $upgrader = new Plugin_Upgrader();
-  $upgrader->init();
-  $run_result = $upgrader->run([
-    'package'           => $tmp_file,
-    'destination'       => WP_PLUGIN_DIR,
-    'clear_destination' => $is_update,  // Only clear the existing folder if this is truly an update
-    'clear_working'     => true,
-    'hook_extra'        => [
-      'type'   => 'plugin',
-      'action' => $is_update ? 'update' : 'install',
-    ],
-  ]);
-
-  if (is_wp_error($run_result) || !$run_result) {
-    return false;
+  /**
+   * $tmp_file has a random component in the filename. WordPress would
+   * install it in wp-content/plugins/$new_name, not wp-content/plugins/$base_name.
+   *
+   * Let's give our package a stable filename to make WordPress actually
+   * upgrade the existing plugin instead of installing a new one.
+   */
+  $stable_tmp_path = sys_get_temp_dir() . '/' . $base_name . '.' . $file_extension;
+  if(file_exists($stable_tmp_path) && $stable_tmp_path !== $tmp_file) {
+    unlink($stable_tmp_path);
   }
+  rename($tmp_file, $stable_tmp_path);
 
-  $plugin_file = $upgrader->plugin_info();
-  if ($plugin_file) {
-    // If it's a fresh install, activate immediately
-    if (!$is_update) {
-      activate_plugin($plugin_file);
-    } else {
-      // If it was already active, re-activate after update
-      $active_plugins = get_option('active_plugins', []);
-      if (in_array($plugin_file, $active_plugins)) {
-        activate_plugin($plugin_file);
-      }
+  if($is_update) {
+    /**
+	 * Use our custom upgrade function instead of the WordPress upgrader.
+	 * It handles additional cases:
+	 *
+	 * * Rename of the zipped directory name (+activation of the plugin)
+	 * * Restore from backup if the upgrade fails
+	 */
+    $plugin_file = rpi_upgrade_plugin($original_plugin_file, $stable_tmp_path);
+    if (!$plugin_file) {
+      return new WP_Error('upgrade_failed', 'Upgrade failed. Please check the URL and try again.');
     }
-    // Update the last update timestamp
-    update_option('rpi_last_update_' . $plugin_file, current_time('mysql'));
+    
+    if($plugin_file !== $original_plugin_file) {
+      // remove $original_plugin_file from rpi_installed_plugins
+      $plugins = get_option('rpi_installed_plugins', []);
+      unset($plugins[$original_plugin_file]);
+      update_option('rpi_installed_plugins', $plugins);
+    }
+  } else {
+    $upgrader = new Plugin_Upgrader();
+    $upgrader->init();
+    $run_result = $upgrader->run([
+      'package'           => $stable_tmp_path,
+      'destination'       => WP_PLUGIN_DIR,
+      'clear_destination' => false,
+      'clear_working'     => true,
+      'hook_extra'        => [
+        'type'   => 'plugin',
+        'action' => 'install',
+      ],
+    ]);
+    if (is_wp_error($run_result) || !$run_result) {
+      return new WP_Error('upgrade_failed', 'Installation failed. Please check the URL and try again.');
+    }
+    $plugin_file = $upgrader->plugin_info();
+    activate_plugin($plugin_file);
   }
+
+  // Update the last update timestamp
+  update_option('rpi_last_update_' . $plugin_file, current_time('mysql'));
+
   return $plugin_file;
+}
+
+/**
+ * Helper function to restore a plugin from backup
+ */
+function rpi_restore_from_backup($backup_dir, $plugin_dir, $plugin_file, $was_active) {
+  // Remove the failed plugin directory if it exists
+  if (file_exists($plugin_dir)) {
+    rpi_remove_directory($plugin_dir);
+  }
+  
+  // Recreate the plugin directory
+  wp_mkdir_p($plugin_dir);
+  
+  // Copy files from backup
+  $files = new RecursiveIteratorIterator(
+    new RecursiveDirectoryIterator($backup_dir, RecursiveDirectoryIterator::SKIP_DOTS),
+    RecursiveIteratorIterator::SELF_FIRST
+  );
+  
+  foreach ($files as $file) {
+    $relative_path = str_replace($backup_dir, '', $file->getPathname());
+    $dest = $plugin_dir . $relative_path;
+    
+    if ($file->isDir()) {
+      wp_mkdir_p($dest);
+    } else {
+      copy($file->getPathname(), $dest);
+    }
+  }
+  
+  // Reactivate the plugin if it was active
+  if ($was_active) {
+    activate_plugin($plugin_file);
+  }
+  
+  // Clean up backup directory
+  rpi_remove_directory($backup_dir);
+}
+
+/**
+ * Helper function to recursively remove a directory
+ */
+function rpi_remove_directory($dir) {
+  if (!file_exists($dir)) {
+    return true;
+  }
+  
+  if (!is_dir($dir)) {
+    return unlink($dir);
+  }
+  
+  foreach (scandir($dir) as $item) {
+    if ($item == '.' || $item == '..') {
+      continue;
+    }
+    
+    if (!rpi_remove_directory($dir . DIRECTORY_SEPARATOR . $item)) {
+      return false;
+    }
+  }
+  
+  return rmdir($dir);
 }
 
 function rpi_store_plugin_url($plugin_file, $url) {
