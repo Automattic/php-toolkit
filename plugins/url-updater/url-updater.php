@@ -59,6 +59,13 @@ function rpi_render_admin_page() {
       echo '<a href="' . esc_url(admin_url('admin.php?page=remote-installer')) . '" class="button">Back to Plugin List</a>';
 	  return;
     }
+
+	// Check if the plugin exists
+	if (!file_exists(WP_PLUGIN_DIR . '/' . $plugin_file) || !$stored_url) {
+		echo '<div class="notice notice-error"><p>Plugin not found.</p></div>';
+		echo '<a href="' . esc_url(admin_url('admin.php?page=remote-installer')) . '" class="button">Back to Plugin List</a>';
+		return;
+	}
 	// Show the form to change the URL
 	echo '<div class="wrap">';
 	echo '<h1>Update Plugin</h1>';
@@ -76,18 +83,18 @@ function rpi_render_admin_page() {
   if (isset($_POST['rpi_plugin_url'])) {
     $plugin_url = sanitize_text_field($_POST['rpi_plugin_url']);
     $installed_plugin_file = rpi_install_plugin_from_url($plugin_url);
-    if ($installed_plugin_file) {
-      rpi_store_plugin_url($installed_plugin_file, $plugin_url);
-      echo '<div class="notice notice-success"><p>Plugin installed and activated successfully.</p></div>';
-    } else {
-      echo '<div class="notice notice-error"><p>Installation failed.</p></div>';
+	if (is_wp_error($installed_plugin_file)) {
+        echo '<div class="notice notice-error"><p>' . esc_html($installed_plugin_file->get_error_message()) . '</p></div>';
+	} else {
+        rpi_store_plugin_url($installed_plugin_file, $plugin_url);
+        echo '<div class="notice notice-success"><p>Plugin installed and activated successfully.</p></div>';
     }
   }
 
   // Default interface
   echo '<div class="wrap">';
   echo '<h1>Remote Plugin Installer</h1>';
-  echo '<form method="POST">';
+  echo '<form method="POST" action="admin.php?page=remote-installer">';
   echo '<p>Install a new plugin from a given URL.</p>';
   echo '<input type="text" name="rpi_plugin_url" placeholder="Plugin ZIP URL" style="width: 50%;" />';
   echo '<br><br><input type="submit" value="Install Plugin" class="button button-primary" />';
@@ -157,6 +164,9 @@ function rpi_install_plugin_from_url(string $url, bool $is_update = false, strin
 	 * * Restore from backup if the upgrade fails
 	 */
     $plugin_file = rpi_upgrade_plugin($original_plugin_file, $stable_tmp_path);
+	if(is_wp_error($plugin_file)) {
+		return $plugin_file;
+	}
     if (!$plugin_file) {
       return new WP_Error('upgrade_failed', 'Upgrade failed. Please check the URL and try again.');
     }
