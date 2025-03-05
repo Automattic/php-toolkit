@@ -103,10 +103,6 @@ class PluginUpdater {
 			return $this->installed_plugin_file;
 		} catch ( Exception $e ) {
 			$this->cleanup();
-			echo '<plaintext>';
-			echo $e->getMessage();
-			echo $e->getTraceAsString();
-			die();
 			return new WP_Error( 'plugin_upgrade_error', $e->getMessage() );
 		}
 	}

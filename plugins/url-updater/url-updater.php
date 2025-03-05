@@ -7,6 +7,8 @@
 
 require_once __DIR__ . '/update_plugin.php';
 
+require_once __DIR__ . '/update_plugin.php';
+
 /**
  * UNSAFE! DO NOT USE IN PRODUCTION!
  *
