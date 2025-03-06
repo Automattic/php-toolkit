@@ -93,12 +93,15 @@ class WP_Static_Files_Editor_Plugin {
 
 		switch ( $config['dataSourceType'] ) {
 			case 'local_directory':
-				return (bool) $config['localDirectory'];
+				return ! empty( $config['localDirectory'] );
 			case 'git_repo':
-				return $config['gitRepo'] && $config['selectedBranch'];
+				return ! empty( $config['gitRepo'] ) && ! empty( $config['selectedBranch'] );
+			case 'github_repository':
+				$github_token = get_option( 'msf_github_token', '' );
+				return ! empty( $github_token ) && ! empty( $config['selectedRepo'] ) && ! empty( $config['selectedGitHubBranch'] );
+			default:
+				return false;
 		}
-
-		return false;
 	}
 
 	public static function get_data_source() {
@@ -114,6 +117,21 @@ class WP_Static_Files_Editor_Plugin {
 					);
 					break;
 				case 'git_repo':
+					self::$data_source = GitDataSource::create( $settings );
+					break;
+				case 'github_repository':
+					// For GitHub repositories, use the GitDataSource with the GitHub token
+					$github_token = get_option( 'msf_github_token', '' );
+					if ( empty( $github_token ) || empty( $settings['selectedRepo'] ) ) {
+						throw new RuntimeException( 'GitHub token or repository not configured' );
+					}
+					
+					// Create a Git repository URL with the token for authentication
+					// Format: https://x-access-token:TOKEN@github.com/OWNER/REPO.git
+					$settings['gitRepo'] = "https://{$github_token}@github.com/{$settings['selectedRepo']}.git";
+					$settings['selectedBranch'] = $settings['selectedGitHubBranch'];
+					$settings['subdirectory'] = $settings['githubSubdirectory'] ?? '/';
+					
 					self::$data_source = GitDataSource::create( $settings );
 					break;
 			}
@@ -581,6 +599,32 @@ class WP_Static_Files_Editor_Plugin {
 						'callback'            => array( self::class, 'save_settings_endpoint' ),
 						'permission_callback' => function () {
 							return current_user_can( 'manage_options' );
+						},
+					)
+				);
+
+				// Endpoint to get GitHub repositories
+				register_rest_route(
+					'static-files-editor/v1',
+					'/github/repos',
+					array(
+						'methods'             => 'GET',
+						'callback'            => 'WP_Static_Files_Editor_Plugin::get_github_repos_endpoint',
+						'permission_callback' => function () {
+							return current_user_can( 'edit_posts' );
+						},
+					)
+				);
+
+				// Endpoint to store GitHub token
+				register_rest_route(
+					'static-files-editor/v1',
+					'/github/store-token',
+					array(
+						'methods'             => 'POST',
+						'callback'            => 'WP_Static_Files_Editor_Plugin::store_github_token_endpoint',
+						'permission_callback' => function () {
+							return current_user_can( 'edit_posts' );
 						},
 					)
 				);
@@ -1685,25 +1729,23 @@ class WP_Static_Files_Editor_Plugin {
 	}
 
 	public static function get_git_branches_endpoint( $request ) {
-		$git_repo_url = $request->get_param( 'gitRepo' );
-		if ( ! str_ends_with( $git_repo_url, '.git' ) ) {
-			$git_repo_url .= '.git';
-		}
-
+		$git_repo_string = $request->get_param( 'gitRepo' );
+		$provider        = $request->get_param( 'provider' );
+		$git_repo_url    = self::get_git_remote_url( $git_repo_string, [ 'provider' => $provider ] );
 		return self::get_git_branches( $git_repo_url );
 	}
 
 	public static function get_git_files_endpoint( $request ) {
-		$git_repo_url = $request->get_param( 'gitRepo' );
-		$branch       = $request->get_param( 'branch' );
-		if ( ! str_ends_with( $git_repo_url, '.git' ) ) {
-			$git_repo_url .= '.git';
-		}
 		$repo = new GitRepository( InMemoryFilesystem::create() );
-		$repo->add_remote( 'origin', $git_repo_url );
+
+		$git_repo_url = $request->get_param( 'gitRepo' );
+		$provider     = $request->get_param( 'provider' );
+		$repo->add_remote( 'origin', self::get_git_remote_url( $git_repo_url, [ 'provider' => $provider ] ) );
 		$remote = new GitRemote( $repo, 'origin' );
 
 		$refs = $remote->ls_refs( 'refs/heads/' );
+
+		$branch       = $request->get_param( 'branch' );
 		if ( ! isset( $refs[ $branch ] ) ) {
 			return new WP_Error( 'branch_not_found', 'Branch "' . $branch . '" not found' );
 		}
@@ -1713,6 +1755,24 @@ class WP_Static_Files_Editor_Plugin {
 		$fs            = GitFilesystem::create( $objects_index );
 
 		return array( 'files' => ls_recursive( $fs ) );
+	}
+
+	public static function get_git_remote_url( $git_repo_url, $options = array() ) {
+		switch ( $options['provider'] ) {
+			case 'github':
+				$url = WPURL::parse( $git_repo_url );
+				$url->username = get_option( 'msf_github_token', '' );
+				$url = $url->toString();
+				break;
+			case 'git':
+			default:
+				$url = $git_repo_url;
+				break;
+		}
+		if ( ! str_ends_with( $url, '.git' ) ) {
+			$url .= '.git';
+		}
+		return $url;
 	}
 
 	public static function delete_file_endpoint( $request ) {
@@ -1758,16 +1818,22 @@ class WP_Static_Files_Editor_Plugin {
 	}
 
 	public static function save_settings_endpoint( WP_REST_Request $request ) {
-		$new_settings = array(
-			'gitRepo'        => $request->get_param( 'gitRepo' ),
-			'selectedBranch' => $request->get_param( 'selectedBranch' ),
-			'subdirectory'   => $request->get_param( 'subdirectory' ),
-			'localDirectory' => $request->get_param( 'localDirectory' ),
+		$settings = array(
 			'dataSourceType' => $request->get_param( 'dataSourceType' ),
+			'gitRepo' => $request->get_param( 'gitRepo' ),
+			'selectedBranch' => $request->get_param( 'selectedBranch' ),
+			'subdirectory' => $request->get_param( 'subdirectory' ),
+			'localDirectory' => $request->get_param( 'localDirectory' ),
+			'selectedRepo' => $request->get_param( 'selectedRepo' ),
+			'gitUserName' => 'WordPress',
+			'gitUserEmail' => 'wordpress@example.com',
+			'.gitPath' => WP_STATIC_PAGES_DIR,
+			'remoteName' => 'origin',
 		);
-		update_option( 'static_files_editor_settings', $new_settings );
 
-		return new WP_REST_Response( 'Settings saved successfully', 200 );
+		update_option( 'static_files_editor_settings', $settings );
+
+		return array( 'success' => true );
 	}
 
 	public static function data_source_sync_endpoint() {
@@ -1852,6 +1918,66 @@ class WP_Static_Files_Editor_Plugin {
 
 		return $settings;
 	}
+
+	/**
+	 * Get GitHub repositories for the authenticated user
+	 */
+	public static function get_github_repos_endpoint() {
+		$github_token = get_option( 'msf_github_token', '' );
+		
+		if ( empty( $github_token ) ) {
+			return new WP_Error( 'no_token', 'GitHub token not found', array( 'status' => 400 ) );
+		}
+		
+		$response = wp_remote_get(
+			'https://api.github.com/user/repos?visibility=all&sort=updated&per_page=100',
+			array(
+				'headers' => array(
+					'Authorization' => "Bearer {$github_token}",
+					'Accept' => 'application/vnd.github.v3+json',
+					'User-Agent' => 'WordPress/Static-Files-Editor',
+				),
+			)
+		);
+		
+		if ( is_wp_error( $response ) ) {
+			return new WP_Error( 'github_api_error', $response->get_error_message(), array( 'status' => 500 ) );
+		}
+		
+		$body = wp_remote_retrieve_body( $response );
+		$repos = json_decode( $body, true );
+		
+		if ( ! is_array( $repos ) ) {
+			return new WP_Error( 'invalid_response', 'Invalid response from GitHub API', array( 'status' => 500 ) );
+		}
+
+		foreach($repos as $key => $repo) {
+			$git_url = $repo['git_url'];
+			if(str_starts_with($git_url, 'git://')) {
+				$git_url = 'https' . substr($git_url, 3);
+			}
+			$repos[$key]['http_clone_url'] = $git_url;
+		}
+		
+		return $repos;
+	}
+	
+	/**
+	 * Store GitHub token endpoint
+	 */
+	public static function store_github_token_endpoint( $request ) {
+		$token = $request->get_param( 'token' );
+		
+		if ( empty( $token ) ) {
+			return new WP_Error( 'no_token', 'No token provided', array( 'status' => 400 ) );
+		}
+		
+		// Store the token in site options
+		update_option( 'msf_github_token', $token );
+		
+		return array( 'success' => true );
+	}
+
 }
 
 WP_Static_Files_Editor_Plugin::initialize();

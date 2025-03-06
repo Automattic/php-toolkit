@@ -234,27 +234,47 @@ export const FilePickerTree: React.FC<FilePickerControlProps> = ({
 		onNodeDeleted(path);
 	};
 
-	const handleCreateNode = (type: 'file' | 'directory') => {
-		if (!selectedPath) {
+	const handleCreateNode = async (type: 'file' | 'directory') => {
+		if (type === 'file') {
+			const currentNode = getNodeByPath(files, selectedPath);
+			const parentPath =
+				selectedPath && currentNode?.type === 'directory' && expanded[selectedPath]
+					? selectedPath
+					: getParentPath(selectedPath);
+			const name = 'New note ' + new Date().toISOString().replaceAll(':', '-') + '.md';
+			await onNodesCreated({
+				path: parentPath,
+				children: [
+					{
+						name,
+						type: type,
+						children: [],
+					},
+				],
+			});
+			selectNode(parentPath + '/' + name);
+		} else {
+			if (!selectedPath) {
+				setEditedNode({
+					reason: 'create',
+					type,
+					parentPath: '',
+				});
+				return;
+			}
+			const currentNode = getNodeByPath(files, selectedPath);
+			const parentPath =
+				currentNode?.type === 'directory' && expanded[selectedPath]
+					? selectedPath
+					: getParentPath(selectedPath);
+
+			expandNode(parentPath, true);
 			setEditedNode({
 				reason: 'create',
 				type,
-				parentPath: '',
+				parentPath,
 			});
-			return;
 		}
-		const currentNode = getNodeByPath(files, selectedPath);
-		const parentPath =
-			currentNode?.type === 'directory' && expanded[selectedPath]
-				? selectedPath
-				: getParentPath(selectedPath);
-
-		expandNode(parentPath, true);
-		setEditedNode({
-			reason: 'create',
-			type,
-			parentPath,
-		});
 	};
 
 	const handleEditedNodeComplete = async (name: string) => {

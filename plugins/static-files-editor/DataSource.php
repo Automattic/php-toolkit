@@ -5,9 +5,6 @@ use WordPress\Filesystem\LocalFilesystem;
 use WordPress\Git\GitFilesystem;
 use WordPress\Git\GitRemote;
 use WordPress\Git\GitRepository;
-use WordPress\Merge\Diff\MyersDiffer;
-use WordPress\Merge\Merge\ChunkMerger;
-use WordPress\Merge\Validate\BlockMarkupMergeValidator;
 
 interface DataSource {
 	public function sync();

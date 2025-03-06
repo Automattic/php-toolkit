@@ -27,13 +27,30 @@ function msf_render_data_source() {
 	}
 	$config           = get_option( 'static_files_editor_settings' ) ?: array();
 	$git_repo         = $config['gitRepo'] ?? '';
-	$data_source_type = $config['dataSourceType'] ?? 'local_directory';
+	$data_source_type = $config['dataSourceType'] ?? 'github_repository';
 	$local_directory  = $config['localDirectory'] ?? WP_CONTENT_DIR . '/uploads/notes';
+	$github_token     = get_option( 'msf_github_token', '' );
+	$selected_repo    = $config['selectedRepo'] ?? '';
+	
 	if ( $git_repo ) {
-		$branches = WP_Static_Files_Editor_Plugin::get_git_branches( $git_repo )['refs'];
+		$branches = WP_Static_Files_Editor_Plugin::get_git_branches(
+			WP_Static_Files_Editor_Plugin::get_git_remote_url( $git_repo, [
+				'provider' => $data_source_type === 'github_repository' ? 'github' : 'git',
+			] ),
+		)[ 'refs' ];
 	} else {
 		$branches = array();
 	}
+	
+	// Get GitHub repositories if we have a token
+	$github_repos = array();
+	if ( ! empty( $github_token ) ) {
+		$github_repos = WP_Static_Files_Editor_Plugin::get_github_repos_endpoint();
+		if ( is_wp_error( $github_repos ) ) {
+			$github_repos = array();
+		}
+	}
+	
 	$notices = array();
 	if ( isset( $_GET['error_code'] ) && $_GET['error_code'] === 'no_data_source' ) {
 		$notices[] = array(
@@ -50,12 +67,16 @@ function msf_render_data_source() {
 				'subdirectory' => '/',
 				'dataSourceType' => $data_source_type,
 				'localDirectory' => $local_directory,
+				'githubToken' => ! empty( $github_token ),
+				'githubRepos' => $github_repos,
+				'selectedRepo' => $selected_repo,
 			),
 			$config,
 			array(
 				'notices' => $notices,
 				'isLocalDirectory' => $data_source_type === 'local_directory',
 				'isGitRepo' => $data_source_type === 'git_repo',
+				'isGithubRepo' => $data_source_type === 'github_repository',
 			)
 		)
 	);
@@ -82,6 +103,7 @@ function msf_render_data_source() {
 							>
 								<option value="local_directory">Local Directory</option>
 								<option value="git_repo">Git Repo</option>
+								<option value="github_repository">GitHub Repository</option>
 							</select>
 						</td>
 					</tr>
@@ -140,6 +162,77 @@ function msf_render_data_source() {
 					</tr>
 
 					<tr>
+						<th scope="row">Path to synchronize</th>
+						<td>
+							<input type="text" class="regular-text" data-wp-bind--value="state.subdirectory" data-wp-on--input="actions.updateSubdirectory" />
+						</td>
+					</tr>
+				</table>
+
+				<table class="form-table" data-wp-class--hidden="!state.isGithubRepo">
+					<tr>
+						<th scope="row">GitHub Authorization</th>
+						<td>
+							<div data-wp-class--hidden="state.githubToken">
+								<button
+									type="button"
+									class="button"
+									data-wp-on--click="actions.authorizeWithGitHub"
+								>
+									Authorize with GitHub
+								</button>
+								<p>You need to authorize with GitHub to access your repositories.</p>
+							</div>
+							<div data-wp-class--hidden="!state.githubToken">
+								<p>✅ Authorized with GitHub</p>
+								<button
+									type="button"
+									class="button"
+									data-wp-on--click="actions.fetchGitHubRepos"
+								>
+									Refresh Repositories
+								</button>
+							</div>
+						</td>
+					</tr>
+
+					<tr data-wp-class--hidden="!state.githubToken">
+						<th scope="row">GitHub Repository</th>
+						<td>
+							<select
+								data-wp-bind--value="state.selectedRepo"
+								data-wp-on--change="actions.updateSelectedRepo"
+							>
+								<option value="">Select repository</option>
+								<template data-wp-each--repo="state.githubRepos">
+									<option
+										data-wp-text="context.repo.full_name"
+										data-wp-bind--value="context.repo.http_clone_url"
+									></option>
+								</template>
+							</select>
+						</td>
+					</tr>
+
+					<tr data-wp-class--hidden="!state.githubToken">
+						<th scope="row">Branch</th>
+						<td>
+							<select
+								data-wp-watch="callbacks.bindSelectedBranch"
+								data-wp-on--change="actions.updateSelectedBranch"
+							>
+								<option value="">Select branch</option>
+								<template data-wp-each--branch="state.branches">
+									<option
+										data-wp-text="context.branch.niceName"
+										data-wp-bind--value="context.branch.fullName"
+									></option>
+								</template>
+							</select>
+						</td>
+					</tr>
+
+					<tr data-wp-class--hidden="!state.githubToken">
 						<th scope="row">Path to synchronize</th>
 						<td>
 							<input type="text" class="regular-text" data-wp-bind--value="state.subdirectory" data-wp-on--input="actions.updateSubdirectory" />

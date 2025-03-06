@@ -45,6 +45,20 @@ export function getPostContent(post) {
 	return false;
 }
 
+export function getPostTitle(post) {
+	const titleField = post.title;
+	if (post.blocks) {
+		return serialize(post.blocks);
+	}
+	if (typeof titleField === 'string') {
+		return titleField.trim();
+	}
+	if (typeof titleField?.raw === 'string') {
+		return titleField.raw.trim();
+	}
+	return false;
+}
+
 
 const STORE_NAME = 'static-files-editor/ui';
 export const uiStore = createReduxStore(STORE_NAME, {

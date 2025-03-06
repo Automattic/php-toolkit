@@ -46,6 +46,7 @@ import {
 	getPostContent,
 	WP_LOCAL_FILE_POST_TYPE,
 	isPreviewableAssetPath,
+	getPostTitle,
 } from './store';
 import { threeWayMerge, validateMergedBlockMarkup } from './merge';
 import { useIsOnline } from './use-is-online';
@@ -289,6 +290,7 @@ function ConnectedFilePickerTree() {
 			postType: WP_LOCAL_FILE_POST_TYPE,
 		});
 		dispatch(uiStore).setSelectedPath(nodePath);
+		dispatch(editorStore).setIsListViewOpened(false);
 		return nodePath;
 	};
 
@@ -1392,6 +1394,24 @@ async function syncDataSource() {
 }
 
 setInterval(syncIfItsTime, 10000);
+
+setInterval(async () => {
+	const currentPostId = select(editorStore).getCurrentPostId();
+	const postType = WP_LOCAL_FILE_POST_TYPE;
+	const post = select(coreStore).getEntityRecord('postType', WP_LOCAL_FILE_POST_TYPE, currentPostId);
+	const editedPost = select(coreStore).getEditedEntityRecord('postType', WP_LOCAL_FILE_POST_TYPE, currentPostId);
+
+	if (!getPostTitle(post) && !getPostTitle(editedPost) && getPostContent(editedPost)) {
+		const parser = new DOMParser();
+		const doc = parser.parseFromString(getPostContent(editedPost), 'text/html');
+		const textContent = doc.body.textContent || "";
+		const newTitle = textContent.replace(/\n/g, ' ').substring(0, 50).replace(/\s+$/, '');
+		await dispatch(coreStore).editEntityRecord('postType', postType, currentPostId, {
+			title: newTitle,
+		});
+	}
+}, 5000);
+
 
 function adjustToolbar() {
 	const toolbar = document.querySelector(
