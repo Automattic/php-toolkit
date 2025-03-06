@@ -51,7 +51,7 @@ jobs:
                   draft: false
                   prerelease: false
 
-            - name: Upload Release Asset
+            - name: Upload Data Liberation Asset
               uses: actions/upload-release-asset@v1
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -61,3 +61,22 @@ jobs:
                   asset_name: data-liberation.zip
                   asset_content_type: application/zip
 
+            - name: Upload URL Updater Asset
+              uses: actions/upload-release-asset@v1
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              with:
+                  upload_url: ${{ steps.create_release.outputs.upload_url }}
+                  asset_path: ./dist/plugins/url-updater.zip
+                  asset_name: url-updater.zip
+                  asset_content_type: application/zip
+
+            - name: Upload Static Files Editor Asset
+              uses: actions/upload-release-asset@v1
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              with:
+                  upload_url: ${{ steps.create_release.outputs.upload_url }}
+                  asset_path: ./dist/plugins/static-files-editor.zip
+                  asset_name: static-files-editor.zip
+                  asset_content_type: application/zip
