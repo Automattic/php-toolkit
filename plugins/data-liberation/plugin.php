@@ -12,6 +12,7 @@
  *   Still keep track of the number of total and successful downloads.
  */
 
+use WordPress\DataLiberation\DataLiberationException;
 use WordPress\DataLiberation\Importer\ImportSession;
 use WordPress\DataLiberation\Importer\RetryFrontloadingIterator;
 use WordPress\DataLiberation\Importer\StreamImporter;
@@ -461,13 +462,16 @@ function data_liberation_import_step( $session, $importer = null ) {
 	}
 }
 
+/**
+ * @throws DataLiberationException If the import arguments are invalid.
+ * @return StreamImporter The created importer instance.
+ */
 function data_liberation_create_importer( $import ) {
 	switch ( $import['data_source'] ) {
 		case 'wxr_file':
 			$wxr_path = get_attached_file( $import['attachment_id'] );
 			if ( false === $wxr_path ) {
-				// @TODO: Save the error, report it to the user.
-				return;
+				throw new DataLiberationException( 'Failed to get the WXR file path' );
 			}
 			$importer = StreamImporter::create_for_wxr_file(
 				$wxr_path,
