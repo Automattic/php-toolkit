@@ -45,6 +45,9 @@ require_once __DIR__ . '/Parser.php';
 require_once __DIR__ . '/playground-protocol/PlaygroundProtocolClient.php';
 require_once __DIR__ . '/ConsoleWriter.php';
 require_once __DIR__ . '/ProgressBar.php';
+
+define('IMPORT_ROOT_SLUG', '/imported_content/');
+
 $parser = new Phalcon\Cop\Parser();
 $args = $parser->parse($argv);
 
@@ -134,14 +137,16 @@ try {
 	do {
 		$result = data_liberation_import_step_customized( $import_session, $importer, $console_writer );
 		if($importer->get_stage() === StreamImporter::STAGE_FINISHED) {
-			$console_writer->write("Finished. Visit the site to see the results: " . get_site_url() . "\n");
+			$console_writer->write("\n");
+			$console_writer->write("\033[1;32mImport finished!\033[0m Visit your site at: \n");
+			$console_writer->write("\033[1;36m" . get_site_url() . IMPORT_ROOT_SLUG . "\033[0m\n");
 			break;
 		} else if(false === $result) {
 			$console_writer->write("Failed\n");
 			break;
 		} else {
 			// Twiddle our thumbs...
-			$console_writer->write("Stage: " . $import_session->get_stage() . "\n");
+			$console_writer->write("Resource quota exhausted. Paused at stage: " . $import_session->get_stage() . "\n");
 		}
 	} while(true);
 } finally {
@@ -154,7 +159,29 @@ try {
 
 wp_update_post(array(
 	'ID' => 2,
-	'post_title' => 'Imported content'
+	'post_title' => 'Imported content',
+	'post_name' => IMPORT_ROOT_SLUG,
+	'post_content' => '
+<!-- wp:paragraph -->
+<p>This page is the root of all your imported files. To see the imported tree structure, go to wp-admin or check the main menu above.</p>
+<!-- /wp:paragraph -->
+
+<!-- wp:paragraph -->
+<p>For quick access to the imported pages, see this flat list:</p>
+<!-- /wp:paragraph -->
+
+<!-- wp:query {"queryId":1,"query":{"perPage":10,"pages":0,"offset":0,"postType":"page","order":"desc","orderBy":"date","author":"","search":"","exclude":[],"sticky":"","inherit":false}} -->
+<div class="wp-block-query"><!-- wp:post-template -->
+<!-- wp:post-title {"isLink":true} /-->
+<!-- wp:post-excerpt /-->
+<!-- /wp:post-template -->
+
+<!-- wp:query-pagination -->
+<!-- wp:query-pagination-previous /-->
+<!-- wp:query-pagination-numbers /-->
+<!-- wp:query-pagination-next /-->
+<!-- /wp:query-pagination --></div>
+<!-- /wp:query -->',
 ));
 
 /**
@@ -162,22 +189,7 @@ wp_update_post(array(
  *        DataLiberation PHP component. Support all sorts of pause conditions
  *        such as time limits, retry counts, memory limits, etc.
  */
-function data_liberation_import_step_customized( ImportSession $session, ?StreamImporter $importer = null, ?ConsoleWriter $console_writer = null ) {
-    static $progress_bar = null;
-    static $current_stage = null;
-    
-    $metadata = $session->get_metadata();
-    if(!$importer) {
-        $importer = data_liberation_create_importer( $metadata );
-    }
-    if ( ! $importer ) {
-        return false;
-    }
-
-    if ($console_writer === null) {
-        $console_writer = new PlaygroundConsoleWriter();
-    }
-
+function data_liberation_import_step_customized( ImportSession $session, StreamImporter $importer, ConsoleWriter $console_writer ) {
     $soft_time_limit_seconds = 15;
     $hard_time_limit_seconds = 25;
     $start_time = microtime( true );
