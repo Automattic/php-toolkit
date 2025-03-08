@@ -46,7 +46,8 @@ class ImportSession {
 	 *     @type int    $attachment_id   Optional. ID of the uploaded file attachment
 	 *     @type string $file_name       Optional. Original name of the uploaded file
 	 * }
-	 * @return WP_Import_Model|WP_Error The import model instance or error if creation failed
+	 * @throws DataLiberationException If the arguments are invalid.
+	 * @return ImportSession The created ImportSession instance.
 	 */
 	public static function create( $args ) {
 		// Validate the required arguments for each data source.
@@ -54,32 +55,22 @@ class ImportSession {
 		switch ( $args['data_source'] ) {
 			case 'wxr_file':
 				if ( empty( $args['file_name'] ) ) {
-					_doing_it_wrong(
-						__METHOD__,
-						'File name is required for WXR file imports',
-						'1.0.0'
-					);
-					return false;
+					throw new DataLiberationException( 'File name is required for WXR file imports' );
 				}
 				break;
 			case 'wxr_url':
 				if ( empty( $args['source_url'] ) ) {
-					_doing_it_wrong(
-						__METHOD__,
-						'Source URL is required for remote imports',
-						'1.0.0'
-					);
-					return false;
+					throw new DataLiberationException( 'Source URL is required for remote imports' );
 				}
 				break;
 			case 'markdown_zip':
 				if ( empty( $args['file_name'] ) ) {
-					_doing_it_wrong(
-						__METHOD__,
-						'File name is required for Markdown ZIP imports',
-						'1.0.0'
-					);
-					return false;
+					throw new DataLiberationException( 'File name is required for Markdown ZIP imports' );
+				}
+				break;
+			case 'local_directory':
+				if ( empty( $args['file_name'] ) ) {
+					throw new DataLiberationException( 'Directory path is required for local directory imports' );
 				}
 				break;
 		}
@@ -104,12 +95,7 @@ class ImportSession {
 			true
 		);
 		if ( is_wp_error( $post_id ) ) {
-			_doing_it_wrong(
-				__METHOD__,
-				'Error creating an import session: ' . $post_id->get_error_message(),
-				'1.0.0'
-			);
-			return false;
+			throw new DataLiberationException( 'Error creating an import session: ' . $post_id->get_error_message() );
 		}
 
 		if ( ! empty( $args['attachment_id'] ) ) {

@@ -491,6 +491,9 @@ class StreamImporter {
 	public function get_frontloading_events() {
 		return $this->frontloading_events;
 	}
+	/**
+	 * @return array<string, int> The frontloading progress per URL.
+	 */
 	public function get_frontloading_progress() {
 		return $this->downloader ? $this->downloader->get_progress() : array();
 	}
