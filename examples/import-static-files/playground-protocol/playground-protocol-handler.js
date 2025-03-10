@@ -20,7 +20,7 @@ export const createPlaygroundProtocolHandler = (php) => async (message) => {
 				
 				if (!fs.existsSync(hostPath)) {
 					return JSON.stringify({
-						error: `Directory ${relativePath} does not exist`
+						error: `Directory ${hostPath} does not exist`
 					});
 				} else if(!fs.statSync(hostPath).isDirectory()) {
 					return JSON.stringify({
@@ -47,7 +47,10 @@ export const createPlaygroundProtocolHandler = (php) => async (message) => {
 				});
 			}
 		}
-				
+
+		if (data.command === 'exit') {
+			process.exit(data.exitCode);
+		}
 		
 		if (data.command === 'stdout') {
 			if (!process.stdout.isTTY) {

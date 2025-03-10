@@ -315,6 +315,18 @@ class ImportSession {
 		);
 	}
 
+	public function mark_frontloading_errors_as_ignored() {
+		global $wpdb;
+		$wpdb->update(
+			$wpdb->posts,
+			array('post_status' => self::FRONTLOAD_STATUS_IGNORED),
+			array(
+				'post_type' => 'frontloading_stub',
+				// 'post_status !=' => self::FRONTLOAD_STATUS_SUCCEEDED,
+			)
+		);
+	}
+
 	public function get_frontloading_stubs( $options = array() ) {
 		$query = new WP_Query(
 			array(

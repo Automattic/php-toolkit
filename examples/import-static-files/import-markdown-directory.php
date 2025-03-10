@@ -59,8 +59,12 @@ spl_autoload_register(function ($class) use ($console_writer) {
 function help_message_and_die($error = false) {
 	global $console_writer;
     $console_writer->write("\033[1;32mUsage:\033[0m php import-markdown-directory.php \033[1;33mmode\033[0m [options]\n");
-    $console_writer->write("  \033[1;33mmode:\033[0m path|git\n");
-    $console_writer->write("\n");
+    $console_writer->write("  options:\n");
+    $console_writer->write("    \033[1;33mmode:\033[0m path|git\n");
+	$console_writer->write("    \033[1;34m--source-site-url=<url>\033[0m (required)\n");
+	$console_writer->write("    \033[1;34m--additional-site-urls=<url>\033[0m – rewrite all the detected links based on this URL (multiple values allowed)\n");
+    $console_writer->write("    \033[1;34m--media-url=<url>\033[0m – media files from this URL will be downloaded during the import (multiple values allowed)\n");
+	$console_writer->write("\n");
     $console_writer->write("  \033[1;33mpath\033[0m mode usage:\n");
     $console_writer->write("    php import-markdown-directory.php path \033[1;34m<path to directory>\033[0m\n");
     $console_writer->write("\n");
@@ -68,13 +72,13 @@ function help_message_and_die($error = false) {
     $console_writer->write("    php import-markdown-directory.php mode \033[1;34m<repo_url>\033[0m\n");
 	$console_writer->write("    options:\n");
 	$console_writer->write("      \033[1;34m--branch=<branch name>\033[0m (required)\n");
-	$console_writer->write("      \033[1;34m--pathInRepo=<path in repo>\033[0m (optional)\n");
+	$console_writer->write("      \033[1;34m--path-in-repo=<path in repo>\033[0m (optional)\n");
 	if($error) {
 		$console_writer->write("\n");
 		$console_writer->write("\033[1;31mError:\033[0m ");
 		$console_writer->write($error);
 		$console_writer->write("\n");
-		exit(1);
+		PlaygroundProtocolClient::getInstance()->exit();
 	}
 	die();
 }
@@ -110,18 +114,22 @@ if($args['mode'] === 'path') {
         help_message_and_die('The "branch" argument is required when mode is "git".');
     }
 
+	$console_writer->write("Sparse checkout of the git repository\n");
 	$temp_dir = sys_get_temp_dir() . '/import-static-' . uniqid();
 	$cache_fs = LocalFilesystem::create($temp_dir);
 	$docs_repo = new GitRepository($cache_fs);
 	$docs_repo->add_remote('origin', $args['repo']);
 	$remote = $docs_repo->get_remote_client('origin');
-	$remote->fetch('trunk', [
-		'path' => $args['pathInRepo'],
+	$path_in_repo = $args['path-in-repo'] ?? '';
+	$branch = $args['branch'] ?? 'trunk';
+	$remote->fetch($branch, [
+		'path' => $path_in_repo,
 		'shallow' => true,
 	]);
-	$docs_repo->set_branch_tip('refs/heads/' . $args['branch'], $docs_repo->get_branch_tip('refs/remotes/origin/' . $args['branch']));
+	$docs_repo->set_branch_tip('refs/heads/' . $branch, $docs_repo->get_branch_tip('refs/remotes/origin/' . $branch));
+	$docs_repo->checkout('refs/heads/' . $branch);
 	$git_fs = GitFilesystem::create($docs_repo);
-	$chrooted_fs = new ChrootLayer($git_fs, $args['pathInRepo']);
+	$chrooted_fs = new ChrootLayer($git_fs, $path_in_repo);
 } else {
     help_message_and_die('The "mode" argument is required and must be either "path" or "git".');
 	exit(1);
@@ -188,17 +196,20 @@ add_action(
  */
 add_filter(
 	'data_liberation.stream_importer.map_entity',
-	function ( $entity ) {
+	function ( $entity ) use ($console_writer) {
 		if($entity->get_type() !== 'post') {
 			return $entity;
 		}
 
 		$data = $entity->get_data();
-		if(!isset($data['local_file_path'])) {
+		if(isset($data['parsed_metadata']['slug'])) {
+			$data['post_name'] = basename($data['parsed_metadata']['slug'][0]);
+		} else if(isset($data['local_file_path'])) {
+			$data['post_name'] = basename(map_file_path_to_wordpress_url($data['local_file_path']));
+		} else {
 			return $entity;
 		}
 
-		$data['post_name'] = basename(map_file_path_to_wordpress_url($data['local_file_path']));
 		$entity->set_data($data);
 		return $entity;
 	},
@@ -208,6 +219,11 @@ add_filter(
 
 $data_url = $args['data_url'];
 $console_writer->write("Importing static files from $data_url\n");
+
+// Validate required arguments
+if (!isset($args['source-site-url'])) {
+    help_message_and_die('The --source-site-url argument is required.');
+}
 
 try {
 	$root_id = wp_insert_post(array(
@@ -237,13 +253,25 @@ try {
 	<!-- /wp:query-pagination --></div>
 	<!-- /wp:query -->',
 	));
-	
+
+	// Parse URL mapping arguments
+	$source_site_url = $args['source-site-url'];
+	$additional_url_mappings = [];
+	foreach ($parser->getArray('additional-site-urls') as $url) {
+		$additional_url_mappings[] = [
+			'from' => $url,
+			'to' => NEW_SITE_CONTENT_ROOT,
+		];
+	}
+
+	$console_writer->write("Starting the import\n");
 	$importer = StreamImporter::create(
-		function () use ( $chrooted_fs, $root_id ) {
+		function () use ( $chrooted_fs, $root_id, $source_site_url ) {
 			return new FilesystemEntityReader(
 				$chrooted_fs,
 				[
 					'root_parent_id' => $root_id,
+					'filter_pattern' => '#\.(?:md|html|xhtml)$#',
 					/**
 					 * Use a number so large, there's no chance for wp_table INSERTs
 					 * to interfere with the post IDs generated by the FilesystemEntityReader.
@@ -253,22 +281,16 @@ try {
 					 * @TODO: Make sure this doesn't automatically bump the AUTOINCREMENT counter in MySQL.
 					 * @TODO: Bump the AUTOINCREMENT counter manually after a finished import.
 					 */
-					'first_post_id' => $root_id + 10000000
+					'first_post_id' => $root_id + 10000000,
+					'base_url' => $source_site_url,
 				]
 			);
 		}, [
-			'source_site_url' => 'https://developer.wordpress.org/block-editor/how-to-guides/data-basics/',
+			'source_site_url' => $source_site_url,
 			'new_site_content_root_url' => NEW_SITE_CONTENT_ROOT,
-			'source_media_root_urls' => [
-				'https://developer.wordpress.org/files/',
-				'https://raw.githubusercontent.com/WordPress/gutenberg/HEAD/docs/',
-			],
-			'additional_url_mappings' => [
-				[
-					'from' => 'https://developer.wordpress.org/docs/how-to-guides/data-basics/',
-					'to' => NEW_SITE_CONTENT_ROOT,
-				],
-			],
+			'source_media_root_urls' => $parser->getArray('media-url') ?: [$source_site_url],
+			'additional_url_mappings' => $additional_url_mappings,
+			'index_batch_size' => 1
 		]
 	);
 
@@ -286,6 +308,7 @@ try {
 	$importer->set_frontloading_retries_iterator( $retries_iterator );
 
 	// @TODO: Prettier progress reporting
+	$ignored_message_printed = false;
 	do {
 		$result = data_liberation_import_step_customized( $import_session, $importer, $console_writer );
 		if($importer->get_stage() === StreamImporter::STAGE_FINISHED) {
@@ -294,8 +317,16 @@ try {
 			$console_writer->write("\033[1;36m" . NEW_SITE_CONTENT_ROOT . "\033[0m\n");
 			break;
 		} else if(false === $result) {
-			$console_writer->write("Failed\n");
-			break;
+			if($importer->get_stage() === StreamImporter::STAGE_FRONTLOAD_ASSETS) {
+				if(!$ignored_message_printed) {
+					$console_writer->write("\nSome assets could not be downloaded – they will be ignored so we can continue with the import.\n");
+					$ignored_message_printed = true;
+				}
+				// $import_session->mark_frontloading_errors_as_ignored();
+			} else {
+				$console_writer->write("Import failed, aborting\n");
+				break;
+			}
 		} else {
 			// Twiddle our thumbs, importing in progress...
 		}
@@ -343,10 +374,11 @@ function data_liberation_import_step_customized( ImportSession $session, StreamI
                 if ( StreamImporter::STAGE_FRONTLOAD_ASSETS === $importer->get_stage() ) {
                     $resolved_all_failures = $session->count_unfinished_frontloading_stubs() === 0;
                     if ( ! $resolved_all_failures ) {
-                        if($progress_bar) {
-							$progress_bar->finish();
-						}
-                        return false;
+						// Uncomment once this script's intent becomes exiting on unresolved frontloading failures.
+                        // if($progress_bar) {
+						// 	$progress_bar->finish();
+						// }
+                        // return false;
                     }
                 }
             }
@@ -369,13 +401,12 @@ function data_liberation_import_step_customized( ImportSession $session, StreamI
                 $entities_counts = $importer->get_indexed_entities_counts();
                 $session->create_frontloading_stubs( $importer->get_indexed_assets_urls() );
                 $session->bump_total_number_of_entities($entities_counts);
-                
 				if(!$progress_bar) {
 					$progress_bar = new ProgressBar($console_writer, null);
 					$progress_bar->setMessage("Indexing entities");
 					$progress_bar->start();
 				}
-                $progress_bar->setCurrent(array_sum($entities_counts));
+                $progress_bar->setCurrent(array_sum($session->get_total_number_of_entities()));
                 break;
                 
             case StreamImporter::STAGE_FRONTLOAD_ASSETS:
@@ -387,7 +418,7 @@ function data_liberation_import_step_customized( ImportSession $session, StreamI
 
 				if(!$progress_bar) {
 					$progress_bar = new ProgressBar($console_writer, null);
-					$progress_bar->setMessage("Loading assets");
+					$progress_bar->setMessage("Fetching media files");
 					$progress_bar->start();
 				}
                 $progress_bar->setCurrent($session->count_unfinished_frontloading_stubs());

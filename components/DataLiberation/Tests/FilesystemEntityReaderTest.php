@@ -14,6 +14,7 @@ class FilesystemEntityReaderTest extends TestCase {
 				'create_index_pages' => true,
 				'filter_pattern' => '#\.html$#',
 				'index_file_pattern' => '#root.html#',
+				'base_url' => 'https://example.com',
 			)
 		);
 		$entities = array();
@@ -77,10 +78,11 @@ class FilesystemEntityReaderTest extends TestCase {
 
 	public function test_uses_root_parent_id_as_top_level_parent() {
 		$reader   = new FilesystemEntityReader(
-			LocalFilesystem::create( __DIR__ . '/fixtures/filesystem-entity-reader' ),
+			LocalFilesystem::create( __DIR__ . '/fixtures/filesystem-entity-reader/simple-structure' ),
 			array(
 				'root_parent_id' => 2,
 				'first_post_id' => 3,
+				'base_url' => 'https://example.com',
 			)
 		);
 		$entities = array();
@@ -98,18 +100,37 @@ class FilesystemEntityReaderTest extends TestCase {
 
 	public function test_preserves_file_extension_in_the_post_name() {
 		$reader   = new FilesystemEntityReader(
-			LocalFilesystem::create( __DIR__ . '/fixtures/filesystem-entity-reader' ),
+			LocalFilesystem::create( __DIR__ . '/fixtures/filesystem-entity-reader/simple-structure' ),
 			array(
 				'first_post_id' => 2,
 				'create_index_pages' => true,
 				'filter_pattern' => '#\.html$#',
 				'index_file_pattern' => '#root.html#',
+				'base_url' => 'https://example.com',
 			)
 		);
 		$entities = $this->get_post_entities( $reader );
-		$this->assertEquals( 'root.html', $entities[0]['post_name'] );
-		$this->assertEquals( 'nested', $entities[1]['post_name'] );
-		$this->assertEquals( 'page1.html', $entities[2]['post_name'] );
+		$this->assertEquals( 'https://example.com/root.html', $entities[0]['link'] );
+		$this->assertEquals( 'https://example.com/nested', $entities[1]['link'] );
+		$this->assertEquals( 'https://example.com/nested/page1.html', $entities[2]['link'] );
+	}
+
+	public function test_leaves_out_directories_with_no_content() {
+		$reader = new FilesystemEntityReader(
+			LocalFilesystem::create( __DIR__ . '/fixtures/filesystem-entity-reader/with-nested-images-directory' ),
+			array(
+				'first_post_id' => 2,
+				'create_index_pages' => true,
+				'filter_pattern' => '#\.html$#',
+				'index_file_pattern' => '#root.html#',
+				'base_url' => 'https://example.com',
+			)
+		);
+		$entities = $this->get_post_entities( $reader );
+		$this->assertCount( 3, $entities );
+		$this->assertEquals( 'https://example.com/root.html', $entities[0]['link'] );
+		$this->assertEquals( 'https://example.com/nested', $entities[1]['link'] );
+		$this->assertEquals( 'https://example.com/nested/page1.html', $entities[2]['link'] );
 	}
 
 	private function get_post_entities($reader) {

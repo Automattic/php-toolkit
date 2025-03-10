@@ -73,8 +73,11 @@ class ProgressBar {
         if ($position >= $this->width) {
             $position = $this->width * 2 - $position;
         }
+
+		$spaces_before = min(max(0, $position), $this->width - 3);
+		$spaces_after = max(0, $this->width - $position - 3);
         
-        $bar = str_repeat(' ', $position) . '<=>' . str_repeat(' ', $this->width - $position - 3);
+        $bar = str_repeat(' ', $spaces_before) . '<=>' . str_repeat(' ', $spaces_after);
         $status = sprintf(
             "[%s] %d items - %s",
             $bar,

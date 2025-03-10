@@ -181,6 +181,11 @@ try {
 		},
 	});
 } catch (error) {
+	// @TODO: remove silencing asyncify errors
+	if ((error + '').includes('Unreachable code should not be executed')) {
+		process.exit(0);
+	}
+
 	console.log('Error running the import script');
 	if ('response' in error) {
 		console.log(error.response.text);

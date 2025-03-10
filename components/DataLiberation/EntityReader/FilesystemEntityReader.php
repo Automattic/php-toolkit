@@ -6,6 +6,7 @@ use WordPress\DataLiberation\DataFormatConsumer\BlocksWithMetadata;
 use WordPress\DataLiberation\DataFormatConsumer\MarkupProcessorConsumer;
 use WordPress\DataLiberation\ImportEntity;
 use WordPress\DataLiberation\Importer\ImportUtils;
+use WordPress\DataLiberation\URL\WPURL;
 use WordPress\Filesystem\Filesystem;
 use WordPress\Filesystem\Visitor\FilesystemVisitor;
 use WordPress\Markdown\MarkdownConsumer;
@@ -29,6 +30,7 @@ use function WordPress\Filesystem\wp_join_paths;
  *     'first_post_id' => 100,
  *     'filter_pattern' => '/\.md$/',
  *     'index_file_pattern' => 'index\.md',
+ *     'base_url' => 'https://example.com',
  * ];
  * $reader = FilesystemEntityReader::create($filesystem, $options);
  * while ($reader->next_filesystem_node()) {
@@ -153,6 +155,13 @@ class FilesystemEntityReader implements EntityReader {
 	private $finished = false;
 
 	/**
+	 * The root URL of the imported site.
+	 *
+	 * @var string
+	 */
+	private $base_url;
+
+	/**
 	 * Initializes the reader with filesystem and options.
 	 *
 	 * @param Filesystem $filesystem The filesystem to traverse.
@@ -182,6 +191,9 @@ class FilesystemEntityReader implements EntityReader {
 		if ( 1 === $options['first_post_id'] ) {
 			throw new \InvalidArgumentException( 'First node ID must be greater than 1' );
 		}
+		if ( ! isset( $options['base_url'] ) ) {
+			throw new \InvalidArgumentException( 'The "base_url" option is required. It should contain the root URL of the imported site.' );
+		}
 
 		$this->fs                 = $filesystem;
 		$this->file_visitor       = new FilesystemVisitor( $filesystem );
@@ -190,6 +202,7 @@ class FilesystemEntityReader implements EntityReader {
 		$this->next_post_id       = $options['first_post_id'];
 		$this->filter_pattern     = $options['filter_pattern'] ?? '#\.(?:md|html|xhtml|png|jpg|jpeg|gif|svg|webp|mp4)$#';
 		$this->index_file_pattern = $options['index_file_pattern'] ?? '#^index\.[a-z]+$#';
+		$this->base_url           = $options['base_url'];
 		if ( isset( $options['root_parent_id'] ) ) {
 			$this->parent_ids[-1] = $options['root_parent_id'];
 		}
@@ -243,6 +256,7 @@ class FilesystemEntityReader implements EntityReader {
 				'post_type'         => $this->post_type,
 				'guid'              => $post_tree_node['local_file_path'],
 				'local_file_path'   => $post_tree_node['local_file_path'],
+				'link'              => WPURL::append_path( $this->base_url, $post_tree_node['local_file_path'] ),
 			);
 			if ( $post_tree_node['type'] === 'file' ) {
 				$extension = pathinfo( $post_tree_node['local_file_path'], PATHINFO_EXTENSION );
@@ -277,7 +291,7 @@ class FilesystemEntityReader implements EntityReader {
 						$result                     = new BlocksWithMetadata( '', array() );
 						break;
 				}
-			} elseif ( $post_tree_node['type'] === 'file_placeholder' ) {
+			} elseif ( $post_tree_node['type'] === 'index_file_placeholder' ) {
 				$result                 = new BlocksWithMetadata( '', array() );
 				$metadata['post_title'] = ImportUtils::slug_to_title( basename( $post_tree_node['local_file_path'] ) );
 			}
@@ -383,11 +397,12 @@ class FilesystemEntityReader implements EntityReader {
 					// Let's create a fake page just to have something in the page tree.
 					$this->parent_ids[ $depth ] = $this->emit_filesystem_node(
 						array(
-							'type' => 'file_placeholder',
+							'type' => 'index_file_placeholder',
 							'local_file_path' => $dir,
 							'parent_id' => $parent_id,
 						)
 					);
+					
 					// We're no longer looking for a directory index.
 					$this->pending_directory_index = null;
 				} else {

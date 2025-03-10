@@ -30,6 +30,16 @@ class PlaygroundProtocolClient {
         
         return self::$instance;
     }
+
+	/**
+	 * Exits the Playground CLI gracefully.
+	 */
+	public function exit(int $exitCode = 0): void {
+		$this->sendMessage([
+			'command' => 'exit',
+			'exitCode' => $exitCode
+		]);
+	}
 	
     /**
      * Sends a message to the JS handler and processes the response

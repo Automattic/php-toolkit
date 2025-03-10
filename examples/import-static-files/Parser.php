@@ -97,6 +97,18 @@ class Parser
         return isset($this->parsedCommands[$key]);
     }
 
+	public function getArray(int|string $key): array {
+		if(!$this->has($key)) {
+			return [];
+		}
+
+		if(!is_array($this->parsedCommands[$key])) {
+			return [$this->parsedCommands[$key]];
+		}
+
+		return $this->parsedCommands[$key];
+	}
+
     /**
      * Parse console input.
      *
@@ -134,11 +146,10 @@ class Parser
      */
     protected function getParamWithEqual(string $arg, int $eqPos): array
     {
-        $out       = [];
-        $key       = $this->stripSlashes(substr($arg, 0, $eqPos));
-        $out[$key] = substr($arg, $eqPos + 1);
-
-        return $out;
+		return [
+			$this->stripSlashes(substr($arg, 0, $eqPos)),
+			substr($arg, $eqPos + 1),
+		];
     }
 
     /**
@@ -160,11 +171,11 @@ class Parser
 
                 $key = $this->stripSlashes($argv[$i]);
                 if ($i + 1 < $j && $argv[$i + 1][0] !== '-') {// --foo value
-                    $this->parsedCommands[$key] = $argv[$i + 1];
+                    $this->setValue($key, $argv[$i + 1]);
                     $i++;
                     continue;
                 }
-                $this->parsedCommands[$key] = $this->parsedCommands[$key] ?? true; // --foo
+                $this->setValue($key, true); // --foo
                 continue;
             }
 
@@ -206,16 +217,25 @@ class Parser
         $eqPos = strpos($command, '=');
 
         if ($eqPos !== false) {
-            $this->parsedCommands = array_merge(
-                $this->parsedCommands,
-                $this->getParamWithEqual($command, $eqPos)
-            );
+			list($key, $value) = $this->getParamWithEqual($command, $eqPos);
+			$this->setValue($key, $value);
 
             return true;
         }
 
         return false;
     }
+
+	protected function setValue($key, $value) {
+		if(isset($this->parsedCommands[$key])) {
+			if(!is_array($this->parsedCommands[$key])) {
+				$this->parsedCommands[$key] = [$this->parsedCommands[$key]];
+			}
+			$this->parsedCommands[$key][] = $value;
+		} else {
+			$this->parsedCommands[$key] = $value;
+		}
+	}
 
     /**
      * Delete dashes from param
