@@ -21,7 +21,6 @@ if(file_exists(__DIR__ . '/../../vendor/autoload.php')) {
 	require_once __DIR__ . '/wp-content/vendor/autoload.php';
 }
 
-
 require_once __DIR__ . '/Parser.php';
 require_once __DIR__ . '/playground-protocol/PlaygroundProtocolClient.php';
 require_once __DIR__ . '/ConsoleWriter.php';
@@ -133,9 +132,9 @@ if($args['mode'] === 'path') {
 
 function map_file_path_to_wordpress_url( $path ) {
 	if (str_ends_with($path, '.md')) {
-		return substr($path, 0, -3);
+		$path = substr($path, 0, -3);
 	}
-	return $path;
+	return strtolower($path);
 }
 
 add_action(
@@ -163,13 +162,6 @@ add_action(
 		$path = $site_url_path_prefix . $path;
 
 		if($path !== $path_before_rewriting) {
-			$console_writer = new \PlaygroundConsoleWriter();
-			$console_writer->write(json_encode([
-				'path' => $path,
-				'path_before_rewriting' => $path_before_rewriting,
-				'path_after' => WPURL::parse($path, $processor->get_parsed_url())->pathname,
-				'site_url_path_prefix' => $site_url_path_prefix
-			], JSON_PRETTY_PRINT));
 			$processor->set_url(
 				$path,
 				WPURL::parse($path, $processor->get_parsed_url())
@@ -186,15 +178,10 @@ add_filter(
 	function ( $entity, $context ) use ( $console_writer ) {
 		if($entity->get_type() === 'post') {
 			$data = $entity->get_data();
-			$console_writer->write(json_encode([
-				'post_id' => $data['post_id'],
-				'post_parent' => $data['post_parent'],
-				'local_file_path' => $data['local_file_path'],
-			], JSON_PRETTY_PRINT));
 			if(isset($data['local_file_path'])) {
-				$data['post_name'] = map_file_path_to_wordpress_url($data['local_file_path']);
+				$data['post_name'] = basename(map_file_path_to_wordpress_url($data['local_file_path']));
+				$entity->set_data($data);
 			}
-			$entity->set_data($data);
 		}
 		return $entity;
 	},
@@ -257,10 +244,14 @@ try {
 			'new_site_url' => TARGET_SITE_URL,
 		]
 	);
-	// $importer->add_site_url_mapping(
-	// 	'https://developer.wordpress.org/files/',
-	// 	TARGET_SITE_URL
-	// );
+	$importer->add_site_url_mapping(
+		'https://developer.wordpress.org/block-editor/getting-started/devenv/',
+		TARGET_SITE_URL
+	);
+	$importer->add_site_url_mapping(
+		'https://developer.wordpress.org/files/',
+		TARGET_SITE_URL
+	);
 
 	$import_session = ImportSession::create(
 		array(

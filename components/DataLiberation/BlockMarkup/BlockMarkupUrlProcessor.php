@@ -227,7 +227,7 @@ class BlockMarkupUrlProcessor extends BlockMarkupProcessor {
 	 *        relative URLs in text nodes. On the other hand, the detection is performed
 	 *        by this WPURL_In_Text_Processor class so maybe the two do go hand in hand?
 	 */
-	public function replace_base_url( URL $to_url ) {
+	public function replace_base_url( URL $to_url, ?URL $base_url=null ) {
 		$updated_url = clone $this->get_parsed_url();
 
 		$updated_url->hostname = $to_url->hostname;
@@ -238,19 +238,22 @@ class BlockMarkupUrlProcessor extends BlockMarkupProcessor {
 		$from_url      = $this->get_parsed_url();
 		$from_pathname = $from_url->pathname;
 		$to_pathname   = $to_url->pathname;
-		if ( $this->base_url_object->pathname !== $to_pathname ) {
-			$base_pathname_with_trailing_slash = rtrim( $this->base_url_object->pathname, '/' ) . '/';
+
+		$base_url = $base_url ?? $this->base_url_object;
+		if ( $base_url->pathname !== $to_pathname ) {
+			$base_pathname_with_trailing_slash = rtrim( $base_url->pathname, '/' ) . '/';
 			$decoded_matched_pathname          = urldecode_n(
 				$from_pathname,
 				strlen( $base_pathname_with_trailing_slash )
 			);
 			$to_pathname_with_trailing_slash   = rtrim( $to_pathname, '/' ) . '/';
-			$updated_url->pathname             =
-				$to_pathname_with_trailing_slash .
-					substr(
-						$decoded_matched_pathname,
-						strlen( $base_pathname_with_trailing_slash )
-					);
+			$remaining_pathname                = 
+				substr(
+					$decoded_matched_pathname,
+					strlen( $base_pathname_with_trailing_slash )
+				);
+
+			$updated_url->pathname = $to_pathname_with_trailing_slash . $remaining_pathname;
 		}
 
 		/*

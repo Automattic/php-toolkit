@@ -275,7 +275,7 @@ class StreamImporter {
 		$options['uploads_path'] = rtrim( $options['uploads_path'], '/' );
 
 		if ( ! isset( $options['uploads_url'] ) ) {
-			$options['uploads_url'] = $options['new_site_url'] . '/wp-content/uploads';
+			$options['uploads_url'] = rtrim( $options['new_site_url'], '/' ) . '/wp-content/uploads';
 		}
 		// Remove the trailing slash to make concatenation easier later.
 		$options['uploads_url'] = rtrim( $options['uploads_url'], '/' );
@@ -306,7 +306,7 @@ class StreamImporter {
 	 *
 	 * @var WP_Entity_Importer
 	 */
-	protected $importer;
+	protected $entity_sink;
 
 	public function next_step() {
 		switch ( $this->stage ) {
@@ -668,14 +668,14 @@ class StreamImporter {
 
 		if ( null === $this->entity_iterator ) {
 			$this->entity_iterator = $this->create_entity_iterator();
-			$this->importer        = new EntityImporter();
+			$this->entity_sink     = $this->options['entity_sink'] ?? new EntityImporter();
 		}
 
 		if ( ! $this->entity_iterator->valid() ) {
 			// We're done.
 			$this->stage           = self::STAGE_FINISHED;
 			$this->entity_iterator = null;
-			$this->importer        = null;
+			$this->entity_sink     = null;
 			return false;
 		}
 
@@ -748,21 +748,20 @@ class StreamImporter {
 							$raw_url_before = $p->get_raw_url();
 							$parsed_url_before = clone $p->get_parsed_url();
 
-							$new_base_url = $this->get_url_mapping_target( $p->get_parsed_url() );
-							$should_rewrite_base_url = false !== $new_base_url;
-
+							$mapping_pair = $this->get_url_mapping_pair( $p->get_parsed_url() );
+							$should_rewrite_base_url = false !== $mapping_pair;
 							if ( $should_rewrite_base_url ) {
-								$p->replace_base_url( $new_base_url );
+								$p->replace_base_url( $mapping_pair[1], $mapping_pair[0] );
 							}
 							do_action( 'data_liberation.stream_importer.rewrite_url', $p, [
 								'base_url_rewritten' => $should_rewrite_base_url,
-								'new_base_url' => $new_base_url,
+								'new_base_url' => $mapping_pair[1],
+								'old_base_url' => $mapping_pair[0],
 								'raw_url_before' => $raw_url_before,
 								'parsed_url_before' => $parsed_url_before,
 								'raw_url_after' => $p->get_raw_url(),
 								'parsed_url_after' => $p->get_parsed_url(),
 								'entity' => $entity,
-								// 'importer' => $this,
 							]);
 						}
 						$data[ $key ] = $p->get_updated_html();
@@ -776,7 +775,7 @@ class StreamImporter {
 			'importer' => $this,
 		]);
 
-		$post_id = $this->importer->import_entity( $entity );
+		$post_id = $this->entity_sink->import_entity( $entity );
 		if ( false !== $post_id ) {
 			$this->count_imported_entity( $entity->get_type() );
 		} else {
@@ -784,7 +783,7 @@ class StreamImporter {
 		}
 		foreach ( $attachments as $filepath ) {
 			// @TODO: Monitor failures.
-			$attachment_id = $this->importer->import_attachment( $filepath, $post_id );
+			$attachment_id = $this->entity_sink->import_attachment( $filepath, $post_id );
 			if ( false !== $attachment_id ) {
 				// @TODO: How to count attachments?
 				$this->count_imported_entity( 'post' );
@@ -914,14 +913,14 @@ class StreamImporter {
 	}
 
 	protected function is_child_of_a_mapped_url( $url_detected_in_content ) {
-		return $this->get_url_mapping_target( $url_detected_in_content ) !== false;
+		return $this->get_url_mapping_pair( $url_detected_in_content ) !== false;
 	}
 
-	protected function get_url_mapping_target( $url_detected_in_content ) {
+	protected function get_url_mapping_pair( $url_detected_in_content ) {
 		foreach ( $this->site_url_mapping as $pair ) {
 			$parsed_base_url = $pair[0];
 			if ( is_child_url_of( $url_detected_in_content, $parsed_base_url ) ) {
-				return $pair[1];
+				return $pair;
 			}
 		}
 		return false;
