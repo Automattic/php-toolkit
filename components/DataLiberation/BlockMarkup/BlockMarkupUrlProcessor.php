@@ -277,17 +277,7 @@ class BlockMarkupUrlProcessor extends BlockMarkupProcessor {
 			return false;
 		}
 
-		$is_relative = (
-			// The URL-rewriting specific logic. We make an assumption that only
-			// absolute URLs are detected in text nodes.
-			// @TODO: Verify this assumption, evaluate whether this is the right
-			// place to place this logic. Perhaps this *method* could be
-			// decoupled into two separate *functions*?
-			$this->get_token_type() !== '#text' &&
-			! str_starts_with( $this->get_raw_url(), 'http://' ) &&
-			! str_starts_with( $this->get_raw_url(), 'https://' )
-		);
-		if ( ! $is_relative ) {
+		if ( ! $this->is_url_relative() ) {
 			$this->set_url( $new_raw_url, $updated_url );
 			return true;
 		}
@@ -302,6 +292,22 @@ class BlockMarkupUrlProcessor extends BlockMarkupProcessor {
 
 		$this->set_url( $new_relative_url, $updated_url );
 		return true;
+	}
+
+	/**
+	 * Returns true if the currently matched URL is relative.
+	 *
+	 * @return bool Whether the currently matched URL is relative.
+	 */
+	public function is_url_relative() {
+		// Assumption:
+		// - only absolute URLs are detected in text nodes.
+		return (
+			$this->get_token_type() !== '#text' &&
+			! str_starts_with( $this->get_raw_url(), 'http://' ) &&
+			! str_starts_with( $this->get_raw_url(), 'https://' ) &&
+			! str_starts_with( $this->get_raw_url(), '//' )
+		);
 	}
 
 	public function get_inspected_attribute_name() {

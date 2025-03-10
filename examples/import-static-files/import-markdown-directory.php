@@ -138,19 +138,19 @@ function map_file_path_to_wordpress_url( $path ) {
 }
 
 add_action(
-	// Link in the post content
+	// Rewrite URLs in the post content
 	'data_liberation.stream_importer.rewrite_url',
 	function ( $processor, $context ) use ( $console_writer, $chrooted_fs ) {
-		if(!$context['base_url_rewritten']) {
+		if(!$context['base_url_mapping']) {
 			return;
 		}
 
 		$path = $processor->get_parsed_url()->pathname;
 		$path_before_rewriting = $path;
 		$site_url_path_prefix = '';
-		if($context['new_base_url']) {
-			if(str_starts_with($path, $context['new_base_url']->pathname)) {
-				$site_url_path_prefix = rtrim($context['new_base_url']->pathname, '/');
+		if($context['base_url_mapping']) {
+			if(str_starts_with($path, $context['base_url_mapping']['to']->pathname)) {
+				$site_url_path_prefix = rtrim($context['base_url_mapping']['to']->pathname, '/');
 				$path = substr($path, strlen($site_url_path_prefix));
 			}
 		}

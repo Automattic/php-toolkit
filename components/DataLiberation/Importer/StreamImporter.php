@@ -2,6 +2,7 @@
 
 namespace WordPress\DataLiberation\Importer;
 
+use Rowbot\URL\URL;
 use WordPress\ByteStream\ReadStream\FileReadStream;
 use WordPress\DataLiberation\BlockMarkup\BlockMarkupUrlProcessor;
 use WordPress\DataLiberation\EntityReader\EntityReaderIterator;
@@ -201,7 +202,7 @@ class StreamImporter {
 		}
 		if ( ! empty( $cursor['site_url_mapping'] ) ) {
 			foreach ( $cursor['site_url_mapping'] as $pair ) {
-				$this->add_site_url_mapping( $pair[0], $pair[1] );
+				$this->add_site_url_mapping( $pair['from'], $pair['to'] );
 			}
 		}
 		if ( ! empty( $cursor['site_url_mapping_candidates'] ) ) {
@@ -216,9 +217,13 @@ class StreamImporter {
 		// Every subsequent call to set_source_site_url() will
 		// override that mapping.
 		$this->site_url_mapping[-1] = array(
-			WPURL::parse( $source_site_url ),
-			WPURL::parse( $this->options['new_site_url'] ),
+			'from' => WPURL::parse( $source_site_url ),
+			'to' => WPURL::parse( $this->options['new_site_url'] ),
 		);
+	}
+
+	protected function get_source_site_url() {
+		return $this->site_url_mapping[-1]['from'];
 	}
 
 	public function get_site_url_mapping_candidates() {
@@ -236,15 +241,18 @@ class StreamImporter {
 	}
 
 	public function add_site_url_mapping( $from, $to ) {
-		$this->site_url_mapping[] = array( WPURL::parse( $from ), WPURL::parse( $to ) );
+		$this->site_url_mapping[] = array(
+			'from' => WPURL::parse( $from ),
+			'to' => WPURL::parse( $to ),
+		);
 	}
 
 	public function get_reentrancy_cursor() {
 		$serialized_site_url_mapping = array();
 		foreach ( $this->site_url_mapping as $pair ) {
 			$serialized_site_url_mapping[] = array(
-				(string) $pair[0],
-				(string) $pair[1],
+				'from' => (string) $pair['from'],
+				'to' => (string) $pair['to'],
 			);
 		}
 		return json_encode(
@@ -699,7 +707,13 @@ class StreamImporter {
 					unset( $data['attachment_url'] );
 					$data['local_file_path'] = $this->options['uploads_path'] . '/' . $asset_filename;
 				} else {
-					// @TODO: Consider rewriting the guid, too.
+					/**
+					 * @TODO: Think through guid rewriting. It may matter for WXR posts,
+					 *        where the guid often describes the page URL, but it may
+					 *        get in the way for Markdown imports, where the guid is
+					 *        either inferred from the static file path or fixed and
+					 *        sourced from metadata.
+					 */
 					foreach ( array( 'post_content', 'post_excerpt' ) as $key ) {
 						if ( ! isset( $data[ $key ] ) ) {
 							continue;
@@ -746,21 +760,14 @@ class StreamImporter {
 							}
 
 							$raw_url_before = $p->get_raw_url();
-							$parsed_url_before = clone $p->get_parsed_url();
-
 							$mapping_pair = $this->get_url_mapping_pair( $p->get_parsed_url() );
 							$should_rewrite_base_url = false !== $mapping_pair;
 							if ( $should_rewrite_base_url ) {
-								$p->replace_base_url( $mapping_pair[1], $mapping_pair[0] );
+								$p->replace_base_url( $mapping_pair['to'], $mapping_pair['from'] );
 							}
 							do_action( 'data_liberation.stream_importer.rewrite_url', $p, [
-								'base_url_rewritten' => $should_rewrite_base_url,
-								'new_base_url' => $mapping_pair[1],
-								'old_base_url' => $mapping_pair[0],
+								'base_url_mapping' => $mapping_pair,
 								'raw_url_before' => $raw_url_before,
-								'parsed_url_before' => $parsed_url_before,
-								'raw_url_after' => $p->get_raw_url(),
-								'parsed_url_after' => $p->get_parsed_url(),
 								'entity' => $entity,
 							]);
 						}
@@ -918,8 +925,7 @@ class StreamImporter {
 
 	protected function get_url_mapping_pair( $url_detected_in_content ) {
 		foreach ( $this->site_url_mapping as $pair ) {
-			$parsed_base_url = $pair[0];
-			if ( is_child_url_of( $url_detected_in_content, $parsed_base_url ) ) {
+			if ( is_child_url_of( $url_detected_in_content, $pair['from'] ) ) {
 				return $pair;
 			}
 		}
