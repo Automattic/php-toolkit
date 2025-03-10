@@ -8,7 +8,7 @@ class FilesystemEntityReaderTest extends TestCase {
 
 	public function test_with_create_index_pages_true() {
 		$reader   = new FilesystemEntityReader(
-			LocalFilesystem::create( __DIR__ . '/fixtures/filesystem-entity-reader' ),
+			LocalFilesystem::create( __DIR__ . '/fixtures/filesystem-entity-reader/simple-structure' ),
 			array(
 				'first_post_id' => 2,
 				'create_index_pages' => true,
