@@ -5,6 +5,7 @@ namespace WordPress\DataLiberation\Importer;
 use Rowbot\URL\URL;
 use WordPress\ByteStream\ReadStream\FileReadStream;
 use WordPress\DataLiberation\BlockMarkup\BlockMarkupUrlProcessor;
+use WordPress\DataLiberation\DataLiberationException;
 use WordPress\DataLiberation\EntityReader\EntityReaderIterator;
 use WordPress\DataLiberation\EntityReader\WXREntityReader;
 use WordPress\DataLiberation\URL\WPURL;
@@ -51,6 +52,10 @@ class StreamImporter {
 	 */
 	protected $site_url_mapping = array();
 	/**
+	 * A list of URLs to frontload the media files from.
+	 */
+	protected $source_media_root_urls = array();
+	/**
 	 * A list of candidate base URLs that have been spotted in the WXR file.
 	 *
 	 * For example, the theme unit test data refers to a site with a base
@@ -73,7 +78,7 @@ class StreamImporter {
 	 * it and how.
 	 *
 	 * Once the API consumer decides on the mapping, it can call
-	 * add_site_url_mapping() to tell the importer what to map that domain to.
+	 * add_url_mapping() to tell the importer what to map that domain to.
 	 */
 	protected $site_url_mapping_candidates = array();
 	protected $entity_reader_factory;
@@ -81,7 +86,7 @@ class StreamImporter {
 	 * @param array|string|null $query {
 	 *     @type string      $uploads_path  The directory to download the media attachments to.
 	 *                                      E.g. WP_CONTENT_DIR . '/uploads'
-	 *     @type string      $uploads_url   The URL where the media attachments will be accessible
+	 *     @type string      $new_media_root_url   The URL where the media attachments will be accessible
 	 *                                      after the import. E.g. http://127.0.0.1:9400/wp-content/uploads/
 	 * }
 	 */
@@ -202,7 +207,7 @@ class StreamImporter {
 		}
 		if ( ! empty( $cursor['site_url_mapping'] ) ) {
 			foreach ( $cursor['site_url_mapping'] as $pair ) {
-				$this->add_site_url_mapping( $pair['from'], $pair['to'] );
+				$this->add_url_mapping( $pair['from'], $pair['to'] );
 			}
 		}
 		if ( ! empty( $cursor['site_url_mapping_candidates'] ) ) {
@@ -218,12 +223,8 @@ class StreamImporter {
 		// override that mapping.
 		$this->site_url_mapping[-1] = array(
 			'from' => WPURL::parse( $source_site_url ),
-			'to' => WPURL::parse( $this->options['new_site_url'] ),
+			'to' => WPURL::parse( $this->options['new_site_content_root_url'] ),
 		);
-	}
-
-	protected function get_source_site_url() {
-		return $this->site_url_mapping[-1]['from'];
 	}
 
 	public function get_site_url_mapping_candidates() {
@@ -240,11 +241,15 @@ class StreamImporter {
 		return $new_candidates;
 	}
 
-	public function add_site_url_mapping( $from, $to ) {
+	public function add_url_mapping( $from_url, $to_url ) {
 		$this->site_url_mapping[] = array(
-			'from' => WPURL::parse( $from ),
-			'to' => WPURL::parse( $to ),
+			'from' => WPURL::parse( $from_url ),
+			'to' => WPURL::parse( $to_url ),
 		);
+	}
+
+	public function add_source_media_root_url( $source_media_root_url ) {
+		$this->source_media_root_urls[] = WPURL::parse( $source_media_root_url );
 	}
 
 	public function get_reentrancy_cursor() {
@@ -272,8 +277,11 @@ class StreamImporter {
 	}
 
 	protected static function parse_options( $options ) {
-		if ( ! isset( $options['new_site_url'] ) ) {
-			$options['new_site_url'] = get_site_url();
+		if ( ! isset( $options['source_site_url'] ) ) {
+			throw new DataLiberationException( 'The "source_site_url" option is required' );
+		}
+		if ( ! isset( $options['new_site_content_root_url'] ) ) {
+			$options['new_site_content_root_url'] = get_site_url();
 		}
 
 		if ( ! isset( $options['uploads_path'] ) ) {
@@ -282,11 +290,11 @@ class StreamImporter {
 		// Remove the trailing slash to make concatenation easier later.
 		$options['uploads_path'] = rtrim( $options['uploads_path'], '/' );
 
-		if ( ! isset( $options['uploads_url'] ) ) {
-			$options['uploads_url'] = rtrim( $options['new_site_url'], '/' ) . '/wp-content/uploads';
+		if ( ! isset( $options['new_media_root_url'] ) ) {
+			$options['new_media_root_url'] = get_site_url() . '/wp-content/uploads';
 		}
 		// Remove the trailing slash to make concatenation easier later.
-		$options['uploads_url'] = rtrim( $options['uploads_url'], '/' );
+		$options['new_media_root_url'] = rtrim( $options['new_media_root_url'], '/' );
 
 		return $options;
 	}
@@ -297,8 +305,18 @@ class StreamImporter {
 	) {
 		$this->entity_reader_factory = $entity_reader_factory;
 		$this->options               = $options;
-		if ( isset( $options['default_source_site_url'] ) ) {
-			$this->set_source_site_url( $options['default_source_site_url'] );
+		$this->set_source_site_url( $options['source_site_url'] );
+
+		if ( isset( $options['source_media_root_urls'] ) ) {
+			foreach ( $options['source_media_root_urls'] as $source_media_root_url ) {
+				$this->add_source_media_root_url( $source_media_root_url );
+			}
+		}
+
+		if ( isset( $options['additional_url_mappings'] ) ) {
+			foreach ( $options['additional_url_mappings'] as $additional_url_mapping ) {
+				$this->add_url_mapping( $additional_url_mapping['from'], $additional_url_mapping['to'] );
+			}
 		}
 	}
 
@@ -477,7 +495,7 @@ class StreamImporter {
 		return true;
 	}
 
-	public function get_new_site_url_mapping_candidates() {
+	public function get_new_site_content_root_url_mapping_candidates() {
 		$candidates = array();
 		foreach ( $this->site_url_mapping_candidates as $base_url => $status ) {
 			if ( false === $status ) {
@@ -737,7 +755,7 @@ class StreamImporter {
 								$data['local_file_path'] ?? $data['slug'] ?? null
 							);
 							if ( file_exists( $this->options['uploads_path'] . '/' . $asset_filename ) ) {
-								$raw_url = $this->options['uploads_url'] . '/' . $asset_filename;
+								$raw_url = $this->options['new_media_root_url'] . '/' . $asset_filename;
 								$p->set_url(
 									$raw_url,
 									WPURL::parse( $raw_url )
@@ -766,7 +784,7 @@ class StreamImporter {
 								$p->replace_base_url( $mapping_pair['to'], $mapping_pair['from'] );
 							}
 							do_action( 'data_liberation.stream_importer.rewrite_url', $p, [
-								'base_url_mapping' => $mapping_pair,
+								'applied_base_url_mapping' => $mapping_pair,
 								'raw_url_before' => $raw_url_before,
 								'entity' => $entity,
 							]);
@@ -912,11 +930,18 @@ class StreamImporter {
 	 * @TODO: What other asset types are there?
 	 */
 	protected function url_processor_matched_asset_url( BlockMarkupUrlProcessor $p ) {
-		return (
-			$p->get_tag() === 'IMG' &&
-			$p->get_inspected_attribute_name() === 'src' &&
-			$this->is_child_of_a_mapped_url( $p->get_parsed_url() )
-		);
+		if ( $p->get_tag() !== 'IMG' ) {
+			return false;
+		}
+		if ( $p->get_inspected_attribute_name() !== 'src' ) {
+			return false;
+		}
+		foreach ( $this->source_media_root_urls as $source_media_root_url ) {
+			if ( is_child_url_of( $p->get_parsed_url(), $source_media_root_url ) ) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	protected function is_child_of_a_mapped_url( $url_detected_in_content ) {

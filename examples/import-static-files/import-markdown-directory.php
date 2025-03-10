@@ -80,9 +80,8 @@ function help_message_and_die($error = false) {
 }
 
 define('IMPORT_ROOT_SLUG', '/imported_content/');
-define('SOURCE_SITE_URL', 'https://developer.wordpress.org/docs/getting-started/devenv/');
-define('TARGET_SITE_URL', get_site_url() . IMPORT_ROOT_SLUG);
-$console_writer->write("Target site URL: " . TARGET_SITE_URL . "\n");
+define('NEW_SITE_CONTENT_ROOT', get_site_url() . IMPORT_ROOT_SLUG);
+$console_writer->write("Target site URL: " . NEW_SITE_CONTENT_ROOT . "\n");
 
 $parser = new Phalcon\Cop\Parser();
 $args = $parser->parse($argv);
@@ -128,61 +127,79 @@ if($args['mode'] === 'path') {
 	exit(1);
 }
 
-// Do the work
-
+/**
+ * Maps a filesystem path to a WordPress-friendly URL path we can assign
+ * to the imported page.
+ * 
+ * Example: "/docs/README.md" -> "/docs/readme"
+ * 
+ * @param string $path The filesystem path to convert
+ * @return string The WordPress-friendly URL path
+ */
 function map_file_path_to_wordpress_url( $path ) {
-	if (str_ends_with($path, '.md')) {
-		$path = substr($path, 0, -3);
+	$extensions = array('.md', '.html', '.xhtml');
+	foreach ($extensions as $ext) {
+		if (str_ends_with($path, $ext)) {
+			$path = substr($path, 0, -strlen($ext));
+			break;
+		}
 	}
 	return strtolower($path);
 }
 
+/**
+ * Transforms links pointing to imported static files (e.g. ./getting-started.md)
+ * to the format they will have after being imported into WordPress (e.g. /docs/getting-started).
+ */
 add_action(
-	// Rewrite URLs in the post content
 	'data_liberation.stream_importer.rewrite_url',
-	function ( $processor, $context ) use ( $console_writer, $chrooted_fs ) {
-		if(!$context['base_url_mapping']) {
+	function ( $processor, $context ) use ( $chrooted_fs ) {
+		// If we didn't rewrite the base URL, the URL points outside
+		// of the imported root directory. Let's keep it as it is.
+		if(!$context['applied_base_url_mapping']) {
 			return;
 		}
 
-		$path = $processor->get_parsed_url()->pathname;
-		$path_before_rewriting = $path;
-		$site_url_path_prefix = '';
-		if($context['base_url_mapping']) {
-			if(str_starts_with($path, $context['base_url_mapping']['to']->pathname)) {
-				$site_url_path_prefix = rtrim($context['base_url_mapping']['to']->pathname, '/');
-				$path = substr($path, strlen($site_url_path_prefix));
-			}
+		$path_original = $processor->get_parsed_url()->pathname;
+
+		// Remove the site path from the URL path and see
+		// if this URL is pointing to a file that exists in the
+		// imported directory.
+		$base_url_path_prefix = rtrim($context['applied_base_url_mapping']['to']->pathname, '/');
+		$path_relative_to_base = substr($path_original, strlen($base_url_path_prefix));
+		if(!$chrooted_fs->is_file($path_relative_to_base)) {
+			return;
 		}
 
-		if($chrooted_fs->is_file($path)) {
-			$path = map_file_path_to_wordpress_url($path);
-		}
-
-		$path = $site_url_path_prefix . $path;
-
-		if($path !== $path_before_rewriting) {
-			$processor->set_url(
-				$path,
-				WPURL::parse($path, $processor->get_parsed_url())
-			);
-		}
+		// Yes! We are linking to an imported page. Let's transform the link
+		// to a WordPress-friendly URL scheme.
+		$path_rewritten = $base_url_path_prefix . map_file_path_to_wordpress_url($path_relative_to_base);
+		$processor->set_url(
+			$path_rewritten,
+			WPURL::parse($path_rewritten, $processor->get_parsed_url())
+		);
 	},
 	10,
 	3
 );
 
+/**
+ * Assigns post_name to every imported static page.
+ */
 add_filter(
 	'data_liberation.stream_importer.map_entity',
-	// wp_insert_post arguments
-	function ( $entity, $context ) use ( $console_writer ) {
-		if($entity->get_type() === 'post') {
-			$data = $entity->get_data();
-			if(isset($data['local_file_path'])) {
-				$data['post_name'] = basename(map_file_path_to_wordpress_url($data['local_file_path']));
-				$entity->set_data($data);
-			}
+	function ( $entity ) {
+		if($entity->get_type() !== 'post') {
+			return $entity;
 		}
+
+		$data = $entity->get_data();
+		if(!isset($data['local_file_path'])) {
+			return $entity;
+		}
+
+		$data['post_name'] = basename(map_file_path_to_wordpress_url($data['local_file_path']));
+		$entity->set_data($data);
 		return $entity;
 	},
 	10,
@@ -240,17 +257,19 @@ try {
 				]
 			);
 		}, [
-			'default_source_site_url' => SOURCE_SITE_URL,
-			'new_site_url' => TARGET_SITE_URL,
+			'source_site_url' => 'https://developer.wordpress.org/block-editor/how-to-guides/data-basics/',
+			'new_site_content_root_url' => NEW_SITE_CONTENT_ROOT,
+			'source_media_root_urls' => [
+				'https://developer.wordpress.org/files/',
+				'https://raw.githubusercontent.com/WordPress/gutenberg/HEAD/docs/',
+			],
+			'additional_url_mappings' => [
+				[
+					'from' => 'https://developer.wordpress.org/docs/how-to-guides/data-basics/',
+					'to' => NEW_SITE_CONTENT_ROOT,
+				],
+			],
 		]
-	);
-	$importer->add_site_url_mapping(
-		'https://developer.wordpress.org/block-editor/getting-started/devenv/',
-		TARGET_SITE_URL
-	);
-	$importer->add_site_url_mapping(
-		'https://developer.wordpress.org/files/',
-		TARGET_SITE_URL
 	);
 
 	$import_session = ImportSession::create(
@@ -272,7 +291,7 @@ try {
 		if($importer->get_stage() === StreamImporter::STAGE_FINISHED) {
 			$console_writer->write("\n");
 			$console_writer->write("\033[1;32mImport finished!\033[0m Visit your site at: \n");
-			$console_writer->write("\033[1;36m" . TARGET_SITE_URL . "\033[0m\n");
+			$console_writer->write("\033[1;36m" . NEW_SITE_CONTENT_ROOT . "\033[0m\n");
 			break;
 		} else if(false === $result) {
 			$console_writer->write("Failed\n");
