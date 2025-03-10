@@ -370,8 +370,17 @@ class FilesystemEntityReader implements EntityReader {
 						)
 					);
 				} elseif ( false === $this->pending_directory_index ) {
-					// No directory index candidate – let's create a fake page
-					// just to have something in the page tree.
+					// No directory index candidate found in the current directory.
+					if($depth === 0 && isset($this->parent_ids[-1]) && $parent_id === $this->parent_ids[-1]) {
+						// We're at the root directory and we have a root parent ID. Let's
+						// reuse that as the top-level parent.
+						$this->parent_ids[ $depth ] = $this->parent_ids[-1];
+						// We're no longer looking for a directory index.
+						$this->pending_directory_index = null;
+						continue;
+					}
+
+					// Let's create a fake page just to have something in the page tree.
 					$this->parent_ids[ $depth ] = $this->emit_filesystem_node(
 						array(
 							'type' => 'file_placeholder',
@@ -494,10 +503,10 @@ class FilesystemEntityReader implements EntityReader {
 		$post_id = $this->next_post_id;
 		++$this->next_post_id;
 		$this->current_filesystem_node = array_merge(
-			$options,
 			array(
 				'post_id' => $post_id,
-			)
+			),
+			$options,
 		);
 		++$this->fs_nodes_emited_so_far;
 		return $post_id;

@@ -285,12 +285,12 @@ class ImportSession {
 		}
 	}
 
-	public function count_awaiting_frontloading_placeholders() {
+	public function count_awaiting_frontloading_stubs() {
 		global $wpdb;
 		return (int) $wpdb->get_var(
 			$wpdb->prepare(
 				"SELECT COUNT(*) FROM $wpdb->posts
-				 WHERE post_type = 'frontloading_placeholder'
+				 WHERE post_type = 'frontloading_stub'
 				 AND post_parent = %d
 				 AND post_status = %s",
 				$this->post_id,
@@ -299,12 +299,12 @@ class ImportSession {
 		);
 	}
 
-	public function count_unfinished_frontloading_placeholders() {
+	public function count_unfinished_frontloading_stubs() {
 		global $wpdb;
 		return (int) $wpdb->get_var(
 			$wpdb->prepare(
 				"SELECT COUNT(*) FROM $wpdb->posts
-				 WHERE post_type = 'frontloading_placeholder'
+				 WHERE post_type = 'frontloading_stub'
 				 AND post_parent = %d
 				 AND post_status != %s
 				 AND post_status != %s",
@@ -315,10 +315,10 @@ class ImportSession {
 		);
 	}
 
-	public function get_frontloading_placeholders( $options = array() ) {
+	public function get_frontloading_stubs( $options = array() ) {
 		$query = new WP_Query(
 			array(
-				'post_type' => 'frontloading_placeholder',
+				'post_type' => 'frontloading_stub',
 				'post_status' => 'any',
 				'post_parent' => $this->post_id,
 				'posts_per_page' => $options['per_page'] ?? 25,
@@ -367,20 +367,20 @@ class ImportSession {
 		return (int) $wpdb->get_var(
 			$wpdb->prepare(
 				"SELECT COUNT(*) FROM $wpdb->posts
-			WHERE post_type = 'frontloading_placeholder'
+			WHERE post_type = 'frontloading_stub'
 			AND post_parent = %d",
 				$this->post_id
 			)
 		);
 	}
 
-	public function get_frontloading_placeholder( $url ) {
+	public function get_frontloading_stub( $url ) {
 		global $wpdb;
 		$id = $wpdb->get_var(
 			$wpdb->prepare(
 				"SELECT p.ID FROM $wpdb->posts p
 				 INNER JOIN $wpdb->postmeta pm ON p.ID = pm.post_id
-				 WHERE p.post_type = 'frontloading_placeholder'
+				 WHERE p.post_type = 'frontloading_stub'
 				 AND p.post_parent = %d
 				 AND pm.meta_key = 'current_url'
 				 AND pm.meta_value = %s
@@ -396,7 +396,7 @@ class ImportSession {
 	 * Creates placeholder attachments for the assets to be downloaded in the
 	 * frontloading stage.
 	 */
-	public function create_frontloading_placeholders( $urls ) {
+	public function create_frontloading_stubs( $urls ) {
 		global $wpdb;
 
 		foreach ( $urls as $url => $_ ) {
@@ -412,7 +412,7 @@ class ImportSession {
 			$exists = $wpdb->get_var(
 				$wpdb->prepare(
 					"SELECT ID FROM $wpdb->posts
-				WHERE post_type = 'frontloading_placeholder'
+				WHERE post_type = 'frontloading_stub'
 				AND post_parent = %d
 				AND guid = %s
 				LIMIT 1",
@@ -426,7 +426,7 @@ class ImportSession {
 			}
 
 			$post_data        = array(
-				'post_type' => 'frontloading_placeholder',
+				'post_type' => 'frontloading_stub',
 				'post_parent' => $this->post_id,
 				'post_title' => basename( $url ),
 				'post_status' => self::FRONTLOAD_STATUS_AWAITING_DOWNLOAD,
@@ -488,7 +488,7 @@ class ImportSession {
 
 		foreach ( $events as $event ) {
 			$url         = $event->resource_id;
-			$placeholder = $this->get_frontloading_placeholder( $url );
+			$placeholder = $this->get_frontloading_stub( $url );
 			if ( ! $placeholder ) {
 				_doing_it_wrong(
 					__METHOD__,

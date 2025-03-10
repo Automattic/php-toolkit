@@ -75,6 +75,28 @@ class FilesystemEntityReaderTest extends TestCase {
 		$this->assertEquals( '/nested/page1.html', $entity_data['meta_value'] );
 	}
 
+	public function test_uses_root_parent_id_as_top_level_parent() {
+		$reader   = new FilesystemEntityReader(
+			LocalFilesystem::create( __DIR__ . '/fixtures/filesystem-entity-reader' ),
+			array(
+				'root_parent_id' => 2,
+				'first_post_id' => 3,
+			)
+		);
+		$entities = array();
+		while ( $reader->next_entity() ) {
+			$page_maybe = $reader->get_entity();
+			if( $page_maybe->get_type() === 'post' ) {
+				$entities[] = $page_maybe->get_data();
+			}
+		}
+		$this->assertCount( 3, $entities );
+		$this->assertEquals( '/root.html', $entities[0]['local_file_path'] );
+		$this->assertEquals( '/nested', $entities[1]['local_file_path'] );
+		$this->assertEquals( '/nested/page1.html', $entities[2]['local_file_path'] );
+	}
+
+
 	private function assertMarkupMatches( $markup, $expected ) {
 		$this->assertEquals(
 			$this->normalize_markup( $expected ),

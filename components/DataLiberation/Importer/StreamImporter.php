@@ -709,6 +709,10 @@ class StreamImporter {
 							if ( ! $p->get_raw_url() ) {
 								continue;
 							}
+							// No need to rewrite anchor links.
+							if ( substr( $p->get_raw_url(), 0, 1 ) === '#' ) {
+								continue;
+							}
 
 							/**
 							 * Any URL that has a corresponding frontloaded file is an asset URL.
@@ -738,11 +742,19 @@ class StreamImporter {
 								continue;
 							}
 
+							$url_before = $p->get_parsed_url();
 							$target_base_url = $this->get_url_mapping_target( $p->get_parsed_url() );
-							if ( false !== $target_base_url ) {
+							$should_rewrite_base_url = false !== $target_base_url;
+							if ( $should_rewrite_base_url ) {
 								$p->replace_base_url( $target_base_url );
-								continue;
 							}
+							do_action( 'data_liberation.stream_importer.rewrite_url', $p, [
+								'base_url_rewritten' => $should_rewrite_base_url,
+								'url_before' => $url_before,
+								'url_after' => $p->get_parsed_url(),
+								'entity' => $entity,
+								'importer' => $this,
+							]);
 						}
 						$data[ $key ] = $p->get_updated_html();
 					}
@@ -750,6 +762,11 @@ class StreamImporter {
 				$entity->set_data( $data );
 				break;
 		}
+		
+		$entity = apply_filters( 'data_liberation.stream_importer.map_entity', $entity, [
+			'entity' => $entity,
+			'importer' => $this,
+		]);
 
 		$post_id = $this->importer->import_entity( $entity );
 		if ( false !== $post_id ) {
@@ -888,8 +905,15 @@ class StreamImporter {
 		);
 	}
 
-	protected function is_child_of_a_mapped_url( $url ) {
-		return $this->get_url_mapping_target( $url ) !== false;
+	protected function is_child_of_a_mapped_url( $url_detected_in_content ) {
+		$url = WPURL::parse( $url_detected_in_content );
+		foreach ( $this->site_url_mapping as $pair ) {
+			$parsed_base_url = $pair[0];
+			if ( is_child_url_of( $url_detected_in_content, $parsed_base_url ) ) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	protected function get_url_mapping_target( $source_url ) {

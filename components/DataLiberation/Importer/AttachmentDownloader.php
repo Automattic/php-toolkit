@@ -119,7 +119,7 @@ class AttachmentDownloader {
 				// Create a placeholder file to indicate that the download is in progress.
 				touch( $output_path . '.partial' );
 				$request                               = new Request( $url );
-				$this->output_paths[ $request->id ]    = $output_relative_path;
+				$this->output_paths[ $request->id ]    = $output_path;
 				$this->progress[ $this->enqueued_url ] = array(
 					'received' => null,
 					'total' => null,
