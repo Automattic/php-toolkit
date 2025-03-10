@@ -4,6 +4,8 @@ use WordPress\DataLiberation\EntityReader\FilesystemEntityReader;
 use WordPress\DataLiberation\Importer\ImportSession;
 use WordPress\DataLiberation\Importer\RetryFrontloadingIterator;
 use WordPress\DataLiberation\Importer\StreamImporter;
+use WordPress\DataLiberation\URL\URLInTextProcessor;
+use WordPress\DataLiberation\URL\WPURL;
 use WordPress\Filesystem\Layer\ChrootLayer;
 use WordPress\Filesystem\LocalFilesystem;
 use WordPress\Git\GitFilesystem;
@@ -15,38 +17,73 @@ if(file_exists('/wordpress/wp-load.php')) {
 
 if(file_exists(__DIR__ . '/../../vendor/autoload.php')) {
 	require_once __DIR__ . '/../../vendor/autoload.php';
+} else if(file_exists(__DIR__ . '/wp-content/vendor/autoload.php')) {
+	require_once __DIR__ . '/wp-content/vendor/autoload.php';
 }
 
-// Parse CLI arguments
-
-function help_message_and_die($error = false) {
-    echo "\033[1;32mUsage:\033[0m php import-markdown-directory.php \033[1;33mmode\033[0m [options]\n";
-    echo "  \033[1;33mmode:\033[0m path|git\n";
-    echo "\n";
-    echo "  \033[1;33mpath\033[0m mode usage:\n";
-    echo "    php import-markdown-directory.php path \033[1;34m<path to directory>\033[0m\n";
-    echo "\n";
-    echo "  \033[1;33mgit\033[0m mode usage:\n";
-    echo "    php import-markdown-directory.php mode \033[1;34m<repo_url>\033[0m\n";
-	echo "    options:\n";
-	echo "      \033[1;34m--branch=<branch name>\033[0m (required)\n";
-	echo "      \033[1;34m--pathInRepo=<path in repo>\033[0m (optional)\n";
-	if($error) {
-		echo "\n";
-		echo "\033[1;31mError:\033[0m ";
-		echo $error;
-		echo "\n";
-		exit(1);
-	}
-	die();
-}
 
 require_once __DIR__ . '/Parser.php';
 require_once __DIR__ . '/playground-protocol/PlaygroundProtocolClient.php';
 require_once __DIR__ . '/ConsoleWriter.php';
 require_once __DIR__ . '/ProgressBar.php';
 
+$console_writer = new PlaygroundConsoleWriter();
+
+/**
+ * Custom autoloader that should not be needed because we already have
+ * the vendor autoloader in place.
+ * @TODO: Investigate why it's needed and get rid of it.
+ */
+spl_autoload_register(function ($class) use ($console_writer) {
+    // Base directory for components
+    $baseDir = __DIR__ . '/wp-content/components/';
+    
+    // Convert namespace to path
+    $path = str_replace('\\', DIRECTORY_SEPARATOR, $class) . '.php';
+	if(str_starts_with($path, 'WordPress/')) {
+		$path = substr($path, 10);
+	}
+    
+    // Full path to the file
+    $file = $baseDir . $path;
+    
+    // Check if file exists and include it
+    if (file_exists($file)) {
+        require_once $file;
+        return true;
+    }
+    
+    return false;
+});
+
+// Parse CLI arguments
+function help_message_and_die($error = false) {
+	global $console_writer;
+    $console_writer->write("\033[1;32mUsage:\033[0m php import-markdown-directory.php \033[1;33mmode\033[0m [options]\n");
+    $console_writer->write("  \033[1;33mmode:\033[0m path|git\n");
+    $console_writer->write("\n");
+    $console_writer->write("  \033[1;33mpath\033[0m mode usage:\n");
+    $console_writer->write("    php import-markdown-directory.php path \033[1;34m<path to directory>\033[0m\n");
+    $console_writer->write("\n");
+    $console_writer->write("  \033[1;33mgit\033[0m mode usage:\n");
+    $console_writer->write("    php import-markdown-directory.php mode \033[1;34m<repo_url>\033[0m\n");
+	$console_writer->write("    options:\n");
+	$console_writer->write("      \033[1;34m--branch=<branch name>\033[0m (required)\n");
+	$console_writer->write("      \033[1;34m--pathInRepo=<path in repo>\033[0m (optional)\n");
+	if($error) {
+		$console_writer->write("\n");
+		$console_writer->write("\033[1;31mError:\033[0m ");
+		$console_writer->write($error);
+		$console_writer->write("\n");
+		exit(1);
+	}
+	die();
+}
+
 define('IMPORT_ROOT_SLUG', '/imported_content/');
+define('SOURCE_SITE_URL', 'https://developer.wordpress.org/docs/block-editor/getting-started/devenv/');
+define('TARGET_SITE_URL', get_site_url() . IMPORT_ROOT_SLUG);
+$console_writer->write("Target site URL: " . TARGET_SITE_URL . "\n");
 
 $parser = new Phalcon\Cop\Parser();
 $args = $parser->parse($argv);
@@ -94,31 +131,113 @@ if($args['mode'] === 'path') {
 
 // Do the work
 
+function map_file_path_to_wordpress_url( $path ) {
+	if (str_ends_with($path, '.md')) {
+		return substr($path, 0, -3);
+	}
+	return $path;
+}
+
 add_action(
-	'data_liberation.rewrite_url',
-	function ( $processor, $entity, $importer ) {
-		var_dump($processor->get_raw_url());
-		die();
+	// Link in the post content
+	'data_liberation.stream_importer.rewrite_url',
+	function ( $processor, $context ) use ( $console_writer, $chrooted_fs ) {
+		if(!$context['base_url_rewritten']) {
+			return;
+		}
+
+		$path = $processor->get_parsed_url()->pathname;
+		$path_before_rewriting = $path;
+		$site_url_path_prefix = '';
+		if($context['new_base_url']) {
+			if(str_starts_with($path, $context['new_base_url']->pathname)) {
+				$site_url_path_prefix = $context['new_base_url']->pathname;
+				$path = substr($path, strlen($site_url_path_prefix));
+			}
+		}
+
+		if($chrooted_fs->is_file($path)) {
+			$path = map_file_path_to_wordpress_url($path);
+		}
+
+		if($path !== $path_before_rewriting) {
+			$processor->set_url(
+				$path,
+				WPURL::parse($path, $processor->get_parsed_url())
+			);
+		}
 	},
 	10,
 	3
 );
 
-$console_writer = new PlaygroundConsoleWriter();
+add_filter(
+	'data_liberation.stream_importer.map_entity',
+	// wp_insert_post arguments
+	function ( $entity, $context ) use ( $console_writer ) {
+		if($entity->get_type() === 'post') {
+			$data = $entity->get_data();
+			if(isset($data['local_file_path'])) {
+				$data['post_name'] = map_file_path_to_wordpress_url($data['local_file_path']);
+			}
+			$entity->set_data($data);
+		}
+		return $entity;
+	},
+	10,
+	2
+);
+
 $data_url = $args['data_url'];
-$console_writer->write("Importing static files from $data_url...\n");
+$console_writer->write("Importing static files from $data_url\n");
 
 try {
+	$root_id = wp_insert_post(array(
+		'post_title' => 'Imported content',
+		'post_name' => IMPORT_ROOT_SLUG,
+		'post_type' => 'page',
+		'post_status' => 'publish',
+		'post_content' => '
+	<!-- wp:paragraph -->
+	<p>This page is the root of all your imported files. To see the imported tree structure, go to wp-admin or check the main menu above.</p>
+	<!-- /wp:paragraph -->
+	
+	<!-- wp:paragraph -->
+	<p>For quick access to the imported pages, see this flat list:</p>
+	<!-- /wp:paragraph -->
+	
+	<!-- wp:query {"queryId":1,"query":{"perPage":10,"pages":0,"offset":0,"postType":"page","order":"desc","orderBy":"date","author":"","search":"","exclude":[],"sticky":"","inherit":false}} -->
+	<div class="wp-block-query"><!-- wp:post-template -->
+	<!-- wp:post-title {"isLink":true} /-->
+	<!-- wp:post-excerpt /-->
+	<!-- /wp:post-template -->
+	
+	<!-- wp:query-pagination -->
+	<!-- wp:query-pagination-previous /-->
+	<!-- wp:query-pagination-numbers /-->
+	<!-- wp:query-pagination-next /-->
+	<!-- /wp:query-pagination --></div>
+	<!-- /wp:query -->',
+	));
+	
 	$importer = StreamImporter::create(
-		function () use ( $chrooted_fs ) {
+		function () use ( $chrooted_fs, $root_id ) {
 			return new FilesystemEntityReader(
 				$chrooted_fs,
 				[
-					'first_post_id' => 2
+					'root_parent_id' => $root_id,
+					'first_post_id' => $root_id + 1
 				]
 			);
-		}
+		}, [
+			'default_source_site_url' => SOURCE_SITE_URL,
+			'new_site_url' => TARGET_SITE_URL,
+		]
 	);
+	// $importer->add_site_url_mapping(
+	// 	'https://developer.wordpress.org/files/',
+	// 	TARGET_SITE_URL
+	// );
 
 	$import_session = ImportSession::create(
 		array(
@@ -139,14 +258,13 @@ try {
 		if($importer->get_stage() === StreamImporter::STAGE_FINISHED) {
 			$console_writer->write("\n");
 			$console_writer->write("\033[1;32mImport finished!\033[0m Visit your site at: \n");
-			$console_writer->write("\033[1;36m" . get_site_url() . IMPORT_ROOT_SLUG . "\033[0m\n");
+			$console_writer->write("\033[1;36m" . TARGET_SITE_URL . "\033[0m\n");
 			break;
 		} else if(false === $result) {
 			$console_writer->write("Failed\n");
 			break;
 		} else {
-			// Twiddle our thumbs...
-			$console_writer->write("Resource quota exhausted. Paused at stage: " . $import_session->get_stage() . "\n");
+			// Twiddle our thumbs, importing in progress...
 		}
 	} while(true);
 } finally {
@@ -156,33 +274,6 @@ try {
 		] );
 	}
 }
-
-wp_update_post(array(
-	'ID' => 2,
-	'post_title' => 'Imported content',
-	'post_name' => IMPORT_ROOT_SLUG,
-	'post_content' => '
-<!-- wp:paragraph -->
-<p>This page is the root of all your imported files. To see the imported tree structure, go to wp-admin or check the main menu above.</p>
-<!-- /wp:paragraph -->
-
-<!-- wp:paragraph -->
-<p>For quick access to the imported pages, see this flat list:</p>
-<!-- /wp:paragraph -->
-
-<!-- wp:query {"queryId":1,"query":{"perPage":10,"pages":0,"offset":0,"postType":"page","order":"desc","orderBy":"date","author":"","search":"","exclude":[],"sticky":"","inherit":false}} -->
-<div class="wp-block-query"><!-- wp:post-template -->
-<!-- wp:post-title {"isLink":true} /-->
-<!-- wp:post-excerpt /-->
-<!-- /wp:post-template -->
-
-<!-- wp:query-pagination -->
-<!-- wp:query-pagination-previous /-->
-<!-- wp:query-pagination-numbers /-->
-<!-- wp:query-pagination-next /-->
-<!-- /wp:query-pagination --></div>
-<!-- /wp:query -->',
-));
 
 /**
  * @TODO: Expose a primitive like the step function below from the
@@ -217,7 +308,7 @@ function data_liberation_import_step_customized( ImportSession $session, StreamI
             $should_advance_to_next_stage = null !== $importer->get_next_stage();
             if ( $should_advance_to_next_stage ) {
                 if ( StreamImporter::STAGE_FRONTLOAD_ASSETS === $importer->get_stage() ) {
-                    $resolved_all_failures = $session->count_unfinished_frontloading_placeholders() === 0;
+                    $resolved_all_failures = $session->count_unfinished_frontloading_stubs() === 0;
                     if ( ! $resolved_all_failures ) {
                         if($progress_bar) {
 							$progress_bar->finish();
@@ -240,11 +331,10 @@ function data_liberation_import_step_customized( ImportSession $session, StreamI
             continue;
         }
 
-
         switch ( $importer->get_stage() ) {
             case StreamImporter::STAGE_INDEX_ENTITIES:
                 $entities_counts = $importer->get_indexed_entities_counts();
-                $session->create_frontloading_placeholders( $importer->get_indexed_assets_urls() );
+                $session->create_frontloading_stubs( $importer->get_indexed_assets_urls() );
                 $session->bump_total_number_of_entities($entities_counts);
                 
 				if(!$progress_bar) {
@@ -256,7 +346,7 @@ function data_liberation_import_step_customized( ImportSession $session, StreamI
                 break;
                 
             case StreamImporter::STAGE_FRONTLOAD_ASSETS:
-                $progress = $importer->get_frontloading_progress();                
+                $progress = $importer->get_frontloading_progress();
                 $session->bump_frontloading_progress(
                     $progress,
                     $importer->get_frontloading_events()
@@ -267,12 +357,11 @@ function data_liberation_import_step_customized( ImportSession $session, StreamI
 					$progress_bar->setMessage("Loading assets");
 					$progress_bar->start();
 				}
-                $progress_bar->setCurrent($session->count_unfinished_frontloading_placeholders());
+                $progress_bar->setCurrent($session->count_unfinished_frontloading_stubs());
                 break;
                 
             case StreamImporter::STAGE_IMPORT_ENTITIES:
                 $imported_counts = $importer->get_imported_entities_counts();
-                $total_imported = array_sum($imported_counts);
                 
                 $session->bump_imported_entities_counts($imported_counts);
 

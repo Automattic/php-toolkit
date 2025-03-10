@@ -16,10 +16,10 @@ class BlockMarkupUrlProcessorTest extends TestCase {
 	 *
 	 * @dataProvider provider_test_finds_next_url
 	 */
-	public function test_next_url_finds_the_url( $url, $markup, $base_url = 'https://wordpress.org' ) {
+	public function test_next_url_finds_the_url( $expected_result, $markup, $base_url = 'https://wordpress.org' ) {
 		$p = new BlockMarkupUrlProcessor( $markup, $base_url );
 		$this->assertTrue( $p->next_url(), 'Failed to find the URL in the markup.' );
-		$this->assertEquals( $url, $p->get_raw_url(), 'Found a URL in the markup, but it wasn\'t the expected one.' );
+		$this->assertEquals( $expected_result, $p->get_raw_url(), 'Found a URL in the markup, but it wasn\'t the expected one.' );
 	}
 
 	public static function provider_test_finds_next_url() {
@@ -70,6 +70,37 @@ class BlockMarkupUrlProcessorTest extends TestCase {
 				'https://developer.w.org',
 				'<a href=""></a><a href="https://developer.w.org"></a>',
 				null,
+			),
+		);
+	}
+
+	/**
+	 * @dataProvider provider_test_parse_url_with_base_url
+	 */
+	public function test_parse_url_with_base_url($expected_result, $markup, $base_url) {
+		$p = new BlockMarkupUrlProcessor($markup, $base_url);
+		$this->assertTrue($p->next_url(), 'Failed to find the URL in the markup.');
+		$parsed_url = $p->get_parsed_url();
+		$this->assertNotFalse($parsed_url, 'URL parsing failed');
+		$this->assertEquals($expected_result, $parsed_url->toString(), 'Parsed URL does not match the expected URL.');
+	}
+
+	public static function provider_test_parse_url_with_base_url() {
+		return array(
+			'Static file URL in the <a> tag' => array(
+				'https://wordpress.org/nodejs-development-environment.md',
+				'<a href="nodejs-development-environment.md">',
+				'https://wordpress.org'
+			),
+			'Relative URL in the <a> tag' => array(
+				'https://wordpress.org/docs/page.html',
+				'<a href="docs/page.html">',
+				'https://wordpress.org'
+			),
+			'Absolute URL with base URL' => array(
+				'https://example.com/page.html',
+				'<a href="https://example.com/page.html">',
+				'https://wordpress.org'
 			),
 		);
 	}

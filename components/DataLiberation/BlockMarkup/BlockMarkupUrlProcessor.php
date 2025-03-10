@@ -140,6 +140,7 @@ class BlockMarkupUrlProcessor extends BlockMarkupProcessor {
 
 			if ( is_string( $url_maybe ) ) {
 				$parsed_url = WPURL::parse( $url_maybe, $this->base_url_string );
+
 				if ( false === $parsed_url ) {
 					return false;
 				}
@@ -177,23 +178,33 @@ class BlockMarkupUrlProcessor extends BlockMarkupProcessor {
 		return false;
 	}
 
-	public function set_raw_url( $new_url ) {
+	/**
+	 * Replaces the currently matched URL with a new one.
+	 *
+	 * @param string $raw_url The raw URL.
+	 * @param URL $parsed_url The parsed version of the raw URL. It is required
+	 *                        as $raw_url might be a relative URL pointing to a different
+	 *                        host than this processor's base URL.
+	 * @return bool True if the URL was set, false otherwise.
+	 */
+	public function set_url( $raw_url, $parsed_url ) {
 		if ( null === $this->raw_url ) {
 			return false;
 		}
-		$this->raw_url = $new_url;
+		$this->raw_url = $raw_url;
+		$this->parsed_url = $parsed_url;
 		switch ( parent::get_token_type() ) {
 			case '#tag':
 				$attr = $this->get_inspected_attribute_name();
 				if ( false === $attr ) {
 					return false;
 				}
-				$this->set_attribute( $attr, $new_url );
+				$this->set_attribute( $attr, $raw_url );
 
 				return true;
 
 			case '#block-comment':
-				return $this->set_block_attribute_value( $new_url );
+				return $this->set_block_attribute_value( $raw_url );
 
 			case '#text':
 				if ( null === $this->url_in_text_processor ) {
@@ -201,7 +212,7 @@ class BlockMarkupUrlProcessor extends BlockMarkupProcessor {
 				}
 				$this->url_in_text_node_updated = true;
 
-				return $this->url_in_text_processor->set_raw_url( $new_url );
+				return $this->url_in_text_processor->set_raw_url( $raw_url );
 		}
 	}
 
@@ -274,7 +285,7 @@ class BlockMarkupUrlProcessor extends BlockMarkupProcessor {
 			! str_starts_with( $this->get_raw_url(), 'https://' )
 		);
 		if ( ! $is_relative ) {
-			$this->set_raw_url( $new_raw_url );
+			$this->set_url( $new_raw_url, $updated_url );
 			return true;
 		}
 
@@ -286,7 +297,7 @@ class BlockMarkupUrlProcessor extends BlockMarkupProcessor {
 			$new_relative_url .= $updated_url->hash;
 		}
 
-		$this->set_raw_url( $new_relative_url );
+		$this->set_url( $new_relative_url, $updated_url );
 		return true;
 	}
 

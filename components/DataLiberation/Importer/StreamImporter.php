@@ -699,7 +699,8 @@ class StreamImporter {
 					unset( $data['attachment_url'] );
 					$data['local_file_path'] = $this->options['uploads_path'] . '/' . $asset_filename;
 				} else {
-					foreach ( array( 'guid', 'post_content', 'post_excerpt' ) as $key ) {
+					// @TODO: Consider rewriting the guid, too.
+					foreach ( array( 'post_content', 'post_excerpt' ) as $key ) {
 						if ( ! isset( $data[ $key ] ) ) {
 							continue;
 						}
@@ -722,8 +723,10 @@ class StreamImporter {
 								$data['local_file_path'] ?? $data['slug'] ?? null
 							);
 							if ( file_exists( $this->options['uploads_path'] . '/' . $asset_filename ) ) {
-								$p->set_raw_url(
-									$this->options['uploads_url'] . '/' . $asset_filename
+								$raw_url = $this->options['uploads_url'] . '/' . $asset_filename;
+								$p->set_url(
+									$raw_url,
+									WPURL::parse( $raw_url )
 								);
 								/**
 								 * @TODO: How would we know a specific image block refers to a specific
@@ -742,18 +745,24 @@ class StreamImporter {
 								continue;
 							}
 
-							$url_before = $p->get_parsed_url();
-							$target_base_url = $this->get_url_mapping_target( $p->get_parsed_url() );
-							$should_rewrite_base_url = false !== $target_base_url;
+							$raw_url_before = $p->get_raw_url();
+							$parsed_url_before = clone $p->get_parsed_url();
+
+							$new_base_url = $this->get_url_mapping_target( $p->get_parsed_url() );
+							$should_rewrite_base_url = false !== $new_base_url;
+
 							if ( $should_rewrite_base_url ) {
-								$p->replace_base_url( $target_base_url );
+								$p->replace_base_url( $new_base_url );
 							}
 							do_action( 'data_liberation.stream_importer.rewrite_url', $p, [
 								'base_url_rewritten' => $should_rewrite_base_url,
-								'url_before' => $url_before,
-								'url_after' => $p->get_parsed_url(),
+								'new_base_url' => $new_base_url,
+								'raw_url_before' => $raw_url_before,
+								'parsed_url_before' => $parsed_url_before,
+								'raw_url_after' => $p->get_raw_url(),
+								'parsed_url_after' => $p->get_parsed_url(),
 								'entity' => $entity,
-								'importer' => $this,
+								// 'importer' => $this,
 							]);
 						}
 						$data[ $key ] = $p->get_updated_html();
@@ -764,7 +773,6 @@ class StreamImporter {
 		}
 		
 		$entity = apply_filters( 'data_liberation.stream_importer.map_entity', $entity, [
-			'entity' => $entity,
 			'importer' => $this,
 		]);
 
@@ -906,21 +914,13 @@ class StreamImporter {
 	}
 
 	protected function is_child_of_a_mapped_url( $url_detected_in_content ) {
-		$url = WPURL::parse( $url_detected_in_content );
+		return $this->get_url_mapping_target( $url_detected_in_content ) !== false;
+	}
+
+	protected function get_url_mapping_target( $url_detected_in_content ) {
 		foreach ( $this->site_url_mapping as $pair ) {
 			$parsed_base_url = $pair[0];
 			if ( is_child_url_of( $url_detected_in_content, $parsed_base_url ) ) {
-				return true;
-			}
-		}
-		return false;
-	}
-
-	protected function get_url_mapping_target( $source_url ) {
-		$url = WPURL::parse( $source_url );
-		foreach ( $this->site_url_mapping as $pair ) {
-			$parsed_base_url = $pair[0];
-			if ( is_child_url_of( $parsed_base_url, $url ) ) {
 				return $pair[1];
 			}
 		}
