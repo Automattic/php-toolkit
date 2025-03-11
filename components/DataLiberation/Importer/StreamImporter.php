@@ -688,7 +688,7 @@ class StreamImporter {
 
 	protected function get_current_entity() {
 		$entity = $this->entity_iterator->current();
-		$entity = apply_filters( 'data_liberation.stream_importer.map_entity_before_any_processing', $entity, [
+		$entity = apply_filters( 'data_liberation.stream_importer.preprocess_entity', $entity, [
 			'importer' => $this,
 		]);
 		return $entity;

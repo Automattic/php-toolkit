@@ -2,6 +2,7 @@
 
 use WordPress\DataLiberation\EntityReader\FilesystemEntityReader;
 use WordPress\DataLiberation\Importer\ImportSession;
+use WordPress\DataLiberation\Importer\ImportUtils;
 use WordPress\DataLiberation\Importer\RetryFrontloadingIterator;
 use WordPress\DataLiberation\Importer\StreamImporter;
 use WordPress\DataLiberation\URL\WPURL;
@@ -138,6 +139,7 @@ if($args['mode'] === 'path') {
 }
 
 $index_file_pattern = '#(?:index|readme)\.md$#i';
+$import_path_prefix = '/imported-content';
 
 /**
  * Maps a filesystem path to a WordPress-friendly URL path we can assign
@@ -149,7 +151,7 @@ $index_file_pattern = '#(?:index|readme)\.md$#i';
  * @return string The WordPress-friendly URL path
  */
 function map_file_path_to_wordpress_url( $path ) {
-	global $index_file_pattern;
+	global $index_file_pattern, $import_path_prefix;
 
 	/**
 	 * Ensure a named top-level parent directory to base the entire
@@ -180,7 +182,7 @@ function map_file_path_to_wordpress_url( $path ) {
 	 * This isn't trivial. Having a top-level path prefix is not perfect,
 	 * but it's a sound compromise.
 	 */
-	$path = wp_join_paths('/imported-content', $path);
+	$path = wp_join_paths($import_path_prefix, $path);
 
 	if(1 === preg_match($index_file_pattern, $path)) {
 		$path = dirname($path);
@@ -203,7 +205,14 @@ function map_file_path_to_wordpress_url( $path ) {
  */
 add_action(
 	'data_liberation.stream_importer.postprocess_url',
-	function ( $processor, $context ) use ( $chrooted_fs ) {
+	function ( $processor, $context ) use (
+		$chrooted_fs,
+		/**
+		 * With &, $import_path_prefix reflects the latest value.
+		 * Without &, it's a local copy of the value from the outer scope.
+		 */
+		&$import_path_prefix
+	) {
 		/**
 		 * If we didn't rewrite the base URL, the URL points outside
 		 * of the imported root directory. Let's keep it as it is.
@@ -241,7 +250,7 @@ add_action(
 			 * Our best shot is to keep the URL as is, just with the imported
 			 * content root prepended to it.
 			 */
-			$path_rewritten = wp_join_paths($base_url_path_prefix, 'imported-content', $path_relative_to_base);
+			$path_rewritten = wp_join_paths($base_url_path_prefix, $import_path_prefix, $path_relative_to_base);
 		} else {
 			/**
 			 * It's a relative URL pointing somewhere within the URL space we're importing
@@ -263,8 +272,9 @@ add_action(
  * Assigns post_name to every imported static page.
  */
 add_filter(
-	'data_liberation.stream_importer.map_entity_before_any_processing',
-	function ( $entity ) {
+	'data_liberation.stream_importer.preprocess_entity',
+	function ( $entity ) use ( &$import_path_prefix, $index_file_pattern ) {
+		static $preprocessed_an_entity = false;
 		if($entity->get_type() !== 'post') {
 			return $entity;
 		}
@@ -273,6 +283,31 @@ add_filter(
 		if(isset($data['parsed_metadata']['slug'])) {
 			$data['post_name'] = basename($data['parsed_metadata']['slug'][0]);
 		} else if(isset($data['local_file_path'])) {
+			/**
+			 * The default import content path is "/imported-content". However,
+			 * maybe we can find a friendlier path prefix based on the post
+			 * title of the top-level index file.
+			 * 
+			 * For example, a "Getting Started" guide found at "README.md"
+			 * could be imported to "/getting-started".
+			 */
+			if(!$preprocessed_an_entity) {
+				$preprocessed_an_entity = true;
+				$dirname = dirname($data['local_file_path']);
+				$dirname_makes_a_bad_slug = $dirname !== '.' && $dirname === '/';
+				$is_index_file = 1 === preg_match($index_file_pattern, $data['local_file_path']);
+				$post_title_not_derived_from_path = $data['post_title'] !== ImportUtils::slug_to_title( basename( $data['local_file_path'] ) );
+
+				if(
+					$dirname_makes_a_bad_slug &&
+					$is_index_file &&
+					$post_title_not_derived_from_path &&
+					strlen($data['post_title']) > 1
+				) {
+					$import_path_prefix = wp_import_slugify($data['post_title']);
+				}
+			}
+	
 			$wordpress_url = map_file_path_to_wordpress_url($data['local_file_path']);
 			$data['post_name'] = basename($wordpress_url);
 		} else {
@@ -285,6 +320,14 @@ add_filter(
 	10,
 	2
 );
+
+/**
+ * Naive slugification function.
+ * @TODO: Use a more sophisticated one with utf-8 support etc.
+ */
+function wp_import_slugify( $title ) {
+	return preg_replace( '/[^a-z0-9]+/i', '-', trim( strtolower( $title ) ) );
+}
 
 $data_url = $args['data_url'];
 $console_writer->write("Importing static files from $data_url\n");
@@ -357,8 +400,25 @@ try {
 		$result = data_liberation_import_step_customized( $import_session, $importer, $console_writer );
 		if($importer->get_stage() === StreamImporter::STAGE_FINISHED) {
 			$console_writer->write("\n");
-			$console_writer->write("\033[1;32mImport finished!\033[0m Visit your site at: \n");
-			$console_writer->write("\033[1;36m" . NEW_SITE_CONTENT_ROOT . "\033[0m\n");
+			$console_writer->write("\033[1;32mImport finished!\033[0m See your imported content at: \n");
+
+			// Get the first page with non-empty content.
+			$posts = get_posts([
+				'numberposts' => 10,
+				'orderby' => 'ID',
+				'order' => 'ASC',
+				'post_type' => 'page',
+				'post_status' => 'publish'
+			]);
+			
+			$url = NEW_SITE_CONTENT_ROOT;
+			foreach ($posts as $post) {
+				if (!empty($post->post_content)) {
+					$url = get_permalink($post);
+					break;
+				}
+			}
+			$console_writer->write("\033[1;36m" . $url . "\033[0m\n");
 			break;
 		} else if(false === $result) {
 			if($importer->get_stage() === StreamImporter::STAGE_FRONTLOAD_ASSETS) {

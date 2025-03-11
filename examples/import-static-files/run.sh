@@ -11,14 +11,14 @@
 # 	--additional-site-urls=https://developer.wordpress.org/docs/how-to-guides/data-basics/
 
 # The entire Gutenberg documentation
-bun index.js \
-	git https://github.com/WordPress/gutenberg.git \
-	--branch=trunk \
-	--path-in-repo=docs/ \
-	--media-url=https://developer.wordpress.org/files/ \
-	--media-url=https://raw.githubusercontent.com/WordPress/gutenberg/HEAD/docs/ \
-	--source-site-url=https://developer.wordpress.org/block-editor/ \
-	--additional-site-urls=https://developer.wordpress.org/docs/
+# bun index.js \
+# 	git https://github.com/WordPress/gutenberg.git \
+# 	--branch=trunk \
+# 	--path-in-repo=docs/ \
+# 	--media-url=https://developer.wordpress.org/files/ \
+# 	--media-url=https://raw.githubusercontent.com/WordPress/gutenberg/HEAD/docs/ \
+# 	--source-site-url=https://developer.wordpress.org/block-editor/ \
+# 	--additional-site-urls=https://developer.wordpress.org/docs/
 
 # A subset of the Gutenberg docs from a local checkout
 # The pages import well.
@@ -43,19 +43,17 @@ bun index.js \
 # 	--source-site-url=https://getbootstrap.com/docs/5.3/ \
 # 	--additional-site-urls=https://getbootstrap.com/docs/
 
-
 # Laravel docs
 # It imports fine but there are issues we'd need a dedicated
 # Laravel plugin to resolve:
 # * interpolate the {{version}} markers in the URLs
 # * Render anchors where empty <a name=""> tags are found
 # * Process other custom syntax used in the Laravel docs
-# bun index.js \
-# 	git https://github.com/laravel/docs.git \
-# 	--path-in-repo=/ \
-# 	--branch=12.x \
-# 	--media-url=https://laravel.com/docs/ \
-# 	--source-site-url=https://laravel.com/docs/
+bun index.js \
+	git https://github.com/laravel/docs.git \
+	--path-in-repo=/ \
+	--branch=12.x \
+	--source-site-url=https://laravel.com/docs/
 
 # CPython internal docs
 # Imports mostly fine, links to other markdown pages continue to work.
@@ -72,14 +70,14 @@ bun index.js \
 # 	git https://github.com/python/cpython.git \
 # 	--branch=main \
 # 	--path-in-repo=InternalDocs/ \
-	# --source-site-url=https://docs.python.org/internal/
+# 	--source-site-url=https://raw.githubusercontent.com/python/cpython/refs/heads/main/InternalDocs/
 
 # Fullstack GraphQL book 
 # bun index.js \
 # 	git https://github.com/GraphQLCollege/fullstack-graphql.git \
 # 	--branch=master \
 # 	--path-in-repo=manuscript/ \
-# 	--source-site-url=https://www.graphqladmin.com/books/fullstack-graphql/
+# 	--source-site-url=https://raw.githubusercontent.com/GraphQLCollege/fullstack-graphql/refs/heads/master/manuscript/
 
 # CPP WASM book
 # The URL structure and images come through fine.
