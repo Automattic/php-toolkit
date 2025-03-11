@@ -688,7 +688,7 @@ class StreamImporter {
 
 	protected function get_current_entity() {
 		$entity = $this->entity_iterator->current();
-		$entity = apply_filters( 'data_liberation.stream_importer.map_entity', $entity, [
+		$entity = apply_filters( 'data_liberation.stream_importer.map_entity_before_any_processing', $entity, [
 			'importer' => $this,
 		]);
 		return $entity;
@@ -782,6 +782,7 @@ class StreamImporter {
 								$p->get_raw_url(),
 								$base_url
 							);
+
 							if ( file_exists( $this->options['uploads_path'] . '/' . $asset_filename ) ) {
 								$raw_url = rtrim( $this->options['new_media_root_url'], '/' ) . '/' . $asset_filename;
 								$p->set_url(

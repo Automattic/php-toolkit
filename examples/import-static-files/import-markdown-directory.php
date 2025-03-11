@@ -4,12 +4,14 @@ use WordPress\DataLiberation\EntityReader\FilesystemEntityReader;
 use WordPress\DataLiberation\Importer\ImportSession;
 use WordPress\DataLiberation\Importer\RetryFrontloadingIterator;
 use WordPress\DataLiberation\Importer\StreamImporter;
-use WordPress\DataLiberation\URL\URLInTextProcessor;
 use WordPress\DataLiberation\URL\WPURL;
 use WordPress\Filesystem\Layer\ChrootLayer;
 use WordPress\Filesystem\LocalFilesystem;
+use WordPress\Filesystem\OverlayFilesystem;
 use WordPress\Git\GitFilesystem;
 use WordPress\Git\GitRepository;
+
+use function WordPress\Filesystem\wp_join_paths;
 
 if(file_exists('/wordpress/wp-load.php')) {
 	require_once '/wordpress/wp-load.php';
@@ -35,7 +37,7 @@ $console_writer = new PlaygroundConsoleWriter();
  */
 spl_autoload_register(function ($class) use ($console_writer) {
     // Base directory for components
-    $baseDir = __DIR__ . '/wp-content/components/';
+    $baseDir = WP_CONTENT_DIR . '/components/';
     
     // Convert namespace to path
     $path = str_replace('\\', DIRECTORY_SEPARATOR, $class) . '.php';
@@ -83,8 +85,9 @@ function help_message_and_die($error = false) {
 	die();
 }
 
-define('IMPORT_ROOT_SLUG', '/imported_content/');
-define('NEW_SITE_CONTENT_ROOT', get_site_url() . IMPORT_ROOT_SLUG);
+// define('IMPORT_ROOT_SLUG', '/imported_content/');
+define('IMPORT_ROOT_SLUG', '/readme');
+define('NEW_SITE_CONTENT_ROOT', get_site_url());
 $console_writer->write("Target site URL: " . NEW_SITE_CONTENT_ROOT . "\n");
 
 $parser = new Phalcon\Cop\Parser();
@@ -137,6 +140,8 @@ if($args['mode'] === 'path') {
 	exit(1);
 }
 
+$index_file_pattern = '#(?:index|readme)\.md$#i';
+
 /**
  * Maps a filesystem path to a WordPress-friendly URL path we can assign
  * to the imported page.
@@ -147,6 +152,27 @@ if($args['mode'] === 'path') {
  * @return string The WordPress-friendly URL path
  */
 function map_file_path_to_wordpress_url( $path ) {
+	global $index_file_pattern;
+
+	/**
+	 * Ensure a named top-level parent directory to base the entire
+	 * URL structure on.
+	 * 
+	 * Without it, the main index called "README.md" would get a slug
+	 * such as `/readme` while all the nested files would get slugs
+	 * informed by their directory names, e.g. `chapter-5`. To resolve
+	 * any URLs, we'd need to maintain a mapping of parents to paths and
+	 * use it whenever creating pages and rewriting URLs.
+	 * 
+	 * This isn't trivial. Let's just compromise and use a named top-level
+	 * parent directory to resolve all URLs in a consistent way.
+	 */
+	$path = wp_join_paths('/imported-content', $path);
+
+	if(1 === preg_match($index_file_pattern, $path)) {
+		$path = dirname($path);
+	}
+
 	$extensions = array('.md', '.html', '.xhtml');
 	foreach ($extensions as $ext) {
 		if (str_ends_with($path, $ext)) {
@@ -154,6 +180,7 @@ function map_file_path_to_wordpress_url( $path ) {
 			break;
 		}
 	}
+
 	return strtolower($path);
 }
 
@@ -183,7 +210,8 @@ add_action(
 
 		// Yes! We are linking to an imported page. Let's transform the link
 		// to a WordPress-friendly URL scheme.
-		$path_rewritten = $base_url_path_prefix . map_file_path_to_wordpress_url($path_relative_to_base);
+		$path_rewritten = map_file_path_to_wordpress_url($path_relative_to_base);
+		$path_rewritten = $base_url_path_prefix . $path_rewritten;
 		$processor->set_url(
 			$path_rewritten,
 			WPURL::parse($path_rewritten, $processor->get_parsed_url())
@@ -197,8 +225,8 @@ add_action(
  * Assigns post_name to every imported static page.
  */
 add_filter(
-	'data_liberation.stream_importer.map_entity',
-	function ( $entity ) use ($console_writer) {
+	'data_liberation.stream_importer.map_entity_before_any_processing',
+	function ( $entity ) {
 		if($entity->get_type() !== 'post') {
 			return $entity;
 		}
@@ -206,8 +234,9 @@ add_filter(
 		$data = $entity->get_data();
 		if(isset($data['parsed_metadata']['slug'])) {
 			$data['post_name'] = basename($data['parsed_metadata']['slug'][0]);
-		} else if(isset($data['link'])) {
-			$data['post_name'] = basename(map_file_path_to_wordpress_url($data['link']));
+		} else if(isset($data['local_file_path'])) {
+			$wordpress_url = map_file_path_to_wordpress_url($data['local_file_path']);
+			$data['post_name'] = basename($wordpress_url);
 		} else {
 			return $entity;
 		}
@@ -228,51 +257,23 @@ if (!isset($args['source-site-url'])) {
 }
 
 try {
-	$root_id = wp_insert_post(array(
-		'post_title' => 'Imported content',
-		'post_name' => IMPORT_ROOT_SLUG,
-		'post_type' => 'page',
-		'post_status' => 'publish',
-		'post_content' => '
-	<!-- wp:paragraph -->
-	<p>This page is the root of all your imported files. To see the imported tree structure, go to wp-admin or check the main menu above.</p>
-	<!-- /wp:paragraph -->
-	
-	<!-- wp:paragraph -->
-	<p>For quick access to the imported pages, see this flat list:</p>
-	<!-- /wp:paragraph -->
-	
-	<!-- wp:query {"queryId":1,"query":{"perPage":10,"pages":0,"offset":0,"postType":"page","order":"desc","orderBy":"date","author":"","search":"","exclude":[],"sticky":"","inherit":false}} -->
-	<div class="wp-block-query"><!-- wp:post-template -->
-	<!-- wp:post-title {"isLink":true} /-->
-	<!-- wp:post-excerpt /-->
-	<!-- /wp:post-template -->
-	
-	<!-- wp:query-pagination -->
-	<!-- wp:query-pagination-previous /-->
-	<!-- wp:query-pagination-numbers /-->
-	<!-- wp:query-pagination-next /-->
-	<!-- /wp:query-pagination --></div>
-	<!-- /wp:query -->',
-	));
-
 	// Parse URL mapping arguments
 	$source_site_url = $args['source-site-url'];
 	$additional_url_mappings = [];
 	foreach ($parser->getArray('additional-site-urls') as $url) {
 		$additional_url_mappings[] = [
 			'from' => $url,
-			'to' => NEW_SITE_CONTENT_ROOT,
+			'to' => IMPORT_ROOT_SLUG,
 		];
 	}
 
 	$console_writer->write("Starting the import\n");
 	$importer = StreamImporter::create(
-		function () use ( $chrooted_fs, $root_id, $source_site_url ) {
+		function () use ( $chrooted_fs, $source_site_url, $index_file_pattern ) {
 			return new FilesystemEntityReader(
 				$chrooted_fs,
 				[
-					'root_parent_id' => $root_id,
+					'index_file_pattern' => $index_file_pattern,
 					'filter_pattern' => '#\.(?:md|html|xhtml)$#',
 					/**
 					 * Use a number so large, there's no chance for wp_table INSERTs
@@ -283,7 +284,7 @@ try {
 					 * @TODO: Make sure this doesn't automatically bump the AUTOINCREMENT counter in MySQL.
 					 * @TODO: Bump the AUTOINCREMENT counter manually after a finished import.
 					 */
-					'first_post_id' => $root_id + 10000000,
+					'first_post_id' => 10000000,
 					'base_url' => $source_site_url,
 				]
 			);

@@ -129,11 +129,12 @@ class FilesystemEntityReader implements EntityReader {
 	private $filter_pattern = '##';
 
 	/**
-	 * Pattern to identify index files.
+	 * Pattern to identify index files. Matches no filenames by default to enforce
+	 * creation of an empty index page.
 	 *
 	 * @var string
 	 */
-	private $index_file_pattern = '##';
+	private $index_file_pattern = '#$^#';
 
 	/**
 	 * Flag to indicate if processing is finished.
@@ -195,13 +196,27 @@ class FilesystemEntityReader implements EntityReader {
 			throw new \InvalidArgumentException( 'The "base_url" option is required. It should contain the root URL of the imported site.' );
 		}
 
-		$this->fs                 = $filesystem;
+		/**
+		 * Ensure the top-level README.md has a named parent directory to
+		 * inform the URL structure for the entire imported content tree.
+		 *
+		 * Otherwise, the main index file would get a slug such as `/readme`
+		 * while every nested index would get a slug informed by its directory
+		 * name, e.g. `chapter-5`. This discrepancy complicates keeping a
+		 * coherent URL structure.
+		 */
+		// $this->fs = new OverlayFilesystem([
+		// 	'/imported-content' => $filesystem
+		// ]);
+		$this->fs = $filesystem;
 		$this->file_visitor       = new FilesystemVisitor( $filesystem );
 		$this->post_type          = $options['post_type'] ?? 'page';
 		$this->create_index_pages = $options['create_index_pages'] ?? true;
 		$this->next_post_id       = $options['first_post_id'];
 		$this->filter_pattern     = $options['filter_pattern'] ?? '#\.(?:md|html|xhtml|png|jpg|jpeg|gif|svg|webp|mp4)$#';
-		$this->index_file_pattern = $options['index_file_pattern'] ?? '#^index\.[a-z]+$#';
+		if(isset($options['index_file_pattern'])) {
+			$this->index_file_pattern = $options['index_file_pattern'];
+		}
 		$this->base_url           = $options['base_url'];
 		if ( isset( $options['root_parent_id'] ) ) {
 			$this->parent_ids[-1] = $options['root_parent_id'];
