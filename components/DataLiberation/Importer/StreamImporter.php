@@ -812,7 +812,7 @@ class StreamImporter {
 							if ( $should_rewrite_base_url ) {
 								$p->replace_base_url( $mapping_pair['to'], $mapping_pair['from'] );
 							}
-							do_action( 'data_liberation.stream_importer.rewrite_url', $p, [
+							do_action( 'data_liberation.stream_importer.postprocess_url', $p, [
 								'applied_base_url_mapping' => $mapping_pair,
 								'raw_url_before' => $raw_url_before,
 								'entity' => $entity,

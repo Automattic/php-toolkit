@@ -119,15 +119,24 @@ function wp_parent_paths( $path, $options = array() ) {
  * Removes any double slashes between path segments.
  */
 function wp_join_paths( ...$path_segments ) {
+	$input_starts_with_slash = null;
+
 	$paths = array();
 	foreach ( $path_segments as $path_segment ) {
 		if ( $path_segment !== '' ) {
 			$paths[] = $path_segment;
+			if(null === $input_starts_with_slash) {
+				$input_starts_with_slash = str_starts_with($path_segment, '/');
+			}
 		}
 	}
 	$path = implode( '/', $paths );
 
-	return preg_replace( '#/+#', '/', $path );
+	$result = preg_replace( '#/+#', '/', $path );
+	if($input_starts_with_slash && !str_starts_with($result, '/')) {
+		$result = '/' . $result;
+	}
+	return $result;
 }
 
 /**

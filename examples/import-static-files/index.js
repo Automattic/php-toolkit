@@ -137,10 +137,10 @@ const { requestHandler } = await runCLI({
 			},
 			{
 				step: 'writeFiles',
-				writeToPath: '/wordpress',
+				writeToPath: '/wordpress/wp-content/plugins/static-files-importer',
 				filesTree: {
 					resource: 'literal:directory',
-					name: 'wordpress',
+					name: 'static-files-importer',
 					files: {
 						'Parser.php': readFile('./Parser.php'),
 						'import-markdown-directory.php': readFile(
@@ -173,7 +173,7 @@ try {
 		 */
 		$argv = json_decode(getenv('JS_ARGV'), true);
 
-		require_once '/wordpress/import-markdown-directory.php';
+		require_once '/wordpress/wp-content/plugins/static-files-importer/import-markdown-directory.php';
 		
 		?>`,
 		env: {

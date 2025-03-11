@@ -196,18 +196,6 @@ class FilesystemEntityReader implements EntityReader {
 			throw new \InvalidArgumentException( 'The "base_url" option is required. It should contain the root URL of the imported site.' );
 		}
 
-		/**
-		 * Ensure the top-level README.md has a named parent directory to
-		 * inform the URL structure for the entire imported content tree.
-		 *
-		 * Otherwise, the main index file would get a slug such as `/readme`
-		 * while every nested index would get a slug informed by its directory
-		 * name, e.g. `chapter-5`. This discrepancy complicates keeping a
-		 * coherent URL structure.
-		 */
-		// $this->fs = new OverlayFilesystem([
-		// 	'/imported-content' => $filesystem
-		// ]);
 		$this->fs = $filesystem;
 		$this->file_visitor       = new FilesystemVisitor( $filesystem );
 		$this->post_type          = $options['post_type'] ?? 'page';

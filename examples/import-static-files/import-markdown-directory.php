@@ -7,7 +7,6 @@ use WordPress\DataLiberation\Importer\StreamImporter;
 use WordPress\DataLiberation\URL\WPURL;
 use WordPress\Filesystem\Layer\ChrootLayer;
 use WordPress\Filesystem\LocalFilesystem;
-use WordPress\Filesystem\OverlayFilesystem;
 use WordPress\Git\GitFilesystem;
 use WordPress\Git\GitRepository;
 
@@ -85,8 +84,6 @@ function help_message_and_die($error = false) {
 	die();
 }
 
-// define('IMPORT_ROOT_SLUG', '/imported_content/');
-define('IMPORT_ROOT_SLUG', '/readme');
 define('NEW_SITE_CONTENT_ROOT', get_site_url());
 $console_writer->write("Target site URL: " . NEW_SITE_CONTENT_ROOT . "\n");
 
@@ -156,16 +153,32 @@ function map_file_path_to_wordpress_url( $path ) {
 
 	/**
 	 * Ensure a named top-level parent directory to base the entire
-	 * URL structure on.
+	 * URL structure on. The goal is to have a consistent way to resolve
+	 * URLs for all the following files:
 	 * 
-	 * Without it, the main index called "README.md" would get a slug
-	 * such as `/readme` while all the nested files would get slugs
-	 * informed by their directory names, e.g. `chapter-5`. To resolve
-	 * any URLs, we'd need to maintain a mapping of parents to paths and
-	 * use it whenever creating pages and rewriting URLs.
+	 * - README.md
+	 * - chapter-5/README.md
+	 * - chapter-5/section-1.md
+	 * - chapter-5/section-3/readme.md
 	 * 
-	 * This isn't trivial. Let's just compromise and use a named top-level
-	 * parent directory to resolve all URLs in a consistent way.
+	 * Without the top-level directory, the best URL we can give the
+	 * /README.md file would be `/readme`. However, the `chapter-5/README.md`
+	 * would get a URL like `/chapter-5` which is inconsistent. However,
+	 * if we transform the path structure as follows, everything becomes
+	 * consistent:
+	 *
+	 * - /imported-content/README.md
+	 * - /imported-content/chapter-5/README.md
+	 * - /imported-content/chapter-5/section-1.md
+	 * - /imported-content/chapter-5/section-3/readme.md
+	 *
+	 * We want to keep all the links working after the import. A single,
+	 * consistent URL mapping strategy makes it much easier. The alternative
+	 * would be to maintain a mapping of parents to paths and use it whenever
+	 * creating pages and rewriting URLs.
+	 * 
+	 * This isn't trivial. Having a top-level path prefix is not perfect,
+	 * but it's a sound compromise.
 	 */
 	$path = wp_join_paths('/imported-content', $path);
 
@@ -189,29 +202,54 @@ function map_file_path_to_wordpress_url( $path ) {
  * to the format they will have after being imported into WordPress (e.g. /docs/getting-started).
  */
 add_action(
-	'data_liberation.stream_importer.rewrite_url',
+	'data_liberation.stream_importer.postprocess_url',
 	function ( $processor, $context ) use ( $chrooted_fs ) {
-		// If we didn't rewrite the base URL, the URL points outside
-		// of the imported root directory. Let's keep it as it is.
+		/**
+		 * If we didn't rewrite the base URL, the URL points outside
+		 * of the imported root directory. Let's keep it as it is.
+		 */
 		if(!$context['applied_base_url_mapping']) {
 			return;
 		}
 
 		$path_original = $processor->get_parsed_url()->pathname;
 
-		// Remove the site path from the URL path and see
-		// if this URL is pointing to a file that exists in the
-		// imported directory.
-		$base_url_path_prefix = rtrim($context['applied_base_url_mapping']['to']->pathname, '/');
+		/**
+		 * Remove the site path from the URL path and check:
+		 * Is this URL pointing to a file that exists in the imported
+		 * directory?
+		 */
+		$base_url_path_prefix = $context['applied_base_url_mapping']['to']->pathname;
 		$path_relative_to_base = substr($path_original, strlen($base_url_path_prefix));
-		if(!$chrooted_fs->is_file($path_relative_to_base)) {
+		if($chrooted_fs->is_file($path_relative_to_base)) {
+			/**
+			 * Yes! We are linking to an imported page. Let's transform the link
+			 * to a WordPress-friendly URL scheme.
+			 */
+			$path_rewritten = map_file_path_to_wordpress_url($path_relative_to_base);
+			$path_rewritten = wp_join_paths($base_url_path_prefix, $path_rewritten);
+		} else if($processor->is_url_absolute()) {
+			/**
+			 * No. We are linking to a content page within our site but there is
+			 * no corresponding static file. This happens e.g. in the Gutenberg
+			 * handbook where the markdown files contain absolute URLs to the deployed
+			 * site, e.g.:
+			 * 
+			 *     Start by ensuring you have Node.js and `npm` installed on your computer. Review
+			 *     the [Node.js development environment](https://developer.wordpress.org/block-editor/getting-started/devenv/nodejs-development-environment/) guide if not.
+			 *
+			 * Our best shot is to keep the URL as is, just with the imported
+			 * content root prepended to it.
+			 */
+			$path_rewritten = wp_join_paths($base_url_path_prefix, 'imported-content', $path_relative_to_base);
+		} else {
+			/**
+			 * It's a relative URL pointing somewhere within the URL space we're importing
+			 * to, but there is no corresponding static file. This is unexpected. There is
+			 * nothing we can do at this point – let's just keep the URL as it is.
+			 */
 			return;
 		}
-
-		// Yes! We are linking to an imported page. Let's transform the link
-		// to a WordPress-friendly URL scheme.
-		$path_rewritten = map_file_path_to_wordpress_url($path_relative_to_base);
-		$path_rewritten = $base_url_path_prefix . $path_rewritten;
 		$processor->set_url(
 			$path_rewritten,
 			WPURL::parse($path_rewritten, $processor->get_parsed_url())
@@ -263,7 +301,7 @@ try {
 	foreach ($parser->getArray('additional-site-urls') as $url) {
 		$additional_url_mappings[] = [
 			'from' => $url,
-			'to' => IMPORT_ROOT_SLUG,
+			'to' => NEW_SITE_CONTENT_ROOT,
 		];
 	}
 

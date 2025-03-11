@@ -300,14 +300,19 @@ class BlockMarkupUrlProcessor extends BlockMarkupProcessor {
 	 * @return bool Whether the currently matched URL is relative.
 	 */
 	public function is_url_relative() {
-		// Assumption:
-		// - only absolute URLs are detected in text nodes.
 		return (
-			$this->get_token_type() !== '#text' &&
-			! str_starts_with( $this->get_raw_url(), 'http://' ) &&
-			! str_starts_with( $this->get_raw_url(), 'https://' ) &&
-			! str_starts_with( $this->get_raw_url(), '//' )
+			! WPURL::can_parse($this->get_raw_url()) &&
+			// only absolute URLs are detected in text nodes.
+			'#text' !== $this->get_token_type()
 		);
+	}
+	/**
+	 * Returns true if the currently matched URL is absolute.
+	 *
+	 * @return bool Whether the currently matched URL is absolute.
+	 */
+	public function is_url_absolute() {
+		return WPURL::can_parse($this->get_raw_url());
 	}
 
 	public function get_inspected_attribute_name() {

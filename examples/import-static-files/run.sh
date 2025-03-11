@@ -1,28 +1,28 @@
 #!/bin/bash
 
 # A subset of Gutenberg docs
-bun index.js \
-	git https://github.com/WordPress/gutenberg.git \
-	--branch=trunk \
-	--path-in-repo=docs/how-to-guides/data-basics/ \
-	--media-url=https://developer.wordpress.org/files/ \
-	--media-url=https://raw.githubusercontent.com/WordPress/gutenberg/HEAD/docs/ \
-	--source-site-url=https://developer.wordpress.org/block-editor/how-to-guides/data-basics/ \
-	--additional-site-urls=https://developer.wordpress.org/docs/how-to-guides/data-basics/
-
-# The entire Gutenberg documentation
 # bun index.js \
 # 	git https://github.com/WordPress/gutenberg.git \
 # 	--branch=trunk \
-# 	--path-in-repo=docs/ \
+# 	--path-in-repo=docs/how-to-guides/data-basics/ \
 # 	--media-url=https://developer.wordpress.org/files/ \
 # 	--media-url=https://raw.githubusercontent.com/WordPress/gutenberg/HEAD/docs/ \
-# 	--source-site-url=https://developer.wordpress.org/block-editor/ \
-# 	--additional-site-urls=https://developer.wordpress.org/docs/
+# 	--source-site-url=https://developer.wordpress.org/block-editor/how-to-guides/data-basics/ \
+# 	--additional-site-urls=https://developer.wordpress.org/docs/how-to-guides/data-basics/
+
+# The entire Gutenberg documentation
+bun index.js \
+	git https://github.com/WordPress/gutenberg.git \
+	--branch=trunk \
+	--path-in-repo=docs/ \
+	--media-url=https://developer.wordpress.org/files/ \
+	--media-url=https://raw.githubusercontent.com/WordPress/gutenberg/HEAD/docs/ \
+	--source-site-url=https://developer.wordpress.org/block-editor/ \
+	--additional-site-urls=https://developer.wordpress.org/docs/
 
 # A subset of the Gutenberg docs from a local checkout
 # The pages import well.
-# bun index.js path ../../../gutenberg/docs/how-to-guides/data-basics/
+# bun index.js path ../../../gutenberg/docs/how-to-guides/
 
 # Playground docs – Blueprints tutorial
 # The URL structure is broken – we would need an MDX-specific plugin to
@@ -33,6 +33,16 @@ bun index.js \
 # 	--path-in-repo=packages/docs/site/docs/blueprints/ \
 # 	--media-url=https://wordpress.github.io/wordpress-playground/ \
 # 	--source-site-url=https://wordpress.github.io/
+
+# Bootstrap 5.3 docs
+# bun index.js \
+# 	git https://github.com/twbs/bootstrap.git \
+# 	--branch=gh-pages \
+# 	--path-in-repo=docs/5.3/ \
+# 	--media-url=https://getbootstrap.com/docs/5.3/ \
+# 	--source-site-url=https://getbootstrap.com/docs/5.3/ \
+# 	--additional-site-urls=https://getbootstrap.com/docs/
+
 
 # Laravel docs
 # It imports fine but there are issues we'd need a dedicated
