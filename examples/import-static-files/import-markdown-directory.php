@@ -1,5 +1,6 @@
 <?php
 
+use Rowbot\URL\URL;
 use WordPress\DataLiberation\EntityReader\FilesystemEntityReader;
 use WordPress\DataLiberation\Importer\ImportSession;
 use WordPress\DataLiberation\Importer\ImportUtils;
@@ -10,7 +11,9 @@ use WordPress\Filesystem\Layer\ChrootLayer;
 use WordPress\Filesystem\LocalFilesystem;
 use WordPress\Git\GitFilesystem;
 use WordPress\Git\GitRepository;
+use WordPress\HttpClient\Crawler;
 
+use function WordPress\DataLiberation\URL\is_child_url_of;
 use function WordPress\Filesystem\wp_join_paths;
 
 if(file_exists('/wordpress/wp-load.php')) {
@@ -62,10 +65,13 @@ function help_message_and_die($error = false) {
 	global $console_writer;
     $console_writer->write("\033[1;32mUsage:\033[0m php import-markdown-directory.php \033[1;33mmode\033[0m [options]\n");
     $console_writer->write("  options:\n");
-    $console_writer->write("    \033[1;33mmode:\033[0m path|git\n");
+    $console_writer->write("    \033[1;33mmode:\033[0m path|git|crawler\n");
 	$console_writer->write("    \033[1;34m--source-site-url=<url>\033[0m (required)\n");
 	$console_writer->write("    \033[1;34m--additional-site-urls=<url>\033[0m – rewrite all the detected links based on this URL (multiple values allowed)\n");
     $console_writer->write("    \033[1;34m--media-url=<url>\033[0m – media files from this URL will be downloaded during the import (multiple values allowed)\n");
+	$console_writer->write("\n");
+	$console_writer->write("  \033[1;33mcrawler\033[0m mode usage:\n");
+	$console_writer->write("    php import-markdown-directory.php crawler \033[1;34m<url>\033[0m\n");
 	$console_writer->write("\n");
     $console_writer->write("  \033[1;33mpath\033[0m mode usage:\n");
     $console_writer->write("    php import-markdown-directory.php path \033[1;34m<path to directory>\033[0m\n");
@@ -133,12 +139,89 @@ if($args['mode'] === 'path') {
 	$docs_repo->checkout('refs/heads/' . $branch);
 	$git_fs = GitFilesystem::create($docs_repo);
 	$chrooted_fs = new ChrootLayer($git_fs, $path_in_repo);
+} else if ($args['mode'] === 'crawler') {
+	if (!isset($args['data_url'])) {
+		help_message_and_die('The "url" argument is required.');
+	}
+	if(!WPURL::parse($args['data_url'])) {
+		help_message_and_die('The "url" argument must be a valid URL.');
+	}
+	$args['source-site-url'] = $args['data_url'];
+	$tmp_dir = sys_get_temp_dir() . '/import-static-' . uniqid();
+	$chrooted_fs = LocalFilesystem::create($tmp_dir);
+	$crawler = new Crawler($args['data_url'], [
+		'preprocess_url' => function(URL $url) use ($args) {
+			if(!is_child_url_of($url, $args['data_url'])) {
+				return false;
+			}
+			$url->search = '';
+			if(in_array($url->pathname, ['/feed/', '/wp-json/'])) {
+				return false;
+			}
+			if(preg_match('#^/\d{4}/\d{2}/\d{2}/[^/]+/$#', $url->pathname)) {
+				return $url;
+			}
+			if(preg_match('#^/[^/]+/$#', $url->pathname)) {
+				return $url;
+			}
+			return false;
+		},
+	]);
+	$progress = new ProgressBar($console_writer, null);
+	$progress->start('Crawling website...');
+	while($crawler->crawl_next()) {
+		$parsed_url = WPURL::parse($crawler->get_current_url());
+		$file_path = $parsed_url->pathname;
+		if($file_path === '/') {
+			$file_path = '/index.html';
+		} else if(str_ends_with($file_path, '/')) {
+			/**
+			 * Choose to treat /2021/10/03/dont-waste-time-on-boring-programming-lessons/ as
+			 * /2021/10/03/dont-waste-time-on-boring-programming-lessons.html
+			 * 
+			 * Another possible choice would be to save it as
+			 * /2021/10/03/dont-waste-time-on-boring-programming-lessons/index.html
+			 */
+			$file_path = rtrim($file_path, '/');
+		}
+		
+		if(!$file_path || strlen($file_path) < 1) {
+			$file_path = sha1($crawler->get_current_url());
+		}
+
+		$extension = pathinfo($file_path, PATHINFO_EXTENSION);
+		if(!$extension) {
+			$file_path .= '.html';
+		}
+
+		/**
+		 * Replace date-based paths with "posts" directory.
+		 *
+		 * Why? wp_insert_post() seems to mangle the post_name if it consists of a few numbers
+		 * and that messes up the URLs of the imported posts.
+		 * 
+		 * @TODO: Investigate the reasons of this behavior.
+		 */
+		$file_path = preg_replace('#/\d{4}/\d{2}/\d{2}/#', '/posts/', $file_path);
+		$content = $crawler->get_current_content();
+		// @TODO: This is very naive – we should use the URL processor instead.
+		$content = preg_replace('#/\d{4}/\d{2}/\d{2}/#', '/posts/', $content);
+
+		$chrooted_fs->mkdir(dirname($file_path), ['recursive' => true]);
+		$chrooted_fs->put_contents(
+			$file_path,
+			$content
+		);
+		$progress->setMessage('Fetching '.$parsed_url->pathname);
+		$progress->advance();
+	}
+	$progress->finish();
 } else {
     help_message_and_die('The "mode" argument is required and must be either "path" or "git".');
 	exit(1);
 }
 
-$index_file_pattern = '#(?:index|readme)\.md$#i';
+$index_file_pattern = '#(?:index|readme)\.(?:md|html|xhtml)$#i';
 $import_path_prefix = '/imported-content';
 
 /**
@@ -280,6 +363,7 @@ add_filter(
 		}
 
 		$data = $entity->get_data();
+
 		if(isset($data['parsed_metadata']['slug'])) {
 			$data['post_name'] = basename($data['parsed_metadata']['slug'][0]);
 		} else if(isset($data['local_file_path'])) {

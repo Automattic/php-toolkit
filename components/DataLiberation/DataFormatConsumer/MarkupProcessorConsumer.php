@@ -92,6 +92,9 @@ class MarkupProcessorConsumer implements DataFormatConsumer {
 		$is_void_tag = ! $html->expects_closer() && ! $html->is_tag_closer();
 		if ( $is_void_tag ) {
 			switch ( $tag ) {
+				case 'TITLE':
+					$this->metadata['post_title'] = array($html->get_modifiable_text());
+					break;
 				case 'META':
 					$key   = $html->get_attribute( 'name' );
 					$value = $html->get_attribute( 'content' );

@@ -297,6 +297,9 @@ class FilesystemEntityReader implements EntityReader {
 			} elseif ( $post_tree_node['type'] === 'index_file_placeholder' ) {
 				$result                 = new BlocksWithMetadata( '', array() );
 				$metadata['post_title'] = ImportUtils::slug_to_title( basename( $post_tree_node['local_file_path'] ) );
+			} else {
+				// Directory node, let's skip it.
+				continue;
 			}
 
 			$reader = new BlocksWithMetadataEntityReader(

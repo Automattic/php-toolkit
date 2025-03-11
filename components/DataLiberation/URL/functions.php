@@ -71,6 +71,10 @@ function is_child_url_of( $child, $parent_url ) {
 		return false;
 	}
 
+	if ($parent_url->protocol !== $child->protocol) {
+		return false;
+	}
+
 	$parent_pathname = urldecode( $parent_url->pathname );
 	return (
 		// Direct match
