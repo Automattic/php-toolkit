@@ -100,6 +100,8 @@ if($args['mode'] === 'path') {
 
 	PlaygroundProtocolClient::getInstance()->mountDirectory($args['data_url'], '/files-to-import');
 	$chrooted_fs = LocalFilesystem::create('/files-to-import');
+
+	$args['source-site-url'] = 'file:///';
 } else if ($args['mode'] === 'git') {
 	if (!isset($args['data_url'])) {
 		help_message_and_die('The "repo" argument is required.');
@@ -204,8 +206,8 @@ add_filter(
 		$data = $entity->get_data();
 		if(isset($data['parsed_metadata']['slug'])) {
 			$data['post_name'] = basename($data['parsed_metadata']['slug'][0]);
-		} else if(isset($data['local_file_path'])) {
-			$data['post_name'] = basename(map_file_path_to_wordpress_url($data['local_file_path']));
+		} else if(isset($data['link'])) {
+			$data['post_name'] = basename(map_file_path_to_wordpress_url($data['link']));
 		} else {
 			return $entity;
 		}
@@ -290,7 +292,10 @@ try {
 			'new_site_content_root_url' => NEW_SITE_CONTENT_ROOT,
 			'source_media_root_urls' => $parser->getArray('media-url') ?: [$source_site_url],
 			'additional_url_mappings' => $additional_url_mappings,
-			'index_batch_size' => 1
+			'index_batch_size' => 1,
+			'attachment_downloader_options' => [
+				'source_from_filesystem' => $chrooted_fs
+			]
 		]
 	);
 

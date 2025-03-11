@@ -662,7 +662,8 @@ class StreamImporter {
 					}
 				} elseif ( isset( $data['post_content'] ) ) {
 					$post = $data;
-					$p    = new BlockMarkupUrlProcessor( $post['post_content'], $this->get_post_base_url( $post ) );
+					$base_url = $this->get_post_base_url( $post );
+					$p    = new BlockMarkupUrlProcessor( $post['post_content'], $base_url );
 					while ( $p->next_url() ) {
 						if ( ! $this->url_processor_matched_asset_url( $p ) ) {
 							continue;
@@ -670,7 +671,7 @@ class StreamImporter {
 						$this->enqueue_attachment_download(
 							$p->get_raw_url(),
 							array(
-								'context_path' => $post['local_file_path'] ?? $post['slug'] ?? null,
+								'base_url' => $base_url,
 							)
 						);
 					}
@@ -746,7 +747,7 @@ class StreamImporter {
 					}
 					$asset_filename = $this->new_asset_filename(
 						$data['attachment_url'],
-						$data['local_file_path'] ?? $data['slug'] ?? null
+						$data['link'] ?? null
 					);
 					unset( $data['attachment_url'] );
 					$data['local_file_path'] = $this->options['uploads_path'] . '/' . $asset_filename;
@@ -762,7 +763,8 @@ class StreamImporter {
 						if ( ! isset( $data[ $key ] ) ) {
 							continue;
 						}
-						$p = new BlockMarkupUrlProcessor( $data[ $key ], $this->get_post_base_url( $data ) );
+						$base_url = $this->get_post_base_url( $data );
+						$p = new BlockMarkupUrlProcessor( $data[ $key ], $base_url );
 						while ( $p->next_url() ) {
 							// Relative URLs are okay at this stage.
 							if ( ! $p->get_raw_url() ) {
@@ -778,7 +780,7 @@ class StreamImporter {
 							 */
 							$asset_filename = $this->new_asset_filename(
 								$p->get_raw_url(),
-								$data['local_file_path'] ?? $data['slug'] ?? null
+								$base_url
 							);
 							if ( file_exists( $this->options['uploads_path'] . '/' . $asset_filename ) ) {
 								$raw_url = rtrim( $this->options['new_media_root_url'], '/' ) . '/' . $asset_filename;
@@ -861,10 +863,9 @@ class StreamImporter {
 	protected function enqueue_attachment_download( string $raw_url, $options = array() ) {
 		$output_filename = $this->new_asset_filename(
 			$options['original_url'] ?? $raw_url,
-			$options['context_path'] ?? null
+			$options['base_url'] ?? null
 		);
-
-		$download_url = $this->rewrite_attachment_url( $raw_url, $options['context_path'] ?? null );
+		$download_url = $this->rewrite_attachment_url( $raw_url, $options['base_url'] ?? null );
 		$enqueued     = $this->downloader->enqueue_if_not_exists( $download_url, $output_filename );
 		if ( false === $enqueued ) {
 			_doing_it_wrong( __METHOD__, sprintf( 'Failed to enqueue attachment download: %s', $raw_url ), '1.0' );
@@ -906,10 +907,10 @@ class StreamImporter {
 	 *   different permissions. Just because Bob deletes his copy, doesn't
 	 *   mean we should delete Alice's copy.
 	 */
-	protected function new_asset_filename( string $raw_asset_url, $context_path = null ) {
+	protected function new_asset_filename( string $raw_asset_url, $base_url = null ) {
 		$raw_asset_url = $this->rewrite_attachment_url(
 			$raw_asset_url,
-			$context_path
+			$base_url
 		);
 
 		$filename   = md5( $raw_asset_url );
@@ -928,16 +929,17 @@ class StreamImporter {
 		return $filename;
 	}
 
-	protected function rewrite_attachment_url( string $raw_url, $context_path = null ) {
+	protected function rewrite_attachment_url( string $raw_url, $base_url = null ) {
 		if ( WPURL::can_parse( $raw_url ) ) {
 			// Absolute URL, nothing to do.
 			return $raw_url;
 		}
-		$base_url = $this->source_site_url;
-		if ( null !== $base_url && null !== $context_path ) {
-			$base_url = rtrim( $base_url, '/' ) . '/' . ltrim( $context_path, '/' );
+
+		if(!$base_url) {
+			$base_url = $this->source_site_url;
 		}
 		$parsed_url = WPURL::parse( $raw_url, $base_url );
+
 		if ( false === $parsed_url ) {
 			return false;
 		}
