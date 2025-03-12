@@ -88,7 +88,7 @@ class FilesystemEntityReaderTest extends TestCase {
 		$entities = array();
 		while ( $reader->next_entity() ) {
 			$page_maybe = $reader->get_entity();
-			if( $page_maybe->get_type() === 'post' ) {
+			if ( $page_maybe->get_type() === 'post' ) {
 				$entities[] = $page_maybe->get_data();
 			}
 		}
@@ -116,7 +116,7 @@ class FilesystemEntityReaderTest extends TestCase {
 	}
 
 	public function test_leaves_out_directories_with_no_content() {
-		$reader = new FilesystemEntityReader(
+		$reader   = new FilesystemEntityReader(
 			LocalFilesystem::create( __DIR__ . '/fixtures/filesystem-entity-reader/with-nested-images-directory' ),
 			array(
 				'first_post_id' => 2,
@@ -133,11 +133,11 @@ class FilesystemEntityReaderTest extends TestCase {
 		$this->assertEquals( 'https://example.com/nested/page1.html', $entities[2]['link'] );
 	}
 
-	private function get_post_entities($reader) {
+	private function get_post_entities( $reader ) {
 		$entities = array();
 		while ( $reader->next_entity() ) {
 			$page_maybe = $reader->get_entity();
-			if( $page_maybe->get_type() === 'post' ) {
+			if ( $page_maybe->get_type() === 'post' ) {
 				$entities[] = $page_maybe->get_data();
 			}
 		}

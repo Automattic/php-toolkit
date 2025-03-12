@@ -77,12 +77,12 @@ class BlockMarkupUrlProcessorTest extends TestCase {
 	/**
 	 * @dataProvider provider_test_parse_url_with_base_url
 	 */
-	public function test_parse_url_with_base_url($expected_result, $markup, $base_url) {
-		$p = new BlockMarkupUrlProcessor($markup, $base_url);
-		$this->assertTrue($p->next_url(), 'Failed to find the URL in the markup.');
+	public function test_parse_url_with_base_url( $expected_result, $markup, $base_url ) {
+		$p = new BlockMarkupUrlProcessor( $markup, $base_url );
+		$this->assertTrue( $p->next_url(), 'Failed to find the URL in the markup.' );
 		$parsed_url = $p->get_parsed_url();
-		$this->assertNotFalse($parsed_url, 'URL parsing failed');
-		$this->assertEquals($expected_result, $parsed_url->toString(), 'Parsed URL does not match the expected URL.');
+		$this->assertNotFalse( $parsed_url, 'URL parsing failed' );
+		$this->assertEquals( $expected_result, $parsed_url->toString(), 'Parsed URL does not match the expected URL.' );
 	}
 
 	public static function provider_test_parse_url_with_base_url() {
@@ -90,17 +90,17 @@ class BlockMarkupUrlProcessorTest extends TestCase {
 			'Static file URL in the <a> tag' => array(
 				'https://wordpress.org/nodejs-development-environment.md',
 				'<a href="nodejs-development-environment.md">',
-				'https://wordpress.org'
+				'https://wordpress.org',
 			),
 			'Relative URL in the <a> tag' => array(
 				'https://wordpress.org/docs/page.html',
 				'<a href="docs/page.html">',
-				'https://wordpress.org'
+				'https://wordpress.org',
 			),
 			'Absolute URL with base URL' => array(
 				'https://example.com/page.html',
 				'<a href="https://example.com/page.html">',
-				'https://wordpress.org'
+				'https://wordpress.org',
 			),
 		);
 	}
@@ -143,7 +143,7 @@ class BlockMarkupUrlProcessorTest extends TestCase {
 	public function test_set_url( $markup, $new_url, $new_markup ) {
 		$p = new BlockMarkupUrlProcessor( $markup );
 		$this->assertTrue( $p->next_url(), 'Failed to find the URL in the markup.' );
-		$this->assertTrue( $p->set_url( $new_url, WPURL::parse($new_url) ), 'Failed to set the URL in the markup.' );
+		$this->assertTrue( $p->set_url( $new_url, WPURL::parse( $new_url ) ), 'Failed to set the URL in the markup.' );
 		$this->assertEquals( $new_markup, $p->get_updated_html(), 'Failed to set the URL in the markup.' );
 	}
 
@@ -191,7 +191,7 @@ HTML
 
 		// Replace every url with 'https://site-export.internal'
 		while ( $p->next_url() ) {
-			$p->set_url( 'https://site-export.internal', WPURL::parse('https://site-export.internal') );
+			$p->set_url( 'https://site-export.internal', WPURL::parse( 'https://site-export.internal' ) );
 		}
 
 		$this->assertEquals(
@@ -219,8 +219,8 @@ HTML
 	/**
 	 * @dataProvider provider_test_next_url_replace_base_url
 	 */
-	public function test_next_url_replace_base_url($input_url, $base_url, $target_base_url, $expected) {
-		$p = new BlockMarkupUrlProcessor($input_url, $base_url);
+	public function test_next_url_replace_base_url( $input_url, $base_url, $target_base_url, $expected ) {
+		$p = new BlockMarkupUrlProcessor( $input_url, $base_url );
 
 		while ( $p->next_url() ) {
 			$p->replace_base_url( WPURL::parse( $target_base_url ) );
@@ -235,32 +235,32 @@ HTML
 				'input_url' => 'https://example.com/test/?page_id=1',
 				'base_url' => 'https://example.com/',
 				'target_base_url' => 'https://example.org:8888/',
-				'expected' => 'https://example.org:8888/test/?page_id=1'
+				'expected' => 'https://example.org:8888/test/?page_id=1',
 			),
 			'complex path with many segments' => array(
 				'input_url' => 'https://example.com/a/b/c/d/e/f/g/h/i/j/page/',
 				'base_url' => 'https://example.com/a/b/c/d/e/f/',
 				'target_base_url' => 'https://example.org/docs/',
-				'expected' => 'https://example.org/docs/g/h/i/j/page/'
+				'expected' => 'https://example.org/docs/g/h/i/j/page/',
 			),
 			'Actual developer.wordpress.org example' => array(
 				'input_url' => 'https://developer.wordpress.org/block-editor/getting-started/devenv/get-started-with-wp-env/',
 				'base_url' => 'https://developer.wordpress.org/block-editor/getting-started/devenv/',
 				'target_base_url' => 'http://127.0.0.1:9400/imported_content/',
-				'expected' => 'http://127.0.0.1:9400/imported_content/get-started-with-wp-env/'
+				'expected' => 'http://127.0.0.1:9400/imported_content/get-started-with-wp-env/',
 			),
 			'path with query and hash' => array(
 				'input_url' => 'https://example.com/path/to/page/?id=123#section',
 				'base_url' => 'https://example.com/path/',
 				'target_base_url' => 'https://example.org/new/',
-				'expected' => 'https://example.org/new/to/page/?id=123#section'
+				'expected' => 'https://example.org/new/to/page/?id=123#section',
 			),
 			'deep nested paths' => array(
 				'input_url' => 'https://example.com/one/two/three/four/five/six/seven/eight/nine/ten/file.html',
 				'base_url' => 'https://example.com/one/two/three/four/five/six/',
 				'target_base_url' => 'https://example.org/root/',
-				'expected' => 'https://example.org/root/seven/eight/nine/ten/file.html'
-			)
+				'expected' => 'https://example.org/root/seven/eight/nine/ten/file.html',
+			),
 		);
 	}
 }

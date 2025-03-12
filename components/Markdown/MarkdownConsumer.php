@@ -372,6 +372,7 @@ BLOCK;
 
 	/**
 	 * Naive slugification.
+	 *
 	 * @TODO: Use a more sophisticated utf-8 aware slugification.
 	 */
 	private function slugify( $title ) {
@@ -383,7 +384,7 @@ BLOCK;
 			return $node->getLiteral();
 		}
 		$text_content = '';
-		$walker = $node->walker();
+		$walker       = $node->walker();
 		while ( true ) {
 			$event = $walker->next();
 			if ( ! $event ) {

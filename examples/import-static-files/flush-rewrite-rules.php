@@ -5,7 +5,7 @@ require_once '/wordpress/wp-load.php';
  * a more involved URL rewriting logic. Right now, we
  * can assume that relative URLs between all static files
  * in the same directory should retain the same structure.
- * 
+ *
  * Imagine the following directory structure:
  * /directory
  *   index.md
@@ -36,5 +36,5 @@ require_once '/wordpress/wp-load.php';
  * It is much easier to just drop the trailing slash, so that's
  * what we're going to do.
  */
-update_option('permalink_structure', '/%postname%');
+update_option( 'permalink_structure', '/%postname%' );
 flush_rewrite_rules();

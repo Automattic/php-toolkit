@@ -30,7 +30,7 @@ use WP_HTML_Processor;
  * array(
  *     'post_title' => array( 'My first post' ),
  * )
- * 
+ *
  * @TODO: Satisfy the same test suite as the Gutenberg paste/raw handler.
  *        Look for the test examples (input/output) in the Gutenberg repo.
  * @TODO: Consider option for "presentation" vs "semantics" mode. We can preserve
@@ -59,7 +59,7 @@ class MarkupProcessorConsumer implements DataFormatConsumer {
 							break;
 						}
 						$this->append_rich_text( htmlspecialchars( $this->markup_processor->get_modifiable_text() ) );
-						if(in_array($this->markup_processor->get_tag(), ['H1', 'H2', 'H3', 'H4', 'H5', 'H6'])) {
+						if ( in_array( $this->markup_processor->get_tag(), array( 'H1', 'H2', 'H3', 'H4', 'H5', 'H6' ) ) ) {
 							$this->on_title_candidate( $this->markup_processor->get_modifiable_text() );
 						}
 						break;
@@ -102,7 +102,7 @@ class MarkupProcessorConsumer implements DataFormatConsumer {
 					$key   = $html->get_attribute( 'name' );
 					$value = $html->get_attribute( 'content' );
 					if ( ! array_key_exists( $key, $this->metadata ) ) {
-						if($key) {
+						if ( $key ) {
 							$this->metadata[ $key ] = array();
 						}
 					}
@@ -115,7 +115,7 @@ class MarkupProcessorConsumer implements DataFormatConsumer {
 							break;
 						// @TODO: Discuss what would support for other types look like.
 					}
-					if($key) {
+					if ( $key ) {
 						$this->metadata[ $key ][] = $value;
 					}
 					break;
@@ -297,15 +297,15 @@ class MarkupProcessorConsumer implements DataFormatConsumer {
 	}
 
 	private function on_title_candidate( $text ) {
-		if(!array_key_exists('post_title', $this->metadata)) {
+		if ( ! array_key_exists( 'post_title', $this->metadata ) ) {
 			$this->metadata['post_title'] = array(
-				$text
+				$text,
 			);
 		}
-		if(!array_key_exists('post_name', $this->metadata)) {
+		if ( ! array_key_exists( 'post_name', $this->metadata ) ) {
 			$this->metadata['post_name'] = array(
 				// @TODO: Slugify
-				$text
+				$text,
 			);
 		}
 	}

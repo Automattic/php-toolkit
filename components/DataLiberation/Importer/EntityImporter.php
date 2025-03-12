@@ -113,7 +113,7 @@ class EntityImporter {
 		);
 
 		// Load the function wp_read_audio_metadata
-		require_once( ABSPATH . 'wp-admin/includes/media.php' );
+		require_once ABSPATH . 'wp-admin/includes/media.php';
 	}
 
 	public function import_entity( ImportEntity $entity ) {

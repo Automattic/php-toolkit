@@ -196,16 +196,16 @@ class FilesystemEntityReader implements EntityReader {
 			throw new \InvalidArgumentException( 'The "base_url" option is required. It should contain the root URL of the imported site.' );
 		}
 
-		$this->fs = $filesystem;
+		$this->fs                 = $filesystem;
 		$this->file_visitor       = new FilesystemVisitor( $filesystem );
 		$this->post_type          = $options['post_type'] ?? 'page';
 		$this->create_index_pages = $options['create_index_pages'] ?? true;
 		$this->next_post_id       = $options['first_post_id'];
 		$this->filter_pattern     = $options['filter_pattern'] ?? '#\.(?:md|html|xhtml|png|jpg|jpeg|gif|svg|webp|mp4)$#';
-		if(isset($options['index_file_pattern'])) {
+		if ( isset( $options['index_file_pattern'] ) ) {
 			$this->index_file_pattern = $options['index_file_pattern'];
 		}
-		$this->base_url           = $options['base_url'];
+		$this->base_url = $options['base_url'];
 		if ( isset( $options['root_parent_id'] ) ) {
 			$this->parent_ids[-1] = $options['root_parent_id'];
 		}
@@ -391,7 +391,7 @@ class FilesystemEntityReader implements EntityReader {
 					);
 				} elseif ( false === $this->pending_directory_index ) {
 					// No directory index candidate found in the current directory.
-					if($depth === 0 && isset($this->parent_ids[-1]) && $parent_id === $this->parent_ids[-1]) {
+					if ( $depth === 0 && isset( $this->parent_ids[-1] ) && $parent_id === $this->parent_ids[-1] ) {
 						// We're at the root directory and we have a root parent ID. Let's
 						// reuse that as the top-level parent.
 						$this->parent_ids[ $depth ] = $this->parent_ids[-1];
@@ -408,7 +408,7 @@ class FilesystemEntityReader implements EntityReader {
 							'parent_id' => $parent_id,
 						)
 					);
-					
+
 					// We're no longer looking for a directory index.
 					$this->pending_directory_index = null;
 				} else {

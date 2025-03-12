@@ -47,21 +47,21 @@ class EPubEntityReader implements EntityReader {
 		}
 
 		if ( null === $this->remaining_html_files ) {
-			if(false === $this->parse_manifest()) {
+			if ( false === $this->parse_manifest() ) {
 				_doing_it_wrong( __METHOD__, 'The EPUB file did not contain a manifest.', '1.0.0' );
 				$this->finished = true;
 				return false;
 			}
 
-			foreach($this->manifest['items'] as $item) {
-				if($item['media-type'] !== 'application/xhtml+xml') {
+			foreach ( $this->manifest['items'] as $item ) {
+				if ( $item['media-type'] !== 'application/xhtml+xml' ) {
 					continue;
 				}
-				if(($item['properties'] ?? '') === 'nav') {
+				if ( ( $item['properties'] ?? '' ) === 'nav' ) {
 					continue;
 				}
 				$this->remaining_html_files[] = wp_join_paths(
-					dirname($this->manifest_path),
+					dirname( $this->manifest_path ),
 					$item['href']
 				);
 			}
@@ -82,27 +82,27 @@ class EPubEntityReader implements EntityReader {
 				return false;
 			}
 
-			$html_file                 = array_shift( $this->remaining_html_files );
-			$html                      = $this->zip->get_contents( $html_file );
-			$converter                 = new MarkupProcessorConsumer(
+			$html_file        = array_shift( $this->remaining_html_files );
+			$html             = $this->zip->get_contents( $html_file );
+			$converter        = new MarkupProcessorConsumer(
 				XMLProcessor::create_from_string( $html )
 			);
-			$blocks_with_meta          = $converter->consume();
-			$meta = $blocks_with_meta->get_all_metadata();
-			if(!array_key_exists('post_name', $meta)) {
+			$blocks_with_meta = $converter->consume();
+			$meta             = $blocks_with_meta->get_all_metadata();
+			if ( ! array_key_exists( 'post_name', $meta ) ) {
 				$meta['post_name'] = array(
-					basename($html_file, '.xhtml')
+					basename( $html_file, '.xhtml' ),
 				);
 			}
-			if(!array_key_exists('post_title', $meta)) {
+			if ( ! array_key_exists( 'post_title', $meta ) ) {
 				$meta['post_title'] = array(
-					basename($html_file, '.xhtml')
+					basename( $html_file, '.xhtml' ),
 				);
 			}
-			$meta['post_type'] = ['page'];
-			$meta['post_status'] = ['publish'];
-			$meta['link'] = ['file://' . $html_file];
-			$blocks_with_meta = new BlocksWithMetadata(
+			$meta['post_type']         = array( 'page' );
+			$meta['post_status']       = array( 'publish' );
+			$meta['link']              = array( 'file://' . $html_file );
+			$blocks_with_meta          = new BlocksWithMetadata(
 				$blocks_with_meta->get_block_markup(),
 				$meta
 			);
@@ -120,32 +120,32 @@ class EPubEntityReader implements EntityReader {
 	 * An absolute path to the manifest file. Starting with slash.
 	 */
 	public function get_manifest_path() {
-		if(null === $this->manifest_path) {
+		if ( null === $this->manifest_path ) {
 			$this->parse_manifest();
 		}
 		return $this->manifest_path;
 	}
 
 	private function parse_manifest() {
-		if(null !== $this->manifest) {
+		if ( null !== $this->manifest ) {
 			return true;
 		}
-		
+
 		$xml = XMLProcessor::create_from_string(
-			$this->zip->get_contents('META-INF/container.xml')
+			$this->zip->get_contents( 'META-INF/container.xml' )
 		);
-		if(false === $xml->next_tag( 'rootfile' )) {
+		if ( false === $xml->next_tag( 'rootfile' ) ) {
 			return false;
 		}
 
 		$full_path = $xml->get_attribute( 'full-path' );
-		if(!$full_path) {
+		if ( ! $full_path ) {
 			return false;
 		}
 
-		$this->manifest_path = '/' . ltrim($full_path, '/');
-		$manifest = $this->zip->get_contents($this->manifest_path);
-		if(!$manifest) {
+		$this->manifest_path = '/' . ltrim( $full_path, '/' );
+		$manifest            = $this->zip->get_contents( $this->manifest_path );
+		if ( ! $manifest ) {
 			return false;
 		}
 		$xml = XMLProcessor::create_from_string(
@@ -156,20 +156,20 @@ class EPubEntityReader implements EntityReader {
 			'metadata' => array(),
 			'items' => array(),
 		);
-		while($xml->next_tag()) {
+		while ( $xml->next_tag() ) {
 			$parsed_entry = array();
-			$keys = $xml->get_attribute_names_with_prefix( '' );
-			foreach($keys as $key) {
-				$parsed_entry[$key] = $xml->get_attribute($key);
+			$keys         = $xml->get_attribute_names_with_prefix( '' );
+			foreach ( $keys as $key ) {
+				$parsed_entry[ $key ] = $xml->get_attribute( $key );
 			}
-			if($xml->matches_breadcrumbs( array( 'metadata', '*' ) )) {
-				$parsed['metadata'][] = [
+			if ( $xml->matches_breadcrumbs( array( 'metadata', '*' ) ) ) {
+				$parsed['metadata'][] = array(
 					'tag' => $xml->get_tag(),
 					'attributes' => $parsed_entry,
-				];
-			} else if($xml->matches_breadcrumbs( array( 'manifest', 'item' ) )) {
+				);
+			} elseif ( $xml->matches_breadcrumbs( array( 'manifest', 'item' ) ) ) {
 				$parsed_entry['type'] = 'item';
-				$parsed['items'][] = $parsed_entry;
+				$parsed['items'][]    = $parsed_entry;
 			}
 		}
 		$this->manifest = $parsed;

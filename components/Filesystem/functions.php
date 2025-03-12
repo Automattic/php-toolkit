@@ -42,7 +42,7 @@ function copy_between_filesystems( array $args ) {
 				)
 			);
 		}
-		
+
 		$to_stream = $destination->open_write_stream( $destination_path );
 		try {
 			$from_stream = $source->open_read_stream( $source_path );
@@ -125,15 +125,15 @@ function wp_join_paths( ...$path_segments ) {
 	foreach ( $path_segments as $path_segment ) {
 		if ( $path_segment !== '' ) {
 			$paths[] = $path_segment;
-			if(null === $input_starts_with_slash) {
-				$input_starts_with_slash = str_starts_with($path_segment, '/');
+			if ( null === $input_starts_with_slash ) {
+				$input_starts_with_slash = str_starts_with( $path_segment, '/' );
 			}
 		}
 	}
 	$path = implode( '/', $paths );
 
 	$result = preg_replace( '#/+#', '/', $path );
-	if($input_starts_with_slash && !str_starts_with($result, '/')) {
+	if ( $input_starts_with_slash && ! str_starts_with( $result, '/' ) ) {
 		$result = '/' . $result;
 	}
 	return $result;
@@ -191,7 +191,7 @@ function wp_canonicalize_path( $path ) {
  */
 function wp_dirname( $path ) {
 	// @TODO: Scrutinize this naive implementation. Could
-	//        we mess things up on Unix when a directory name
-	//        legitimately contains a backslash?
+	// we mess things up on Unix when a directory name
+	// legitimately contains a backslash?
 	return str_replace( '\\', '/', dirname( $path ) );
 }

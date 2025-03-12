@@ -29,7 +29,7 @@ class ImportSession {
 		'comment',
 		'comment_meta',
 	);
-    
+
 	const FRONTLOAD_STATUS_AWAITING_DOWNLOAD = 'awaiting_download';
 	const FRONTLOAD_STATUS_IGNORED           = 'ignored';
 	const FRONTLOAD_STATUS_ERROR             = 'error';
@@ -319,7 +319,7 @@ class ImportSession {
 		global $wpdb;
 		$wpdb->update(
 			$wpdb->posts,
-			array('post_status' => self::FRONTLOAD_STATUS_IGNORED),
+			array( 'post_status' => self::FRONTLOAD_STATUS_IGNORED ),
 			array(
 				'post_type' => 'frontloading_stub',
 				// 'post_status !=' => self::FRONTLOAD_STATUS_SUCCEEDED,

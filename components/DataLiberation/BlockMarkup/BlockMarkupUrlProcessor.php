@@ -182,16 +182,16 @@ class BlockMarkupUrlProcessor extends BlockMarkupProcessor {
 	 * Replaces the currently matched URL with a new one.
 	 *
 	 * @param string $raw_url The raw URL.
-	 * @param URL $parsed_url The parsed version of the raw URL. It is required
-	 *                        as $raw_url might be a relative URL pointing to a different
-	 *                        host than this processor's base URL.
+	 * @param URL    $parsed_url The parsed version of the raw URL. It is required
+	 *                           as $raw_url might be a relative URL pointing to a different
+	 *                           host than this processor's base URL.
 	 * @return bool True if the URL was set, false otherwise.
 	 */
 	public function set_url( $raw_url, $parsed_url ) {
 		if ( null === $this->raw_url ) {
 			return false;
 		}
-		$this->raw_url = $raw_url;
+		$this->raw_url    = $raw_url;
 		$this->parsed_url = $parsed_url;
 		switch ( parent::get_token_type() ) {
 			case '#tag':
@@ -227,7 +227,7 @@ class BlockMarkupUrlProcessor extends BlockMarkupProcessor {
 	 *        relative URLs in text nodes. On the other hand, the detection is performed
 	 *        by this WPURL_In_Text_Processor class so maybe the two do go hand in hand?
 	 */
-	public function replace_base_url( URL $to_url, ?URL $base_url=null ) {
+	public function replace_base_url( URL $to_url, ?URL $base_url = null ) {
 		$updated_url = clone $this->get_parsed_url();
 
 		$updated_url->hostname = $to_url->hostname;
@@ -247,7 +247,7 @@ class BlockMarkupUrlProcessor extends BlockMarkupProcessor {
 				strlen( $base_pathname_with_trailing_slash )
 			);
 			$to_pathname_with_trailing_slash   = rtrim( $to_pathname, '/' ) . '/';
-			$remaining_pathname                = 
+			$remaining_pathname                =
 				substr(
 					$decoded_matched_pathname,
 					strlen( $base_pathname_with_trailing_slash )
@@ -301,7 +301,7 @@ class BlockMarkupUrlProcessor extends BlockMarkupProcessor {
 	 */
 	public function is_url_relative() {
 		return (
-			! WPURL::can_parse($this->get_raw_url()) &&
+			! WPURL::can_parse( $this->get_raw_url() ) &&
 			// only absolute URLs are detected in text nodes.
 			'#text' !== $this->get_token_type()
 		);
@@ -312,7 +312,7 @@ class BlockMarkupUrlProcessor extends BlockMarkupProcessor {
 	 * @return bool Whether the currently matched URL is absolute.
 	 */
 	public function is_url_absolute() {
-		return WPURL::can_parse($this->get_raw_url());
+		return WPURL::can_parse( $this->get_raw_url() );
 	}
 
 	public function get_inspected_attribute_name() {

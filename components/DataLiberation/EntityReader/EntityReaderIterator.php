@@ -49,13 +49,13 @@ class EntityReaderIterator implements \Iterator {
 			return false;
 		}
 		// @TODO: Remove these checks once we figure out why
-		//        WXREntityReader says next_entity() succeeds
-		//        one time once the data stream is exhausted.
+		// WXREntityReader says next_entity() succeeds
+		// one time once the data stream is exhausted.
 		$entity = $this->entity_reader->get_entity();
 		if ( ! $entity ) {
 			return false;
 		}
-		if( !$entity->get_type() ) {
+		if ( ! $entity->get_type() ) {
 			return false;
 		}
 		return true;

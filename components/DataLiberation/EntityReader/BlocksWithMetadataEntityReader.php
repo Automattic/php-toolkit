@@ -55,8 +55,8 @@ class BlocksWithMetadataEntityReader implements EntityReader {
 			}
 		}
 
-		$post_fields['post_id']      = $this->post_id;
-		$post_fields['post_content'] = $this->block_markup;
+		$post_fields['post_id']         = $this->post_id;
+		$post_fields['post_content']    = $this->block_markup;
 		$post_fields['parsed_metadata'] = $all_metadata;
 
 		// In Markdown, the frontmatter title can be a worse title candidate than

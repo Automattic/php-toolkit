@@ -137,5 +137,4 @@ class StreamImporterTest extends TestCase {
 		$this->assertEquals( $stage, $importer->get_next_stage() );
 		$this->assertTrue( $importer->advance_to_next_stage() );
 	}
-
 }
