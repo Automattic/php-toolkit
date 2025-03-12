@@ -68,7 +68,7 @@ spl_autoload_register(function ($class) use ($console_writer) {
 function help_message_and_die($error = false) {
 	global $console_writer;
 	$console_writer->write("\033[1;32mDescription:\033[0m\n");
-	$console_writer->write("  Import content from various sources into WordPress\n\n");
+	$console_writer->write("  Imports content into a new WordPress site\n\n");
 
 	$console_writer->write("\033[1;32mUsage:\033[0m\n");
 	$console_writer->write("  php import-markdown-directory.php <mode> [options]\n\n");
@@ -143,7 +143,11 @@ $source_site_url = null;
 if(in_array($args['mode'], ['local-directory', 'git', 'crawler'])) {
 	// Validate required arguments
 	if (!isset($args['source-site-url'])) {
-		help_message_and_die('The --source-site-url argument is required.');
+		if($args['mode'] === 'crawler') {
+			$args['source-site-url'] = $args['data_url'];
+		} else {
+			help_message_and_die('The --source-site-url argument is required.');
+		}
 	}
 	$index_file_pattern = '#(?:index|readme)\.(?:md|html|xhtml)$#i';
 	$import_path_prefix = '/imported-content';

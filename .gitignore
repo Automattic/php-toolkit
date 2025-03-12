@@ -29,3 +29,4 @@ blueprint-url-updater.json
 components/DataLiberation/Tests/test-output-html/
 components/DataLiberation/Tests/test-output-md
 blueprint-dev.json
+examples/import-static-files/data-liberation.zip
