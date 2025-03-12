@@ -59,6 +59,9 @@ class MarkupProcessorConsumer implements DataFormatConsumer {
 							break;
 						}
 						$this->append_rich_text( htmlspecialchars( $this->markup_processor->get_modifiable_text() ) );
+						if(in_array($this->markup_processor->get_tag(), ['H1', 'H2', 'H3', 'H4', 'H5', 'H6'])) {
+							$this->on_title_candidate( $this->markup_processor->get_modifiable_text() );
+						}
 						break;
 					case '#tag':
 						$this->handle_tag();
@@ -93,13 +96,15 @@ class MarkupProcessorConsumer implements DataFormatConsumer {
 		if ( $is_void_tag ) {
 			switch ( $tag ) {
 				case 'TITLE':
-					$this->metadata['post_title'] = array($html->get_modifiable_text());
+					$this->on_title_candidate( $html->get_modifiable_text() );
 					break;
 				case 'META':
 					$key   = $html->get_attribute( 'name' );
 					$value = $html->get_attribute( 'content' );
 					if ( ! array_key_exists( $key, $this->metadata ) ) {
-						$this->metadata[ $key ] = array();
+						if($key) {
+							$this->metadata[ $key ] = array();
+						}
 					}
 					switch ( $html->get_attribute( 'type' ) ) {
 						case 'integer':
@@ -110,7 +115,9 @@ class MarkupProcessorConsumer implements DataFormatConsumer {
 							break;
 						// @TODO: Discuss what would support for other types look like.
 					}
-					$this->metadata[ $key ][] = $value;
+					if($key) {
+						$this->metadata[ $key ][] = $value;
+					}
 					break;
 				case 'IMG':
 					$template = new \WP_HTML_Tag_Processor( '<img>' );
@@ -286,6 +293,20 @@ class MarkupProcessorConsumer implements DataFormatConsumer {
 					}
 					break;
 			}
+		}
+	}
+
+	private function on_title_candidate( $text ) {
+		if(!array_key_exists('post_title', $this->metadata)) {
+			$this->metadata['post_title'] = array(
+				$text
+			);
+		}
+		if(!array_key_exists('post_name', $this->metadata)) {
+			$this->metadata['post_name'] = array(
+				// @TODO: Slugify
+				$text
+			);
 		}
 	}
 

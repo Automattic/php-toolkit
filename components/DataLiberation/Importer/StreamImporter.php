@@ -277,7 +277,8 @@ class StreamImporter {
 
 	protected static function parse_options( $options ) {
 		if ( ! isset( $options['source_site_url'] ) ) {
-			throw new DataLiberationException( 'The "source_site_url" option is required' );
+			// @TODO: Throw only if source_site_url is not set by the time we're processing the first encountered URL.
+			// throw new DataLiberationException( 'The "source_site_url" option is required' );
 		}
 		if ( ! isset( $options['new_site_content_root_url'] ) ) {
 			$options['new_site_content_root_url'] = get_site_url();
@@ -431,6 +432,7 @@ class StreamImporter {
 			$entity = $this->get_current_entity();
 
 			$type = $entity->get_type();
+			var_dump($type);
 
 			// Count entities by type.
 			if ( ! isset( $this->indexed_entities_counts[ $type ] ) ) {

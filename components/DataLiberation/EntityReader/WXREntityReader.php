@@ -438,7 +438,10 @@ class WXREntityReader implements EntityReader {
 	 * @return ImportEntity The entity.
 	 * @since WP_VERSION
 	 */
-	public function get_entity(): ImportEntity {
+	public function get_entity() {
+		if(!$this->get_entity_type()) {
+			return false;
+		}
 		return new ImportEntity(
 			$this->get_entity_type(),
 			$this->entity_data
@@ -556,7 +559,7 @@ class WXREntityReader implements EntityReader {
 			return false;
 		}
 		while ( true ) {
-			if ( $this->read_next_entity() ) {
+			if ( $this->read_next_entity() ) {  
 				return true;
 			}
 			// If the read failed because of incomplete input data,

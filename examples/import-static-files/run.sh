@@ -11,14 +11,32 @@
 # 	--additional-site-urls=https://developer.wordpress.org/docs/how-to-guides/data-basics/
 
 # The entire Gutenberg documentation
-# bun index.js \
-# 	git https://github.com/WordPress/gutenberg.git \
-# 	--branch=trunk \
-# 	--path-in-repo=docs/ \
-# 	--media-url=https://developer.wordpress.org/files/ \
-# 	--media-url=https://raw.githubusercontent.com/WordPress/gutenberg/HEAD/docs/ \
-# 	--source-site-url=https://developer.wordpress.org/block-editor/ \
-# 	--additional-site-urls=https://developer.wordpress.org/docs/
+bun index.js \
+	git https://github.com/WordPress/gutenberg.git \
+	--branch=trunk \
+	--path-in-repo=docs/ \
+	--media-url=https://developer.wordpress.org/files/ \
+	--media-url=https://raw.githubusercontent.com/WordPress/gutenberg/HEAD/docs/ \
+	--source-site-url=https://developer.wordpress.org/block-editor/ \
+	--additional-site-urls=https://developer.wordpress.org/docs/
+
+# Adam's blog
+# The content imports well, the media files
+# are downloaded, and the internal links continue to work!
+# The few problems I've noticed:
+# * HTML -> Block markup could use brushing up
+# * Each page also contains the header and the footer.
+#
+# bun examples/import-static-files/index.js crawler https://adamadam.blog
+
+# Accessibility testing content
+# bun index.js wxr https://raw.githubusercontent.com/wpaccessibility/a11y-theme-unit-test/master/a11y-theme-unit-test-data.xml
+
+# Theme unit test data
+# bun index.js wxr https://raw.githubusercontent.com/WordPress/theme-test-data/master/themeunittestdata.wordpress.xml
+
+# Epub
+# bun index.js epub https://github.com/IDPF/epub3-samples/releases/download/20230704/childrens-literature.epub
 
 # A subset of the Gutenberg docs from a local checkout
 # The pages import well.
