@@ -15,6 +15,31 @@ const readFile = (relativePath, encoding) => {
 	);
 };
 
+const argv = yargs(hideBin(process.argv))
+	.option('output-dir', {
+		type: 'string',
+		description: 'Create the new site in the specified directory'
+	})
+	.argv;
+
+if (argv['output-dir']) {
+	if (!fs.existsSync(argv['output-dir'])) {
+		console.error(`Error: Output directory does not exist: ${argv['output-dir']}`);
+		process.exit(1);
+	}
+
+	if (!fs.statSync(argv['output-dir']).isDirectory()) {
+		console.error(`Error: Output path must be a directory: ${argv['output-dir']}`);
+		process.exit(1); 
+	}
+
+	const files = fs.readdirSync(argv['output-dir']);
+	if (files.length > 0) {
+		console.error(`Error: Output directory must be empty: ${argv['output-dir']}`);
+		process.exit(1);
+	}
+}
+
 // Production
 const isDevelopment = process.env.NODE_ENV === 'development';
 const { requestHandler } = await runCLI({
@@ -36,6 +61,9 @@ const { requestHandler } = await runCLI({
 				)}:/wordpress/wp-content/plugins/data-liberation`,
 		  ]
 		: [],
+	mountBeforeInstall: argv['output-dir'] ? [
+		`${argv['output-dir']}:/wordpress`
+	] : [],
 	blueprint: {
 		$schema: 'https://playground.wordpress.net/blueprint-schema.json',
 		login: true,

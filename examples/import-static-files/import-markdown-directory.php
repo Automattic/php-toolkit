@@ -67,26 +67,60 @@ spl_autoload_register(function ($class) use ($console_writer) {
 // Parse CLI arguments
 function help_message_and_die($error = false) {
 	global $console_writer;
-    $console_writer->write("\033[1;32mUsage:\033[0m php import-markdown-directory.php \033[1;33mmode\033[0m [options]\n");
-    $console_writer->write("  options:\n");
-    $console_writer->write("    \033[1;33mmode:\033[0m path|git|crawler\n");
-	$console_writer->write("    \033[1;34m--source-site-url=<url>\033[0m (required)\n");
-	$console_writer->write("    \033[1;34m--additional-site-urls=<url>\033[0m – rewrite all the detected links based on this URL (multiple values allowed)\n");
-    $console_writer->write("    \033[1;34m--media-url=<url>\033[0m – media files from this URL will be downloaded during the import (multiple values allowed)\n");
-	$console_writer->write("\n");
-	$console_writer->write("  \033[1;33mcrawler\033[0m mode usage:\n");
-	$console_writer->write("    php import-markdown-directory.php crawler \033[1;34m<url>\033[0m\n");
-	$console_writer->write("\n");
-    $console_writer->write("  \033[1;33mpath\033[0m mode usage:\n");
-    $console_writer->write("    php import-markdown-directory.php path \033[1;34m<path to directory>\033[0m\n");
-    $console_writer->write("\n");
-    $console_writer->write("  \033[1;33mgit\033[0m mode usage:\n");
-    $console_writer->write("    php import-markdown-directory.php mode \033[1;34m<repo_url>\033[0m\n");
-	$console_writer->write("    options:\n");
-	$console_writer->write("      \033[1;34m--branch=<branch name>\033[0m (required)\n");
-	$console_writer->write("      \033[1;34m--path-in-repo=<path in repo>\033[0m (optional)\n");
+	$console_writer->write("\033[1;32mDescription:\033[0m\n");
+	$console_writer->write("  Import content from various sources into WordPress\n\n");
+
+	$console_writer->write("\033[1;32mUsage:\033[0m\n");
+	$console_writer->write("  php import-markdown-directory.php <mode> [options]\n\n");
+
+	$console_writer->write("\033[1;32mModes:\033[0m\n");
+	$console_writer->write("  \033[1;33mcrawler\033[0m     Import content by crawling a website\n");
+	$console_writer->write("  \033[1;33mlocal-directory\033[0m        Import content from a local directory\n");
+	$console_writer->write("  \033[1;33mgit\033[0m         Import content from a git repository\n");
+	$console_writer->write("  \033[1;33mwxr\033[0m         Import content from a WordPress eXtended RSS file\n");
+	$console_writer->write("  \033[1;33mepub\033[0m        Import content from an EPUB ebook\n\n");
+
+	$console_writer->write("\033[1;32mGlobal Options:\033[0m\n");
+	$console_writer->write("  \033[1;34m--source-site-url=<url>\033[0m\n");
+	$console_writer->write("      Base URL of the source content (required)\n\n");
+
+	$console_writer->write("  \033[1;34m--additional-site-urls=<url>\033[0m\n");
+	$console_writer->write("      Additional URLs to rewrite links for (multiple allowed)\n\n");
+
+	$console_writer->write("  \033[1;34m--media-url=<url>\033[0m\n");
+	$console_writer->write("      URLs to download media files from (multiple allowed)\n\n");
+
+	$console_writer->write("  \033[1;34m--output-dir=<path>\033[0m\n");
+	$console_writer->write("      Create the new WordPress site in this directory\n");
+	$console_writer->write("      Must be empty and have write permissions\n\n");
+
+	$console_writer->write("\033[1;32mMode-specific Usage:\033[0m\n");
+
+	$console_writer->write("\033[1;33mgit\033[0m mode:\n");
+	$console_writer->write("  php import-markdown-directory.php git <repo_url>\n");
+	$console_writer->write("  Options:\n");
+	$console_writer->write("    \033[1;34m--branch=<branch>\033[0m\n");
+	$console_writer->write("        Git branch to import from (required)\n");
+	$console_writer->write("    \033[1;34m--path-in-repo=<path>\033[0m\n");
+	$console_writer->write("        Subdirectory in repository to import from\n\n");
+
+	$console_writer->write("\033[1;33mcrawler\033[0m mode:\n");
+	$console_writer->write("  php import-markdown-directory.php crawler <url>\n");
+	$console_writer->write("  Crawls the website at <url> and imports discovered content\n\n");
+
+	$console_writer->write("\033[1;33mlocal-directory\033[0m mode:\n");
+	$console_writer->write("  php import-markdown-directory.php local-directory <directory>\n");
+	$console_writer->write("  Imports content from local <directory>\n\n");
+
+	$console_writer->write("\033[1;33mwxr\033[0m mode:\n");
+	$console_writer->write("  php import-markdown-directory.php wxr <url or local path>\n");
+	$console_writer->write("  Imports content from a WordPress eXtended RSS file\n\n");
+	
+	$console_writer->write("\033[1;33mepub\033[0m mode:\n");
+	$console_writer->write("  php import-markdown-directory.php epub <url or local path>\n");
+	$console_writer->write("  Imports content from an EPUB ebook\n\n");
+
 	if($error) {
-		$console_writer->write("\n");
 		$console_writer->write("\033[1;31mError:\033[0m ");
 		$console_writer->write($error);
 		$console_writer->write("\n");
@@ -106,7 +140,7 @@ $args['data_url'] = $args[1] ?? '';
 
 $chrooted_fs = null;
 $source_site_url = null;
-if(in_array($args['mode'], ['path', 'git', 'crawler'])) {
+if(in_array($args['mode'], ['local-directory', 'git', 'crawler'])) {
 	// Validate required arguments
 	if (!isset($args['source-site-url'])) {
 		help_message_and_die('The --source-site-url argument is required.');
@@ -115,9 +149,9 @@ if(in_array($args['mode'], ['path', 'git', 'crawler'])) {
 	$import_path_prefix = '/imported-content';
 	$source_site_url = $args['source-site-url'];
 
-	if($args['mode'] === 'path') {
+	if($args['mode'] === 'local-directory') {
 		if (!isset($args['data_url'])) {
-			help_message_and_die('The "path" argument is required.');
+			help_message_and_die('The "local-directory" argument is required.');
 		}
 
 		PlaygroundProtocolClient::getInstance()->mountDirectory($args['data_url'], '/files-to-import');
@@ -480,7 +514,7 @@ if(in_array($args['mode'], ['path', 'git', 'crawler'])) {
 		}
 	);
 } else {
-    help_message_and_die('The "mode" argument is required and must be one of: "path", "git", "crawler", "wxr", or "epub".');
+    help_message_and_die('The "mode" argument is required and must be one of: "local-directory", "git", "crawler", "wxr", or "epub".');
 	exit(1);
 }
 
