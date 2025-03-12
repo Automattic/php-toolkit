@@ -1,6 +1,8 @@
 vendor/
 **/*/vendor/
 opfs/
+node_modules
+.cursor
 rest/
 dist/
 outdir/

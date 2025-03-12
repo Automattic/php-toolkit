@@ -2,7 +2,6 @@
 
 namespace WordPress\DataLiberation\EntityReader;
 
-use Exception;
 use WordPress\DataLiberation\DataFormatConsumer\BlocksWithMetadata;
 use WordPress\DataLiberation\DataFormatConsumer\MarkupProcessorConsumer;
 use WordPress\Filesystem\Filesystem;

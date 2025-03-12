@@ -1,6 +1,5 @@
 <?php
 
-use PHP_CodeSniffer\Files\LocalFile;
 use Rowbot\URL\URL;
 use WordPress\ByteStream\ReadStream\FileReadStream;
 use WordPress\DataLiberation\EntityReader\EPubEntityReader;
@@ -15,7 +14,6 @@ use WordPress\Filesystem\Layer\ChrootLayer;
 use WordPress\Filesystem\LocalFilesystem;
 use WordPress\Git\GitFilesystem;
 use WordPress\Git\GitRepository;
-use WordPress\HttpClient\Client;
 use WordPress\HttpClient\Crawler;
 use WordPress\Zip\ZipFilesystem;
 
@@ -32,10 +30,10 @@ if(file_exists(__DIR__ . '/../../vendor/autoload.php')) {
 	require_once __DIR__ . '/wp-content/vendor/autoload.php';
 }
 
-require_once __DIR__ . '/Parser.php';
+require_once __DIR__ . '/cli/Parser.php';
 require_once __DIR__ . '/playground-protocol/PlaygroundProtocolClient.php';
-require_once __DIR__ . '/ConsoleWriter.php';
-require_once __DIR__ . '/ProgressBar.php';
+require_once __DIR__ . '/cli/ConsoleWriter.php';
+require_once __DIR__ . '/cli/ProgressBar.php';
 
 $console_writer = new PlaygroundConsoleWriter();
 
@@ -460,6 +458,8 @@ if(in_array($args['mode'], ['path', 'git', 'crawler'])) {
 	};
 	$reader = $entity_reader_factory();
 	$source_site_url = 'file://' . dirname( $reader->get_manifest_path() );
+
+	// To source the media files from the EPUB bundle:
 	$chrooted_fs = $zip_fs;
 
 	/**
