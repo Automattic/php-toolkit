@@ -1,10 +1,10 @@
 {
-	"name": "import-static-files",
+	"name": "create-wp-site",
 	"version": "1.0.0",
 	"description": "A package to import static files into WordPress",
 	"main": "index.js",
 	"bin": {
-		"import-static-files": "./index.js"
+		"create-wp-site": "./index.js"
 	},
 	"scripts": {
 		"start": "node main.js"

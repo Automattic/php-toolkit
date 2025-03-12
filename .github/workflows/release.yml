@@ -87,6 +87,6 @@ jobs:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               with:
                   upload_url: ${{ steps.create_release.outputs.upload_url }}
-                  asset_path: ./dist/examples/import-static-files.tar.gz
-                  asset_name: import-static-files.tar.gz
+                  asset_path: ./dist/examples/create-wp-site.tar.gz
+                  asset_name: create-wp-site.tar.gz
                   asset_content_type: application/gzip

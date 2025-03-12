@@ -48,7 +48,7 @@ bun index.js \
 Import content from Adam's blog using a crawler:
 
 ```bash
-bun examples/import-static-files/index.js crawler https://adamadam.blog
+bun examples/create-wp-site/index.js crawler https://adamadam.blog
 ```
 
 **Commentary:**  
