@@ -74,7 +74,8 @@
             "WordPress\\HttpServer\\": "components/HttpServer/",
             "WordPress\\CORSProxy\\": "components/CORSProxy/",
             "WordPress\\Git\\": "components/Git/",
-            "WordPress\\Merge\\": "components/Merge/"
+            "WordPress\\Merge\\": "components/Merge/",
+            "WordPress\\Sync\\": "components/Sync/"
         }
     },
     "scripts": {

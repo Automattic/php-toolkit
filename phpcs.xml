@@ -35,5 +35,11 @@
         <exclude name="WordPress.Security.EscapeOutput.OutputNotEscaped"/>
         <exclude name="WordPress.WP.AlternativeFunctions"/>
         <exclude name="WordPress.WP.AlternativeFunctions.file_system_operations_fclose"/>
+        <!--
+        The WordPress standards create more problems than they solve. All the weird namespace rules,
+        no while ( false !== ( $entry = readdir( $dir ) ) ), no short array syntax etc. Let's just
+        disable them and leave it open for reconsideration.
+        -->
+        <exclude name="WordPress"/>
     </rule>
 </ruleset>

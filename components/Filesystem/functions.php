@@ -95,6 +95,9 @@ function copy_between_filesystems( array $args ) {
 function wp_path_segments( $path ) {
 	$canonicalized   = wp_canonicalize_path( $path );
 	$without_slashes = trim( $canonicalized, '/' );
+	if(!$without_slashes) {
+		return array();
+	}
 	return explode( '/', $without_slashes );
 }
 
