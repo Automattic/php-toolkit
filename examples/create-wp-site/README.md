@@ -20,7 +20,7 @@ Make sure you have [bun](https://bun.sh/) installed before running the script.
 Import a subset of Gutenberg documentation focused on data basics:
 
 ```bash
-npx https://adamadam.blog/create-wp-site.tar.gz \
+bun index.js \
   git https://github.com/WordPress/gutenberg.git \
   --branch=trunk \
   --path-in-repo=docs/how-to-guides/data-basics/ \
@@ -33,7 +33,7 @@ npx https://adamadam.blog/create-wp-site.tar.gz \
 Import the complete Gutenberg documentation:
 
 ```bash
-npx https://adamadam.blog/create-wp-site.tar.gz \
+bun index.js \
   git https://github.com/WordPress/gutenberg.git \
   --branch=trunk \
   --path-in-repo=docs/ \
@@ -63,7 +63,7 @@ bun examples/create-wp-site/index.js crawler https://adamadam.blog
 Import accessibility testing content from a WordPress XML export:
 
 ```bash
-npx https://adamadam.blog/create-wp-site.tar.gz wxr https://raw.githubusercontent.com/wpaccessibility/a11y-theme-unit-test/master/a11y-theme-unit-test-data.xml
+bun index.js wxr https://raw.githubusercontent.com/wpaccessibility/a11y-theme-unit-test/master/a11y-theme-unit-test-data.xml
 ```
 
 
@@ -72,7 +72,7 @@ npx https://adamadam.blog/create-wp-site.tar.gz wxr https://raw.githubuserconten
 Import standard WordPress theme unit test data:
 
 ```bash
-npx https://adamadam.blog/create-wp-site.tar.gz wxr https://raw.githubusercontent.com/WordPress/theme-test-data/master/themeunittestdata.wordpress.xml
+bun index.js wxr https://raw.githubusercontent.com/WordPress/theme-test-data/master/themeunittestdata.wordpress.xml
 ```
 
 
@@ -81,7 +81,7 @@ npx https://adamadam.blog/create-wp-site.tar.gz wxr https://raw.githubuserconten
 Import content from an EPUB file:
 
 ```bash
-npx https://adamadam.blog/create-wp-site.tar.gz epub https://github.com/IDPF/epub3-samples/releases/download/20230704/childrens-literature.epub
+bun index.js epub https://github.com/IDPF/epub3-samples/releases/download/20230704/childrens-literature.epub
 ```
 
 ### 7. Gutenberg Docs from Local Checkout
@@ -89,7 +89,7 @@ npx https://adamadam.blog/create-wp-site.tar.gz epub https://github.com/IDPF/epu
 Import Gutenberg documentation from a local repository checkout:
 
 ```bash
-npx https://adamadam.blog/create-wp-site.tar.gz path ../../../gutenberg/docs/how-to-guides/
+bun index.js path ../../../gutenberg/docs/how-to-guides/
 ```
 
 
@@ -98,7 +98,7 @@ npx https://adamadam.blog/create-wp-site.tar.gz path ../../../gutenberg/docs/how
 Import documentation from the WordPress Playground project:
 
 ```bash
-npx https://adamadam.blog/create-wp-site.tar.gz \
+bun index.js \
   git https://github.com/WordPress/wordpress-playground.git \
   --branch=trunk \
   --path-in-repo=packages/docs/site/docs/blueprints/ \
@@ -111,7 +111,7 @@ npx https://adamadam.blog/create-wp-site.tar.gz \
 Import Bootstrap 5.3 documentation:
 
 ```bash
-npx https://adamadam.blog/create-wp-site.tar.gz \
+bun index.js \
   git https://github.com/twbs/bootstrap.git \
   --branch=gh-pages \
   --path-in-repo=docs/5.3/ \
@@ -125,7 +125,7 @@ npx https://adamadam.blog/create-wp-site.tar.gz \
 Import Laravel documentation:
 
 ```bash
-npx https://adamadam.blog/create-wp-site.tar.gz \
+bun index.js \
   git https://github.com/laravel/docs.git \
   --path-in-repo=/ \
   --branch=12.x \
@@ -137,7 +137,7 @@ npx https://adamadam.blog/create-wp-site.tar.gz \
 Import internal documentation from the CPython repository:
 
 ```bash
-npx https://adamadam.blog/create-wp-site.tar.gz \
+bun index.js \
   git https://github.com/python/cpython.git \
   --branch=main \
   --path-in-repo=InternalDocs/ \
@@ -149,7 +149,7 @@ npx https://adamadam.blog/create-wp-site.tar.gz \
 Import content from the Fullstack GraphQL book repository:
 
 ```bash
-npx https://adamadam.blog/create-wp-site.tar.gz \
+bun index.js \
   git https://github.com/GraphQLCollege/fullstack-graphql.git \
   --branch=master \
   --path-in-repo=manuscript/ \
@@ -161,7 +161,7 @@ npx https://adamadam.blog/create-wp-site.tar.gz \
 Import content from the CPP WASM book repository:
 
 ```bash
-npx https://adamadam.blog/create-wp-site.tar.gz \
+bun index.js \
   git https://github.com/3dgen/cppwasm-book.git \
   --branch=master \
   --path-in-repo=en/ \
