@@ -603,6 +603,54 @@ class XMLProcessor {
 	protected $lexical_updates = array();
 
 	/**
+	 * The Name from the DOCTYPE declaration.
+	 *
+	 * doctypedecl ::= '<!DOCTYPE' S Name (S ExternalID)? S? ('[' intSubset ']' S?)? '>'
+	 *                               ^^^^
+	 *
+	 * @since WP_VERSION
+	 * @var WP_HTML_Span|null
+	 */
+	protected $doctype_name = null;
+
+	/**
+	 * The system literal value from the DOCTYPE declaration.
+	 *
+	 * doctypedecl ::= '<!DOCTYPE' S Name (S ExternalID)? S? ('[' intSubset ']' S?)? '>'
+	 * ExternalID ::= 'SYSTEM' S SystemLiteral | 'PUBLIC' S PubidLiteral
+	 *                           ^^^^^^^^^^^^^
+	 *
+	 * Example:
+	 *
+	 *     <!DOCTYPE html SYSTEM "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+	 *
+	 * In this example, the system_literal would be:
+	 * "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"
+	 *
+	 * @since WP_VERSION
+	 * @var WP_HTML_Span|null
+	 */
+	protected $system_literal = null;
+
+	/**
+	 * The public identifier value from the DOCTYPE declaration.
+	 *
+	 * doctypedecl ::= '<!DOCTYPE' S Name (S ExternalID)? S? ('[' intSubset ']' S?)? '>'
+	 * ExternalID ::= 'SYSTEM' S SystemLiteral | 'PUBLIC' S PubidLiteral
+	 *                                                      ^^^^^^^^^^^^
+	 * Example:
+	 *
+	 *     <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+	 *
+	 * In this example, the publid_literal would be:
+	 * "-//W3C//DTD XHTML 1.0 Strict//EN"
+	 *
+	 * @since WP_VERSION
+	 * @var WP_HTML_Span|null
+	 */
+	protected $pubid_literal = null;
+
+	/**
 	 * Memory budget for the processed XML.
 	 *
 	 * append_bytes() will flush the processed bytes whenever the XML buffer
@@ -670,6 +718,7 @@ class XMLProcessor {
 			return false;
 		}
 		$processor->input_finished();
+
 		return $processor;
 	}
 
@@ -681,6 +730,7 @@ class XMLProcessor {
 		if ( null !== $cursor && true !== $processor->initialize_from_cursor( $cursor ) ) {
 			return false;
 		}
+
 		return $processor;
 	}
 
@@ -702,11 +752,11 @@ class XMLProcessor {
 		return base64_encode(
 			json_encode(
 				array(
-					'is_finished' => $this->is_finished(),
+					'is_finished'              => $this->is_finished(),
 					'upstream_bytes_forgotten' => $this->upstream_bytes_forgotten,
-					'parser_context' => $this->parser_context,
-					'stack_of_open_elements' => $this->stack_of_open_elements,
-					'expecting_more_input' => $this->expecting_more_input,
+					'parser_context'           => $this->parser_context,
+					'stack_of_open_elements'   => $this->stack_of_open_elements,
+					'expecting_more_input'     => $this->expecting_more_input,
 				)
 			)
 		);
@@ -730,16 +780,19 @@ class XMLProcessor {
 	protected function initialize_from_cursor( $cursor ) {
 		if ( ! is_string( $cursor ) ) {
 			_doing_it_wrong( __METHOD__, 'Cursor must be a JSON-encoded string.', '1.0.0' );
+
 			return false;
 		}
 		$cursor = base64_decode( $cursor );
 		if ( false === $cursor ) {
 			_doing_it_wrong( __METHOD__, 'Invalid cursor provided to initialize_from_cursor().', '1.0.0' );
+
 			return false;
 		}
 		$cursor = json_decode( $cursor, true );
 		if ( false === $cursor ) {
 			_doing_it_wrong( __METHOD__, 'Invalid cursor provided to initialize_from_cursor().', '1.0.0' );
+
 			return false;
 		}
 		if ( $cursor['is_finished'] ) {
@@ -751,6 +804,7 @@ class XMLProcessor {
 		$this->stack_of_open_elements   = $cursor['stack_of_open_elements'];
 		$this->parser_context           = $cursor['parser_context'];
 		$this->expecting_more_input     = $cursor['expecting_more_input'];
+
 		return true;
 	}
 
@@ -761,20 +815,21 @@ class XMLProcessor {
 	 *
 	 * @access private
 	 *
+	 * @param  string  $xml  XML to process.
+	 * @param  string|null  $use_the_static_create_methods_instead  This constructor should not be called manually.
+	 *
+	 * @see XMLProcessor::create_stream()
+	 *
 	 * @since 6.4.0
 	 *
 	 * @see XMLProcessor::create_fragment()
-	 * @see XMLProcessor::create_stream()
-	 *
-	 * @param string      $xml            XML to process.
-	 * @param string|null $use_the_static_create_methods_instead This constructor should not be called manually.
 	 */
 	protected function __construct( $xml, $use_the_static_create_methods_instead = null ) {
 		if ( self::CONSTRUCTOR_UNLOCK_CODE !== $use_the_static_create_methods_instead ) {
 			_doing_it_wrong(
 				__METHOD__,
 				sprintf(
-					/* translators: %s: XMLProcessor::create_fragment(). */
+				/* translators: %s: XMLProcessor::create_fragment(). */
 					__( 'Call %s to create an XML Processor instead of calling the constructor directly.' ),
 					'<code>XMLProcessor::create_fragment()</code>'
 				),
@@ -788,7 +843,7 @@ class XMLProcessor {
 	 * Wipes out the processed XML and appends the next chunk of XML to
 	 * any remaining unprocessed XML.
 	 *
-	 * @param string $next_chunk XML to append.
+	 * @param  string  $next_chunk  XML to append.
 	 */
 	public function append_bytes( string $next_chunk ) {
 		if ( ! $this->expecting_more_input ) {
@@ -797,6 +852,7 @@ class XMLProcessor {
 				__( 'Cannot append bytes after the last input chunk was provided and input_finished() was called.' ),
 				'WP_VERSION'
 			);
+
 			return false;
 		}
 		$this->xml .= $next_chunk;
@@ -811,6 +867,7 @@ class XMLProcessor {
 		) {
 			$this->flush_processed_xml();
 		}
+
 		return true;
 	}
 
@@ -838,11 +895,11 @@ class XMLProcessor {
 			$unreferenced_bytes = min( $unreferenced_bytes, $this->token_starts_at );
 		}
 
-		$flushed_bytes               = substr( $this->xml, 0, $unreferenced_bytes );
-		$this->xml                   = substr( $this->xml, $unreferenced_bytes );
-		$this->bookmarks             = array();
-		$this->lexical_updates       = array();
-		$this->seek_count            = 0;
+		$flushed_bytes              = substr( $this->xml, 0, $unreferenced_bytes );
+		$this->xml                  = substr( $this->xml, $unreferenced_bytes );
+		$this->bookmarks            = array();
+		$this->lexical_updates      = array();
+		$this->seek_count           = 0;
 		$this->bytes_already_parsed -= $unreferenced_bytes;
 		if ( null !== $this->token_starts_at ) {
 			$this->token_starts_at -= $unreferenced_bytes;
@@ -854,6 +911,7 @@ class XMLProcessor {
 			$this->text_starts_at -= $unreferenced_bytes;
 		}
 		$this->upstream_bytes_forgotten += $unreferenced_bytes;
+
 		return $flushed_bytes;
 	}
 
@@ -866,11 +924,11 @@ class XMLProcessor {
 	 * without triggering subclass methods for things like `next_token()`, e.g. when
 	 * applying patches before searching for the next token.
 	 *
+	 * @return bool Whether a token was parsed.
 	 * @since 6.5.0
 	 *
 	 * @access private
 	 *
-	 * @return bool Whether a token was parsed.
 	 */
 	protected function parse_next_token() {
 		$was_at = $this->bytes_already_parsed;
@@ -897,6 +955,7 @@ class XMLProcessor {
 			} else {
 				$this->parser_state = self::STATE_COMPLETE;
 			}
+
 			return false;
 		}
 
@@ -942,6 +1001,7 @@ class XMLProcessor {
 
 		if ( self::STATE_INCOMPLETE_INPUT === $this->parser_state ) {
 			$this->bytes_already_parsed = $was_at;
+
 			return false;
 		}
 
@@ -967,6 +1027,7 @@ class XMLProcessor {
 				'Invalid closing tag encountered.',
 				self::ERROR_SYNTAX
 			);
+
 			return false;
 		}
 
@@ -999,6 +1060,7 @@ class XMLProcessor {
 		if ( false === $found_closer ) {
 			$this->mark_incomplete_input( 'Closing tag missing.' );
 			$this->bytes_already_parsed = $was_at;
+
 			return false;
 		}
 
@@ -1030,9 +1092,9 @@ class XMLProcessor {
 	 *     false      === $processor->get_next_tag();
 	 *     true       === $processor->is_paused_at_incomplete_token();
 	 *
+	 * @return bool Whether the parse paused at the start of an incomplete token.
 	 * @since WP_VERSION
 	 *
-	 * @return bool Whether the parse paused at the start of an incomplete token.
 	 */
 	public function is_paused_at_incomplete_input(): bool {
 		return self::STATE_INCOMPLETE_INPUT === $this->parser_state;
@@ -1041,9 +1103,9 @@ class XMLProcessor {
 	/**
 	 * Whether the processor finished processing.
 	 *
+	 * @return bool Whether the processor finished processing.
 	 * @since WP_VERSION
 	 *
-	 * @return bool Whether the processor finished processing.
 	 */
 	public function is_finished(): bool {
 		return self::STATE_COMPLETE === $this->parser_state;
@@ -1124,10 +1186,11 @@ class XMLProcessor {
 	 * reaching for it, as inappropriate use could lead to broken
 	 * XML structure or unwanted processing overhead.
 	 *
+	 * @param  string  $name  Identifies this particular bookmark.
+	 *
+	 * @return bool Whether the bookmark was successfully created.
 	 * @since WP_VERSION
 	 *
-	 * @param string $name Identifies this particular bookmark.
-	 * @return bool Whether the bookmark was successfully created.
 	 */
 	public function set_bookmark( $name ) {
 		// It only makes sense to set a bookmark if the parser has paused on a concrete token.
@@ -1144,6 +1207,7 @@ class XMLProcessor {
 				__( 'Too many bookmarks: cannot create any more.' ),
 				'WP_VERSION'
 			);
+
 			return false;
 		}
 
@@ -1159,7 +1223,8 @@ class XMLProcessor {
 	 * Releasing a bookmark frees up the small
 	 * performance overhead it requires.
 	 *
-	 * @param string $name Name of the bookmark to remove.
+	 * @param  string  $name  Name of the bookmark to remove.
+	 *
 	 * @return bool Whether the bookmark already existed before removal.
 	 */
 	public function release_bookmark( $name ) {
@@ -1175,12 +1240,13 @@ class XMLProcessor {
 	/**
 	 * Skips contents of PCDATA element.
 	 *
+	 * @param  string  $tag_name  The tag name which will close the PCDATA region.
+	 *
+	 * @return false|int Byte offset of the closing tag, or false if not found.
 	 * @since WP_VERSION
 	 *
 	 * @see https://www.w3.org/TR/xml/#sec-mixed-content
 	 *
-	 * @param string $tag_name The tag name which will close the PCDATA region.
-	 * @return false|int Byte offset of the closing tag, or false if not found.
 	 */
 	private function skip_pcdata( $tag_name ) {
 		$xml        = $this->xml;
@@ -1197,8 +1263,8 @@ class XMLProcessor {
 				return false;
 			}
 
-			$at                        += 2 + $tag_length;
-			$at                        += strspn( $this->xml, " \t\f\r\n", $at );
+			$at                         += 2 + $tag_length;
+			$at                         += strspn( $this->xml, " \t\f\r\n", $at );
 			$this->bytes_already_parsed = $at;
 
 			/*
@@ -1212,6 +1278,7 @@ class XMLProcessor {
 			}
 			if ( '>' === $xml[ $at ] ) {
 				$this->bytes_already_parsed = $at + 1;
+
 				return true;
 			}
 		}
@@ -1235,12 +1302,12 @@ class XMLProcessor {
 	 *     false === $processor->next_tag();
 	 *     XMLProcessor::ERROR_SYNTAX === $processor->get_last_error();
 	 *
-	 * @since WP_VERSION
-	 *
+	 * @return string|null The last error, if one exists, otherwise null.
 	 * @see self::ERROR_UNSUPPORTED
 	 * @see self::ERROR_EXCEEDED_MAX_BOOKMARKS
 	 *
-	 * @return string|null The last error, if one exists, otherwise null.
+	 * @since WP_VERSION
+	 *
 	 */
 	public function get_last_error(): ?string {
 		return $this->last_error;
@@ -1312,7 +1379,8 @@ class XMLProcessor {
 	 *      // element as text:
 	 *      $processor->get_modifiable_text();
 	 *
-	 * @param string $element_name The name of the element to declare as PCDATA.
+	 * @param  string  $element_name  The name of the element to declare as PCDATA.
+	 *
 	 * @return void
 	 */
 	public function declare_element_as_pcdata( $element_name ) {
@@ -1322,9 +1390,9 @@ class XMLProcessor {
 	/**
 	 * Indicates if the currently matched tag is a PCDATA element.
 	 *
+	 * @return bool Whether the currently matched tag is a PCDATA element.
 	 * @since WP_VERSION
 	 *
-	 * @return bool Whether the currently matched tag is a PCDATA element.
 	 */
 	public function is_pcdata_element() {
 		return array_key_exists( $this->get_tag(), $this->pcdata_elements );
@@ -1338,19 +1406,19 @@ class XMLProcessor {
 	 * semantic rules for text nodes. For access to the raw tokens consider using
 	 * XMLProcessor instead.
 	 *
-	 * @since WP_VERSION
-	 *
-	 * @param array|string|null $query {
+	 * @param  array|string|null  $query  {
 	 *     Optional. Which tag name to find, having which class, etc. Default is to find any tag.
 	 *
-	 *     @type string|null $tag_name     Which tag to find, or `null` for "any tag."
-	 *     @type int|null    $match_offset Find the Nth tag matching all search criteria.
+	 * @type string|null $tag_name Which tag to find, or `null` for "any tag."
+	 * @type int|null $match_offset Find the Nth tag matching all search criteria.
 	 *                                     1 for "first" tag, 3 for "third," etc.
 	 *                                     Defaults to first tag.
-	 *     @type string[]    $breadcrumbs  DOM sub-path at which element is found, e.g. `array( 'FIGURE', 'IMG' )`.
+	 * @type string[] $breadcrumbs DOM sub-path at which element is found, e.g. `array( 'FIGURE', 'IMG' )`.
 	 *                                     May also contain the wildcard `*` which matches a single element, e.g. `array( 'SECTION', '*' )`.
 	 * }
 	 * @return bool Whether a tag was matched.
+	 * @since WP_VERSION
+	 *
 	 */
 	public function next_tag( $query = null ) {
 		if ( null === $query ) {
@@ -1377,6 +1445,7 @@ class XMLProcessor {
 				__( 'Please pass a query array to this function.' ),
 				'WP_VERSION'
 			);
+
 			return false;
 		}
 
@@ -1400,6 +1469,7 @@ class XMLProcessor {
 				__( 'Cannot visit tag closers in XML Processor.' ),
 				'WP_VERSION'
 			);
+
 			return false;
 		}
 
@@ -1411,7 +1481,7 @@ class XMLProcessor {
 				continue;
 			}
 
-			if ( $this->matches_breadcrumbs( $breadcrumbs ) && 0 === --$match_offset ) {
+			if ( $this->matches_breadcrumbs( $breadcrumbs ) && 0 === -- $match_offset ) {
 				return true;
 			}
 		}
@@ -1427,9 +1497,9 @@ class XMLProcessor {
 	 * name. It does not parse the attributes or scan to the
 	 * closing `>`; these are left for other methods.
 	 *
+	 * @return bool Whether a tag was found before the end of the document.
 	 * @since WP_VERSION
 	 *
-	 * @return bool Whether a tag was found before the end of the document.
 	 */
 	private function parse_next_tag() {
 		$this->after_tag();
@@ -1460,13 +1530,14 @@ class XMLProcessor {
 
 			if ( $at + 1 < $doc_length && '/' === $this->xml[ $at + 1 ] ) {
 				$this->is_closing_tag = true;
-				++$at;
+				++ $at;
 			} else {
 				$this->is_closing_tag = false;
 			}
 
 			if ( $at + 1 >= $doc_length ) {
 				$this->mark_incomplete_input();
+
 				return false;
 			}
 
@@ -1484,7 +1555,7 @@ class XMLProcessor {
 			}
 
 			if ( $tag_name_length > 0 ) {
-				++$at;
+				++ $at;
 				$this->parser_state         = self::STATE_MATCHED_TAG;
 				$this->tag_name_starts_at   = $at;
 				$this->tag_name_length      = $tag_name_length;
@@ -1528,11 +1599,12 @@ class XMLProcessor {
 					/*
 					 * Comments may only be closed by a --> sequence.
 					 */
-					--$closer_at; // Pre-increment inside condition below reduces risk of accidental infinite looping.
-					while ( ++$closer_at < $doc_length ) {
+					-- $closer_at; // Pre-increment inside condition below reduces risk of accidental infinite looping.
+					while ( ++ $closer_at < $doc_length ) {
 						$closer_at = strpos( $xml, '--', $closer_at );
 						if ( false === $closer_at || $closer_at + 2 === $doc_length ) {
 							$this->mark_incomplete_input( 'Unclosed comment.' );
+
 							return false;
 						}
 
@@ -1549,6 +1621,7 @@ class XMLProcessor {
 						$this->text_starts_at       = $this->token_starts_at + 4;
 						$this->text_length          = $closer_at - $this->text_starts_at;
 						$this->bytes_already_parsed = $closer_at + 3;
+
 						return true;
 					}
 				}
@@ -1585,12 +1658,18 @@ class XMLProcessor {
 					$this->text_starts_at       = $this->token_starts_at + 9;
 					$this->text_length          = $closer_at - $this->text_starts_at;
 					$this->bytes_already_parsed = $closer_at + 3;
+
 					return true;
 				}
 
 				/*
 				 * Identify DOCTYPE nodes.
 				 *
+				 * doctypedecl	   ::=   	'<!DOCTYPE' S Name (S ExternalID)? S? ('[' intSubset ']' S?)? '>'
+				 * ExternalID	   ::=   	'SYSTEM' S SystemLiteral | 'PUBLIC' S PubidLiteral S SystemLiteral
+				 * SystemLiteral   ::=   	('"' [^"]* '"') | ("'" [^']* "'")
+				 * PubidLiteral	   ::=   	'"' PubidChar* '"' | "'" (PubidChar - "'")* "'"
+				 * PubidChar	   ::=   	#x20 | #xD | #xA | [a-zA-Z0-9] | [-'()+,./:=?;!*#@$_%]
 				 * See https://www.w3.org/TR/xml11.html/#dtd
 				 */
 				if (
@@ -1614,24 +1693,129 @@ class XMLProcessor {
 					}
 
 					// @TODO: Expose the "name" value instead of skipping it like that
-					$at += $this->parse_name( $at );
+					$name_length = $this->parse_name( $at );
+					if ( false === $name_length ) {
+						$this->mark_incomplete_input( 'Unclosed DOCTYPE declaration.' );
+
+						return false;
+					}
+					$this->doctype_name = new WP_HTML_Span(
+						$at,
+						$name_length
+					);
+					$at                 += $name_length;
 
 					// Skip whitespace.
 					$at += strspn( $this->xml, " \t\f\r\n", $at );
 
 					if ( $doc_length <= $at ) {
 						$this->mark_incomplete_input( 'Unclosed DOCTYPE declaration.' );
+
 						return false;
 					}
 
+					// Check for SYSTEM or PUBLIC identifiers
+					if (
+						$doc_length > $at + 6 &&
+						'S' === $this->xml[ $at ] &&
+						'Y' === $this->xml[ $at + 1 ] &&
+						'S' === $this->xml[ $at + 2 ] &&
+						'T' === $this->xml[ $at + 3 ] &&
+						'E' === $this->xml[ $at + 4 ] &&
+						'M' === $this->xml[ $at + 5 ]
+					) {
+						$at += 6;
+						// Skip whitespace.
+						$at += strspn( $this->xml, " \t\f\r\n", $at );
+
+						// Parse the SystemLiteral token.
+						$quoted_string_length = $this->parse_quoted_string( $at );
+						if ( self::STATE_INCOMPLETE_INPUT === $this->parser_state ) {
+							$this->mark_incomplete_input( 'Unclosed SYSTEM literal.' );
+
+							return false;
+						}
+
+						$this->system_literal = new WP_HTML_Span(
+						// Start after the opening quote.
+							$at + 1,
+							// Exclude the closing quote.
+							$quoted_string_length - 2
+						);
+						$at                   += $quoted_string_length;
+					} elseif (
+						$doc_length > $at + 6 &&
+						'P' === $this->xml[ $at ] &&
+						'U' === $this->xml[ $at + 1 ] &&
+						'B' === $this->xml[ $at + 2 ] &&
+						'L' === $this->xml[ $at + 3 ] &&
+						'I' === $this->xml[ $at + 4 ] &&
+						'C' === $this->xml[ $at + 5 ]
+					) {
+						$at += 6;
+						// Skip whitespace.
+						$at += strspn( $this->xml, " \t\f\r\n", $at );
+
+						/*
+						 * PubidLiteral	   ::=  '"' PubidChar* '"' | "'" (PubidChar - "'")* "'"
+						 * PubidChar	   ::=  #x20 | #xD | #xA | [a-zA-Z0-9] | [-'()+,./:=?;!*#@$_%]
+						 */
+						$opening_quote_char = $this->xml[ $at ];
+						if ( "'" !== $opening_quote_char && '"' !== $opening_quote_char ) {
+							$this->bail( 'Unsupported DOCTYPE syntax. PUBLIC identifiers must be enclosed in double quotes.' );
+
+							return false;
+						}
+
+						$pubid_char = " \r\nabcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-()+,./:=?;!*#@\$_%";
+						if ( "'" === $opening_quote_char ) {
+							$pubid_char .= "'";
+						}
+						$pubid_literal_length = strspn( $this->xml, $pubid_char, $at + 1 );
+						$this->pubid_literal  = new WP_HTML_Span(
+							$at + 1,
+							$pubid_literal_length
+						);
+						$at                   += $pubid_literal_length + 2;
+
+						// Skip whitespace.
+						$at += strspn( $this->xml, " \t\f\r\n", $at );
+
+						// Parse the SystemLiteral token.
+						$quoted_string_length = $this->parse_quoted_string( $at );
+						if ( self::STATE_INCOMPLETE_INPUT === $this->parser_state ) {
+							$this->mark_incomplete_input( 'Unclosed SYSTEM literal.' );
+
+							return false;
+						}
+
+						$this->system_literal = new WP_HTML_Span(
+						// Start after the opening quote.
+							$at + 1,
+							// Exclude the closing quote.
+							$quoted_string_length - 2
+						);
+						$at                   += $quoted_string_length;
+					} elseif ( $this->xml[ $at ] === '[' ) {
+						$this->bail( 'Inline entity declarations are not yet supported in DOCTYPE declarations.', self::ERROR_SYNTAX );
+					}
+
+					// Skip whitespace.
+					$at += strspn( $this->xml, " \t\f\r\n", $at );
+
 					if ( $this->xml[ $at ] !== '>' ) {
-						$this->bail( 'Unsupported DOCTYPE syntax. Only a simple <!DOCTYPE name> is supported.' );
+						$this->bail(
+							sprintf( 'Syntax error in DOCTYPE declaration. Unexpected character "%s" at position %d.', $this->xml[ $at ],
+								$at ),
+							self::ERROR_SYNTAX
+						);
 					}
 
 					$closer_at                  = $at;
 					$this->parser_state         = self::STATE_DOCTYPE_NODE;
 					$this->token_length         = $closer_at + 1 - $this->token_starts_at;
 					$this->bytes_already_parsed = $closer_at + 1;
+
 					return true;
 				}
 
@@ -1706,12 +1890,12 @@ class XMLProcessor {
 				 * See https://www.w3.org/TR/xml/#sec-predefined-ent.
 				 */
 				if ( null !== $this->get_attribute( 'encoding' )
-					&& 'UTF-8' !== strtoupper( $this->get_attribute( 'encoding' ) )
+				     && 'UTF-8' !== strtoupper( $this->get_attribute( 'encoding' ) )
 				) {
 					$this->bail( 'Unsupported XML encoding declared, only UTF-8 is supported.', self::ERROR_UNSUPPORTED );
 				}
 				if ( null !== $this->get_attribute( 'standalone' )
-					&& 'YES' !== strtoupper( $this->get_attribute( 'standalone' ) )
+				     && 'YES' !== strtoupper( $this->get_attribute( 'standalone' ) )
 				) {
 					$this->bail( 'Standalone XML documents are not supported.', self::ERROR_UNSUPPORTED );
 				}
@@ -1794,7 +1978,7 @@ class XMLProcessor {
 				return true;
 			}
 
-			++$at;
+			++ $at;
 		}
 
 		// There's no more tag openers and we're not expecting more data –
@@ -1806,6 +1990,7 @@ class XMLProcessor {
 			$this->text_starts_at       = $was_at;
 			$this->text_length          = $doc_length - $was_at;
 			$this->bytes_already_parsed = $doc_length;
+
 			return true;
 		}
 
@@ -1818,21 +2003,23 @@ class XMLProcessor {
 		$this->token_length    = $doc_length - $was_at;
 		$this->text_starts_at  = $was_at;
 		$this->text_length     = $doc_length - $was_at;
+
 		return false;
 	}
 
 	/**
 	 * Parses the next attribute.
 	 *
+	 * @return bool Whether an attribute was found before the end of the document.
 	 * @since WP_VERSION
 	 *
-	 * @return bool Whether an attribute was found before the end of the document.
 	 */
 	private function parse_next_attribute() {
 		// Skip whitespace and slashes.
 		$this->bytes_already_parsed += strspn( $this->xml, " \t\f\r\n/", $this->bytes_already_parsed );
 		if ( $this->bytes_already_parsed >= strlen( $this->xml ) ) {
 			$this->mark_incomplete_input();
+
 			return false;
 		}
 
@@ -1847,14 +2034,15 @@ class XMLProcessor {
 			$this->bail( 'Invalid attribute name encountered.', self::ERROR_SYNTAX );
 		}
 		$this->bytes_already_parsed += $attribute_name_length;
-		$attribute_name              = substr( $this->xml, $attribute_start, $attribute_name_length );
+		$attribute_name             = substr( $this->xml, $attribute_start, $attribute_name_length );
 		$this->skip_whitespace();
 
 		// Parse attribute value.
-		++$this->bytes_already_parsed;
+		++ $this->bytes_already_parsed;
 		$this->skip_whitespace();
 		if ( $this->bytes_already_parsed >= strlen( $this->xml ) ) {
 			$this->mark_incomplete_input();
+
 			return false;
 		}
 		switch ( $this->xml[ $this->bytes_already_parsed ] ) {
@@ -1895,6 +2083,7 @@ class XMLProcessor {
 
 		if ( $attribute_end >= strlen( $this->xml ) ) {
 			$this->mark_incomplete_input();
+
 			return false;
 		}
 
@@ -1918,6 +2107,29 @@ class XMLProcessor {
 		return true;
 	}
 
+	private function parse_quoted_string( $at = null ) {
+		if ( null === $at ) {
+			$at = $this->bytes_already_parsed;
+		}
+
+		$quote = $this->xml[ $at ];
+		if ( $quote !== "'" && $quote !== '"' ) {
+			$this->bail( 'Invalid quote character encountered in an attribute value.', self::ERROR_SYNTAX );
+		}
+		$value_length = strcspn( $this->xml, $quote, $at + 1 );
+		if ( $at + $value_length + 1 >= strlen( $this->xml ) ) {
+			$this->mark_incomplete_input();
+
+			return false;
+		}
+
+		if ( $this->xml[ $at + $value_length + 1 ] !== $quote ) {
+			$this->bail( 'A disallowed character encountered in an attribute value (either < or &).', self::ERROR_SYNTAX );
+		}
+
+		return $value_length + 2;
+	}
+
 	/**
 	 * Move the internal cursor past any immediate successive whitespace.
 	 *
@@ -1932,7 +2144,8 @@ class XMLProcessor {
 	 *
 	 * Name ::= NameStartChar (NameChar)*
 	 *
-	 * @param int $offset
+	 * @param  int  $offset
+	 *
 	 * @return int
 	 */
 	private function parse_name( $offset ) {
@@ -1975,6 +2188,7 @@ class XMLProcessor {
 
 			$name_byte_length += $bytes_parsed;
 		}
+
 		return $name_byte_length;
 	}
 
@@ -2086,16 +2300,19 @@ class XMLProcessor {
 		$this->text_starts_at     = null;
 		$this->text_length        = null;
 		$this->is_closing_tag     = null;
+		$this->pubid_literal      = null;
+		$this->system_literal     = null;
 		$this->attributes         = array();
 	}
 
 	/**
 	 * Applies lexical updates to XML document.
 	 *
+	 * @param  int  $shift_this_point  Accumulate and return shift for this position.
+	 *
+	 * @return int How many bytes the given pointer moved in response to the updates.
 	 * @since WP_VERSION
 	 *
-	 * @param int $shift_this_point Accumulate and return shift for this position.
-	 * @return int How many bytes the given pointer moved in response to the updates.
 	 */
 	private function apply_lexical_updates( $shift_this_point = 0 ) {
 		if ( ! count( $this->lexical_updates ) ) {
@@ -2131,8 +2348,8 @@ class XMLProcessor {
 				$accumulated_shift_for_given_point += $shift;
 			}
 
-			$output_buffer       .= substr( $this->xml, $bytes_already_copied, $diff->start - $bytes_already_copied );
-			$output_buffer       .= $diff->text;
+			$output_buffer        .= substr( $this->xml, $bytes_already_copied, $diff->start - $bytes_already_copied );
+			$output_buffer        .= $diff->text;
 			$bytes_already_copied = $diff->start + $diff->length;
 		}
 
@@ -2189,10 +2406,11 @@ class XMLProcessor {
 	/**
 	 * Checks whether a bookmark with the given name exists.
 	 *
+	 * @param  string  $bookmark_name  Name to identify a bookmark that potentially exists.
+	 *
+	 * @return bool Whether that bookmark exists.
 	 * @since WP_VERSION
 	 *
-	 * @param string $bookmark_name Name to identify a bookmark that potentially exists.
-	 * @return bool Whether that bookmark exists.
 	 */
 	public function has_bookmark( $bookmark_name ) {
 		return array_key_exists( $bookmark_name, $this->bookmarks );
@@ -2208,10 +2426,11 @@ class XMLProcessor {
 	 * In order to prevent accidental infinite loops, there's a
 	 * maximum limit on the number of times seek() can be called.
 	 *
+	 * @param  string  $bookmark_name  Jump to the place in the document identified by this bookmark name.
+	 *
+	 * @return bool Whether the internal cursor was successfully moved to the bookmark's location.
 	 * @since WP_VERSION
 	 *
-	 * @param string $bookmark_name Jump to the place in the document identified by this bookmark name.
-	 * @return bool Whether the internal cursor was successfully moved to the bookmark's location.
 	 */
 	public function seek( $bookmark_name ) {
 		if ( ! array_key_exists( $bookmark_name, $this->bookmarks ) ) {
@@ -2220,15 +2439,17 @@ class XMLProcessor {
 				__( 'Unknown bookmark name.' ),
 				'WP_VERSION'
 			);
+
 			return false;
 		}
 
-		if ( ++$this->seek_count > static::MAX_SEEK_OPS ) {
+		if ( ++ $this->seek_count > static::MAX_SEEK_OPS ) {
 			_doing_it_wrong(
 				__METHOD__,
 				__( 'Too many calls to seek() - this can lead to performance issues.' ),
 				'WP_VERSION'
 			);
+
 			return false;
 		}
 
@@ -2238,17 +2459,19 @@ class XMLProcessor {
 		// Point this tag processor before the sought tag opener and consume it.
 		$this->bytes_already_parsed = $this->bookmarks[ $bookmark_name ]->start;
 		$this->parser_state         = self::STATE_READY;
+
 		return $this->parse_next_token();
 	}
 
 	/**
 	 * Compare two WP_HTML_Text_Replacement objects.
 	 *
+	 * @param  WP_HTML_Text_Replacement  $a  First attribute update.
+	 * @param  WP_HTML_Text_Replacement  $b  Second attribute update.
+	 *
+	 * @return int Comparison value for string order.
 	 * @since WP_VERSION
 	 *
-	 * @param WP_HTML_Text_Replacement $a First attribute update.
-	 * @param WP_HTML_Text_Replacement $b Second attribute update.
-	 * @return int Comparison value for string order.
 	 */
 	private static function sort_start_ascending( $a, $b ) {
 		$by_start = $a->start - $b->start;
@@ -2265,6 +2488,7 @@ class XMLProcessor {
 		 * This code should be unreachable, because it implies the two replacements
 		 * start at the same location and contain the same text.
 		 */
+
 		return $a->length - $b->length;
 	}
 
@@ -2277,10 +2501,11 @@ class XMLProcessor {
 	 *  - If an attribute is enqueued to be removed, the return will be `null` to indicate that.
 	 *  - If no updates are enqueued, the return will be `false` to differentiate from "removed."
 	 *
+	 * @param  string  $comparable_name  The attribute name in its comparable form.
+	 *
+	 * @return string|boolean|null Value of enqueued update if present, otherwise false.
 	 * @since WP_VERSION
 	 *
-	 * @param string $comparable_name The attribute name in its comparable form.
-	 * @return string|boolean|null Value of enqueued update if present, otherwise false.
 	 */
 	private function get_enqueued_attribute_value( $comparable_name ) {
 		if ( self::STATE_MATCHED_TAG !== $this->parser_state ) {
@@ -2330,7 +2555,8 @@ class XMLProcessor {
 		 *        2. Double-quoting starts one after the equals sign.
 		 *        3. Double-quoting ends at the last character in the update.
 		 */
-		$enqueued_value = substr( $enqueued_text, $equals_at + 2, -1 );
+		$enqueued_value = substr( $enqueued_text, $equals_at + 2, - 1 );
+
 		/*
 		 * We're deliberately not decoding entities in attribute values:
 		 *
@@ -2338,6 +2564,7 @@ class XMLProcessor {
 		 *
 		 * See https://www.w3.org/TR/xml/#sec-starttags.
 		 */
+
 		return $enqueued_value;
 	}
 
@@ -2355,10 +2582,11 @@ class XMLProcessor {
 	 *     $p->next_tag() === false;
 	 *     $p->get_attribute( 'class' ) === null;
 	 *
+	 * @param  string  $name  Name of attribute whose value is requested.
+	 *
+	 * @return string|true|null Value of attribute or `null` if not available. Boolean attributes return `true`.
 	 * @since WP_VERSION
 	 *
-	 * @param string $name Name of attribute whose value is requested.
-	 * @return string|true|null Value of attribute or `null` if not available. Boolean attributes return `true`.
 	 */
 	public function get_attribute( $name ) {
 		if (
@@ -2395,6 +2623,7 @@ class XMLProcessor {
 				__( 'Invalid attribute value encountered.' ),
 				'WP_VERSION'
 			);
+
 			return false;
 		}
 
@@ -2414,10 +2643,11 @@ class XMLProcessor {
 	 *     $p->get_attribute_names_with_prefix( 'DATA-' ) === array( 'DATA-test-id' );
 	 *     $p->get_attribute_names_with_prefix( 'DAta-' ) === array();
 	 *
+	 * @param  string  $prefix  Prefix of requested attribute names.
+	 *
+	 * @return array|null List of attribute names, or `null` when no tag opener is matched.
 	 * @since WP_VERSION
 	 *
-	 * @param string $prefix Prefix of requested attribute names.
-	 * @return array|null List of attribute names, or `null` when no tag opener is matched.
 	 */
 	public function get_attribute_names_with_prefix( $prefix ) {
 		if (
@@ -2433,6 +2663,7 @@ class XMLProcessor {
 				$matches[] = $attr_name;
 			}
 		}
+
 		return $matches;
 	}
 
@@ -2448,9 +2679,9 @@ class XMLProcessor {
 	 *     $p->next_tag() === false;
 	 *     $p->get_tag() === null;
 	 *
+	 * @return string|null Name of currently matched tag in input XML, or `null` if none found.
 	 * @since WP_VERSION
 	 *
-	 * @return string|null Name of currently matched tag in input XML, or `null` if none found.
 	 */
 	public function get_tag() {
 		if ( null === $this->tag_name_starts_at ) {
@@ -2464,6 +2695,69 @@ class XMLProcessor {
 		}
 
 		return null;
+	}
+
+	/**
+	 * Returns the name from the DOCTYPE declaration.
+	 *
+	 * doctypedecl ::= '<!DOCTYPE' S Name (S ExternalID)? S? ('[' intSubset ']' S?)? '>'
+	 *                               ^^^^
+	 *
+	 * @return string|null The name from the DOCTYPE declaration, or null if not available.
+	 * @since WP_VERSION
+	 *
+	 */
+	public function get_doctype_name() {
+		if ( null === $this->doctype_name ) {
+			return null;
+		}
+
+		return substr( $this->xml, $this->doctype_name->start, $this->doctype_name->length );
+	}
+
+
+	/**
+	 * Returns the system literal value from the DOCTYPE declaration.
+	 *
+	 * Example:
+	 *
+	 *     <!DOCTYPE html SYSTEM "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+	 *
+	 * In this example, the system_literal would be:
+	 * "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"
+	 *
+	 * @return string|null The system literal value, or null if not available.
+	 * @since WP_VERSION
+	 *
+	 */
+	public function get_system_literal() {
+		if ( null === $this->system_literal ) {
+			return null;
+		}
+
+		return substr( $this->xml, $this->system_literal->start, $this->system_literal->length );
+	}
+
+	/**
+	 * Returns the public identifier value from the DOCTYPE declaration.
+	 *
+	 * Example:
+	 *
+	 *     <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+	 *
+	 * In this example, the pubid_literal would be:
+	 * "-//W3C//DTD XHTML 1.0 Strict//EN"
+	 *
+	 * @return string|null The public identifier value, or null if not available.
+	 * @since WP_VERSION
+	 *
+	 */
+	public function get_pubid_literal() {
+		if ( null === $this->pubid_literal ) {
+			return null;
+		}
+
+		return substr( $this->xml, $this->pubid_literal->start, $this->pubid_literal->length );
 	}
 
 	/**
@@ -2487,10 +2781,9 @@ class XMLProcessor {
 	 *
 	 * XML tags ending with a solidus ("/") are parsed as empty elements. They have no
 	 * content and no matching closer is expected.
-
+	 * @return bool Whether the currently matched tag is an empty element tag.
 	 * @since WP_VERSION
 	 *
-	 * @return bool Whether the currently matched tag is an empty element tag.
 	 */
 	public function is_empty_element() {
 		if ( self::STATE_MATCHED_TAG !== $this->parser_state ) {
@@ -2505,6 +2798,7 @@ class XMLProcessor {
 		 *     <figure />
 		 *             ^ this appears one character before the end of the closing ">".
 		 */
+
 		return '/' === $this->xml[ $this->token_starts_at + $this->token_length - 2 ];
 	}
 
@@ -2520,9 +2814,9 @@ class XMLProcessor {
 	 *     $p->next_tag( array( 'tag_name' => 'wp:content', 'tag_closers' => 'visit' ) );
 	 *     $p->is_tag_closer() === true;
 	 *
+	 * @return bool Whether the current tag is a tag closer.
 	 * @since WP_VERSION
 	 *
-	 * @return bool Whether the current tag is a tag closer.
 	 */
 	public function is_tag_closer() {
 		return (
@@ -2543,9 +2837,9 @@ class XMLProcessor {
 	 *     $p->next_token();
 	 *     $p->is_tag_opener() === false;
 	 *
+	 * @return bool Whether the current tag is a tag closer.
 	 * @since WP_VERSION
 	 *
-	 * @return bool Whether the current tag is a tag closer.
 	 */
 	public function is_tag_opener() {
 		return (
@@ -2571,9 +2865,9 @@ class XMLProcessor {
 	 *  - `#comment` when matched on a comment.
 	 *  - `#presumptuous-tag` when matched on an empty tag closer.
 	 *
+	 * @return string|null What kind of token is matched, or null.
 	 * @since WP_VERSION
 	 *
-	 * @return string|null What kind of token is matched, or null.
 	 */
 	public function get_token_type() {
 		switch ( $this->parser_state ) {
@@ -2600,9 +2894,9 @@ class XMLProcessor {
 	 * hasn't yet found a token or because it reached the end
 	 * of the document without matching a token.
 	 *
+	 * @return string|null Name of the matched token.
 	 * @since WP_VERSION
 	 *
-	 * @return string|null Name of the matched token.
 	 */
 	public function get_token_name() {
 		switch ( $this->parser_state ) {
@@ -2654,9 +2948,9 @@ class XMLProcessor {
 	 * that a token has modifiable text, and a token with modifiable text may
 	 * have an empty string (e.g. a comment with no contents).
 	 *
+	 * @return string
 	 * @since WP_VERSION
 	 *
-	 * @return string
 	 */
 	public function get_modifiable_text() {
 		if ( null === $this->text_starts_at ) {
@@ -2699,8 +2993,10 @@ class XMLProcessor {
 				__( 'Invalid text content encountered.' ),
 				'WP_VERSION'
 			);
+
 			return false;
 		}
+
 		return $decoded;
 	}
 
@@ -2714,6 +3010,7 @@ class XMLProcessor {
 					// @TODO This is naive, let's rethink this.
 					htmlspecialchars( $new_value, ENT_XML1, 'UTF-8' )
 				);
+
 				return true;
 
 			case self::STATE_CDATA_NODE:
@@ -2723,6 +3020,7 @@ class XMLProcessor {
 					// @TODO This is naive, let's rethink this.
 					str_replace( ']]>', ']]&gt;', $new_value )
 				);
+
 				return true;
 			default:
 				_doing_it_wrong(
@@ -2730,6 +3028,7 @@ class XMLProcessor {
 					__( 'Cannot set text content on a non-text node.' ),
 					'WP_VERSION'
 				);
+
 				return false;
 		}
 	}
@@ -2743,11 +3042,12 @@ class XMLProcessor {
 	 *
 	 * For string attributes, the value is escaped using the `esc_attr` function.
 	 *
+	 * @param  string  $name  The attribute name to target.
+	 * @param  string|bool  $value  The new attribute value.
+	 *
+	 * @return bool Whether an attribute value was set.
 	 * @since WP_VERSION
 	 *
-	 * @param string      $name  The attribute name to target.
-	 * @param string|bool $value The new attribute value.
-	 * @return bool Whether an attribute value was set.
 	 */
 	public function set_attribute( $name, $value ) {
 		if ( ! is_string( $value ) ) {
@@ -2756,6 +3056,7 @@ class XMLProcessor {
 				__( 'Non-string attribute values cannot be passed to set_attribute().' ),
 				'WP_VERSION'
 			);
+
 			return false;
 		}
 		if (
@@ -2820,10 +3121,11 @@ class XMLProcessor {
 	/**
 	 * Remove an attribute from the currently-matched tag.
 	 *
+	 * @param  string  $name  The attribute name to remove.
+	 *
+	 * @return bool Whether an attribute was removed.
 	 * @since WP_VERSION
 	 *
-	 * @param string $name The attribute name to remove.
-	 * @return bool Whether an attribute was removed.
 	 */
 	public function remove_attribute( $name ) {
 		if (
@@ -2845,6 +3147,7 @@ class XMLProcessor {
 			if ( isset( $this->lexical_updates[ $name ] ) ) {
 				unset( $this->lexical_updates[ $name ] );
 			}
+
 			return false;
 		}
 
@@ -2871,11 +3174,11 @@ class XMLProcessor {
 	/**
 	 * Returns the string representation of the XML Tag Processor.
 	 *
-	 * @since WP_VERSION
-	 *
+	 * @return string The processed XML.
 	 * @see XMLProcessor::get_updated_xml()
 	 *
-	 * @return string The processed XML.
+	 * @since WP_VERSION
+	 *
 	 */
 	public function __toString() {
 		return $this->get_updated_xml();
@@ -2884,9 +3187,9 @@ class XMLProcessor {
 	/**
 	 * Returns the string representation of the XML Tag Processor.
 	 *
+	 * @return string The processed XML.
 	 * @since WP_VERSION
 	 *
-	 * @return string The processed XML.
 	 */
 	public function get_updated_xml() {
 		$requires_no_updating = 0 === count( $this->lexical_updates );
@@ -2971,13 +3274,14 @@ class XMLProcessor {
 	 * It considers the current XML context (prolog, element, or misc)
 	 * and only expects the nodes that are allowed in that context.
 	 *
+	 * @param  int  $node_to_process  Whether to process the next node or
+	 *            reprocess the current node, e.g. using another parser context.
+	 *
+	 * @return bool Whether a token was parsed.
 	 * @since WP_VERSION
 	 *
 	 * @access private
 	 *
-	 * @param int $node_to_process Whether to process the next node or
-	 *            reprocess the current node, e.g. using another parser context.
-	 * @return bool Whether a token was parsed.
 	 */
 	private function step( $node_to_process = self::PROCESS_NEXT_NODE ) {
 		// Refuse to proceed if there was a previous error.
@@ -3009,6 +3313,7 @@ class XMLProcessor {
 					return $this->step_in_misc( $node_to_process );
 				default:
 					$this->last_error = self::ERROR_UNSUPPORTED;
+
 					return false;
 			}
 		} catch ( XMLUnsupportedException $e ) {
@@ -3023,12 +3328,12 @@ class XMLProcessor {
 	/**
 	 * Parses the next node in the 'prolog' part of the XML document.
 	 *
-	 * @since WP_VERSION
-	 *
+	 * @return bool Whether a node was found.
 	 * @see https://www.w3.org/TR/xml/#NT-document.
 	 * @see XMLProcessor::step
 	 *
-	 * @return bool Whether a node was found.
+	 * @since WP_VERSION
+	 *
 	 */
 	private function step_in_prolog( $node_to_process = self::PROCESS_NEXT_NODE ) {
 		if ( self::PROCESS_NEXT_NODE === $node_to_process ) {
@@ -3045,6 +3350,7 @@ class XMLProcessor {
 		// before finding a root element, then the document is incomplete.
 		if ( self::STATE_COMPLETE === $this->parser_state ) {
 			$this->mark_incomplete_input();
+
 			return false;
 		}
 		// Do not step if we paused due to an incomplete input.
@@ -3058,6 +3364,7 @@ class XMLProcessor {
 				if ( strlen( $text ) !== $whitespaces ) {
 					$this->bail( 'Unexpected token type in prolog stage.', self::ERROR_SYNTAX );
 				}
+
 				return $this->step();
 			// @TODO: Fail if there's more than one <!DOCTYPE> or if <!DOCTYPE> was found before the XML declaration token.
 			case '#doctype':
@@ -3067,6 +3374,7 @@ class XMLProcessor {
 				return true;
 			case '#tag':
 				$this->parser_context = self::IN_ELEMENT_CONTEXT;
+
 				return $this->step( self::PROCESS_CURRENT_NODE );
 			default:
 				$this->bail( 'Unexpected token type in prolog stage.', self::ERROR_SYNTAX );
@@ -3076,12 +3384,12 @@ class XMLProcessor {
 	/**
 	 * Parses the next node in the 'element' part of the XML document.
 	 *
-	 * @since WP_VERSION
-	 *
+	 * @return bool Whether a node was found.
 	 * @see https://www.w3.org/TR/xml/#NT-document.
 	 * @see XMLProcessor::step
 	 *
-	 * @return bool Whether a node was found.
+	 * @since WP_VERSION
+	 *
 	 */
 	private function step_in_element( $node_to_process = self::PROCESS_NEXT_NODE ) {
 		if ( self::PROCESS_NEXT_NODE === $node_to_process ) {
@@ -3127,11 +3435,12 @@ class XMLProcessor {
 				} else {
 					$this->push_open_element( $tag_name );
 				}
+
 				return true;
 			default:
 				$this->bail(
 					sprintf(
-						// translators: %1$s is the unexpected token type.
+					// translators: %1$s is the unexpected token type.
 						__( 'Unexpected token type "%1$s" in element stage.', 'data-liberation' ),
 						$this->get_token_type()
 					),
@@ -3143,12 +3452,12 @@ class XMLProcessor {
 	/**
 	 * Parses the next node in the 'misc' part of the XML document.
 	 *
-	 * @since WP_VERSION
-	 *
+	 * @return bool Whether a node was found.
 	 * @see https://www.w3.org/TR/xml/#NT-document.
 	 * @see XMLProcessor::step
 	 *
-	 * @return bool Whether a node was found.
+	 * @since WP_VERSION
+	 *
 	 */
 	private function step_in_misc( $node_to_process = self::PROCESS_NEXT_NODE ) {
 		if ( self::PROCESS_NEXT_NODE === $node_to_process ) {
@@ -3159,6 +3468,7 @@ class XMLProcessor {
 			) {
 				// Parsing is complete.
 				$this->parser_state = self::STATE_COMPLETE;
+
 				return true;
 			}
 		}
@@ -3182,6 +3492,7 @@ class XMLProcessor {
 				if ( strlen( $text ) !== $whitespaces ) {
 					$this->bail( 'Unexpected token type "' . $this->get_token_type() . '" in misc stage.', self::ERROR_SYNTAX );
 				}
+
 				return $this->step();
 			default:
 				$this->bail( 'Unexpected token type "' . $this->get_token_type() . '" in misc stage.', self::ERROR_SYNTAX );
@@ -3193,16 +3504,15 @@ class XMLProcessor {
 	 *
 	 * Breadcrumbs start at the outermost parent and descend toward the matched element.
 	 * They always include the entire path from the root XML node to the matched element.
-
 	 * Example
 	 *
 	 *     $processor = XMLProcessor::create_fragment( '<p><strong><em><img/></em></strong></p>' );
 	 *     $processor->next_tag( 'img' );
 	 *     $processor->get_breadcrumbs() === array( 'p', 'strong', 'em', 'img' );
 	 *
+	 * @return string[]|null Array of tag names representing path to matched node, if matched, otherwise NULL.
 	 * @since WP_VERSION
 	 *
-	 * @return string[]|null Array of tag names representing path to matched node, if matched, otherwise NULL.
 	 */
 	public function get_breadcrumbs() {
 		return $this->stack_of_open_elements;
@@ -3227,11 +3537,12 @@ class XMLProcessor {
 	 *     false === $processor->matches_breadcrumbs( array( 'wp:post', 'image' ) );
 	 *     true  === $processor->matches_breadcrumbs( array( 'wp:post', '*', 'image' ) );
 	 *
+	 * @param  string[]  $breadcrumbs  DOM sub-path at which element is found, e.g. `array( 'content', 'image' )`.
+	 *                              May also contain the wildcard `*` which matches a single element, e.g. `array( 'wp:post', '*' )`.
+	 *
+	 * @return bool Whether the currently-matched tag is found at the given nested structure.
 	 * @since WP_VERSION
 	 *
-	 * @param string[] $breadcrumbs DOM sub-path at which element is found, e.g. `array( 'content', 'image' )`.
-	 *                              May also contain the wildcard `*` which matches a single element, e.g. `array( 'wp:post', '*' )`.
-	 * @return bool Whether the currently-matched tag is found at the given nested structure.
 	 */
 	public function matches_breadcrumbs( $breadcrumbs ) {
 		// Everything matches when there are zero constraints.
@@ -3250,7 +3561,7 @@ class XMLProcessor {
 			return false;
 		}
 
-		for ( $i = count( $this->stack_of_open_elements ) - 1; $i >= 0; $i-- ) {
+		for ( $i = count( $this->stack_of_open_elements ) - 1; $i >= 0; $i -- ) {
 			$tag_name = $this->stack_of_open_elements[ $i ];
 			$crumb    = current( $breadcrumbs );
 
@@ -3286,9 +3597,9 @@ class XMLProcessor {
 	 *     $processor->next_token();
 	 *     1 === $processor->get_current_depth();
 	 *
+	 * @return int Nesting-depth of current location in the document.
 	 * @since WP_VERSION
 	 *
-	 * @return int Nesting-depth of current location in the document.
 	 */
 	public function get_current_depth() {
 		return count( $this->stack_of_open_elements );
@@ -3310,6 +3621,7 @@ class XMLProcessor {
 	) {
 		if ( $this->expecting_more_input ) {
 			$this->parser_state = self::STATE_INCOMPLETE_INPUT;
+
 			return;
 		}
 
@@ -3332,9 +3644,10 @@ class XMLProcessor {
 	/**
 	 * Stops the parser and terminates its execution when encountering unsupported markup.
 	 *
+	 * @param  string  $message  Explains support is missing in order to parse the current node.
+	 *
 	 * @throws XMLUnsupportedException Halts execution of the parser.
 	 *
-	 * @param string $message Explains support is missing in order to parse the current node.
 	 */
 	private function bail( string $message, $reason = self::ERROR_UNSUPPORTED ) {
 		$starts_at = $this->token_starts_at ?? strlen( $this->xml );
