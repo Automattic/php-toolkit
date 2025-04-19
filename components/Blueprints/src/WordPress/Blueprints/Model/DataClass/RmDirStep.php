@@ -2,9 +2,9 @@
 
 namespace WordPress\Blueprints\Model\DataClass;
 
-class DefineSiteUrlStep implements StepDefinitionInterface {
+class RmDirStep implements StepDefinitionInterface {
 
-	const DISCRIMINATOR = 'defineSiteUrl';
+	const DISCRIMINATOR = 'rmdir';
 
 	/** @var Progress */
 	public $progress;
@@ -13,14 +13,22 @@ class DefineSiteUrlStep implements StepDefinitionInterface {
 	public $continueOnError = false;
 
 	/** @var string */
-	public $step = 'defineSiteUrl';
+	public $step = 'rmdir';
 
 	/**
-	 * The URL
+	 * The path to remove
 	 *
 	 * @var string
 	 */
-	public $siteUrl;
+	public $path;
+
+	/**
+	 * Whether to remove the directory recursively.
+	 * Defaults to false.
+	 *
+	 * @var bool
+	 */
+	public $recursive = false;
 
 
 	/**
@@ -51,10 +59,18 @@ class DefineSiteUrlStep implements StepDefinitionInterface {
 
 
 	/**
-	 * @param string $siteUrl
+	 * @param string $path
 	 */
-	public function setSiteUrl( $siteUrl ) {
-		$this->siteUrl = $siteUrl;
+	public function setPath( $path ) {
+		$this->path = $path;
+		return $this;
+	}
+
+	/**
+	 * @param bool $recursive
+	 */
+	public function setRecursive( $recursive ) {
+		$this->recursive = $recursive;
 		return $this;
 	}
 }

@@ -2,9 +2,6 @@
 
 namespace WordPress\Blueprints\Runner\Step;
 
-use WordPress\Blueprints\Model\DataClass\RunPHPStep;
-use WordPress\Blueprints\Progress\Tracker;
-
 class RunPHPStepRunner extends BaseStepRunner {
 	/**
 	 * @param \WordPress\Blueprints\Model\DataClass\RunPHPStep $input

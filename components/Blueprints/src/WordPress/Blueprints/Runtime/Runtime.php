@@ -2,10 +2,13 @@
 
 namespace WordPress\Blueprints\Runtime;
 
-use Symfony\Component\Filesystem\Filesystem;
-use Symfony\Component\Filesystem\Path;
+use WordPress\Filesystem\Filesystem;
 use Symfony\Component\Process\Process;
+use WordPress\Filesystem\FilesystemHelpers;
+use WordPress\Filesystem\LocalFilesystem;
+
 use function WordPress\Blueprints\join_paths;
+use function WordPress\Filesystem\wp_join_paths;
 
 class Runtime implements RuntimeInterface {
 
@@ -16,20 +19,9 @@ class Runtime implements RuntimeInterface {
 		string $documentRoot
 	) {
 		$this->documentRoot = $documentRoot;
-		$this->fs           = new Filesystem();
-		if ( ! file_exists( $this->getDocumentRoot() ) ) {
-			$this->fs->mkdir( $this->getDocumentRoot() );
-		}
-		if ( ! file_exists( $this->getTempRoot() ) ) {
-			$this->fs->mkdir( $this->getTempRoot() );
-		}
+		$this->fs           = LocalFilesystem::create( $this->getDocumentRoot() );
 	}
 
-	// @TODO: public function getTmpDir(): string {
-	// @TODO: should this class mediate network requests?
-
-	// @TODO: Move these filesystem operations to a separate class
-	// Maybe ExecutionContext? Or a separate Filesystem class?
 	public function getDocumentRoot(): string {
 		return $this->documentRoot;
 	}
@@ -38,35 +30,21 @@ class Runtime implements RuntimeInterface {
 	 * @param string $path
 	 */
 	public function resolvePath( $path ): string {
-		return Path::makeAbsolute( $path, $this->getDocumentRoot() );
+		// @deprecated Use getTargetFilesystem() instead.
+		trigger_error( 'Runtime::resolvePath() is deprecated. Use getTargetFilesystem() instead.', E_USER_DEPRECATED );
+		return wp_join_paths( $this->getDocumentRoot(), $path );
 	}
 
-	public function withTemporaryDirectory( $callback ) {
-		$path = $this->fs->tempnam( $this->getTempRoot(), 'tmpdir' );
-		$this->fs->remove( $path );
-		$this->fs->mkdir( $path );
-		try {
-			return $callback( $path );
-		} finally {
-			$this->fs->remove( $path );
-		}
+	public function getTargetFilesystem(): Filesystem {
+		return $this->fs;
 	}
 
-	public function withTemporaryFile( $callback, $suffix = null ) {
-		$path = $this->fs->tempnam( $this->getTempRoot(), 'tmpfile', $suffix );
-		try {
-			return $callback( $path );
-		} finally {
-			$this->fs->remove( $path );
-		}
+	public function withTemporaryDirectory( callable $callback ) {
+		return FilesystemHelpers::withTemporaryDirectory( $this->fs, $callback );
 	}
 
-	public function getTempRoot() {
-		// Store tmp files inside document root because in some runtime environments,
-		// `/tmp` may be on another filesystem and we couldn't move files across filesystems
-		// without a slow recursive copy.
-		return join_paths( $this->getDocumentRoot(), '/tmp' );
-		// return sys_get_temp_dir();
+	public function withTemporaryFile( callable $callback, ?string $suffix = null ) {
+		return FilesystemHelpers::withTemporaryFile( $this->fs, $callback, $suffix );
 	}
 
 	// @TODO: Move this to a separate class

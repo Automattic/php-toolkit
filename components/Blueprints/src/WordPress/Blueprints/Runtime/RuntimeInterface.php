@@ -2,6 +2,7 @@
 
 namespace WordPress\Blueprints\Runtime;
 
+use WordPress\Filesystem\Filesystem;
 use Symfony\Component\Process\Process;
 
 interface RuntimeInterface {
@@ -19,4 +20,13 @@ interface RuntimeInterface {
 		$input = null,
 		$timeout = 60
 	): Process;
+
+	public function getTargetFilesystem(): Filesystem;
+
+	public function evalPhpInSubProcess(
+		$code,
+		$env = null,
+		$input = null,
+		$timeout = 60
+	);
 }

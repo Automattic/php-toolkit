@@ -29,6 +29,14 @@ class CpStep implements StepDefinitionInterface {
 	 */
 	public $toPath;
 
+	/**
+	 * Whether to copy the file recursively.
+	 * Defaults to false.
+	 *
+	 * @var bool
+	 */
+	public $recursive = false;
+
 
 	/**
 	 * @param \WordPress\Blueprints\Model\DataClass\Progress $progress
@@ -71,6 +79,14 @@ class CpStep implements StepDefinitionInterface {
 	 */
 	public function setToPath( $toPath ) {
 		$this->toPath = $toPath;
+		return $this;
+	}
+
+	/**
+	 * @param bool $recursive
+	 */
+	public function setRecursive( $recursive ) {
+		$this->recursive = $recursive;
 		return $this;
 	}
 }
