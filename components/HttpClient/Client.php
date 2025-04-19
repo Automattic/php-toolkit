@@ -128,6 +128,24 @@ class Client {
 	}
 
 	/**
+	 * Returns an array of RemoteFileReader instances that stream the response bodies
+	 * of the given requests.
+	 *
+	 * @param Request[] $requests The requests to stream.
+	 *
+	 * @return RequestReadStream[]
+	 */
+	public function fetch_many( array $requests ) {
+		$streams = array();
+		
+		foreach ( $requests as $request ) {
+			$streams[] = $this->fetch( $request );
+		}
+		
+		return $streams;
+	}
+
+	/**
 	 * Enqueues one or multiple HTTP requests for asynchronous processing.
 	 * It does not open the network sockets, only adds the Request objects to
 	 * an internal queue. Network transmission is delayed until one of the returned
