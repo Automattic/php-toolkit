@@ -4,22 +4,28 @@ namespace WordPress\Blueprints\Runtime;
 
 use WordPress\Filesystem\Filesystem;
 use Symfony\Component\Process\Process;
+use WordPress\Blueprints\references\DataReferenceResolver;
+use WordPress\Blueprints\Resources\Model\DataReference;
+use WordPress\Blueprints\Resources\Model\File;
 use WordPress\Filesystem\FilesystemHelpers;
 use WordPress\Filesystem\LocalFilesystem;
+use WordPress\HttpClient\Client;
 
-use function WordPress\Blueprints\join_paths;
 use function WordPress\Filesystem\wp_join_paths;
 
-class Runtime implements RuntimeInterface {
+class Runtime {
 
 	public $fs;
 	protected $documentRoot;
+	protected $dataReferenceResolver;
 
 	public function __construct(
 		string $documentRoot
 	) {
 		$this->documentRoot = $documentRoot;
 		$this->fs           = LocalFilesystem::create( $this->getDocumentRoot() );
+		$http_client = new Client();
+		$this->dataReferenceResolver = new DataReferenceResolver( $http_client, $this->fs );
 	}
 
 	public function getDocumentRoot(): string {
@@ -33,6 +39,10 @@ class Runtime implements RuntimeInterface {
 		// @deprecated Use getTargetFilesystem() instead.
 		trigger_error( 'Runtime::resolvePath() is deprecated. Use getTargetFilesystem() instead.', E_USER_DEPRECATED );
 		return wp_join_paths( $this->getDocumentRoot(), $path );
+	}
+
+	public function resolveDataReference( DataReference $reference ): Filesystem|File {
+		return $this->dataReferenceResolver->resolve( $reference );
 	}
 
 	public function getTargetFilesystem(): Filesystem {

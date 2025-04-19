@@ -58,7 +58,7 @@ use WordPress\Blueprints\Runner\Step\SetSiteOptionsStepRunner;
 use WordPress\Blueprints\Runner\Step\UnzipStepRunner;
 use WordPress\Blueprints\Runner\Step\WPCLIStepRunner;
 use WordPress\Blueprints\Runner\Step\WriteFileStepRunner;
-use WordPress\Blueprints\Runtime\RuntimeInterface;
+use WordPress\Blueprints\Runtime\Runtime;
 use WordPress\DataSource\PlaygroundFetchSource;
 use WordPress\DataSource\UrlSource;
 
@@ -82,7 +82,7 @@ class ContainerBuilder {
 
 	/**
 	 * @param string                                         $environment
-	 * @param \WordPress\Blueprints\Runtime\RuntimeInterface $runtime
+	 * @param \WordPress\Blueprints\Runtime\Runtime $runtime
 	 */
 	public function build( $environment, $runtime ) {
 		$container            = $this->container;

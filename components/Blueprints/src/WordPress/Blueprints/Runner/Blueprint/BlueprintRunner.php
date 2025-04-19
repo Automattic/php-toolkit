@@ -7,7 +7,7 @@ use Symfony\Component\EventDispatcher\EventDispatcher;
 use WordPress\Blueprints\Compile\CompiledBlueprint;
 use WordPress\Blueprints\Compile\CompiledStep;
 use WordPress\Blueprints\Compile\StepSuccess;
-use WordPress\Blueprints\Runtime\RuntimeInterface;
+use WordPress\Blueprints\Runtime\Runtime;
 
 class BlueprintRunner {
 
@@ -16,7 +16,7 @@ class BlueprintRunner {
 	protected $resourceManagerFactory;
 
 	public function __construct(
-		RuntimeInterface $runtime,
+		Runtime $runtime,
 		$resourceManagerFactory
 	) {
 		$this->resourceManagerFactory = $resourceManagerFactory;

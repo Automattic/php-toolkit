@@ -2,6 +2,8 @@
 
 namespace WordPress\Blueprints\Model\DataClass;
 
+use WordPress\Blueprints\Resources\Model\DataReference;
+
 class InstallThemeStep implements StepDefinitionInterface {
 
 	const DISCRIMINATOR = 'installTheme';
@@ -19,8 +21,8 @@ class InstallThemeStep implements StepDefinitionInterface {
 	 */
 	public $step = 'installTheme';
 
-	/** @var string|ResourceDefinitionInterface */
-	public $themeZipFile;
+	/** @var DataReference */
+	public $themeData;
 
 	/**
 	 * Whether to activate the theme after installing it.
@@ -57,8 +59,8 @@ class InstallThemeStep implements StepDefinitionInterface {
 	}
 
 
-	public function setThemeZipFile( $themeZipFile ) {
-		$this->themeZipFile = $themeZipFile;
+	public function setThemeData( $themeData ) {
+		$this->themeData = $themeData;
 		return $this;
 	}
 

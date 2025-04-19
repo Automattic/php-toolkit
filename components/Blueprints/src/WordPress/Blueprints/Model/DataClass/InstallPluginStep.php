@@ -2,6 +2,8 @@
 
 namespace WordPress\Blueprints\Model\DataClass;
 
+use WordPress\Blueprints\Resources\Model\DataReference;
+
 class InstallPluginStep implements StepDefinitionInterface {
 	const DISCRIMINATOR = 'installPlugin';
 
@@ -18,8 +20,8 @@ class InstallPluginStep implements StepDefinitionInterface {
 	 */
 	public $step = 'installPlugin';
 
-	/** @var string|ResourceDefinitionInterface */
-	public $pluginZipFile;
+	/** @var DataReference */
+	public $pluginData;
 
 	/**
 	 * Whether to activate the plugin after installing it.
@@ -59,12 +61,11 @@ class InstallPluginStep implements StepDefinitionInterface {
 	}
 
 
-	public function setPluginZipFile( $pluginZipFile ) {
-		$this->pluginZipFile = $pluginZipFile;
+	public function setPluginData( $pluginData ) {
+		$this->pluginData = $pluginData;
 
 		return $this;
 	}
-
 
 	/**
 	 * @param bool $activate

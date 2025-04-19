@@ -3,7 +3,7 @@
 namespace WordPress\Blueprints\Runner\Step;
 
 use WordPress\Blueprints\Resources\ResourceManager;
-use WordPress\Blueprints\Runtime\RuntimeInterface;
+use WordPress\Blueprints\Runtime\Runtime;
 
 abstract class BaseStepRunner implements StepRunnerInterface {
 	protected $resourceManager;
@@ -22,13 +22,13 @@ abstract class BaseStepRunner implements StepRunnerInterface {
 	}
 
 	/**
-	 * @param \WordPress\Blueprints\Runtime\RuntimeInterface $runtime
+	 * @param \WordPress\Blueprints\Runtime\Runtime $runtime
 	 */
 	public function setRuntime( $runtime ) {
 		$this->runtime = $runtime;
 	}
 
-	protected function getRuntime(): RuntimeInterface {
+	protected function getRuntime(): Runtime {
 		return $this->runtime;
 	}
 

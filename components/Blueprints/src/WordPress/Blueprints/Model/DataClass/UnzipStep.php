@@ -2,6 +2,8 @@
 
 namespace WordPress\Blueprints\Model\DataClass;
 
+use WordPress\Blueprints\Resources\Model\DataReference;
+
 class UnzipStep implements StepDefinitionInterface {
 
 	const DISCRIMINATOR = 'unzip';
@@ -15,7 +17,7 @@ class UnzipStep implements StepDefinitionInterface {
 	/** @var string */
 	public $step = 'unzip';
 
-	/** @var string|ResourceDefinitionInterface */
+	/** @var DataReference */
 	public $zipFile;
 
 	/**

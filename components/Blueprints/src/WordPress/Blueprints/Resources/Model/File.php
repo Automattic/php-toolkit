@@ -1,0 +1,32 @@
+<?php
+
+namespace WordPress\Blueprints\Resources\Model;
+
+use WordPress\ByteStream\ReadStream\ByteReadStream;
+
+/**
+ * Represents a file-like object, similar to JavaScript's File.
+ * It encapsulates a byte stream and a filename.
+ */
+class File extends DataReference {
+	/**
+	 * @var ByteReadStream The stream representing the file content.
+	 */
+	public $stream;
+
+	/**
+	 * @var string The name of the file.
+	 */
+	public $filename;
+
+	/**
+	 * Constructor.
+	 *
+	 * @param ByteReadStream $stream   The stream representing the file content.
+	 * @param string         $filename The name of the file.
+	 */
+	public function __construct( ByteReadStream $stream, string $filename ) {
+		$this->stream   = $stream;
+		$this->filename = $filename;
+	}
+}

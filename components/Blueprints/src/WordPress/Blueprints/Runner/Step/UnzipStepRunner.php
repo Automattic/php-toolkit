@@ -4,6 +4,10 @@ namespace WordPress\Blueprints\Runner\Step;
 
 use WordPress\Blueprints\Model\DataClass\UnzipStep;
 use WordPress\Blueprints\Progress\Tracker;
+use WordPress\Blueprints\Resources\Model\File;
+use WordPress\Zip\ZipFilesystem;
+
+use function WordPress\Filesystem\copy_between_filesystems;
 
 class UnzipStepRunner extends BaseStepRunner {
 
@@ -20,7 +24,18 @@ class UnzipStepRunner extends BaseStepRunner {
 	) {
 		$progress_tracker->set( 10, 'Unzipping...' );
 
-		$resolved_to_path = $this->getRuntime()->resolvePath( $input->extractToPath );
-		throw new \Exception("Not implemented at the moment. Needs to be updated to use the new ZipStreamReader API.");
+		$target_fs = $this->getRuntime()->getTargetFilesystem();
+		$zip_stream = $this->getRuntime()->resolveDataReference( $input->zipFile );
+		if ( ! $zip_stream instanceof File ) {
+			throw new \InvalidArgumentException( 'The provided resource is not a zip file.' );
+		}
+		$zip_fs = ZipFilesystem::create( $zip_stream->stream );
+		copy_between_filesystems([
+			'source_filesystem' => $zip_fs,
+			'source_path'       => '/',
+			'target_filesystem' => $target_fs,
+			'target_path'       => $input->extractToPath,
+			'recursive'         => true,
+		]);
 	}
 }
