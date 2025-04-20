@@ -10,6 +10,15 @@
  *   • getTableColumns($name) → column names for that table
  *   • iterateRecords($name)  → decoded rows
  * ───────────────────────────────────────────────────────────────────
+ * 
+ * Next steps:
+ * * Adjust the API to be next_table(): bool, get_table(): string, get_columns(), next_record(): bool, get_record(): array
+ *   essentially, to truly support streaming.
+ * * Add comments to each method and complex fragment that correlates it with the
+ *   relevant setion of the SQLite binary format spec.
+ * * Examine error hangling
+ * * Add a solud suite of tests that checks for all kinds of corner cases,
+ *   e.g. records with nulls, records with overflow pages, indexes, etc.
  */
 
 class SQLiteParser
@@ -17,19 +26,45 @@ class SQLiteParser
 	/* ─────────── ctor & state ─────────── */
 
 	private array  $db        = [];
-	private array  $allPages  = [];
+	private array  $pageCache = [];
+	private $fileHandle;
+	private int    $pageSize  = 0;
+	private int    $pageCount = 0;
+	private int    $reservedSpace = 0;
 
 	public function __construct(private string $filePath)
 	{
-		$buf      = file_get_contents($filePath);
-		$this->db = $this->parseDatabase($buf);
+		$this->fileHandle = fopen($filePath, 'rb');
+		if (!$this->fileHandle) {
+			throw new Exception("Could not open SQLite database file: $filePath");
+		}
+		
+		$header = $this->readHeader();
+		$this->pageSize = $header['pageSize'];
+		$this->pageCount = $header['pageCount'];
+		$this->reservedSpace = $header['reservedSpace'];
+		
+		$this->db = [
+			'header' => $header,
+			'pages' => [] // Will be populated on demand
+		];
+		
+		// Mark free list pages
+		$this->markFreeListPages($header);
+	}
+	
+	public function __destruct()
+	{
+		if ($this->fileHandle) {
+			fclose($this->fileHandle);
+		}
 	}
 
 	/* ─────────── public high‑level API ─────────── */
 
 	public function iterateTables(): array
 	{
-		$rows   = $this->traverseTable($this->db['pages'], 1);       // sqlite_master
+		$rows   = $this->traverseTable(1);       // sqlite_master
 		$tables = [];
 		foreach ($rows as $pl) {
 			$c = $this->decodeRecord($pl);                           // type, name, tbl_name, rootpage, sql
@@ -60,11 +95,67 @@ class SQLiteParser
 	{
 		foreach ($this->iterateTables() as $t) {
 			if (strcasecmp($t['name'], $name) === 0) {
-				$r = $this->traverseTable($this->db['pages'], $t['root']);
+				$r = $this->traverseTable($t['root']);
 				return array_map(fn($p) => $this->decodeRecord($p), $r);
 			}
 		}
 		return [];
+	}
+
+	/* ─────────── file reading helpers ─────────── */
+	
+	private function readBytes(int $offset, int $length): string
+	{
+		fseek($this->fileHandle, $offset);
+		return fread($this->fileHandle, $length);
+	}
+	
+	private function readPage(int $pageNumber): array
+	{
+		// Page numbers are 1-indexed
+		if (isset($this->pageCache[$pageNumber])) {
+			return $this->pageCache[$pageNumber];
+		}
+		
+		$offset = ($pageNumber - 1) * $this->pageSize;
+		$data = $this->readBytes($offset, $this->pageSize);
+		
+		$page = [
+			'number' => $pageNumber,
+			'data' => $data,
+			'type' => 'Unknown'
+		];
+		
+		// Store raw page in cache
+		$this->pageCache[$pageNumber] = $page;
+		
+		// Parse the page
+		$parsedPage = $this->parsePage($page);
+		$this->pageCache[$pageNumber] = $parsedPage;
+		
+		return $parsedPage;
+	}
+	
+	private function readHeader(): array
+	{
+		$headerData = $this->readBytes(0, 100);
+		return [
+			'pageSize' => $this->u16($headerData, 16),
+			'reservedSpace' => $this->u8($headerData, 20),
+			'pageCount' => $this->u32($headerData, 28),
+			'firstFreelistPage' => $this->u32($headerData, 32),
+			'totalFreelistPages' => $this->u32($headerData, 36),
+		];
+	}
+	
+	private function markFreeListPages(array $header): void
+	{
+		$cur = $header['firstFreelistPage'];
+		while ($cur) {
+			$page = $this->readPage($cur);
+			$this->pageCache[$cur]['type'] = 'Free Trunk';
+			$cur = $this->u32($page['data'], 0);
+		}
 	}
 
 	/* ─────────── tiny binary helpers ─────────── */
@@ -80,45 +171,16 @@ class SQLiteParser
 		return [$v,$l];
 	}
 
-	/* ─────────── DB‑wide parsing ─────────── */
-
-	private function parseDatabase(string $buf): array
-	{
-		$h     = $this->hdr($buf);
-		$pages = $this->split($buf, $h);
-		$pages = $this->freeList($pages, $h);
-		$this->allPages = $pages;                       // raw cache for overflow chains
-		$pages = array_map(fn($p) => $this->parsePage($p, $h), $pages);
-		$pages = $this->overflowPass($pages);
-		return ['header' => $h, 'pages' => $pages];
-	}
-
-	private function hdr(string $b): array
-	{
-		return [
-			'pageSize' => $this->u16($b,16),   'reservedSpace'=>$this->u8($b,20),
-			'pageCount'=> $this->u32($b,28),   'firstFreelistPage'=>$this->u32($b,32),
-			'totalFreelistPages'=>$this->u32($b,36),
-		];
-	}
-
-	private function split(string $b, array $h): array
-	{
-		$ps = $h['pageSize']; $cnt = $h['pageCount']; $p = [];
-		for ($i=0;$i<$cnt;$i++) $p[]=['number'=>$i+1,'data'=>substr($b,$i*$ps,$ps),'type'=>'Unknown'];
-		return $p;
-	}
-
 	/* ─────────── page parsing (B‑tree, freelist, overflow) — unchanged logic, $this‑ified ─────────── */
 
-	private function parsePage(array $p, array $h): array
+	private function parsePage(array $p): array
 	{
 		if ($bt = $this->btree($p)) {
 			return match($bt['type']) {
 				'Table Interior' => $this->tabInt($bt),
-				'Table Leaf'     => $this->tabLeaf($bt,$h),
-				'Index Interior' => $this->idxInt($bt,$h),
-				'Index Leaf'     => $this->idxLeaf($bt,$h),
+				'Table Leaf'     => $this->tabLeaf($bt),
+				'Index Interior' => $this->idxInt($bt),
+				'Index Leaf'     => $this->idxLeaf($bt),
 				default          => $bt,
 			};
 		}
@@ -145,9 +207,14 @@ class SQLiteParser
 		usort($cells,fn($a,$b)=>$a['offset']<=>$b['offset']); $p['cells']=$cells; return $p;
 	}
 
-	private function tabLeaf(array $p, array $h):array
+	private function tabLeaf(array $p):array
 	{
-		$d=$p['data']; $us=$h['pageSize']-$h['reservedSpace']; $max=$us-35; $min=(int)floor((($us-12)*32)/255-23); $cells=[];
+		$d=$p['data']; 
+		$us=$this->pageSize-$this->reservedSpace; 
+		$max=$us-35; 
+		$min=(int)floor((($us-12)*32)/255-23); 
+		$cells=[];
+		
 		foreach($p['cellPointerArray'] as $c){
 			$o=$c['value']; [$sz,$sb]=$this->varint($d,$o); $o+=$sb; [$rid,$rb]=$this->varint($d,$o); $o+=$rb;
 			$ls=$sz; $of=false; if($sz>$max){$ls=$min+(($sz-$min)%($us-4)); if($ls>=$max)$ls=$min; $of=true;}
@@ -157,19 +224,9 @@ class SQLiteParser
 		usort($cells,fn($a,$b)=>$a['offset']<=>$b['offset']); $p['cells']=$cells; return $p;
 	}
 
-	private function idxInt(array $p, array $h):array { /* identical to static version but $this‑ified */ return $p; }
-	private function idxLeaf(array $p, array $h):array { /* identical to static version but $this‑ified */ return $p; }
+	private function idxInt(array $p):array { return $p; }
+	private function idxLeaf(array $p):array { return $p; }
 
-	private function freeList(array $pages, array $h):array
-	{
-		$r=$pages; $cur=$h['firstFreelistPage']; while($cur){ $r[$cur-1]['type']='Free Trunk'; $cur=$this->u32($r[$cur-1]['data'],0); }
-		return $r;
-	}
-
-	private function overflowPass(array $p):array
-	{
-		return array_map(fn($q)=>$q['type']==='Unknown'?$this->ovPage($q):$q,$p);
-	}
 	private function ovPage(array $p):array
 	{
 		$d=$p['data']; return array_merge($p,['type'=>'Overflow','nextPage'=>$this->u32($d,0),'payload'=>substr($d,4)]);
@@ -177,16 +234,35 @@ class SQLiteParser
 
 	private function overflow(int $pg):string
 	{
-		$pay=''; $cur=$pg; while($cur){ $d=$this->allPages[$cur-1]['data']??''; $pay.=substr($d,4); $cur=$this->u32($d,0);} return $pay;
+		$pay=''; $cur=$pg; 
+		while($cur) { 
+			$page = $this->readPage($cur);
+			$d = $page['data'];
+			$pay .= substr($d,4); 
+			$cur = $this->u32($d,0);
+		} 
+		return $pay;
 	}
 
 	/* ─────────── row helpers ─────────── */
 
-	private function traverseTable(array $pages, int $pg):array
+	private function traverseTable(int $pg):array
 	{
-		$p=$pages[$pg-1]; if($p['type']==='Table Interior'){ $rows=[]; foreach($p['cells'] as $c){$rows=array_merge($rows,$this->traverseTable($pages,$c['pageNumber']));}
-			$right=$p['header']['rightChildPageNumber']; return $right?array_merge($rows,$this->traverseTable($pages,$right)):$rows; }
-		if($p['type']==='Table Leaf'){ return array_map(fn($c)=>$c['payload'],$p['cells']); }
+		$p = $this->readPage($pg);
+		
+		if ($p['type'] === 'Table Interior') { 
+			$rows = []; 
+			foreach ($p['cells'] as $c) {
+				$rows = array_merge($rows, $this->traverseTable($c['pageNumber']));
+			}
+			$right = $p['header']['rightChildPageNumber']; 
+			return $right ? array_merge($rows, $this->traverseTable($right)) : $rows; 
+		}
+		
+		if ($p['type'] === 'Table Leaf') { 
+			return array_map(fn($c) => $c['payload'], $p['cells']); 
+		}
+		
 		return [];
 	}
 
