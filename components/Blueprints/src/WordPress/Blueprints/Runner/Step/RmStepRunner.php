@@ -2,9 +2,6 @@
 
 namespace WordPress\Blueprints\Runner\Step;
 
-use Symfony\Component\Filesystem\Exception\IOException;
-use Symfony\Component\Filesystem\Filesystem;
-use WordPress\Blueprints\BlueprintException;
 use WordPress\Blueprints\Model\DataClass\RmStep;
 use WordPress\Filesystem\FilesystemException;
 
