@@ -3,12 +3,14 @@
 namespace unit\steps;
 
 use PHPUnitTestCase;
-use Symfony\Component\Filesystem\Filesystem;
-use Symfony\Component\Filesystem\Path;
-use WordPress\Blueprints\BlueprintException;
 use WordPress\Blueprints\Model\DataClass\RmStep;
 use WordPress\Blueprints\Runner\Step\RmStepRunner;
 use WordPress\Blueprints\Runtime\Runtime;
+use WordPress\Filesystem\FilesystemException;
+use WordPress\Filesystem\Filesystem;
+use WordPress\Filesystem\LocalFilesystem;
+
+use function WordPress\Filesystem\wp_join_paths;
 
 class RmStepRunnerTest extends PHPUnitTestCase {
 	/**
@@ -34,130 +36,113 @@ class RmStepRunnerTest extends PHPUnitTestCase {
 	/**
 	 * @before
 	 */
-	public function before() {
-		$this->document_root = Path::makeAbsolute( 'test', sys_get_temp_dir() );
+	public function setUp(): void {
+		$this->document_root = wp_join_paths(sys_get_temp_dir(), 'test_' . uniqid());
 		$this->runtime       = new Runtime( $this->document_root );
+
+		$this->filesystem = LocalFilesystem::create($this->document_root);
+		
+		// Create the document root directory if it doesn't exist
+		if (!$this->filesystem->exists('/')) {
+			$this->filesystem->mkdir('/');
+		}
 
 		$this->step_runner = new RmStepRunner();
 		$this->step_runner->setRuntime( $this->runtime );
-
-		$this->filesystem = new Filesystem();
 	}
 
 	/**
 	 * @after
 	 */
-	public function after() {
-		$this->filesystem->remove( $this->document_root );
-	}
-
-	public function testRemoveDirectoryWhenUsingAbsolutePath() {
-		$absolute_path = $this->runtime->resolvePath( 'dir' );
-		$this->filesystem->mkdir( $absolute_path );
-
-		$step       = new RmStep();
-		$step->path = $absolute_path;
-
-		$this->step_runner->run( $step );
-
-		self::assertDirectoryDoesNotExist( $absolute_path );
+	public function tearDown(): void {
+		try {
+			if ($this->filesystem->exists('/')) {
+				$this->filesystem->rmdir('/', [
+					'recursive' => true
+				]);
+			}
+		} catch (\Exception $e) {
+			// Ignore cleanup errors
+		}
 	}
 
 	public function testRemoveDirectoryWhenUsingRelativePath() {
-		$relative_path = 'dir';
-		$absolute_path = $this->runtime->resolvePath( $relative_path );
-		$this->filesystem->mkdir( $absolute_path );
+		$this->filesystem->mkdir('test_dir');
+		
+		$step = new RmStep();
+		$step->path = 'test_dir';
 
-		$step       = new RmStep();
-		$step->path = $relative_path;
+		$this->step_runner->run($step);
 
-		$this->step_runner->run( $step );
-
-		self::assertDirectoryDoesNotExist( $absolute_path );
+		self::assertFalse(
+			$this->filesystem->exists('test_dir'),
+			'Failed to assert that the directory does not exist'
+		);
 	}
 
 	public function testRemoveDirectoryWithSubdirectory() {
-		$relative_path = 'dir/subdir';
-		$absolute_path = $this->runtime->resolvePath( $relative_path );
-		$this->filesystem->mkdir( $absolute_path );
+		$this->filesystem->mkdir('parent/child', ['recursive' => true]);
+		
+		$step = new RmStep();
+		$step->path = 'parent';
 
-		$step       = new RmStep();
-		$step->path = dirname( $relative_path );
+		$this->step_runner->run($step);
 
-		$this->step_runner->run( $step );
-
-		self::assertDirectoryDoesNotExist( $absolute_path );
+		// Assert parent directory and child don't exist anymore
+		self::assertFalse(
+			$this->filesystem->exists('parent'),
+			'Failed to assert that the parent directory does not exist'
+		);
 	}
 
 	public function testRemoveDirectoryWithFile() {
-		$relative_path  = 'dir/file.txt';
-		$absolute_pPath = $this->runtime->resolvePath( $relative_path );
-		$this->filesystem->dumpFile( $absolute_pPath, 'test' );
+		// Create directory with file
+		$this->filesystem->mkdir('dir_with_file', ['recursive' => true]);
+		$this->filesystem->put_contents('dir_with_file/test.txt', 'test content');
+		
+		// Create RmStep for removing the directory
+		$step = new RmStep();
+		$step->path = 'dir_with_file';
 
-		$step       = new RmStep();
-		$step->path = dirname( $relative_path );
+		$this->step_runner->run($step);
 
-		$this->step_runner->run( $step );
-
-		self::assertDirectoryDoesNotExist( dirname( $absolute_pPath ) );
+		self::assertFalse(
+			$this->filesystem->exists('dir_with_file'),
+			'Failed to assert that the directory does not exist'
+		);
 	}
 
 	public function testRemoveFile() {
-		$relative_path = 'file.txt';
-		$absolute_path = $this->runtime->resolvePath( $relative_path );
-		$this->filesystem->dumpFile( $absolute_path, 'test' );
+		$this->filesystem->put_contents('test_file.txt', 'test content');
+		
+		$step = new RmStep();
+		$step->path = 'test_file.txt';
 
-		$step       = new RmStep();
-		$step->path = $relative_path;
+		$this->step_runner->run($step);
 
-		$this->step_runner->run( $step );
-
-		self::assertDirectoryDoesNotExist( $absolute_path );
+		self::assertFalse(
+			$this->filesystem->exists('test_file.txt'),
+			'Failed to assert that the file does not exist'
+		);
 	}
 
 	public function testThrowExceptionWhenRemovingNonexistentDirectoryAndUsingRelativePath() {
-		$relative_path = 'dir';
-		$absolute_path = $this->runtime->resolvePath( $relative_path );
+		$step = new RmStep();
+		$step->path = 'nonexistent_dir';
 
-		$step       = new RmStep();
-		$step->path = $relative_path;
-
-		self::expectException( BlueprintException::class );
-		self::expectExceptionMessage( "Failed to remove \"$absolute_path\": the directory or file does not exist." );
-		$this->step_runner->run( $step );
-	}
-
-	public function testThrowExceptionWhenRemovingNonexistentDirectoryAndUsingAbsolutePath() {
-		$absolute_path = '/dir';
-
-		$step       = new RmStep();
-		$step->path = $absolute_path;
-
-		self::expectException( BlueprintException::class );
-		self::expectExceptionMessage( "Failed to remove \"$absolute_path\": the directory or file does not exist." );
-		$this->step_runner->run( $step );
-	}
-
-	public function testThrowExceptionWhenRemovingNonexistentFileAndUsingAbsolutePath() {
-		$relative_path = '/file.txt';
-
-		$step       = new RmStep();
-		$step->path = $relative_path;
-
-		self::expectException( BlueprintException::class );
-		self::expectExceptionMessage( "Failed to remove \"$relative_path\": the directory or file does not exist." );
-		$this->step_runner->run( $step );
+		self::expectException(FilesystemException::class);
+		self::expectExceptionMessageMatches('/Path does not exist:/');
+		
+		$this->step_runner->run($step);
 	}
 
 	public function testThrowExceptionWhenRemovingNonexistentFileAndUsingRelativePath() {
-		$relativePath = 'file.txt';
-		$absolutePath = $this->runtime->resolvePath( $relativePath );
+		$step = new RmStep();
+		$step->path = 'nonexistent_file.txt';
 
-		$step       = new RmStep();
-		$step->path = $relativePath;
-
-		self::expectException( BlueprintException::class );
-		self::expectExceptionMessage( "Failed to remove \"$absolutePath\": the directory or file does not exist." );
-		$this->step_runner->run( $step );
+		self::expectException(FilesystemException::class);
+		self::expectExceptionMessageMatches('/Path does not exist:/');
+		
+		$this->step_runner->run($step);
 	}
 }

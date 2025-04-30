@@ -6,6 +6,7 @@ use Symfony\Component\Filesystem\Exception\IOException;
 use Symfony\Component\Filesystem\Filesystem;
 use WordPress\Blueprints\BlueprintException;
 use WordPress\Blueprints\Model\DataClass\RmStep;
+use WordPress\Filesystem\FilesystemException;
 
 class RmStepRunner extends BaseStepRunner {
 
@@ -13,6 +14,19 @@ class RmStepRunner extends BaseStepRunner {
 	 * @param RmStep $input
 	 */
 	public function run( RmStep $input ) {
-		$this->getRuntime()->getTargetFilesystem()->rm( $input->path );
+		$filesystem = $this->getRuntime()->getTargetFilesystem();
+		$path = $input->path;
+		
+		// Check if path exists
+		if (!$filesystem->exists($path)) {
+			throw new FilesystemException(sprintf('Path does not exist: %s', $path));
+		}
+		
+		// Different behavior for files and directories
+		if ($filesystem->is_dir($path)) {
+			$filesystem->rmdir($path, ['recursive' => true]);
+		} else {
+			$filesystem->rm($path);
+		}
 	}
 }

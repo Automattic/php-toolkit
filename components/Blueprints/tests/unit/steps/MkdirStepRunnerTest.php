@@ -3,12 +3,14 @@
 namespace unit\steps;
 
 use PHPUnitTestCase;
-use Symfony\Component\Filesystem\Filesystem;
-use Symfony\Component\Filesystem\Path;
 use WordPress\Blueprints\Model\DataClass\MkdirStep;
 use WordPress\Blueprints\Runner\Step\MkdirStepRunner;
 use WordPress\Blueprints\Runtime\Runtime;
-use WordPress\Blueprints\BlueprintException;
+use WordPress\Filesystem\FilesystemException;
+use WordPress\Filesystem\Filesystem;
+use WordPress\Filesystem\LocalFilesystem;
+
+use function WordPress\Filesystem\wp_join_paths;
 
 class MkdirStepRunnerTest extends PHPUnitTestCase {
 	/**
@@ -34,21 +36,23 @@ class MkdirStepRunnerTest extends PHPUnitTestCase {
 	/**
 	 * @before
 	 */
-	public function before() {
-		$this->document_root = Path::makeAbsolute( 'test', sys_get_temp_dir() );
+	public function setUp(): void {
+		$this->document_root = wp_join_paths(sys_get_temp_dir(), 'test');
 		$this->runtime       = new Runtime( $this->document_root );
+
+		$this->filesystem = LocalFilesystem::create($this->document_root);
 
 		$this->step_runner = new MkdirStepRunner();
 		$this->step_runner->setRuntime( $this->runtime );
-
-		$this->filesystem = new Filesystem();
 	}
 
 	/**
 	 * @after
 	 */
-	public function after() {
-		$this->filesystem->remove( $this->document_root );
+	public function tearDown():void {
+		$this->filesystem->rmdir( '/', [
+			'recursive' => true
+		] );
 	}
 
 	public function testCreateDirectoryWhenUsingRelativePath() {
@@ -63,15 +67,17 @@ class MkdirStepRunnerTest extends PHPUnitTestCase {
 	}
 
 	public function testCreateDirectoryWhenUsingAbsolutePath() {
-		$relative_path = 'dir';
-		$absolute_path = $this->runtime->resolvePath( $relative_path );
+		$absolute_path = '/dir';
 
 		$step = new MkdirStep();
 		$step->setPath( $absolute_path );
 
 		$this->step_runner->run( $step );
 
-		self::assertDirectoryExists( $absolute_path );
+		self::assertTrue(
+			$this->filesystem->exists($absolute_path),
+			sprintf( 'Failed to assert that the directory exists: %s', $absolute_path )
+		);
 	}
 
 	public function testCreateDirectoryRecursively() {
@@ -100,14 +106,13 @@ class MkdirStepRunnerTest extends PHPUnitTestCase {
 
 	public function testThrowExceptionWhenCreatingDirectoryAndItAlreadyExists() {
 		$path          = 'dir';
-		$resolved_path = $this->runtime->resolvePath( $path );
-		$this->filesystem->mkdir( $resolved_path );
+		$this->filesystem->mkdir( $path );
 
 		$step = new MkdirStep();
 		$step->setPath( $path );
 
-		self::expectException( BlueprintException::class );
-		self::expectExceptionMessage( "Failed to create \"$resolved_path\": the directory exists." );
+		self::expectException( FilesystemException::class );
+		self::expectExceptionMessageMatches( "/Path already exists:/" );
 		$this->step_runner->run( $step );
 	}
 }

@@ -1,5 +1,5 @@
 {
-	"name": "@wordpress/blueprints",
+	"name": "wordpress/blueprints",
 	"prefer-stable": true,
 	"require": {
 		"ext-json": "*",
@@ -49,5 +49,9 @@
 	},
 	"scripts": {
 		"test": "phpunit tests --testdox"
+	},
+	"require-dev": {
+		"yoast/phpunit-polyfills": "^4.0",
+		"phpunit/phpunit": "12"
 	}
 }
