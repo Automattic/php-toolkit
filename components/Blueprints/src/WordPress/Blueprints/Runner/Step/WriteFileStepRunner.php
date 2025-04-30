@@ -4,32 +4,60 @@ namespace WordPress\Blueprints\Runner\Step;
 
 use WordPress\Blueprints\Model\DataClass\WriteFileStep;
 use WordPress\Blueprints\Progress\Tracker;
+use WordPress\Blueprints\Resources\Model\DataReference;
+use WordPress\Blueprints\Resources\Model\File;
+use WordPress\ByteStream\ReadStream\ByteReadStream;
 
 class WriteFileStepRunner extends BaseStepRunner {
 	/**
-	 * @param \WordPress\Blueprints\Model\DataClass\WriteFileStep $input
-	 * @param \WordPress\Blueprints\Progress\Tracker|null         $progress
+	 * Runs the WriteFile Step
+	 *
+	 * @param WriteFileStep $input Step.
+	 * @param Tracker $progress_tracker Tracker.
+	 * @return void
 	 */
 	public function run(
-		$input,
-		$progress = null
+		WriteFileStep $input,
+		Tracker      $progress_tracker = null
 	) {
-		$path = $this->getRuntime()->resolvePath( $input->path );
-		// @TODO: Treat $input->path as relative path to the document root (unless it's absolute)
-		if ( is_string( $input->data ) ) {
-			file_put_contents( $path, $input->data );
-
-			return;
+		if ($progress_tracker) {
+			$progress_tracker->set(10, 'Writing file...');
 		}
-		$fp2 = fopen( $path, 'w' );
-		if ( $fp2 === false ) {
-			throw new \Exception( "Failed to open file at {$path}" );
+		
+		$target_fs = $this->getRuntime()->getTargetFilesystem();
+		$path = $input->path;
+		
+		// Create directory structure if needed
+		$dir = dirname($path);
+		if ($dir && $dir !== '/' && $dir !== '.') {
+			$target_fs->mkdir($dir, [
+				'recursive' => true
+			]);
 		}
-		stream_copy_to_stream( $this->getResource( $input->data ), $fp2 );
-		fclose( $fp2 );
+		
+		if (is_string($input->data)) {
+			$target_fs->put_contents($path, $input->data);
+		} else {
+			// Convert to DataReference if not already
+			$data_ref = $input->data instanceof DataReference ? 
+				$input->data : 
+				DataReference::from_json($input->data);
+				
+			$data_stream = $this->getRuntime()->resolveDataReference($data_ref);
+			if (!$data_stream instanceof File) {
+				throw new \InvalidArgumentException('The provided resource is not a valid file.');
+			}
+			
+			// ByteReadStream should be handled directly by the filesystem's put_contents
+			$target_fs->put_contents($path, $data_stream->stream->consume_all());
+		}
+		
+		if ($progress_tracker) {
+			$progress_tracker->set(100, 'File written successfully.');
+		}
 	}
 
-	public function getDefaultCaption( $input ) {
+	public function getDefaultCaption($input) {
 		return 'Writing file ' . $input->path;
 	}
 }
