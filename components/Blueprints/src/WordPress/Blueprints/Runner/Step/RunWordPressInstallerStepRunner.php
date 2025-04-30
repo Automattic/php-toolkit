@@ -2,9 +2,6 @@
 
 namespace WordPress\Blueprints\Runner\Step;
 
-use WordPress\Blueprints\Model\DataClass\RunWordPressInstallerStep;
-use WordPress\Blueprints\Progress\Tracker;
-
 class RunWordPressInstallerStepRunner extends BaseStepRunner {
 	/**
 	 * @param \WordPress\Blueprints\Model\DataClass\RunWordPressInstallerStep $input
