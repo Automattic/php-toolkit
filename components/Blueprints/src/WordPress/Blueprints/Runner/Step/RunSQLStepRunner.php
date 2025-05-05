@@ -6,7 +6,6 @@
 namespace WordPress\Blueprints\Runner\Step;
 
 use WordPress\Blueprints\Model\DataClass\RunSQLStep;
-use WordPress\Blueprints\Progress\Tracker;
 use WordPress\Blueprints\Resources\Model\File;
 
 class RunSQLStepRunner extends BaseStepRunner {

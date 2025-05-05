@@ -42,6 +42,21 @@ class RequestReadStream extends BaseByteReadStream {
 		$this->request = $request;
 	}
 
+	public function get_request(): Request {
+		return $this->request;
+	}
+
+	public function get_response(): Response {
+		if ( ! $this->response ) {
+			$this->pull_until_event(
+				array(
+					'event' => Client::EVENT_GOT_HEADERS,
+				)
+			);
+		}
+		return $this->response;
+	}
+
 	protected function seek_outside_of_buffer( int $target_offset ): void {
 		throw new ByteStreamException(
 			'Cannot seek() a RequestReadStream instance once the request was initialized. ' .

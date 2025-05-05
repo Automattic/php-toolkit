@@ -3,6 +3,8 @@
 namespace WordPress\Blueprints\references;
 
 use WordPress\Blueprints\BlueprintException;
+use WordPress\Blueprints\Model\DataClass\WordPressPluginDirectoryReference;
+use WordPress\Blueprints\Model\DataClass\WordPressThemeDirectoryReference;
 use WordPress\Blueprints\Resources\Model\DataReference;
 use WordPress\HttpClient\Client;
 use WordPress\Filesystem\Filesystem;
@@ -46,6 +48,13 @@ class DataReferenceResolver {
 	 * @throws \Exception If the reference type is unsupported
 	 */
 	public function resolve( DataReference $reference ): File|Directory {
+		if ( $reference instanceof WordPressPluginDirectoryReference ) {
+			$reference = new URLReference('https://downloads.wordpress.org/plugin/' . $reference->slug . '.latest-stable.zip');
+			var_dump($reference);
+		} elseif ( $reference instanceof WordPressThemeDirectoryReference ) {
+			$reference = new URLReference('https://downloads.wordpress.org/theme/' . $reference->slug . '.latest-stable.zip');
+		}
+		
 		if ( $reference instanceof URLReference ) {
 			$url = $reference->get_url();
 			$filename = basename( parse_url( $url, PHP_URL_PATH ) );
@@ -55,11 +64,22 @@ class DataReferenceResolver {
 
 			// @TODO: Don't cache files like this. Memoize downloads to the disk
 			//        – probably by adding support for that in the Client class.
+
+			// @TODO: Parallelize the downloads.
 			$sha1_hash = hash( 'sha1', $url );
 			$tmp_dir = sys_get_temp_dir();
 			$temp_file_path = wp_join_paths( $tmp_dir, $sha1_hash . '.zip' );
 			if( !file_exists( $temp_file_path ) ) {
 				$remote_stream = $this->http_client->fetch( $url );
+				$response = $remote_stream->get_response();
+				if( $response->status_code !== 200 ) {
+					$remote_stream->pull( 50 );
+					throw new BlueprintException( sprintf( 'Failed to download file: %s (status code: %d, response: %s)', 
+						$url, 
+						$response->status_code, 
+						substr( $remote_stream->peek( 50 ), 0, 50 ) 
+					) );
+				}
 				$write_stream = FileWriteStream::from_path( $temp_file_path, 'truncate' );
 				pipe_stream( $remote_stream, $write_stream );
 				$remote_stream->close_reading();

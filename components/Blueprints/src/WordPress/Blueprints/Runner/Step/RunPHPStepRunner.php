@@ -10,6 +10,8 @@ class RunPHPStepRunner extends BaseStepRunner {
 	function run( $input, $tracker ) {
 		( $nullsafeVariable1 = $tracker ) ? $nullsafeVariable1->setCaption( 'Running custom PHP code' ) : null;
 
-		return $this->getRuntime()->evalPhpInSubProcess( $input->code );
+		return $this->getRuntime()->evalPhpInSubProcess( $input->code, [
+			'DOCROOT' => $this->getRuntime()->getDocumentRoot(),
+		] );
 	}
 }
