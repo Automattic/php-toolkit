@@ -14,7 +14,18 @@ class DefineWpConfigConstsStepRunner extends BaseStepRunner {
 
 		return $this->getRuntime()->evalPhpInSubProcess(
 			"$functions ?>" . '<?php
-    $wp_config_path = "./wp-config.php";
+    $wp_config_path = getenv("DOCROOT") . "/wp-config.php";
+    
+    if (!file_exists($wp_config_path)) {
+        error_log("Blueprint Error: wp-config.php file not found at " . $wp_config_path);
+        exit(1);
+    }
+    
+    if (!is_readable($wp_config_path) || !is_writable($wp_config_path)) {
+        error_log("Blueprint Error: wp-config.php is not readable or writable at " . $wp_config_path);
+        exit(1);
+    }
+    
 	$consts = json_decode(getenv("CONSTS"), true);
 	$wp_config = file_get_contents($wp_config_path);
 	$new_wp_config = rewrite_wp_config_to_define_constants($wp_config, $consts);
