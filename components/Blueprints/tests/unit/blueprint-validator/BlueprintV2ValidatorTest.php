@@ -248,7 +248,7 @@ class BlueprintV2ValidatorTest extends TestCase {
      * @return array The decoded fixture.
      */
     private function loadFixture($fixture_path) {
-        $fixture_file = dirname(__DIR__) . '/fixtures/' . $fixture_path;
+        $fixture_file = __DIR__ . '/fixtures/' . $fixture_path;
         $json = file_get_contents($fixture_file);
         return json_decode($json, true);
     }
