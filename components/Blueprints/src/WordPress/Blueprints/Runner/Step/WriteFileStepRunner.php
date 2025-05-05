@@ -23,10 +23,10 @@ class WriteFileStepRunner extends BaseStepRunner {
 		if ($progress_tracker) {
 			$progress_tracker->set(10, 'Writing file...');
 		}
-		
+
 		$target_fs = $this->getRuntime()->getTargetFilesystem();
 		$path = $input->path;
-		
+
 		// Create directory structure if needed
 		$dir = dirname($path);
 		if ($dir && $dir !== '/' && $dir !== '.') {
@@ -34,24 +34,24 @@ class WriteFileStepRunner extends BaseStepRunner {
 				'recursive' => true
 			]);
 		}
-		
+
 		if (is_string($input->data)) {
 			$target_fs->put_contents($path, $input->data);
 		} else {
 			// Convert to DataReference if not already
-			$data_ref = $input->data instanceof DataReference ? 
-				$input->data : 
-				DataReference::from_json($input->data);
-				
+			$data_ref = $input->data instanceof DataReference ?
+				$input->data :
+				DataReference::create($input->data);
+
 			$data_stream = $this->getRuntime()->resolveDataReference($data_ref);
 			if (!$data_stream instanceof File) {
 				throw new \InvalidArgumentException('The provided resource is not a valid file.');
 			}
-			
+
 			// ByteReadStream should be handled directly by the filesystem's put_contents
 			$target_fs->put_contents($path, $data_stream->stream->consume_all());
 		}
-		
+
 		if ($progress_tracker) {
 			$progress_tracker->set(100, 'File written successfully.');
 		}

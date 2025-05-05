@@ -8,6 +8,7 @@ use WordPress\ByteStream\ByteTransformer\InflateTransformer;
 use WordPress\HttpClient\ByteStream\ChunkedDecoderReadStream;
 use WordPress\HttpClient\ByteStream\ChunkedEncoderByteTransformer;
 use WordPress\HttpClient\ByteStream\RequestReadStream;
+use WordPress\HttpClient\ByteStream\SeekableRequestReadStream;
 
 /**
  * An asynchronous HTTP client library.

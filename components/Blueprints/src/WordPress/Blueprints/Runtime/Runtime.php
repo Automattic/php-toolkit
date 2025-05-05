@@ -72,7 +72,7 @@ class Runtime {
 			array(
 				'php',
 				'-r',
-				'?>' . $code,
+				'$_SERVER["HTTP_HOST"] = "localhost"; ?>' . $code,
 			),
 			null,
 			array_merge(

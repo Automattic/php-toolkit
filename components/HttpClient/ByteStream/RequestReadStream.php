@@ -44,8 +44,8 @@ class RequestReadStream extends BaseByteReadStream {
 
 	protected function seek_outside_of_buffer( int $target_offset ): void {
 		throw new ByteStreamException(
-			'Cannot seek() a RemoteFileReader instance once the request was initialized. ' .
-			'Use RemoteFileRangedReader to seek() using range requests instead.'
+			'Cannot seek() a RequestReadStream instance once the request was initialized. ' .
+			'Use SeekableRequestReadStream to seek() using range requests instead.'
 		);
 	}
 

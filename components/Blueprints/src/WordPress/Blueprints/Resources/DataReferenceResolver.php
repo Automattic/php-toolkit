@@ -14,10 +14,15 @@ use WordPress\Blueprints\Resources\Model\InlineDirectory;
 use WordPress\Blueprints\Resources\Model\GitPath;
 use WordPress\Blueprints\Resources\Model\File;
 use WordPress\ByteStream\MemoryPipe;
+use WordPress\ByteStream\ReadStream\FileReadStream;
+use WordPress\ByteStream\WriteStream\FileWriteStream;
+use WordPress\Filesystem\FilesystemHelpers;
 use WordPress\Filesystem\InMemoryFilesystem;
 use WordPress\Filesystem\Layer\ChrootLayer;
 use WordPress\Git\GitFilesystem;
 use WordPress\Git\GitRepository;
+
+use function WordPress\Filesystem\pipe_stream;
 
 class DataReferenceResolver {
 
@@ -43,11 +48,24 @@ class DataReferenceResolver {
 		if ( $reference instanceof URLReference ) {
 			$url = $reference->get_url();
 			$filename = basename( parse_url( $url, PHP_URL_PATH ) );
-			return new File( $this->http_client->fetch( $url ), $filename );
+
+			// @TODO: Get the SeekableRequestReadStream to work instead of
+			//        pre-emptively buffering the entire file to the disk.
+			$remote_stream = $this->http_client->fetch( $url );
+			$temp_file_path = FilesystemHelpers::createTemporaryFile();
+			$write_stream = FileWriteStream::from_path( $temp_file_path, 'truncate' );
+			pipe_stream( $remote_stream, $write_stream );
+			$remote_stream->close_reading();
+			$write_stream->close_writing();
+
+			return new File(
+				FileReadStream::from_path( $temp_file_path ),
+				$filename
+			);
 		} elseif ( $reference instanceof ExecutionContextPath ) {
 			$path = $reference->get_path();
 			if( ! $this->blueprint_bundle_fs->exists( $path ) ) {
-				throw new BlueprintException( 'Path not found: ' . $path );
+				throw new BlueprintException( 'File not found: ' . $path );
 			}
 			if( $this->blueprint_bundle_fs->is_file( $path ) ) {
 				return new File( $this->blueprint_bundle_fs->open_read_stream( $path ), basename( $path ) );

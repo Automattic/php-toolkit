@@ -21,11 +21,12 @@ class SeekableRequestReadStream extends BaseByteReadStream {
 
 	private $url;
 	private $remote_file_length;
-	private $current_reader;
+	private $request_stream;
 	private $offset_in_remote_file       = 0;
 	private $default_expected_chunk_size = 10 * 1024; // 10 KB
 	private $expected_chunk_size         = 10 * 1024; // 10 KB
 	private $stop_after_chunk            = false;
+	private $options;
 
 	/**
 	 * Creates a seekable reader for the remote file.
@@ -33,24 +34,25 @@ class SeekableRequestReadStream extends BaseByteReadStream {
 	 * file to disk when the remote server does not support range requests.
 	 */
 	public static function create( $url ) {
-		$remote_file_reader = new self( $url );
+		return self::save_to_disk( $url );
+		// $remote_file_reader = new self( $url );
 
-		if ( false === $remote_file_reader->length() ) {
-			return self::save_to_disk( $url );
-		}
+		// if ( false === $remote_file_reader->length() ) {
+		// 	return self::save_to_disk( $url );
+		// }
 
-		$remote_file_reader->seek_to_chunk( 0, 2 );
-		if ( false === $remote_file_reader->pull( 2 ) ) {
-			return self::save_to_disk( $url );
-		}
+		// $remote_file_reader->seek_to_chunk( 0, 2 );
+		// if ( false === $remote_file_reader->pull( 2 ) ) {
+		// 	return self::save_to_disk( $url );
+		// }
 
-		$bytes = $remote_file_reader->peek( 2 );
-		if ( strlen( $bytes ) !== 2 ) {
-			return self::redirect_output_to_disk( $remote_file_reader );
-		}
+		// $bytes = $remote_file_reader->peek( 2 );
+		// if ( strlen( $bytes ) !== 2 ) {
+		// 	return self::redirect_output_to_disk( $remote_file_reader );
+		// }
 
-		$remote_file_reader->seek( 0 );
-		return $remote_file_reader;
+		// $remote_file_reader->seek( 0 );
+		// return $remote_file_reader;
 	}
 
 	private static function save_to_disk( $url ) {
@@ -59,7 +61,7 @@ class SeekableRequestReadStream extends BaseByteReadStream {
 	}
 
 	private static function redirect_output_to_disk( ByteReadStream $reader ) {
-		$file_path = tempnam( sys_get_temp_dir(), 'wp-remote-file-reader-' ) . '.epub';
+		$file_path = tempnam( sys_get_temp_dir(), 'wp-remote-file-reader-' ) . '.tmp';
 		$file      = fopen( $file_path, 'w' );
 		if ( false === $file ) {
 			throw new ByteStreamException( 'Failed to open file for writing' );
@@ -83,17 +85,18 @@ class SeekableRequestReadStream extends BaseByteReadStream {
 		return FileReadStream::from_path( $file_path );
 	}
 
-	public function __construct( $url ) {
+	public function __construct( $url, $options = array() ) {
 		$this->url = $url;
+		$this->options = $options;
 	}
 
 	protected function internal_pull( $n ): string {
-		if ( null === $this->current_reader ) {
+		if ( null === $this->request_stream ) {
 			$this->create_reader();
 		}
 
-		if ( $this->current_reader->get_bytes() ) {
-			$this->offset_in_remote_file += strlen( $this->current_reader->get_bytes() );
+		if ( $this->buffer ) {
+			$this->offset_in_remote_file += strlen( $this->buffer );
 		}
 
 		if ( $this->offset_in_remote_file >= $this->length() - 1 ) {
@@ -101,16 +104,16 @@ class SeekableRequestReadStream extends BaseByteReadStream {
 			return '';
 		}
 
-		if ( false === $this->current_reader->pull( $n ) ) {
+		if ( false === $this->request_stream->pull( $n ) ) {
 			if ( $this->stop_after_chunk ) {
 				$this->is_closed = true;
 				return '';
 			}
-			$this->current_reader = null;
+			$this->request_stream = null;
 			return $this->internal_pull( $n );
 		}
 
-		return $this->current_reader->get_bytes();
+		return $this->request_stream->peek( $n );
 	}
 
 	public function length(): ?int {
@@ -119,7 +122,7 @@ class SeekableRequestReadStream extends BaseByteReadStream {
 	}
 
 	private function create_reader() {
-		$this->current_reader = new RequestReadStream(
+		$this->request_stream = new RequestReadStream(
 			new Request(
 				$this->url,
 				array(
@@ -129,7 +132,8 @@ class SeekableRequestReadStream extends BaseByteReadStream {
 						),
 					),
 				)
-			)
+			),
+			$this->options
 		);
 	}
 
@@ -141,7 +145,7 @@ class SeekableRequestReadStream extends BaseByteReadStream {
 
 	public function seek( int $offset ): void {
 		$this->offset_in_remote_file    = $offset;
-		$this->current_reader           = null;
+		$this->request_stream           = null;
 		$this->expected_chunk_size      = $this->default_expected_chunk_size;
 		$this->stop_after_chunk         = false;
 		$this->buffer                   = '';
@@ -152,16 +156,16 @@ class SeekableRequestReadStream extends BaseByteReadStream {
 		if ( null !== $this->remote_file_length ) {
 			return;
 		}
-		if ( null === $this->current_reader ) {
-			$this->current_reader = new RequestReadStream( $this->url );
+		if ( null === $this->request_stream ) {
+			$this->request_stream = new RequestReadStream( $this->url, $this->options );
 		}
-		$this->remote_file_length = $this->current_reader->length();
+		$this->remote_file_length = $this->request_stream->length();
 	}
 
 	public function close_reading(): void {
-		if ( null !== $this->current_reader ) {
-			$this->current_reader->close();
-			$this->current_reader = null;
+		if ( null !== $this->request_stream ) {
+			$this->request_stream->close();
+			$this->request_stream = null;
 		}
 		$this->is_closed = true;
 	}

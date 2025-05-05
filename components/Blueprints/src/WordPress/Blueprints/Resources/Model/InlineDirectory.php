@@ -76,7 +76,7 @@ class InlineDirectory extends DataReference {
 	 * @param array $data The array to check.
 	 * @return bool Whether the array is valid.
 	 */
-	public static function is_valid( array $data ): bool {
-		return isset( $data['name'] ) && isset( $data['children'] ) && is_array( $data['children'] );
+	public static function is_valid( $data ): bool {
+		return is_array( $data ) && isset( $data['name'] ) && isset( $data['children'] ) && is_array( $data['children'] );
 	}
 } 

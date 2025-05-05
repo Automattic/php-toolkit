@@ -50,7 +50,7 @@ class WriteFileStepRunnerTest extends PHPUnitTestCase {
 		$this->filesystem = LocalFilesystem::create($this->document_root);
 
 		$this->runtime = new Runtime($this->document_root);
-		
+
 		// Create a test resource file
 		$test_content = "Test file content";
 		$this->filesystem->put_contents('test_source.txt', $test_content);
@@ -81,7 +81,7 @@ class WriteFileStepRunnerTest extends PHPUnitTestCase {
 		$step = new WriteFileStep();
 		$step->path = 'test_output.txt';
 		$step->data = 'String content test';
-		
+
 		$this->step_runner->run($step, $this->progress_tracker);
 
 		$this->assertTrue($this->filesystem->exists('test_output.txt'));
@@ -92,8 +92,8 @@ class WriteFileStepRunnerTest extends PHPUnitTestCase {
 		// Create and run the step with a data reference
 		$step = new WriteFileStep();
 		$step->path = 'test_output_from_ref.txt';
-		$step->data = DataReference::from_json('./test_source.txt');
-		
+		$step->data = DataReference::create('./test_source.txt');
+
 		$this->step_runner->run($step, $this->progress_tracker);
 
 		$this->assertTrue($this->filesystem->exists('test_output_from_ref.txt'));
@@ -105,10 +105,10 @@ class WriteFileStepRunnerTest extends PHPUnitTestCase {
 		$step = new WriteFileStep();
 		$step->path = 'nested/directory/structure/test.txt';
 		$step->data = 'Nested directory test';
-		
+
 		$this->step_runner->run($step, $this->progress_tracker);
 
 		$this->assertTrue($this->filesystem->exists('nested/directory/structure/test.txt'));
 		$this->assertEquals('Nested directory test', $this->filesystem->get_contents('nested/directory/structure/test.txt'));
 	}
-} 
+}

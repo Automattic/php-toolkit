@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit
+    bootstrap="tests/bootstrap.php"
+    colors="true"
+    convertErrorsToExceptions="true"
+    convertNoticesToExceptions="true"
+    convertWarningsToExceptions="true"
+    verbose="true"
+    stopOnFailure="false"
+    processIsolation="false"
+    backupGlobals="false"
+    backupStaticAttributes="false"
+>
+    <testsuites>
+        <testsuite name="WordPress Blueprints Test Suite">
+            <directory suffix="Test.php">./tests/unit</directory>
+        </testsuite>
+    </testsuites>
+    <filter>
+        <whitelist>
+            <directory suffix=".php">./src</directory>
+            <exclude>
+                <directory suffix=".php">./src/pimple</directory>
+                <directory suffix=".php">./src/psr</directory>
+                <directory suffix=".php">./src/Symfony</directory>
+                <directory suffix=".php">./src/opis</directory>
+            </exclude>
+        </whitelist>
+    </filter>
+</phpunit>

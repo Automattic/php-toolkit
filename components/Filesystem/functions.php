@@ -92,6 +92,35 @@ function copy_between_filesystems( array $args ) {
 	}
 }
 
+/**
+ * Pipes data from one stream to another.
+ *
+ * @param ByteReadStream $from_stream The stream to read from.
+ * @param ByteWriteStream $to_stream The stream to write to.
+ * @param int $chunk_size Optional. The size of chunks to read at a time. Default 65536.
+ * @return int The number of chunks written.
+ * @throws FilesystemException If there's an error during the transfer.
+ */
+function pipe_stream( $from_stream, $to_stream, $chunk_size = 65536 ) {
+	$chunks_written = 0;
+	while ( ! $from_stream->reached_end_of_data() ) {
+		$available = $from_stream->pull( $chunk_size );
+		$to_stream->append_bytes( $from_stream->consume( $available ) );
+		++$chunks_written;
+	}
+	
+	if ( $chunks_written === 0 ) {
+		// Make sure the file receives at least one chunk
+		// so we can be sure it gets created in case the
+		// destination filesystem is lazy.
+		$to_stream->append_bytes( '' );
+		$chunks_written = 1;
+	}
+	
+	return $chunks_written;
+}
+
+
 function wp_path_segments( $path ) {
 	$canonicalized   = wp_canonicalize_path( $path );
 	$without_slashes = trim( $canonicalized, '/' );

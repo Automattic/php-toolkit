@@ -80,9 +80,9 @@ class UnzipStepRunnerTest extends PHPUnitTestCase {
 	public function testRunWithValidDataReference() {
 		// Create and run the step
 		$step = new UnzipStep();
-		$step->zipFile = DataReference::from_json('./test_zip.zip');
+		$step->zipFile = DataReference::create('./test_zip.zip');
 		$step->extractToPath = 'extract_dir';
-		
+
 		$this->step_runner->run($step, $this->progress_tracker);
 
 		$this->assertTrue($this->filesystem->exists('extract_dir'));

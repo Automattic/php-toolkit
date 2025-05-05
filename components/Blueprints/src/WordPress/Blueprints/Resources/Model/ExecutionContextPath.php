@@ -47,12 +47,16 @@ class ExecutionContextPath extends DataReference {
 	}
 
 	/**
-	 * Check if a string is a valid execution context path.
+	 * Every string is a valid context–relative path.
+	 * Most strings are so, for now, we're always returning true.
+	 * At this stage, we're not yet concerned whether the file actually
+	 * exists. We're only saying "this seems like a local path, let's try
+	 * using it as one".
 	 *
 	 * @param string $path The path to check.
 	 * @return bool Whether the path is valid.
 	 */
-	public static function is_valid( string $path ): bool {
-		return strpos( $path, './' ) === 0 || strpos( $path, '/' ) === 0;
+	public static function is_valid(): bool {
+		return true;
 	}
 } 
