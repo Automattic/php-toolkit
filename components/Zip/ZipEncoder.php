@@ -39,7 +39,6 @@ class ZipEncoder {
 		} finally {
 			if ( $entry->compressionMethod === ZipDecoder::COMPRESSION_DEFLATE ) {
 				$body_stream->close_reading();
-
 			}
 		}
 	}

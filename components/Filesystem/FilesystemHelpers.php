@@ -69,12 +69,7 @@ class FilesystemHelpers {
 	 * @throws FilesystemException If the temporary file cannot be created.
 	 */
 	public static function createTemporaryFile( ?Filesystem $fs = null, string $prefix = 'tmp_', ?string $dir = null ): string {
-		if ( null === $fs ) {
-			$fs = LocalFilesystem::create();
-		}
-		if ( null === $dir ) {
-			$dir = sys_get_temp_dir();
-		}
+		list( $fs, $dir ) = self::resolveFsAndTempDir( $fs, $dir );
 
 		// Create temporary directory if it doesn't exist
 		if ( ! $fs->exists( $dir ) ) {
@@ -101,12 +96,7 @@ class FilesystemHelpers {
 	 * @throws FilesystemException If the temporary directory cannot be created or cleaned up.
 	 */
 	public static function withTemporaryDirectory( ?Filesystem $fs = null, callable $callback, string $prefix = 'tmp_', ?string $dir = null ): mixed {
-		if ( null === $fs ) {
-			$fs = LocalFilesystem::create();
-		}
-		if ( null === $dir ) {
-			$dir = sys_get_temp_dir();
-		}
+		list( $fs, $dir ) = self::resolveFsAndTempDir( $fs, $dir );
 
 		// Create parent directory if it doesn't exist
 		if ( ! $fs->exists( $dir ) ) {
@@ -130,4 +120,18 @@ class FilesystemHelpers {
 			}
 		}
 	}
+
+	private static function resolveFsAndTempDir( ?Filesystem $fs = null, ?string $dir = null ): array {
+		if ( null === $fs ) {
+			$fs = LocalFilesystem::create();
+			if ( null === $dir ) {
+				$dir = sys_get_temp_dir();
+			}
+		}
+		if ( null === $dir ) {
+			$dir = 'tmp';
+		}
+		return [ $fs, $dir ];
+	}
+
 } 

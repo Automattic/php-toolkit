@@ -22,19 +22,18 @@ class BootOptions {
 		$instance->documentRoot = $options['documentRoot'];
 
 		if (!isset($options['wordPressZip'])) {
-			$options['wordPressZip'] = self::resolveWordPressRelease('latest');
-		}
-		if(is_string($options['wordPressZip'])) {
+			$instance->wordPressZip = DataReference::create(self::resolveWordPressRelease('latest')['releaseUrl']);
+		} else if(is_string($options['wordPressZip'])) {
 			$instance->wordPressZip = DataReference::create($options['wordPressZip']);
-		} else if(!$instance->wordPressZip instanceof DataReference) {
+		} else {
 			throw new \InvalidArgumentException('The wordPressZip option must be a DataReference but was ' . gettype($options['wordPressZip']));
 		}
 
 		if(!isset($options['sqliteIntegrationPluginZip'])) {
-			$options['sqliteIntegrationPluginZip'] = DataReference::create('https://downloads.wordpress.org/plugin/sqlite-database-integration.zip');
+			$instance->sqliteIntegrationPluginZip = DataReference::create('https://downloads.wordpress.org/plugin/sqlite-database-integration.zip');
 		} else if(is_string($options['sqliteIntegrationPluginZip'])) {
 			$instance->sqliteIntegrationPluginZip = DataReference::create($options['sqliteIntegrationPluginZip']);
-		} else if(!$instance->sqliteIntegrationPluginZip instanceof DataReference) {
+		} else {
 			throw new \InvalidArgumentException('The sqliteIntegrationPluginZip option must be a DataReference but was ' . gettype($options['sqliteIntegrationPluginZip']));
 		}
 		
@@ -60,7 +59,7 @@ class BootOptions {
 	 * @param string $versionQuery The WordPress version query string to resolve.
 	 * @return array The resolved WordPress release URL and version string.
 	 */
-	public function resolveWordPressRelease($versionQuery = 'latest')
+	static public function resolveWordPressRelease($versionQuery = 'latest')
 	{
 		if (
 			str_starts_with($versionQuery, 'https://') ||
