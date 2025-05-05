@@ -7,7 +7,7 @@ namespace WordPress\Blueprints\Runner\Step;
 
 use WordPress\Blueprints\Model\DataClass\RunSQLStep;
 use WordPress\Blueprints\Progress\Tracker;
-
+use WordPress\Blueprints\Resources\Model\File;
 
 class RunSQLStepRunner extends BaseStepRunner {
 	/**
@@ -18,6 +18,10 @@ class RunSQLStepRunner extends BaseStepRunner {
 		$input,
 		$progress = null
 	) {
+		$sql = $this->getRuntime()->resolveDataReference( $input->sql );
+		if ( ! $sql instanceof File ) {
+			throw new \InvalidArgumentException( 'The provided resource is not a file.' );
+		}
 		return $this->getRuntime()->evalPhpInSubProcess(
 			<<<'CODE'
 <?php
@@ -41,7 +45,7 @@ class RunSQLStepRunner extends BaseStepRunner {
 CODE
 			,
 			null,
-			$this->getResource( $input->sql )
+			$sql->stream->consume_all()
 		);
 	}
 
