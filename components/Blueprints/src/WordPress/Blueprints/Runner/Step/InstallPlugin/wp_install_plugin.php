@@ -161,7 +161,6 @@ $result = $upgrader->install( $plugin_zip_path, array(
     'overwrite_package' => true,
     'destination' => $target_directory
 ) );
-var_dump($target_directory);
 
 // Check for filesystem errors
 if ( $GLOBALS['wp_filesystem']->errors->has_errors() ) {
@@ -204,6 +203,11 @@ if ( empty( $plugins_in_folder ) ) {
 $plugin_file_relative_path = array_key_first( $plugins_in_folder );
 
 // Output the relative path of the main plugin file.
-echo $plugin_folder_name . '/' . $plugin_file_relative_path;
+$output = $plugin_folder_name . '/' . $plugin_file_relative_path;
+if(getenv('OUTPUT_FILE')) {
+	file_put_contents(getenv('OUTPUT_FILE'), $output);
+} else {
+	echo $output;
+}
 
 exit( 0 );

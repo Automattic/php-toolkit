@@ -23,6 +23,7 @@ use WordPress\Git\GitFilesystem;
 use WordPress\Git\GitRepository;
 
 use function WordPress\Filesystem\pipe_stream;
+use function WordPress\Filesystem\wp_join_paths;
 
 class DataReferenceResolver {
 
@@ -51,12 +52,19 @@ class DataReferenceResolver {
 
 			// @TODO: Get the SeekableRequestReadStream to work instead of
 			//        pre-emptively buffering the entire file to the disk.
-			$remote_stream = $this->http_client->fetch( $url );
-			$temp_file_path = FilesystemHelpers::createTemporaryFile();
-			$write_stream = FileWriteStream::from_path( $temp_file_path, 'truncate' );
-			pipe_stream( $remote_stream, $write_stream );
-			$remote_stream->close_reading();
-			$write_stream->close_writing();
+
+			// @TODO: Don't cache files like this. Memoize downloads to the disk
+			//        – probably by adding support for that in the Client class.
+			$sha1_hash = hash( 'sha1', $url );
+			$tmp_dir = sys_get_temp_dir();
+			$temp_file_path = wp_join_paths( $tmp_dir, $sha1_hash . '.zip' );
+			if( !file_exists( $temp_file_path ) ) {
+				$remote_stream = $this->http_client->fetch( $url );
+				$write_stream = FileWriteStream::from_path( $temp_file_path, 'truncate' );
+				pipe_stream( $remote_stream, $write_stream );
+				$remote_stream->close_reading();
+				$write_stream->close_writing();
+			}
 
 			return new File(
 				FileReadStream::from_path( $temp_file_path ),

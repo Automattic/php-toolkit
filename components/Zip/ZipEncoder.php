@@ -6,6 +6,9 @@ use WordPress\ByteStream\ReadStream\DeflateReadStream;
 use WordPress\ByteStream\ReadStream\TransformedReadStream;
 use WordPress\ByteStream\ByteTransformer\ChecksumTransformer;
 use WordPress\ByteStream\WriteStream\ByteWriteStream;
+use WordPress\Filesystem\Filesystem;
+
+use function WordPress\Filesystem\wp_join_paths;
 
 class ZipEncoder {
 
@@ -15,6 +18,20 @@ class ZipEncoder {
 
 	public function __construct( ByteWriteStream $output ) {
 		$this->output = $output;
+	}
+
+	public function append_from_filesystem( Filesystem $filesystem, $path='/') {
+		foreach ( $filesystem->ls( $path ) as $entry ) {
+			$entry_path = wp_join_paths( $path, $entry );
+			if ( $filesystem->is_dir( $entry_path ) ) {
+				$this->append_from_filesystem( $filesystem, $entry_path );
+			} else {
+				$this->append_file( new FileEntry( [
+					'path' => $entry_path,
+					'body_reader' => $filesystem->open_read_stream( $entry_path ),
+				] ) );
+			}
+		}
 	}
 
 	/**
