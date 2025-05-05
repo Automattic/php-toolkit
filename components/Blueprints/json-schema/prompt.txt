@@ -1,0 +1,1 @@
+Create a JSON schema file called blueprints-v2-schema.json that reflects the intent expressed with TypeScript types defined in @appendix-A-blueprint-v2-schema.ts @appendix-B-data-sources.ts. Preserve the structure, the comments etc. Anytime an array buffer is used, replace it with a string.
