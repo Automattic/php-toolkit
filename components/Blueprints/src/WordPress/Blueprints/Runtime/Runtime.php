@@ -7,6 +7,7 @@ use Symfony\Component\Process\Process;
 use WordPress\Blueprints\references\DataReferenceResolver;
 use WordPress\Blueprints\Resources\Model\DataReference;
 use WordPress\Blueprints\Resources\Model\File;
+use WordPress\Blueprints\Resources\Model\Directory;
 use WordPress\Filesystem\FilesystemHelpers;
 use WordPress\Filesystem\LocalFilesystem;
 use WordPress\HttpClient\Client;
@@ -41,7 +42,7 @@ class Runtime {
 		return wp_join_paths( $this->getDocumentRoot(), $path );
 	}
 
-	public function resolveDataReference( DataReference $reference ): Filesystem|File {
+	public function resolveDataReference( DataReference $reference ): File|Directory {
 		return $this->dataReferenceResolver->resolve( $reference );
 	}
 

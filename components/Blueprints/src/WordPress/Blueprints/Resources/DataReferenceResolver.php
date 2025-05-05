@@ -13,10 +13,10 @@ use WordPress\Blueprints\Resources\Model\InlineFile;
 use WordPress\Blueprints\Resources\Model\InlineDirectory;
 use WordPress\Blueprints\Resources\Model\GitPath;
 use WordPress\Blueprints\Resources\Model\File;
+use WordPress\Blueprints\Resources\Model\Directory;
 use WordPress\ByteStream\MemoryPipe;
 use WordPress\ByteStream\ReadStream\FileReadStream;
 use WordPress\ByteStream\WriteStream\FileWriteStream;
-use WordPress\Filesystem\FilesystemHelpers;
 use WordPress\Filesystem\InMemoryFilesystem;
 use WordPress\Filesystem\Layer\ChrootLayer;
 use WordPress\Git\GitFilesystem;
@@ -42,10 +42,10 @@ class DataReferenceResolver {
 	 * Resolves a data reference into either a ByteReadStream or Filesystem instance.
 	 *
 	 * @param mixed $reference The reference to resolve (string or array)
-	 * @return ByteReadStream|Filesystem The resolved reference
+	 * @return The resolved reference
 	 * @throws \Exception If the reference type is unsupported
 	 */
-	public function resolve( DataReference $reference ): Filesystem|File {
+	public function resolve( DataReference $reference ): File|Directory {
 		if ( $reference instanceof URLReference ) {
 			$url = $reference->get_url();
 			$filename = basename( parse_url( $url, PHP_URL_PATH ) );
@@ -78,7 +78,10 @@ class DataReferenceResolver {
 			if( $this->blueprint_bundle_fs->is_file( $path ) ) {
 				return new File( $this->blueprint_bundle_fs->open_read_stream( $path ), basename( $path ) );
 			} else if( $this->blueprint_bundle_fs->is_dir( $path ) ) {
-				return new ChrootLayer( $this->blueprint_bundle_fs, $path );
+				return new Directory(
+					new ChrootLayer( $this->blueprint_bundle_fs, $path ),
+					basename( $path )
+				);
 			} else {
 				throw new BlueprintException( 'Path is not a file or directory: ' . $path );
 			}
@@ -92,7 +95,7 @@ class DataReferenceResolver {
 			foreach( $reference->get_children() as $child ) {
 				$fs->put_contents( $child->get_path(), $child->get_content() );
 			}
-			return $fs;
+			return new Directory( $fs, $reference->get_name() );
 		} elseif ( $reference instanceof GitPath ) {
 			/**
 			 * @TODO: Use a local path as in the Blueprints v2 spec Appendix B.
@@ -107,7 +110,10 @@ class DataReferenceResolver {
 					'path' => $reference->get_path(),
 				)
 			);
-			return new GitFilesystem( $repo );
+			return new Directory(
+				new GitFilesystem( $repo ),
+				basename( $reference->get_path() ) ?: 'git-repo'
+			);
 		}
 		
 		throw new \Exception( 'Unsupported reference type' );

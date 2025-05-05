@@ -3,7 +3,7 @@
 namespace WordPress\Blueprints\Runner\Step;
 
 use WordPress\Blueprints\Resources\Model\File;
-use WordPress\Filesystem\Filesystem;
+use WordPress\Blueprints\Resources\Model\Directory;
 use WordPress\Filesystem\FilesystemHelpers;
 use WordPress\Zip\FileEntry;
 use WordPress\Zip\ZipDecoder;
@@ -24,7 +24,7 @@ class InstallPluginStepRunner extends BaseStepRunner {
 		FilesystemHelpers::withTemporaryDirectory($fs, function($temp_dir) use ($fs, $input) {
 			$plugin_data = $this->getRuntime()->resolveDataReference( $input->pluginData );
 		
-			if ( $plugin_data instanceof Filesystem ) {
+			if ( $plugin_data instanceof Directory ) {
 				/**
 				 * A directory. Let's zip it and provide WordPress with a plugin zip file.
 				 * 
@@ -39,20 +39,10 @@ class InstallPluginStepRunner extends BaseStepRunner {
 				 * 
 				 * So, we zip it up and provide WordPress with a plugin zip file.
 				 */
-				$first_php_file = $first_directory = null;
-				foreach( $plugin_data->ls() as $filename ) {
-					if( !$first_php_file && str_ends_with( $filename, '.php' ) ) {
-						$first_php_file = $filename;
-					}
-					if( !$first_directory && $plugin_data->is_dir( $filename ) && !str_starts_with( $filename, '.' ) ) {
-						$first_directory = $filename;
-					}
-				}
-				$zip_filename = substr($first_php_file, 0, -4) ?? $first_directory ?? 'plugin';
-				$zip_path = $temp_dir . '/' . $zip_filename . '.zip';
+				$zip_path = $temp_dir . '/' . $plugin_data->dirname . '.zip';
 				$zip_stream = $fs->open_write_stream( $zip_path );
 				$zip_encoder = new ZipEncoder( $zip_stream );
-				$zip_encoder->append_from_filesystem( $plugin_data );
+				$zip_encoder->append_from_filesystem( $plugin_data->filesystem );
 				$zip_encoder->close();
 			} elseif ( $plugin_data instanceof File ) {
 				// Use ZIP files directly. Wrap other types of files in a ZIP archive.

@@ -1,88 +1,36 @@
 <?php
+require_once getenv( 'DOCROOT' ) . '/wp-load.php';
+
 define( 'WP_ADMIN', true );
 
-// Define a dummy skin for the upgrader.
-// This allows us to install themes without generating HTML output,
-// and capture installation results and errors.
-if ( ! class_exists( '\WP_Upgrader_Skin', false ) ) {
-	require_once getenv( 'DOCROOT' ) . '/wp-admin/includes/class-wp-upgrader.php';
-	class Blueprint_WP_Upgrader_Skin extends \WP_Upgrader_Skin {
-		public $destination;
-		public $options = array(
-			'type'   => '',
-			'title'  => '',
-			'url'    => '',
-			'nonce'  => '',
-			'theme' => '', // Adjusted from 'plugin' for clarity, though WP core might not use it directly here.
-			'api'    => null,
-			'extra'  => array(),
-		);
-		public $result = null;
-		public function add_strings() {}
-		public function set_upgrader( &$upgrader ) {
-			if ( is_object( $upgrader ) ) {
-				$this->upgrader = &$upgrader;
-			}
-			$this->add_strings();
-		}
-		public function set_result( $result ) {
-			$this->result = $result;
-		}
-		public function request_filesystem_credentials( $error = false, $context = '', $allow_relaxed_file_ownership = false ) {
-			// Always return true to avoid prompting for FS credentials.
-			// This assumes the environment is set up with correct file permissions.
-			return true;
-		}
-		public function error( $errors ) {
-			// Store the error internally if it's a WP_Error object
-			if ( is_wp_error( $errors ) ) {
-				$this->result = $errors;
-			}
-			// Log errors for debugging purposes
-			if ( is_string( $errors ) ) {
-				$this->feedback( $errors );
-				return;
-			}
-			if ( is_wp_error( $errors ) && $errors->has_errors() ) {
-				foreach ( $errors->get_error_messages() as $message ) {
-					if ( $errors->get_error_data() && is_string( $errors->get_error_data() ) ) {
-						$this->feedback( $message . ': ' . esc_html( strip_tags( $errors->get_error_data() ) ) );
-					} else {
-						$this->feedback( $message );
-					}
-				}
-			}
-		}
-		public function feedback( $string, ...$args ) {
-			// Keep this empty to avoid output unless debugging.
-			// error_log( "Blueprint Skin Feedback: " . $string );
-		}
-		// Empty implementations for UI methods to prevent any output
-		public function header() {}
-		public function footer() {}
-		public function bulk_header() {}
-		public function bulk_footer() {}
-		public function before( $title = '' ) {}
-		public function after( $title = '' ) {}
-	}
-}
-
-// Load WordPress environment
+// Load required WordPress files
 require_once getenv( 'DOCROOT' ) . '/wp-load.php';
-// Load WordPress Administration Upgrade API
 require_once getenv( 'DOCROOT' ) . '/wp-admin/includes/file.php';
-require_once getenv( 'DOCROOT' ) . '/wp-admin/includes/theme.php'; // Contains Theme_Upgrader
+require_once getenv( 'DOCROOT' ) . '/wp-admin/includes/theme.php';
+require_once getenv( 'DOCROOT' ) . '/wp-admin/includes/class-wp-upgrader.php';
+require_once getenv( 'DOCROOT' ) . '/wp-admin/includes/misc.php';
 
-// Ensure class-wp-upgrader.php is loaded if not already done by the skin check
-if ( ! class_exists( '\WP_Upgrader', false ) ) {
-	require_once getenv( 'DOCROOT' ) . '/wp-admin/includes/class-wp-upgrader.php';
+// Define show_message function if it doesn't exist (fallback)
+if (!function_exists('show_message')) {
+    function show_message($message) {
+        if (is_wp_error($message)) {
+            if ($message->get_error_data() && is_string($message->get_error_data())) {
+                $message = $message->get_error_message() . ': ' . $message->get_error_data();
+            } else {
+                $message = $message->get_error_message();
+            }
+        }
+        echo "$message\n";
+    }
 }
 
+// Ensure filesystem access is properly set up
+WP_Filesystem();
 
 // Set current user to an administrator to ensure permissions for theme installation
 $admins = get_users( array( 'role' => 'Administrator' ) );
 if ( ! empty( $admins ) ) {
-	set_current_user( $admins[0]->ID );
+	wp_set_current_user( $admins[0]->ID );
 } else {
 	error_log( "Blueprint Error: No admin user found to perform theme installation." );
 	exit( 1 );
@@ -101,47 +49,86 @@ if ( ! file_exists( $theme_zip_path ) ) {
 	exit( 1 );
 }
 
-// Use the Theme_Upgrader class with our custom skin to install the theme
-$skin     = new Blueprint_WP_Upgrader_Skin();
-$upgrader = new \Theme_Upgrader( $skin );
-// Clear the destination directory if it already exists.
-// This prevents errors if the theme was partially installed before.
-// Note: $upgrader->init() might be needed before accessing skin->options, but install() calls it.
-// $upgrader->init(); // Usually called within install()
-// $skin->options['clear_destination'] = true; // This option might be useful but needs testing if it works as expected here.
-// Let's proceed without clear_destination for now, relying on default behavior.
+// Make sure the destination directory is writable
+$wp_theme_dir = WP_CONTENT_DIR . '/themes';
+if ( ! is_writable( $wp_theme_dir ) ) {
+	error_log( "Blueprint Error: Theme directory is not writable: " . $wp_theme_dir );
+	// Try to fix permissions
+	@chmod( $wp_theme_dir, 0755 );
+	if ( ! is_writable( $wp_theme_dir ) ) {
+		exit( 1 );
+	}
+}
 
-$result   = $upgrader->install( $theme_zip_path, array( 'overwrite_package' => false ) ); // overwrite_package=false is default, but explicit
+// Extract theme slug from the zip file
+$theme_slug = '';
+$zip = new ZipArchive();
+if ($zip->open($theme_zip_path) === true) {
+	// Check the first directory in the zip file
+	if ($zip->numFiles > 0) {
+		$first_entry = $zip->getNameIndex(0);
+		// Most theme zips have a top-level directory that is the theme slug
+		if (strpos($first_entry, '/') !== false) {
+			$theme_slug = explode('/', $first_entry)[0];
+		}
+	}
+	$zip->close();
+}
 
-// Check for installation errors reported by the upgrader directly
-if ( is_wp_error( $result ) ) {
-	error_log( "Blueprint Error: Failed to install theme (Upgrader Error): " . $result->get_error_message() );
+// Target directory for the theme
+$target_directory = null;
+if (!empty($theme_slug)) {
+	$target_directory = $wp_theme_dir . '/' . $theme_slug;
+	
+	// Remove existing directory if it exists
+	if (is_dir($target_directory)) {
+		$GLOBALS['wp_filesystem']->delete($target_directory, true);
+	}
+	
+	// Create the directory
+	$GLOBALS['wp_filesystem']->mkdir($target_directory);
+}
+
+// Use the Theme_Upgrader class to install the theme
+$upgrader = new \Theme_Upgrader();
+$result = $upgrader->install($theme_zip_path, array(
+	'overwrite_package' => true,
+	'destination' => $target_directory
+));
+
+// Check for filesystem errors
+if ( $GLOBALS['wp_filesystem']->errors->has_errors() ) {
+	foreach ( $GLOBALS['wp_filesystem']->errors->get_error_messages() as $message ) {
+		error_log( "Blueprint Error: Filesystem error: " . $message );
+	}
 	exit( 1 );
 }
 
-// Check for errors reported via the skin (sometimes errors don't return via $result)
-if ( is_wp_error( $skin->result ) ) {
-	error_log( "Blueprint Error: Failed to install theme (Skin Error): " . $skin->result->get_error_message() );
+// Check for installation errors reported by the upgrader directly
+if ( is_wp_error( $result ) ) {
+	error_log( "Blueprint Error: Failed to install theme: " . $result->get_error_message() );
 	exit( 1 );
 }
 
 // Check for null or false result, which also indicates failure
 if ( $result === false || $result === null ) {
-	error_log( "Blueprint Error: Failed to install theme for an unknown reason (Upgrader returned false/null)." );
+	error_log( "Blueprint Error: Failed to install theme for an unknown reason." );
 	exit( 1 );
 }
 
 // Installation successful, get the theme folder name (stylesheet) from the result array
-$theme_folder_name = $upgrader->result['destination_name'] ?? null;
+$theme_folder_name = !empty($theme_slug) ? $theme_slug : ($upgrader->result['destination_name'] ?? null);
 if ( ! $theme_folder_name ) {
-	error_log( "Blueprint Error: Could not determine theme folder name (stylesheet) after installation." );
-	// Log the full result for debugging if needed
-	// error_log("Blueprint Debug: Upgrader result: " . print_r($upgrader->result, true));
+	error_log( "Blueprint Error: Could not determine theme folder name after installation." );
 	exit( 1 );
 }
 
-// Output the theme folder name (stylesheet) to stdout. This is captured by the runner.
-echo $theme_folder_name;
+// Output the theme folder name (stylesheet) either to a file or stdout
+if (getenv('OUTPUT_FILE')) {
+	file_put_contents(getenv('OUTPUT_FILE'), $theme_folder_name);
+} else {
+	echo $theme_folder_name;
+}
 
 // Exit with success status code
 exit( 0 );
