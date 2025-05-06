@@ -46,7 +46,7 @@ class BlueprintV2Validator {
         }
         
         // Check required fields
-        $this->validate_required_fields($data, ['version', 'content'], '');
+        $this->validate_required_fields($data, ['version'], '');
         
         // Only proceed with detailed validation if required fields exist
         if (empty($this->errors)) {

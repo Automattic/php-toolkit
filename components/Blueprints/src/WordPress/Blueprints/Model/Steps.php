@@ -5,7 +5,7 @@ namespace WordPress\Blueprints\Model;
 use Exception;
 use InvalidArgumentException; // Standard PHP exception
 use JsonException; // Standard PHP exception
-use WordPress\Blueprints\BlueprintException;
+use RuntimeException;
 use WordPress\Blueprints\BlueprintV2Validator;
 use WordPress\Blueprints\Progress\Tracker;
 use WordPress\Blueprints\Resources\Model\DataReference;
@@ -710,7 +710,7 @@ class InstallThemeStepRunner {
 				if ($theme_data->stream->peek(4) === "PK\x03\x04") {
 					pipe_stream($theme_data->stream, $zip_stream);
 				} else {
-					throw new BlueprintException("Theme is not a valid zip file.");
+					throw new \RuntimeException("Theme is not a valid zip file.");
 				}
 				$zip_stream->close_writing();
 			}
@@ -724,14 +724,14 @@ class InstallThemeStepRunner {
 			);
 
 			if (!$fs->exists($output_file)) {
-				throw new BlueprintException(
+				throw new \RuntimeException(
 					"Theme installation script did not create output file. Error output: {$install_script_result}"
 				);
 			}
 
 			$theme_folder_name = trim($fs->get_contents($output_file));
 			if (empty($theme_folder_name)) {
-				throw new BlueprintException(
+				throw new \RuntimeException(
 					"Theme installation script did not return the theme stylesheet name."
 				);
 			}
@@ -1460,6 +1460,8 @@ class Blueprint
     {
 		$validator = new BlueprintV2Validator();
 		if (!$validator->validate($data)) {
+			// @TODO: Propagate validation errors
+			print_r($validator->get_errors());
 			throw new InvalidArgumentException('Invalid Blueprint JSON provided: ' . $validator->get_errors());
 		}
         return self::fromValidatedArray($data);
@@ -2007,29 +2009,307 @@ PHP;
     }
 }
 
-class BlueprintRunner {
-    private Blueprint $blueprint;
-    private array $steps;
-    private Runtime $runtime;
-    private Tracker $mainTracker;
 
-    public function __construct(Blueprint $blueprint, Runtime $runtime, ?Tracker $mainTracker = null) {
-        $this->blueprint = $blueprint;
-        $this->steps = $blueprint->getExecutionPlan();
-        $this->runtime = $runtime;
-        $this->mainTracker = $mainTracker ?? new Tracker();
+/**
+ * Represents the configuration for the Blueprint Runner.
+ * 
+ * These settings are provided out-of-band (CLI flags, ENV variables, etc.)
+ * and are never stored inside a Blueprint document.
+ */
+class RunnerConfiguration
+{
+	private array|string $rawBlueprint;
+
+    /** @var string Either 'create-new-site' or 'apply-to-existing-site' */
+    private string $executionMode;
+    
+    /** @var string File-system directory in which the Blueprint will be executed */
+    private string $targetSiteRoot;
+
+	/** @var string Local path to source the Blueprint context from */
+	private string $executionContextRoot;
+    
+    /** @var string Database engine to use when executing the Blueprint */
+    private string $databaseEngine = 'mysql';
+    
+    /** @var array|null Connection parameters for the database */
+    private ?array $databaseCredentials = null;
+    
+    /** @var bool Whether to override user passwords with randomly-generated ones */
+    private bool $generatePasswords = false;
+    
+    /** @var string|false Path to save randomly-generated passwords */
+    private $savePasswords = false;
+    
+    /** @var string Strategy for importing content objects */
+    private string $contentImportMode;
+
+	static public function create(): self
+	{
+		return new self();
+	}
+
+	public function setRawBlueprint(array|string $rawBlueprint): self
+	{
+		$this->rawBlueprint = $rawBlueprint;
+		return $this;
+	}
+
+	public function getRawBlueprint(): array|string
+	{
+		return $this->rawBlueprint;
+	}
+    
+    /**
+     * Sets the execution mode.
+     *
+     * @param string $executionMode Either 'create-new-site' or 'apply-to-existing-site'
+     * @return self
+     * @throws InvalidArgumentException If the execution mode is invalid
+     */
+    public function setExecutionMode(string $executionMode): self
+    {
+        if (!in_array($executionMode, ['create-new-site', 'apply-to-existing-site'])) {
+            throw new InvalidArgumentException("Invalid execution mode: {$executionMode}");
+        }
+        
+        $this->executionMode = $executionMode;
+        return $this;
+    }
+    
+    /**
+     * Sets the target site reference.
+     *
+     * @param string $targetSiteRef File-system directory for Blueprint execution
+     * @return self
+     */
+    public function setTargetSiteRoot(string $targetSiteRoot): self
+    {
+        $this->targetSiteRoot = $targetSiteRoot;
+        return $this;
     }
 
-    public function run() {
+	public function getTargetSiteRoot(): string
+	{
+		return $this->targetSiteRoot;
+	}
+    
+    /**
+     * Sets the database engine.
+     *
+     * @param string $databaseEngine Database engine to use ('mysql' or 'sqlite')
+     * @return self
+     * @throws InvalidArgumentException If the database engine is invalid
+     */
+    public function setDatabaseEngine(string $databaseEngine): self
+    {
+        if (!in_array($databaseEngine, ['mysql', 'sqlite'])) {
+            throw new InvalidArgumentException("Invalid database engine: {$databaseEngine}");
+        }
+        
+        $this->databaseEngine = $databaseEngine;
+        return $this;
+    }
+    
+    /**
+     * Sets the database credentials.
+     *
+     * @param array $databaseCredentials Connection parameters for the database
+     * @return self
+     */
+    public function setDatabaseCredentials(array $databaseCredentials): self
+    {
+        $this->databaseCredentials = $databaseCredentials;
+        return $this;
+    }
+    
+    /**
+     * Sets whether to generate passwords.
+     *
+     * @param bool $generatePasswords Whether to override user passwords
+     * @return self
+     */
+    public function setGeneratePasswords(bool $generatePasswords): self
+    {
+        $this->generatePasswords = $generatePasswords;
+        return $this;
+    }
+    
+    /**
+     * Sets the path to save passwords.
+     *
+     * @param string|false $savePasswords Path to save generated passwords
+     * @return self
+     */
+    public function setSavePasswords($savePasswords): self
+    {
+        $this->savePasswords = $savePasswords;
+        return $this;
+    }
+
+	public function setExecutionContextRoot(string $executionContextRoot): self
+	{
+		$this->executionContextRoot = $executionContextRoot;
+		return $this;
+	}
+	
+    /**
+     * Sets the content import mode.
+     *
+     * @param string $contentImportMode Strategy for importing content ('append', 'replace-all', or 'merge')
+     * @return self
+     * @throws InvalidArgumentException If the content import mode is invalid
+     */
+    public function setContentImportMode(string $contentImportMode): self
+    {
+        if (!in_array($contentImportMode, ['append', 'replace-all', 'merge'])) {
+            throw new InvalidArgumentException("Invalid content import mode: {$contentImportMode}");
+        }
+        
+        $this->contentImportMode = $contentImportMode;
+        return $this;
+    }
+    
+    /**
+     * Validates the configuration.
+     *
+     * @return bool
+     * @throws InvalidArgumentException If the configuration is invalid
+     */
+    public function validate(): bool
+    {
+        if (!isset($this->executionMode)) {
+            throw new InvalidArgumentException('Execution mode must be set');
+        }
+        
+        if (!isset($this->targetSiteRef)) {
+            throw new InvalidArgumentException('Target site reference must be set');
+        }
+        
+        if (!isset($this->contentImportMode)) {
+            throw new InvalidArgumentException('Content import mode must be set');
+        }
+        
+        if ($this->databaseEngine === 'mysql' && $this->executionMode === 'create-new-site' && empty($this->databaseCredentials)) {
+            throw new InvalidArgumentException('MySQL credentials are required for create-new-site mode');
+        }
+        
+        return true;
+    }
+    
+    /**
+     * Gets the execution mode.
+     *
+     * @return string
+     */
+    public function getExecutionMode(): string
+    {
+        return $this->executionMode;
+    }
+    
+    /**
+     * Gets the target site reference.
+     *
+     * @return string
+     */
+    public function getExecutionContextRoot(): string
+    {
+        return $this->executionContextRoot;
+    }
+    
+    /**
+     * Gets the database engine.
+     *
+     * @return string
+     */
+    public function getDatabaseEngine(): string
+    {
+        return $this->databaseEngine;
+    }
+    
+    /**
+     * Gets the database credentials.
+     *
+     * @return array|null
+     */
+    public function getDatabaseCredentials(): ?array
+    {
+        return $this->databaseCredentials;
+    }
+    
+    /**
+     * Checks if passwords should be generated.
+     *
+     * @return bool
+     */
+    public function shouldGeneratePasswords(): bool
+    {
+        return $this->generatePasswords;
+    }
+    
+    /**
+     * Gets the path to save passwords.
+     *
+     * @return string|false
+     */
+    public function getSavePasswordsPath()
+    {
+        return $this->savePasswords;
+    }
+    
+    /**
+     * Gets the content import mode.
+     *
+     * @return string
+     */
+    public function getContentImportMode(): string
+    {
+        return $this->contentImportMode;
+    }
+}
+
+
+class BlueprintRunner {
+    private ?Blueprint $blueprint;
+    private Runtime $runtime;
+    private Tracker $mainTracker;
+	private RunnerConfiguration $runnerConfiguration;
+
+    public function __construct(RunnerConfiguration $runnerConfiguration) {
+        $this->runnerConfiguration = $runnerConfiguration;
+        $this->runtime = new Runtime(
+			$runnerConfiguration->getTargetSiteRoot(),
+			$runnerConfiguration->getExecutionContextRoot(),
+		);
+        $this->mainTracker = new Tracker();
+    }
+
+	public function run() {
+		$this->resolveBlueprint();
 		$this->runSteps();
     }
 
+	/**
+	 * @TODO: support sourcing Blueprints from arbitrary sources
+	 */
+	private function resolveBlueprint() {
+		$rawBlueprint = $this->runnerConfiguration->getRawBlueprint();
+		if(is_string($rawBlueprint)) {
+			$this->blueprint = Blueprint::fromJsonString($rawBlueprint);
+		} else if(is_array($rawBlueprint)) {
+			$this->blueprint = Blueprint::fromArray($rawBlueprint);
+		} else {
+			throw new RuntimeException('Invalid blueprint source');
+		}
+	}
+
 	private function runSteps() {
         $results = [];
-        $stepCount = count($this->steps);
+		$steps = $this->blueprint->getExecutionPlan();
+        $stepCount = count($steps);
 
         for ($i = 0; $i < $stepCount; $i++) {
-            $step = $this->steps[$i];
+            $step = $steps[$i];
             $stepWeight = 1 / $stepCount;
             $stepTracker = $this->mainTracker->stage($stepWeight, $this->getStepCaption($step));
 
@@ -2044,7 +2324,7 @@ class BlueprintRunner {
                 // Determine if we should continue or stop execution
                 $continueOnError = $step->continueOnError ?? false;
                 if (!$continueOnError) {
-                    throw new BlueprintException(
+                    throw new RuntimeException(
                         "Error when executing step " . (get_class($step)) . " (number " . ($i + 1) . " in the plan)",
                         0,
                         $e
@@ -2226,7 +2506,7 @@ $complex_blueprint = Blueprint::fromValidatedArray(json_decode(<<<'JSON'
 } 
 JSON, true, 512, JSON_THROW_ON_ERROR));
 
-$simple_blueprint = Blueprint::fromValidatedArray(json_decode(<<<'JSON'
+$simple_blueprint = <<<'JSON'
 {
   "version": 2,
   "$schema": "https://raw.githubusercontent.com/WordPress/blueprints/trunk/blueprints/schema.json",
@@ -2246,13 +2526,13 @@ $simple_blueprint = Blueprint::fromValidatedArray(json_decode(<<<'JSON'
       "files": {
         "wp-content/uploads/custom-file.txt": "This is a custom file created by the Blueprint.",
         "builder.php": {
-			"source": "./BlueprintBuilder.php"
+			"source": "./test_file.txt"
 		}
       }
     }
   ]
 } 
-JSON, true, 512, JSON_THROW_ON_ERROR));
+JSON;
 
 // Silence PHP deprecation warnings
 error_reporting(E_ALL & ~E_DEPRECATED & ~E_USER_DEPRECATED);
@@ -2262,5 +2542,10 @@ require_once __DIR__ . '/../../../../vendor/autoload.php';
 require_once __DIR__ . '/../../../../../../vendor/autoload.php';
 $runtime = new Runtime(__DIR__ . '/test_blueprint_runner', __DIR__);
 
-$runner = new BlueprintRunner($simple_blueprint, $runtime);
+$runnerConfiguration = RunnerConfiguration::create()
+	->setRawBlueprint($simple_blueprint)
+	->setTargetSiteRoot(__DIR__ . '/test_blueprint_runner')
+	->setExecutionContextRoot(__DIR__);
+
+$runner = new BlueprintRunner($runnerConfiguration);
 $runner->run();

@@ -355,7 +355,7 @@ export type Blueprint = {
 
 	// Site data {{{
 
-	content: Array<
+	content?: Array<
 		| ({
 				type: 'mysql-dump';
 				source: DataReference | DataReference[];

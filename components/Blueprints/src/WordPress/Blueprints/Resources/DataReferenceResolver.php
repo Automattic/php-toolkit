@@ -2,7 +2,7 @@
 
 namespace WordPress\Blueprints\references;
 
-use WordPress\Blueprints\BlueprintException;
+use WordPress\Blueprints\RuntimeException;
 use WordPress\Blueprints\Model\DataClass\WordPressPluginDirectoryReference;
 use WordPress\Blueprints\Model\DataClass\WordPressThemeDirectoryReference;
 use WordPress\Blueprints\Resources\Model\DataReference;
@@ -74,7 +74,7 @@ class DataReferenceResolver {
 				$response = $remote_stream->get_response();
 				if( $response->status_code !== 200 ) {
 					$remote_stream->pull( 50 );
-					throw new BlueprintException( sprintf( 'Failed to download file: %s (status code: %d, response: %s)', 
+					throw new \RuntimeException( sprintf( 'Failed to download file: %s (status code: %d, response: %s)', 
 						$url, 
 						$response->status_code, 
 						substr( $remote_stream->peek( 50 ), 0, 50 ) 
@@ -93,7 +93,7 @@ class DataReferenceResolver {
 		} elseif ( $reference instanceof ExecutionContextPath ) {
 			$path = $reference->get_path();
 			if( ! $this->blueprint_bundle_fs->exists( $path ) ) {
-				throw new BlueprintException( 'File not found: ' . $path );
+				throw new \RuntimeException( 'File not found: ' . $path );
 			}
 			if( $this->blueprint_bundle_fs->is_file( $path ) ) {
 				return new File( $this->blueprint_bundle_fs->open_read_stream( $path ), basename( $path ) );
@@ -103,7 +103,7 @@ class DataReferenceResolver {
 					basename( $path )
 				);
 			} else {
-				throw new BlueprintException( 'Path is not a file or directory: ' . $path );
+				throw new \RuntimeException( 'Path is not a file or directory: ' . $path );
 			}
 		} elseif ( $reference instanceof InlineFile ) {
 			return new File( new MemoryPipe( $reference->get_content() ), $reference->get_filename() );
