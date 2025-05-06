@@ -51,7 +51,7 @@ class InlineFile extends DataReference {
 	 * @param array $data The array data.
 	 * @return self The created instance.
 	 */
-	public static function from_array( array $data ): self {
+	public static function from_blueprint_data( array $data ): self {
 		if ( ! isset( $data['filename'] ) || ! isset( $data['content'] ) ) {
 			throw new \InvalidArgumentException( 'Invalid inline file data' );
 		}

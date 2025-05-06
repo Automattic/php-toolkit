@@ -4,17 +4,22 @@ namespace WordPress\Blueprints\Resources\Model;
 
 class DataReference {
 
-	static public function create( $reference ) {
+	static public function create( $reference, array $additional_reference_classes = [] ) {
 		$classes = array(
 			URLReference::class,
 			GitPath::class,
 			InlineDirectory::class,
 			InlineFile::class,
 			ExecutionContextPath::class,
+			...$additional_reference_classes,
 		);
 		foreach( $classes as $class ) {
 			if( $class::is_valid( $reference ) ) {
-				return new $class( $reference );
+				if (method_exists($class, 'from_blueprint_data')) {
+					return $class::from_blueprint_data($reference);
+				} else {
+					return new $class($reference);
+				}
 			}
 		}
 		throw new \InvalidArgumentException(

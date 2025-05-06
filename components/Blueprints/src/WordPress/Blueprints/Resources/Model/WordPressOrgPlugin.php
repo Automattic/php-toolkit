@@ -2,7 +2,7 @@
 
 namespace WordPress\Blueprints\Resources\Model;
 
-class WordPressOrgPlugin {
+class WordPressOrgPlugin extends DataReference {
 
 	/**
 	 * @var string The plugin slug.

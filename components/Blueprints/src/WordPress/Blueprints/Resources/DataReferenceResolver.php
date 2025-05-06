@@ -16,6 +16,8 @@ use WordPress\Blueprints\Resources\Model\InlineDirectory;
 use WordPress\Blueprints\Resources\Model\GitPath;
 use WordPress\Blueprints\Resources\Model\File;
 use WordPress\Blueprints\Resources\Model\Directory;
+use WordPress\Blueprints\Resources\Model\WordPressOrgPlugin;
+use WordPress\Blueprints\Resources\Model\WordPressOrgTheme;
 use WordPress\ByteStream\MemoryPipe;
 use WordPress\ByteStream\ReadStream\FileReadStream;
 use WordPress\ByteStream\WriteStream\FileWriteStream;
@@ -48,11 +50,11 @@ class DataReferenceResolver {
 	 * @throws \Exception If the reference type is unsupported
 	 */
 	public function resolve( DataReference $reference ): File|Directory {
-		if ( $reference instanceof WordPressPluginDirectoryReference ) {
-			$reference = new URLReference('https://downloads.wordpress.org/plugin/' . $reference->slug . '.latest-stable.zip');
+		if ( $reference instanceof WordPressOrgPlugin ) {
+			$reference = new URLReference('https://downloads.wordpress.org/plugin/' . $reference->get_slug() . '.latest-stable.zip');
 			var_dump($reference);
-		} elseif ( $reference instanceof WordPressThemeDirectoryReference ) {
-			$reference = new URLReference('https://downloads.wordpress.org/theme/' . $reference->slug . '.latest-stable.zip');
+		} elseif ( $reference instanceof WordPressOrgTheme ) {
+			$reference = new URLReference('https://downloads.wordpress.org/theme/' . $reference->get_slug() . '.latest-stable.zip');
 		}
 		
 		if ( $reference instanceof URLReference ) {
@@ -136,7 +138,7 @@ class DataReferenceResolver {
 			);
 		}
 		
-		throw new \Exception( 'Unsupported reference type' );
+		throw new \Exception( 'Unsupported reference type ' . get_class( $reference ) );
 	}
 	
 }

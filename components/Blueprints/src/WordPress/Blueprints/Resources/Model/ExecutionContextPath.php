@@ -52,10 +52,10 @@ class ExecutionContextPath extends DataReference {
 	 * exists. We're only validating that the path format is correct
 	 * according to the Blueprint specification.
 	 *
-	 * @param string $path The path to check.
+	 * @param $path The path to check.
 	 * @return bool Whether the path is valid.
 	 */
-	public static function is_valid( string $path ): bool {
-		return strpos( $path, './' ) === 0 || strpos( $path, '/' ) === 0;
+	public static function is_valid( $path ): bool {
+		return is_string($path) && (strpos( $path, './' ) === 0 || strpos( $path, '/' ) === 0);
 	}
 } 

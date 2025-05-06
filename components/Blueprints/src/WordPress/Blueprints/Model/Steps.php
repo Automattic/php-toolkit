@@ -12,6 +12,7 @@ use WordPress\Blueprints\Resources\Model\DataReference;
 use WordPress\Blueprints\Resources\Model\Directory;
 use WordPress\Blueprints\Resources\Model\File;
 use WordPress\Blueprints\Resources\Model\WordPressOrgPlugin;
+use WordPress\Blueprints\Resources\Model\WordPressOrgTheme;
 use WordPress\Blueprints\Runner\WordPressBoot\BootOptions;
 use WordPress\Blueprints\Runner\WordPressBoot\WordPressBootManager;
 use WordPress\Blueprints\Runtime\Runtime;
@@ -24,6 +25,13 @@ use WordPress\Zip\ZipFilesystem;
 
 use function WordPress\Filesystem\copy_between_filesystems;
 use function WordPress\Filesystem\pipe_stream;
+
+// Silence PHP deprecation warnings
+error_reporting(E_ALL & ~E_DEPRECATED & ~E_USER_DEPRECATED);
+
+// Initialize runtime for the given document root
+require_once __DIR__ . '/../../../../vendor/autoload.php';
+require_once __DIR__ . '/../../../../../../vendor/autoload.php';
 
 // --- Enums / Helper Data Objects ---
 
@@ -466,9 +474,9 @@ class ImportThemeStarterContentStep {
  */
 class InstallPluginStep {
     /**
-     * Plugin source identifier (slug, slug@version, URL, ./path, /path).
+     * Plugin source reference.
      */
-    private string $source;
+    private DataReference $source;
 
     /**
      * Whether to activate the plugin after installation. Defaults to true.
@@ -487,13 +495,13 @@ class InstallPluginStep {
     private PluginErrorBehavior $onError;
 
     /**
-     * @param string $source            Plugin source identifier.
+     * @param DataReference $source            Plugin source reference.
      * @param bool $active              Activate after install?
      * @param array<string, mixed>|null $activationOptions Optional activation data.
      * @param PluginErrorBehavior $onError           Error handling behavior.
      */
     public function __construct(
-        string $source,
+        DataReference $source,
         bool $active = true,
         ?array $activationOptions = null,
         PluginErrorBehavior $onError = PluginErrorBehavior::THROW_ERROR
@@ -504,11 +512,11 @@ class InstallPluginStep {
         $this->onError = $onError;
     }
 
-    public function getSource(): string {
+    public function getSource(): DataReference {
         return $this->source;
     }
 
-    public function setSource(string $source): void {
+    public function setSource(DataReference $source): void {
         $this->source = $source;
     }
 
@@ -545,15 +553,11 @@ class InstallPluginStep {
 
 class InstallPluginStepRunner {
 	public function run(object $step, Runtime $runtime, Tracker $tracker): mixed {
-		$tracker->setCaption('Installing plugin ' . $step->getSource());
+		$tracker->setCaption('Installing plugin');
 
 		$fs = $runtime->getTargetFilesystem();
 		FilesystemHelpers::withTemporaryDirectory($fs, function($temp_dir) use ($fs, $runtime, $step, $tracker) {
-			// Create data reference for the plugin source
-			$source = $step->getSource();
-			$dataRef = DataReference::create($source);
-
-			$plugin_data = $runtime->resolveDataReference($dataRef);
+			$plugin_data = $runtime->resolveDataReference($step->getSource());
 
 			if ($plugin_data instanceof Directory) {
 				$zip_path = $temp_dir . '/' . $plugin_data->dirname . '.zip';
@@ -580,7 +584,7 @@ class InstallPluginStepRunner {
 			}
 			$zip_stream->close_writing();
 
-			$tracker->set(50, 'Installing plugin ' . $step->getSource());
+			$tracker->set(50, 'Installing plugin');
 
 			$runtime->evalPhpInSubProcess(
 				file_get_contents(__DIR__ . '/InstallPlugin/wp_install_plugin.php'),
@@ -590,7 +594,7 @@ class InstallPluginStepRunner {
 			$relative_path = $fs->get_contents($temp_dir . '/plugin_path.txt');
 
 			if ($step->isActive()) {
-				$tracker->set(75, 'Activating plugin ' . $step->getSource());
+				$tracker->set(75, 'Activating plugin');
 				$runtime->evalPhpInSubProcess(
 					file_get_contents(__DIR__ . '/ActivatePlugin/wp_activate_plugin.php'),
 					['PLUGIN_PATH' => $relative_path]
@@ -611,7 +615,7 @@ class InstallThemeStep {
     /**
      * Theme source identifier (slug, slug@version, URL, ./path, /path).
      */
-    private string $source;
+    private DataReference $source;
 
     /**
      * Whether to activate the theme after installing it. Defaults to false.
@@ -629,13 +633,13 @@ class InstallThemeStep {
     private ?string $targetFolderName;
 
     /**
-     * @param string      $source              Theme source identifier.
+     * @param DataReference      $source              Theme source identifier.
      * @param bool        $activate            Activate after install?
      * @param bool        $importStarterContent Import starter content?
      * @param string|null $targetFolderName    Optional target folder name.
      */
     public function __construct(
-        string $source,
+        DataReference $source,
         bool $activate = false,
         bool $importStarterContent = false,
         ?string $targetFolderName = null
@@ -646,11 +650,11 @@ class InstallThemeStep {
         $this->targetFolderName = $targetFolderName;
     }
 
-    public function getSource(): string {
+    public function getSource(): DataReference {
         return $this->source;
     }
 
-    public function setSource(string $source): void {
+    public function setSource(DataReference $source): void {
         $this->source = $source;
     }
 
@@ -1070,26 +1074,25 @@ class RunPHPStepRunner implements StepRunnerInterface {
 
 /**
  * Represents the 'runSql' step.
- * Simplified: assumes DataReference is resolved to a file path or URL string.
  */
 class RunSqlStep {
     /**
-     * Path or URL to the SQL file.
+     * SQL source identifier (URL, ./path, /path).
      */
-    private string $source;
+    private DataReference $source;
 
     /**
-     * @param string $source Path or URL to the SQL file.
+     * @param DataReference $source SQL source identifier.
      */
-    public function __construct(string $source) {
+    public function __construct(DataReference $source) {
         $this->source = $source;
     }
 
-    public function getSource(): string {
+    public function getSource(): DataReference {
         return $this->source;
     }
 
-    public function setSource(string $source): void {
+    public function setSource(DataReference $source): void {
         $this->source = $source;
     }
 }
@@ -1098,11 +1101,9 @@ class RunSQLStepRunner implements StepRunnerInterface {
 	public function run(object $step, Runtime $runtime, Tracker $tracker): mixed {
 		$tracker->setCaption('Running SQL queries');
 
-		// Create data reference for the SQL file
+		// Get the data reference for the SQL file
 		$source = $step->getSource();
-		$dataRef = DataReference::create($source);
-
-		$sql = $runtime->resolveDataReference($dataRef);
+		$sql = $runtime->resolveDataReference($source);
 
 		if (!$sql instanceof File) {
 			throw new \InvalidArgumentException('The provided resource is not a file.');
@@ -1208,33 +1209,32 @@ class SetSiteOptionsStepRunner implements StepRunnerInterface {
 
 /**
  * Represents the 'unzip' step.
- * Simplified: assumes zipFile reference is resolved to a file path or URL string.
  */
 class UnzipStep {
     /**
-     * Path or URL to the zip file.
+     * Zip file source identifier (URL, ./path, /path).
      */
-    private string $zipFile;
+    private DataReference $zipFile;
 
     /**
-     * The path to extract the contents to.
+     * The path to extract the zip file to.
      */
     private string $extractToPath;
 
     /**
-     * @param string $zipFile       Path or URL to the zip file.
-     * @param string $extractToPath Destination path for extraction.
+     * @param DataReference $zipFile Zip file source identifier.
+     * @param string $extractToPath The path to extract the zip file to.
      */
-    public function __construct(string $zipFile, string $extractToPath) {
+    public function __construct(DataReference $zipFile, string $extractToPath) {
         $this->zipFile = $zipFile;
         $this->extractToPath = $extractToPath;
     }
 
-    public function getZipFile(): string {
+    public function getZipFile(): DataReference {
         return $this->zipFile;
     }
 
-    public function setZipFile(string $zipFile): void {
+    public function setZipFile(DataReference $zipFile): void {
         $this->zipFile = $zipFile;
     }
 
@@ -1253,11 +1253,9 @@ class UnzipStepRunner implements StepRunnerInterface {
 
 		$target_fs = $runtime->getTargetFilesystem();
 
-		// Create data reference for the zip file
+		// Get the data reference for the zip file
 		$zipFile = $step->getZipFile();
-		$dataRef = DataReference::create($zipFile);
-
-		$zip_stream = $runtime->resolveDataReference($dataRef);
+		$zip_stream = $runtime->resolveDataReference($zipFile);
 
 		if (!$zip_stream instanceof File) {
 			throw new \InvalidArgumentException('The provided resource is not a zip file.');
@@ -1330,31 +1328,30 @@ class WPCLIStepRunner implements StepRunnerInterface {
 
 /**
  * Represents the 'writeFiles' step.
- * Simplified: assumes DataReference values are resolved to actual string content.
  */
 class WriteFilesStep {
     /**
-     * An associative array where keys are file paths and values are their string contents.
-     * @var array<string, string>
+     * An associative array where keys are file paths and values are their contents.
+     * @var array<string, string|DataReference>
      */
     private array $files;
 
     /**
-     * @param array<string, string> $files Files to write (path => content).
+     * @param array<string, string|DataReference> $files Files to write (path => content).
      */
     public function __construct(array $files) {
         $this->files = $files;
     }
 
     /**
-     * @return array<string, string>
+     * @return array<string, string|DataReference>
      */
     public function getFiles(): array {
         return $this->files;
     }
 
     /**
-     * @param array<string, string> $files
+     * @param array<string, string|DataReference> $files
      */
     public function setFiles(array $files): void {
         $this->files = $files;
@@ -1386,11 +1383,8 @@ class WriteFilesStepRunner {
 			// Handle the data which can be a string or a DataReference
 			if (is_string($data)) {
 				$content = $data;
-			} else if(is_array($data)) {
-				$data_ref = $data['source'] instanceof DataReference ?
-					$data['source'] :
-					DataReference::create($data['source']);
-				$data_stream = $runtime->resolveDataReference($data_ref);
+			} else {
+				$data_stream = $runtime->resolveDataReference($data);
 				$content = $data_stream->stream->consume_all();
 			}
 
@@ -1683,17 +1677,24 @@ class Blueprint
             case 'installPlugin':
                 $pluginDef = $data['plugin'];
                 if (is_string($pluginDef)) {
-                    return new InstallPluginStep(new WordPressOrgPlugin($pluginDef));
+                    return new InstallPluginStep(DataReference::create($pluginDef, [
+						WordPressOrgPlugin::class,
+					]));
                 } else {
-                    $source = $pluginDef['source'];
+                    $source = DataReference::create($pluginDef['source'], [
+						WordPressOrgPlugin::class,
+					]);
                     $active = $pluginDef['active'] ?? true;
                     $options = $pluginDef['activationOptions'] ?? null;
                     $onError = isset($pluginDef['onError']) ? PluginErrorBehavior::from($pluginDef['onError']) : PluginErrorBehavior::THROW_ERROR;
                     return new InstallPluginStep($source, $active, $options, $onError);
                 }
             case 'installTheme':
+                $source = DataReference::create($data['source'], [
+					WordPressOrgTheme::class,
+				]);
                 return new InstallThemeStep(
-                    $data['source'],
+                    $source,
                     $data['activate'] ?? false,
                     $data['importStarterContent'] ?? false,
                     $data['targetFolderName'] ?? null
@@ -1720,17 +1721,13 @@ class Blueprint
                     $data['$_SERVER'] ?? null
                 );
             case 'runSql':
-                return new RunSqlStep($data['source']);
+                $source = $data['source'] instanceof DataReference ? $data['source'] : DataReference::create($data['source']);
+                return new RunSqlStep($source);
             case 'setSiteLanguage':
                 return new SetSiteLanguageStep($data['language']);
             case 'setSiteOptions':
                 return new SetSiteOptionsStep($data['options']);
-            case 'unzip':
-                return new UnzipStep($data['zipFile'], $data['extractToPath']);
-            case 'wp-cli':
-                return new WPCLIStep($data['command'], $data['wpCliPath'] ?? null);
-            case 'writeFiles':
-                return new WriteFilesStep($data['files']);
+
             case 'createRoles':
                 if (empty($data['roles']) || !is_array($data['roles'])) {
                     throw new InvalidArgumentException('Invalid roles data: must be a non-empty array.');
@@ -1955,18 +1952,21 @@ PHP;
                     $data['env'] ?? null,
                     $data['$_SERVER'] ?? null
                 );
-            case 'runSql':
-                return new RunSqlStep($data['source']);
-            case 'setSiteLanguage':
-                return new SetSiteLanguageStep($data['language']);
-            case 'setSiteOptions':
-                return new SetSiteOptionsStep($data['options']);
             case 'unzip':
-                return new UnzipStep($data['zipFile'], $data['extractToPath']);
+                $zipFile = $data['zipFile'] instanceof DataReference ? $data['zipFile'] : DataReference::create($data['zipFile']);
+                return new UnzipStep($zipFile, $data['extractToPath']);
             case 'wp-cli':
                 return new WPCLIStep($data['command'], $data['wpCliPath'] ?? null);
             case 'writeFiles':
-                return new WriteFilesStep($data['files']);
+                $files = [];
+                foreach ($data['files'] as $path => $content) {
+                    if (is_string($content)) {
+                        $files[$path] = $content;
+                    } else {
+                        $files[$path] = $content instanceof DataReference ? $content : DataReference::create($content);
+                    }
+                }
+                return new WriteFilesStep($files);
             default:
                 throw new InvalidArgumentException("Unknown step type: {$stepType}");
         }
@@ -2425,116 +2425,116 @@ class BlueprintRunner {
 }
 
 
-$complex_blueprint = Blueprint::fromValidatedArray(json_decode(<<<'JSON'
-{
-  "version": 2,
-  "$schema": "https://raw.githubusercontent.com/WordPress/blueprints/trunk/blueprints/schema.json",
-  "blueprintMeta": {
-    "name": "Full Featured Blueprint",
-    "description": "A blueprint demonstrating most of the available features",
-    "version": "1.0.0",
-    "authors": ["Test Author", "Another Author"],
-    "authorUrl": "https://example.com",
-    "donateLink": "https://example.com/donate",
-    "tags": ["test", "full-features", "demo"],
-    "license": "GPL-2.0"
-  },
-  "siteLanguage": "en_US",
-  "siteOptions": {
-    "blogname": "Full Featured Test Site",
-    "timezone_string": "America/New_York",
-    "permalink_structure": "/%postname%/"
-  },
-  "constants": {
-    "WP_DEBUG": true,
-    "WP_DEBUG_LOG": true,
-    "WP_DEBUG_DISPLAY": false,
-    "SCRIPT_DEBUG": true,
-    "CUSTOM_CONSTANT": "custom-value"
-  },
-  "wordpressVersion": "6.4",
-  "phpVersion": "8.0",
-  "activeTheme": "twentytwentythree",
-  "themes": [
-    "twentytwentyfour"
-  ],
-  "plugins": [
-    "akismet",
-    {
-      "source": "woocommerce",
-      "active": true,
-      "activationOptions": {
-        "option1": "value1"
-      }
-    }
-  ],
-  "postTypes": {
-    "book": {
-      "label": "Books",
-      "description": "Books post type",
-      "public": true,
-      "has_archive": true,
-      "show_in_rest": true,
-      "supports": ["title", "editor", "author", "thumbnail", "excerpt", "comments"]
-    }
-  },
-  "content": [
-    {
-      "type": "posts",
-      "source": [
-        {
-          "post_title": "Sample Post",
-          "post_content": "This is a sample post content.",
-          "post_status": "publish",
-          "post_type": "post"
-        },
-        {
-          "post_title": "Sample Page",
-          "post_content": "This is a sample page content.",
-          "post_status": "publish",
-          "post_type": "page"
-        }
-      ]
-    }
-  ],
-  "users": [
-    {
-      "username": "editor",
-      "email": "editor@example.com",
-      "role": "editor",
-      "meta": {
-        "first_name": "Test",
-        "last_name": "Editor"
-      }
-    }
-  ],
-  "roles": [
-    {
-      "name": "book_editor",
-      "capabilities": {
-        "read": "true",
-        "edit_books": "true",
-        "publish_books": "true"
-      }
-    }
-  ],
-  "additionalStepsAfterExecution": [
-    {
-      "step": "writeFiles",
-      "files": [
-        {
-          "path": "wp-content/uploads/custom-file.txt",
-          "content": "This is a custom file created by the Blueprint."
-        }
-      ]
-    },
-    {
-      "step": "runPHP",
-      "code": "echo 'Blueprint execution completed!';"
-    }
-  ]
-} 
-JSON, true, 512, JSON_THROW_ON_ERROR));
+// $complex_blueprint = Blueprint::fromValidatedArray(json_decode(<<<'JSON'
+// {
+//   "version": 2,
+//   "$schema": "https://raw.githubusercontent.com/WordPress/blueprints/trunk/blueprints/schema.json",
+//   "blueprintMeta": {
+//     "name": "Full Featured Blueprint",
+//     "description": "A blueprint demonstrating most of the available features",
+//     "version": "1.0.0",
+//     "authors": ["Test Author", "Another Author"],
+//     "authorUrl": "https://example.com",
+//     "donateLink": "https://example.com/donate",
+//     "tags": ["test", "full-features", "demo"],
+//     "license": "GPL-2.0"
+//   },
+//   "siteLanguage": "en_US",
+//   "siteOptions": {
+//     "blogname": "Full Featured Test Site",
+//     "timezone_string": "America/New_York",
+//     "permalink_structure": "/%postname%/"
+//   },
+//   "constants": {
+//     "WP_DEBUG": true,
+//     "WP_DEBUG_LOG": true,
+//     "WP_DEBUG_DISPLAY": false,
+//     "SCRIPT_DEBUG": true,
+//     "CUSTOM_CONSTANT": "custom-value"
+//   },
+//   "wordpressVersion": "6.4",
+//   "phpVersion": "8.0",
+//   "activeTheme": "twentytwentythree",
+//   "themes": [
+//     "twentytwentyfour"
+//   ],
+//   "plugins": [
+//     "akismet",
+//     {
+//       "source": "woocommerce",
+//       "active": true,
+//       "activationOptions": {
+//         "option1": "value1"
+//       }
+//     }
+//   ],
+//   "postTypes": {
+//     "book": {
+//       "label": "Books",
+//       "description": "Books post type",
+//       "public": true,
+//       "has_archive": true,
+//       "show_in_rest": true,
+//       "supports": ["title", "editor", "author", "thumbnail", "excerpt", "comments"]
+//     }
+//   },
+//   "content": [
+//     {
+//       "type": "posts",
+//       "source": [
+//         {
+//           "post_title": "Sample Post",
+//           "post_content": "This is a sample post content.",
+//           "post_status": "publish",
+//           "post_type": "post"
+//         },
+//         {
+//           "post_title": "Sample Page",
+//           "post_content": "This is a sample page content.",
+//           "post_status": "publish",
+//           "post_type": "page"
+//         }
+//       ]
+//     }
+//   ],
+//   "users": [
+//     {
+//       "username": "editor",
+//       "email": "editor@example.com",
+//       "role": "editor",
+//       "meta": {
+//         "first_name": "Test",
+//         "last_name": "Editor"
+//       }
+//     }
+//   ],
+//   "roles": [
+//     {
+//       "name": "book_editor",
+//       "capabilities": {
+//         "read": "true",
+//         "edit_books": "true",
+//         "publish_books": "true"
+//       }
+//     }
+//   ],
+//   "additionalStepsAfterExecution": [
+//     {
+//       "step": "writeFiles",
+//       "files": [
+//         {
+//           "path": "wp-content/uploads/custom-file.txt",
+//           "content": "This is a custom file created by the Blueprint."
+//         }
+//       ]
+//     },
+//     {
+//       "step": "runPHP",
+//       "code": "echo 'Blueprint execution completed!';"
+//     }
+//   ]
+// } 
+// JSON, true, 512, JSON_THROW_ON_ERROR));
 
 $simple_blueprint = <<<'JSON'
 {
@@ -2567,22 +2567,17 @@ $simple_blueprint = <<<'JSON'
     {
       "step": "writeFiles",
       "files": {
-        "wp-content/uploads/custom-file.txt": "This is a custom file created by the Blueprint.",
-        "builder.php": {
-			"source": "./test_file.txt"
-		}
+        "wp-content/uploads/custom-file.txt": {
+		    "filename": "custom-file.txt",
+		    "content": "This is a custom file created by the Blueprint."
+		},
+        "builder.php": "./test_file.txt"
       }
     }
   ]
 } 
 JSON;
 
-// Silence PHP deprecation warnings
-error_reporting(E_ALL & ~E_DEPRECATED & ~E_USER_DEPRECATED);
-
-// Initialize runtime for the given document root
-require_once __DIR__ . '/../../../../vendor/autoload.php';
-require_once __DIR__ . '/../../../../../../vendor/autoload.php';
 $runtime = new Runtime(__DIR__ . '/test_blueprint_runner', __DIR__);
 
 $runnerConfiguration = RunnerConfiguration::create()

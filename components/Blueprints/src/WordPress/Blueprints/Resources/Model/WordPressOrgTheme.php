@@ -2,7 +2,7 @@
 
 namespace WordPress\Blueprints\Resources\Model;
 
-class WordPressOrgTheme {
+class WordPressOrgTheme extends DataReference {
 
 	/**
 	 * @var string The theme slug.
