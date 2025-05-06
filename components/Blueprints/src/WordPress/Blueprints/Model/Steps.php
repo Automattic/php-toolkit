@@ -1224,37 +1224,59 @@ class WriteFilesStep {
     }
 }
 
-class WriteFileStepRunner extends BaseStepRunner {
+class WriteFilesStepRunner extends BaseStepRunner {
 	public function run(
-		WriteFileStep $input,
+		WriteFilesStep $input,
 		?Tracker      $progress_tracker = null
 	) {
 		if ($progress_tracker) {
-			$progress_tracker->set(10, 'Writing file...');
+			$progress_tracker->set(10, 'Writing files...');
 		}
+		
 		$target_fs = $this->getRuntime()->getTargetFilesystem();
-		$path = $input->path;
-		$dir = dirname($path);
-		if ($dir && $dir !== '/' && $dir !== '.') {
-			$target_fs->mkdir($dir, [ 'recursive' => true ]);
-		}
-		if (is_string($input->data)) {
-			$target_fs->put_contents($path, $input->data);
-		} else {
-			$data_ref = $input->data instanceof \WordPress\Blueprints\Resources\Model\DataReference ?
-				$input->data :
-				\WordPress\Blueprints\Resources\Model\DataReference::create($input->data);
-			$data_stream = $this->getRuntime()->resolveDataReference($data_ref);
-			if (!$data_stream instanceof \WordPress\Blueprints\Resources\Model\File) {
-				throw new \InvalidArgumentException('The provided resource is not a valid file.');
+		$files = $input->getFiles();
+		$total_files = count($files);
+		$files_written = 0;
+		
+		foreach ($files as $path => $data) {
+			if ($progress_tracker) {
+				$progress_value = 10 + (($files_written / $total_files) * 80);
+				$progress_tracker->set((int)$progress_value, "Writing file {$files_written}/{$total_files}: {$path}");
 			}
-			$target_fs->put_contents($path, $data_stream->stream->consume_all());
+			
+			// Create directory if it doesn't exist
+			$dir = dirname($path);
+			if ($dir && $dir !== '/' && $dir !== '.') {
+				$target_fs->mkdir($dir, [ 'recursive' => true ]);
+			}
+			
+			// Handle the data which can be a string or a DataReference
+			if (is_string($data)) {
+				$target_fs->put_contents($path, $data);
+			} else {
+				$data_ref = $data instanceof \WordPress\Blueprints\Resources\Model\DataReference ?
+					$data :
+					\WordPress\Blueprints\Resources\Model\DataReference::create($data);
+				$data_stream = $this->getRuntime()->resolveDataReference($data_ref);
+				if (!$data_stream instanceof \WordPress\Blueprints\Resources\Model\File) {
+					throw new \InvalidArgumentException("The provided resource for '{$path}' is not a valid file.");
+				}
+				$target_fs->put_contents($path, $data_stream->stream->consume_all());
+			}
+			
+			$files_written++;
 		}
+		
 		if ($progress_tracker) {
-			$progress_tracker->set(100, 'File written successfully.');
+			$progress_tracker->set(100, "All {$total_files} files written successfully.");
 		}
 	}
-	public function getDefaultCaption($input) { return 'Writing file ' . $input->path; }
+	
+	public function getDefaultCaption($input) { 
+		$files = $input->getFiles();
+		$count = count($files);
+		return "Writing {$count} " . ($count === 1 ? 'file' : 'files');
+	}
 }
 
 
@@ -1861,6 +1883,78 @@ PHP;
     {
         return $this->metadata;
     }
+}
+
+class BlueprintRunner {
+    private Blueprint $blueprint;
+    private array $steps;
+    private array $stepRunners;
+    
+    public function __construct(Blueprint $blueprint) {
+        $this->blueprint = $blueprint;
+        $this->steps = $blueprint->getExecutionPlan();
+        $this->stepRunners = [];
+    }
+
+	public function run() {
+		foreach ($this->steps as $step) {
+			$this->stepRunners[$step->getType()] = $step->getRunner();
+		}
+	}
+
+	private function createStepRunner($step) {
+		if ($step instanceof ActivatePluginStep) {
+			return new ActivatePluginStepRunner();
+		}
+		if ($step instanceof ActivateThemeStep) {
+			return new ActivateThemeStepRunner();
+		}
+		if ($step instanceof CpStep) {
+			return new CpStepRunner();
+		}
+		if ($step instanceof DefineConstantsStep) {
+			return new DefineConstantsStepRunner();
+		}
+		if ($step instanceof InstallPluginStep) {
+			return new InstallPluginStepRunner();
+		}
+		if ($step instanceof InstallThemeStep) {
+			return new InstallThemeStepRunner();
+		}
+		if ($step instanceof MkdirStep) {
+			return new MkdirStepRunner();
+		}
+		if ($step instanceof MvStep) {
+			return new MvStepRunner();
+		}
+		if ($step instanceof RmStep) {
+			return new RmStepRunner();
+		}
+		if ($step instanceof RmDirStep) {
+			return new RmDirStepRunner();
+		}
+		if ($step instanceof RunPHPStep) {
+			return new RunPHPStepRunner();
+		}
+		if ($step instanceof RunSqlStep) {
+			return new RunSqlStepRunner();
+		}
+		if ($step instanceof SetSiteOptionsStep) {
+			return new SetSiteOptionsStepRunner();
+		}
+		if ($step instanceof UnzipStep) {
+			return new UnzipStepRunner();
+		}
+		if ($step instanceof WPCLIStep) {
+			return new WPCLIStepRunner();
+		}
+		if ($step instanceof WriteFilesStep) {
+			return new WriteFilesStepRunner();
+		}
+		
+		throw new \InvalidArgumentException('Unknown step type: ' . get_class($step));
+	}
+    
 }
 
 
