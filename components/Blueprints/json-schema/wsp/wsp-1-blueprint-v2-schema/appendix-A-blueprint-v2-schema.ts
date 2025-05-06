@@ -1480,11 +1480,6 @@ type Step =
 			wpCliPath?: string;
 	  }
 	| {
-			step: 'writeFile';
-			path: string;
-			content: DataReference;
-	  }
-	| {
 			step: 'writeFiles';
 			files: Record<string, DataReference>;
 	  };

@@ -41,7 +41,7 @@ class FilesystemHelpers {
 	 * @return mixed               The return value of the callback function.
 	 * @throws FilesystemException If the temporary file cannot be created or cleaned up.
 	 */
-	public static function withTemporaryFile( ?Filesystem $fs = null, callable $callback, string $prefix = 'tmp_', ?string $dir = null ): mixed {
+	public static function withTemporaryFile( ?Filesystem $fs = null, callable $callback, ?string $prefix = 'tmp_', ?string $dir = null ): mixed {
 		if ( null === $fs ) {
 			$fs = LocalFilesystem::create();
 		}
@@ -68,7 +68,7 @@ class FilesystemHelpers {
 	 * @return string            The path to the created temporary file.
 	 * @throws FilesystemException If the temporary file cannot be created.
 	 */
-	public static function createTemporaryFile( ?Filesystem $fs = null, string $prefix = 'tmp_', ?string $dir = null ): string {
+	public static function createTemporaryFile( ?Filesystem $fs = null, ?string $prefix = 'tmp_', ?string $dir = null ): string {
 		list( $fs, $dir ) = self::resolveFsAndTempDir( $fs, $dir );
 
 		// Create temporary directory if it doesn't exist
@@ -95,7 +95,7 @@ class FilesystemHelpers {
 	 * @return mixed               The return value of the callback function.
 	 * @throws FilesystemException If the temporary directory cannot be created or cleaned up.
 	 */
-	public static function withTemporaryDirectory( ?Filesystem $fs = null, callable $callback, string $prefix = 'tmp_', ?string $dir = null ): mixed {
+	public static function withTemporaryDirectory( ?Filesystem $fs = null, callable $callback, ?string $prefix = 'tmp_', ?string $dir = null ): mixed {
 		list( $fs, $dir ) = self::resolveFsAndTempDir( $fs, $dir );
 
 		// Create parent directory if it doesn't exist

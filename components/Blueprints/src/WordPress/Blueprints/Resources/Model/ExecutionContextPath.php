@@ -45,18 +45,17 @@ class ExecutionContextPath extends DataReference {
 		// Remove leading / if present
 		return ltrim( $path, '/' );
 	}
-
 	/**
-	 * Every string is a valid context–relative path.
-	 * Most strings are so, for now, we're always returning true.
+	 * Checks if a string is a valid context-relative path.
+	 * A valid path must start with either '/' or './'.
 	 * At this stage, we're not yet concerned whether the file actually
-	 * exists. We're only saying "this seems like a local path, let's try
-	 * using it as one".
+	 * exists. We're only validating that the path format is correct
+	 * according to the Blueprint specification.
 	 *
 	 * @param string $path The path to check.
 	 * @return bool Whether the path is valid.
 	 */
-	public static function is_valid(): bool {
-		return true;
+	public static function is_valid( string $path ): bool {
+		return strpos( $path, './' ) === 0 || strpos( $path, '/' ) === 0;
 	}
 } 

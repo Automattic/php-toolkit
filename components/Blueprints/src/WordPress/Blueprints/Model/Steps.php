@@ -2,9 +2,25 @@
 
 namespace WordPress\Blueprints\Model;
 
+use Exception;
 use InvalidArgumentException; // Standard PHP exception
 use JsonException; // Standard PHP exception
+use WordPress\Blueprints\BlueprintException;
 use WordPress\Blueprints\BlueprintV2Validator;
+use WordPress\Blueprints\Progress\Tracker;
+use WordPress\Blueprints\Resources\Model\DataReference;
+use WordPress\Blueprints\Resources\Model\Directory;
+use WordPress\Blueprints\Resources\Model\File;
+use WordPress\Blueprints\Runtime\Runtime;
+use WordPress\Filesystem\FilesystemException;
+use WordPress\Filesystem\FilesystemHelpers;
+use WordPress\Zip\FileEntry;
+use WordPress\Zip\ZipDecoder;
+use WordPress\Zip\ZipEncoder;
+use WordPress\Zip\ZipFilesystem;
+
+use function WordPress\Filesystem\copy_between_filesystems;
+use function WordPress\Filesystem\pipe_stream;
 
 // --- Enums / Helper Data Objects ---
 
@@ -82,12 +98,12 @@ class VersionConstraint {
         if (is_array($constraint)) {
             $minVersion = $constraint['minVersion'] ?? $constraint['min'] ?? $defaultVersion;
             $maxVersion = $constraint['maxVersion'] ?? $constraint['max'] ?? null;
-            
+
             // For WP: preferredVersion in schema, for PHP: recommendedVersion
-            $recommendedVersion = $constraint['recommendedVersion'] ?? 
-                                 $constraint['preferredVersion'] ?? 
-                                 $constraint['recommended'] ?? 
-                                 $constraint['preferred'] ?? 
+            $recommendedVersion = $constraint['recommendedVersion'] ??
+                                 $constraint['preferredVersion'] ??
+                                 $constraint['recommended'] ??
+                                 $constraint['preferred'] ??
                                  $minVersion;
 
             return new self($minVersion, $maxVersion, $recommendedVersion);
@@ -203,19 +219,15 @@ class BlueprintMetadata {
 
 // StepRunnerInterface
 interface StepRunnerInterface {
-	public function setResourceManager( $map );
-	public function setRuntime( $runtime );
-}
-
-// BaseStepRunner
-abstract class BaseStepRunner implements StepRunnerInterface {
-	protected $resourceManager;
-	protected $runtime;
-	public function setResourceManager( $map ) { $this->resourceManager = $map; }
-	protected function getResource( $declaration ) { return $this->resourceManager->getStream( $declaration ); }
-	public function setRuntime( $runtime ) { $this->runtime = $runtime; }
-	protected function getRuntime() { return $this->runtime; }
-	public function getDefaultCaption( $input ) { return null; }
+	/**
+	 * Runs the step with the given parameters.
+	 *
+	 * @param object $step The step object with configuration
+	 * @param Runtime $runtime The runtime providing environment access
+	 * @param Tracker $tracker The tracker for reporting progress
+	 * @return mixed The result of running the step
+	 */
+	public function run(object $step, Runtime $runtime, Tracker $tracker);
 }
 
 // --- Step Classes ---
@@ -247,17 +259,24 @@ class ActivatePluginStep {
 }
 
 // ActivatePluginStepRunner
-class ActivatePluginStepRunner extends BaseStepRunner {
-	function run( $input, $tracker ) {
-		( $nullsafeVariable1 = $tracker ) ? $nullsafeVariable1->setCaption( $input->progress->caption ?? 'Activating plugin ' . $input->slug ) : null;
-		return $this->getRuntime()->evalPhpInSubProcess(
-			file_get_contents( __DIR__ . '/ActivatePlugin/wp_activate_plugin.php' ),
+class ActivatePluginStepRunner {
+	/**
+	 * Runs the activatePlugin step.
+	 *
+	 * @param ActivatePluginStep $step The activatePlugin step configuration
+	 * @param Runtime $runtime The runtime providing environment access
+	 * @param Tracker $tracker The tracker for reporting progress
+	 * @return mixed The result of running the step
+	 */
+	public function run(ActivatePluginStep $step, Runtime $runtime, Tracker $tracker): mixed {
+		$tracker->setCaption('Activating plugin ' . ($step->getPluginPath() ?? ''));
+		return $runtime->evalPhpInSubProcess(
+			file_get_contents(__DIR__ . '/ActivatePlugin/wp_activate_plugin.php'),
 			[
-				'PLUGIN_PATH' => $input->pluginPath,
+				'PLUGIN_PATH' => $step->getPluginPath(),
 			]
 		);
 	}
-	public function getDefaultCaption( $input ) { return 'Activating plugin'; }
 }
 
 
@@ -287,14 +306,13 @@ class ActivateThemeStep {
 }
 
 // ActivateThemeStepRunner
-class ActivateThemeStepRunner extends BaseStepRunner {
-	public static function getStepClass(): string { return ActivateThemeStep::class; }
-	public function getDefaultCaption( $input ) { return 'Activating theme ' . $input->slug; }
-	public function run( $input, $tracker ) {
-		return $this->getRuntime()->evalPhpInSubProcess(
-			file_get_contents( __DIR__ . '/ActivateTheme/wp_activate_theme.php' ),
+class ActivateThemeStepRunner {
+	public function run(object $step, Runtime $runtime, Tracker $tracker): mixed {
+		$tracker->setCaption('Activating theme ' . $step->getThemeFolderName());
+		return $runtime->evalPhpInSubProcess(
+			file_get_contents(__DIR__ . '/ActivateTheme/wp_activate_theme.php'),
 			[
-				'THEME_FOLDER_NAME' => $input->themeFolderName,
+				'THEME_FOLDER_NAME' => $step->getThemeFolderName(),
 			]
 		);
 	}
@@ -334,9 +352,22 @@ class CpStep {
 }
 
 // CpStepRunner
-class CpStepRunner extends BaseStepRunner {
-	function run( $input ) {
-		$this->getRuntime()->getTargetFilesystem()->copy( $input->fromPath, $input->toPath, [ 'recursive' => $input->recursive, ] );
+class CpStepRunner {
+	/**
+	 * Runs the cp step.
+	 *
+	 * @param CpStep $step The cp step configuration
+	 * @param Runtime $runtime The runtime providing environment access
+	 * @param Tracker $tracker The tracker for reporting progress
+	 * @return mixed The result of running the step
+	 */
+	public function run(CpStep $step, Runtime $runtime, Tracker $tracker): mixed {
+		$tracker->setCaption('Copying from ' . $step->getFromPath() . ' to ' . $step->getToPath());
+		return $runtime->getTargetFilesystem()->copy(
+			$step->getFromPath(),
+			$step->getToPath(),
+			[ 'recursive' => true ]
+		);
 	}
 }
 
@@ -372,11 +403,20 @@ class DefineConstantsStep {
     }
 }
 
-// DefineWpConfigConstsStepRunner
-class DefineConstantsStepRunner extends BaseStepRunner {
-	function run( $input ) {
-		$functions = file_get_contents( __DIR__ . '/DefineWpConfigConsts/functions.php' );
-		return $this->getRuntime()->evalPhpInSubProcess(
+// DefineConstantsStepRunner
+class DefineConstantsStepRunner {
+	/**
+	 * Runs the defineConstants step.
+	 *
+	 * @param DefineConstantsStep $step The defineConstants step configuration
+	 * @param Runtime $runtime The runtime providing environment access
+	 * @param Tracker $tracker The tracker for reporting progress
+	 * @return mixed The result of running the step
+	 */
+	public function run(DefineConstantsStep $step, Runtime $runtime, Tracker $tracker): mixed {
+		$tracker->setCaption('Defining wp-config constants');
+		$functions = file_get_contents(__DIR__ . '/DefineWpConfigConsts/functions.php');
+		return $runtime->evalPhpInSubProcess(
 			"$functions ?>" . '<?php
     $wp_config_path = getenv("DOCROOT") . "/wp-config.php";
     if (!file_exists($wp_config_path)) { error_log("Blueprint Error: wp-config.php file not found at " . $wp_config_path); exit(1); }
@@ -386,10 +426,9 @@ class DefineConstantsStepRunner extends BaseStepRunner {
 	$new_wp_config = rewrite_wp_config_to_define_constants($wp_config, $consts);
 	file_put_contents($wp_config_path, $new_wp_config);
 ',
-			array('CONSTS' => json_encode( $input->consts ),)
+			array('CONSTS' => json_encode($step->getConstants()))
 		);
 	}
-	public function getDefaultCaption( $input ) { return 'Defining wp-config constants'; }
 }
 
 /**
@@ -500,49 +539,66 @@ class InstallPluginStep {
         $this->onError = $onError;
     }
 }
-class InstallPluginStepRunner extends BaseStepRunner {
-	function run( $input, $tracker ) {
-		$fs = $this->getRuntime()->getTargetFilesystem();
-		\WordPress\Filesystem\FilesystemHelpers::withTemporaryDirectory($fs, function($temp_dir) use ($fs, $input) {
-			$plugin_data = $this->getRuntime()->resolveDataReference( $input->pluginData );
-			if ( $plugin_data instanceof \WordPress\Blueprints\Resources\Model\Directory ) {
+
+class InstallPluginStepRunner {
+	public function run(object $step, Runtime $runtime, Tracker $tracker): mixed {
+		$tracker->setCaption('Installing plugin ' . $step->getSource());
+
+		$fs = $runtime->getTargetFilesystem();
+		FilesystemHelpers::withTemporaryDirectory($fs, function($temp_dir) use ($fs, $runtime, $step, $tracker) {
+			// Create data reference for the plugin source
+			$source = $step->getSource();
+			$dataRef = DataReference::create($source);
+
+			$plugin_data = $runtime->resolveDataReference($dataRef);
+
+			if ($plugin_data instanceof Directory) {
 				$zip_path = $temp_dir . '/' . $plugin_data->dirname . '.zip';
-				$zip_stream = $fs->open_write_stream( $zip_path );
-				$zip_encoder = new \WordPress\Zip\ZipEncoder( $zip_stream );
-				$zip_encoder->append_from_filesystem( $plugin_data->filesystem );
+				$zip_stream = $fs->open_write_stream($zip_path);
+				$zip_encoder = new ZipEncoder($zip_stream);
+				$zip_encoder->append_from_filesystem($plugin_data->filesystem);
 				$zip_encoder->close();
-			} elseif ( $plugin_data instanceof \WordPress\Blueprints\Resources\Model\File ) {
+			} elseif ($plugin_data instanceof File) {
 				$zip_filename = preg_replace('/\.(zip|php)$/', '', $plugin_data->filename) . '.zip';
 				$zip_path = $temp_dir . '/' . $zip_filename;
-				$zip_stream = $fs->open_write_stream( $zip_path );
-				$plugin_data->stream->pull( 4 );
-				if ( $plugin_data->stream->peek( 4 ) === "PK\x03\x04" ) {
-					\WordPress\Filesystem\pipe_stream( $plugin_data->stream, $zip_stream );
+				$zip_stream = $fs->open_write_stream($zip_path);
+				$plugin_data->stream->pull(4);
+				if ($plugin_data->stream->peek(4) === "PK\x03\x04") {
+					pipe_stream($plugin_data->stream, $zip_stream);
 				} else {
-					$zip_encoder = new \WordPress\Zip\ZipEncoder( $zip_stream );
-					$zip_encoder->append_file( new \WordPress\Zip\FileEntry( [
+					$zip_encoder = new ZipEncoder($zip_stream);
+					$zip_encoder->append_file(new FileEntry([
 						'path'              => $plugin_data->filename,
 						'body_reader'       => $plugin_data->stream,
-						'compressionMethod' => \WordPress\Zip\ZipDecoder::COMPRESSION_DEFLATE,
-					] ) );
+						'compressionMethod' => ZipDecoder::COMPRESSION_DEFLATE,
+					]));
 					$zip_encoder->close();
 				}
 			}
 			$zip_stream->close_writing();
-			$this->getRuntime()->evalPhpInSubProcess(
-				file_get_contents( __DIR__ . '/InstallPlugin/wp_install_plugin.php' ),
-				[ 'PLUGIN_ZIP_PATH' => $zip_path, 'OUTPUT_FILE' => $temp_dir . '/plugin_path.txt' ]
+
+			$tracker->set(50, 'Installing plugin ' . $step->getSource());
+
+			$runtime->evalPhpInSubProcess(
+				file_get_contents(__DIR__ . '/InstallPlugin/wp_install_plugin.php'),
+				['PLUGIN_ZIP_PATH' => $zip_path, 'OUTPUT_FILE' => $temp_dir . '/plugin_path.txt']
 			);
+
 			$relative_path = $fs->get_contents($temp_dir . '/plugin_path.txt');
-			if ( $input->activate ) {
-				$this->getRuntime()->evalPhpInSubProcess(
-					file_get_contents( __DIR__ . '/ActivatePlugin/wp_activate_plugin.php' ),
-					[ 'PLUGIN_PATH' => $relative_path ]
+
+			if ($step->isActive()) {
+				$tracker->set(75, 'Activating plugin ' . $step->getSource());
+				$runtime->evalPhpInSubProcess(
+					file_get_contents(__DIR__ . '/ActivatePlugin/wp_activate_plugin.php'),
+					['PLUGIN_PATH' => $relative_path]
 				);
 			}
+
+			$tracker->set(100, 'Plugin installation complete');
 		}, '');
+
+		return true;
 	}
-	public function getDefaultCaption( $input ) { return 'Installing plugin ' . $input->pluginZipFile; }
 }
 
 /**
@@ -619,51 +675,80 @@ class InstallThemeStep {
         $this->targetFolderName = $targetFolderName;
     }
 }
-class InstallThemeStepRunner extends BaseStepRunner {
-	public function run( $input, $tracker ) {
-		$tracker?->setCaption( $this->getDefaultCaption( $input ) );
-		$fs = $this->getRuntime()->getTargetFilesystem();
-		\WordPress\Filesystem\FilesystemHelpers::withTemporaryDirectory($fs, function($temp_dir) use ($fs, $input) {
-			$theme_data = $this->getRuntime()->resolveDataReference( $input->themeData );
-			if ( $theme_data instanceof \WordPress\Blueprints\Resources\Model\Directory ) {
+
+class InstallThemeStepRunner {
+	/**
+	 * Runs the installTheme step.
+	 *
+	 * @param InstallThemeStep $step The installTheme step configuration
+	 * @param Runtime $runtime The runtime providing environment access
+	 * @param Tracker $tracker The tracker for reporting progress
+	 * @return mixed The result of running the step
+	 */
+	public function run(InstallThemeStep $step, Runtime $runtime, Tracker $tracker): mixed {
+		$tracker->setCaption('Installing theme ' . $step->getSource());
+
+		$fs = $runtime->getTargetFilesystem();
+		FilesystemHelpers::withTemporaryDirectory($fs, function($temp_dir) use ($fs, $runtime, $step, $tracker) {
+			// Create data reference for the theme source
+			$source = $step->getSource();
+			$dataRef = DataReference::create($source);
+
+			$theme_data = $runtime->resolveDataReference($dataRef);
+
+			if ($theme_data instanceof Directory) {
 				$zip_path = $temp_dir . '/' . $theme_data->dirname . '.zip';
-				$zip_stream = $fs->open_write_stream( $zip_path );
-				$zip_encoder = new \WordPress\Zip\ZipEncoder( $zip_stream );
-				$zip_encoder->append_from_filesystem( $theme_data->filesystem );
+				$zip_stream = $fs->open_write_stream($zip_path);
+				$zip_encoder = new ZipEncoder($zip_stream);
+				$zip_encoder->append_from_filesystem($theme_data->filesystem);
 				$zip_encoder->close();
-			} elseif ( $theme_data instanceof \WordPress\Blueprints\Resources\Model\File ) {
+			} elseif ($theme_data instanceof File) {
 				$zip_filename = preg_replace('/\.(zip|php)$/', '', $theme_data->filename) . '.zip';
 				$zip_path = $temp_dir . '/' . $zip_filename;
-				$zip_stream = $fs->open_write_stream( $zip_path );
-				$theme_data->stream->pull( 4 );
-				if ( $theme_data->stream->peek( 4 ) === "PK\x03\x04" ) {
-					\WordPress\Filesystem\pipe_stream( $theme_data->stream, $zip_stream );
+				$zip_stream = $fs->open_write_stream($zip_path);
+				$theme_data->stream->pull(4);
+				if ($theme_data->stream->peek(4) === "PK\x03\x04") {
+					pipe_stream($theme_data->stream, $zip_stream);
 				} else {
-					throw new \WordPress\Blueprints\BlueprintException( "Theme is not a valid zip file." );
+					throw new BlueprintException("Theme is not a valid zip file.");
 				}
 				$zip_stream->close_writing();
 			}
+
+			$tracker->set(50, 'Installing theme files');
+
 			$output_file = $temp_dir . '/theme_stylesheet.txt';
-			$install_script_result = $this->getRuntime()->evalPhpInSubProcess(
-				file_get_contents( __DIR__ . '/InstallTheme/wp_install_theme.php' ),
-				[ 'THEME_ZIP_PATH' => $zip_path, 'OUTPUT_FILE' => $output_file ]
+			$install_script_result = $runtime->evalPhpInSubProcess(
+				file_get_contents(__DIR__ . '/InstallTheme/wp_install_theme.php'),
+				['THEME_ZIP_PATH' => $zip_path, 'OUTPUT_FILE' => $output_file]
 			);
+
 			if (!$fs->exists($output_file)) {
-				throw new \WordPress\Blueprints\BlueprintException( "Theme installation script did not create output file. Error output: {$install_script_result}" );
-			}
-			$theme_folder_name = trim($fs->get_contents($output_file));
-			if (empty($theme_folder_name)) {
-				throw new \WordPress\Blueprints\BlueprintException( "Theme installation script did not return the theme stylesheet name." );
-			}
-			if ( $input->activate ) {
-				$this->getRuntime()->evalPhpInSubProcess(
-					file_get_contents( __DIR__ . '/ActivateTheme/wp_activate_theme.php' ),
-					[ 'THEME_FOLDER_NAME' => $theme_folder_name ]
+				throw new BlueprintException(
+					"Theme installation script did not create output file. Error output: {$install_script_result}"
 				);
 			}
+
+			$theme_folder_name = trim($fs->get_contents($output_file));
+			if (empty($theme_folder_name)) {
+				throw new BlueprintException(
+					"Theme installation script did not return the theme stylesheet name."
+				);
+			}
+
+			if ($step->isActivate()) {
+				$tracker->set(75, 'Activating theme');
+				$runtime->evalPhpInSubProcess(
+					file_get_contents(__DIR__ . '/ActivateTheme/wp_activate_theme.php'),
+					['THEME_FOLDER_NAME' => $theme_folder_name]
+				);
+			}
+
+			$tracker->set(100, 'Theme installation complete');
 		}, '');
+
+		return true;
 	}
-	public function getDefaultCaption( $input ): string { return 'Installing theme'; }
 }
 
 /**
@@ -688,15 +773,25 @@ class MkdirStep {
     }
 }
 
-class MkdirStepRunner extends BaseStepRunner {
-	function run( MkdirStep $input ) {
-		$filesystem = $this->getRuntime()->getTargetFilesystem();
-		if ($filesystem->exists($input->path)) {
-			throw new \WordPress\Filesystem\FilesystemException(
-				sprintf('Path already exists: %s', $input->path)
+class MkdirStepRunner {
+	/**
+	 * Runs the mkdir step.
+	 *
+	 * @param MkdirStep $step The mkdir step configuration
+	 * @param Runtime $runtime The runtime providing environment access
+	 * @param Tracker $tracker The tracker for reporting progress
+	 * @return mixed The result of running the step
+	 */
+	public function run(MkdirStep $step, Runtime $runtime, Tracker $tracker): mixed {
+		$tracker->setCaption('Creating directory ' . $step->getPath());
+
+		$filesystem = $runtime->getTargetFilesystem();
+		if ($filesystem->exists($step->getPath())) {
+			throw new FilesystemException(
+				sprintf('Path already exists: %s', $step->getPath())
 			);
 		}
-		$this->getRuntime()->getTargetFilesystem()->mkdir( $input->path, [ 'recursive' => true ] );
+		return $runtime->getTargetFilesystem()->mkdir($step->getPath(), ['recursive' => true]);
 	}
 }
 
@@ -733,9 +828,18 @@ class MvStep {
     }
 }
 
-class MvStepRunner extends BaseStepRunner {
-	function run( $input ) {
-		$this->getRuntime()->getTargetFilesystem()->rename( $input->fromPath, $input->toPath );
+class MvStepRunner {
+	/**
+	 * Runs the mv step.
+	 *
+	 * @param MvStep $step The mv step configuration
+	 * @param Runtime $runtime The runtime providing environment access
+	 * @param Tracker $tracker The tracker for reporting progress
+	 * @return mixed The result of running the step
+	 */
+	public function run(MvStep $step, Runtime $runtime, Tracker $tracker): mixed {
+		$tracker->setCaption('Moving from ' . $step->getFromPath() . ' to ' . $step->getToPath());
+		return $runtime->getTargetFilesystem()->rename($step->getFromPath(), $step->getToPath());
 	}
 }
 
@@ -761,17 +865,21 @@ class RmStep {
     }
 }
 
-class RmStepRunner extends BaseStepRunner {
-	public function run( RmStep $input ) {
-		$filesystem = $this->getRuntime()->getTargetFilesystem();
-		$path = $input->path;
+class RmStepRunner {
+	public function run(object $step, Runtime $runtime, Tracker $tracker): mixed {
+		$tracker->setCaption('Removing ' . $step->getPath());
+
+		$filesystem = $runtime->getTargetFilesystem();
+		$path = $step->getPath();
+
 		if (!$filesystem->exists($path)) {
-			throw new \WordPress\Filesystem\FilesystemException(sprintf('Path does not exist: %s', $path));
+			throw new FilesystemException(sprintf('Path does not exist: %s', $path));
 		}
+
 		if ($filesystem->is_dir($path)) {
-			$filesystem->rmdir($path, ['recursive' => true]);
+			return $filesystem->rmdir($path, ['recursive' => true]);
 		} else {
-			$filesystem->rm($path);
+			return $filesystem->rm($path);
 		}
 	}
 }
@@ -798,9 +906,18 @@ class RmDirStep {
     }
 }
 
-class RmDirStepRunner extends BaseStepRunner {
-	public function run( RmDirStep $input ) {
-		$this->getRuntime()->getTargetFilesystem()->rmdir( $input->path, [ 'recursive' => $input->recursive ] );
+class RmDirStepRunner {
+	/**
+	 * Runs the rmdir step.
+	 *
+	 * @param RmDirStep $step The rmdir step configuration
+	 * @param Runtime $runtime The runtime providing environment access
+	 * @param Tracker $tracker The tracker for reporting progress
+	 * @return mixed The result of running the step
+	 */
+	public function run(RmDirStep $step, Runtime $runtime, Tracker $tracker): mixed {
+		$tracker->setCaption('Removing directory ' . $step->getPath());
+		return $runtime->getTargetFilesystem()->rmdir($step->getPath(), ['recursive' => true]);
 	}
 }
 
@@ -939,12 +1056,12 @@ class RunPHPStep {
     }
 }
 
-class RunPHPStepRunner extends BaseStepRunner {
-	function run( $input, $tracker ) {
-		( $nullsafeVariable1 = $tracker ) ? $nullsafeVariable1->setCaption( 'Running custom PHP code' ) : null;
-		return $this->getRuntime()->evalPhpInSubProcess( $input->code, [
-			'DOCROOT' => $this->getRuntime()->getDocumentRoot(),
-		] );
+class RunPHPStepRunner implements StepRunnerInterface {
+	public function run(object $step, Runtime $runtime, Tracker $tracker): mixed {
+		$tracker->setCaption('Running custom PHP code');
+		return $runtime->evalPhpInSubProcess($step->getCode(), [
+			'DOCROOT' => $runtime->getDocumentRoot(),
+		]);
 	}
 }
 
@@ -974,16 +1091,21 @@ class RunSqlStep {
     }
 }
 
-class RunSQLStepRunner extends BaseStepRunner {
-	function run(
-		$input,
-		$progress = null
-	) {
-		$sql = $this->getRuntime()->resolveDataReference( $input->sql );
-		if ( ! $sql instanceof \WordPress\Blueprints\Resources\Model\File ) {
-			throw new \InvalidArgumentException( 'The provided resource is not a file.' );
+class RunSQLStepRunner implements StepRunnerInterface {
+	public function run(object $step, Runtime $runtime, Tracker $tracker): mixed {
+		$tracker->setCaption('Running SQL queries');
+
+		// Create data reference for the SQL file
+		$source = $step->getSource();
+		$dataRef = DataReference::create($source);
+
+		$sql = $runtime->resolveDataReference($dataRef);
+
+		if (!$sql instanceof File) {
+			throw new \InvalidArgumentException('The provided resource is not a file.');
 		}
-		return $this->getRuntime()->evalPhpInSubProcess(
+
+		return $runtime->evalPhpInSubProcess(
 			<<<'CODE'
 <?php
 		require_once getenv("DOCROOT") . '/wp-load.php';
@@ -1005,7 +1127,6 @@ CODE
 			$sql->stream->consume_all()
 		);
 	}
-	public function getDefaultCaption( $input ) { return 'Running SQL queries'; }
 }
 
 /**
@@ -1065,9 +1186,10 @@ class SetSiteOptionsStep {
     }
 }
 
-class SetSiteOptionsStepRunner extends BaseStepRunner {
-	function run( $input, $tracker ) {
-		return $this->getRuntime()->evalPhpInSubProcess(
+class SetSiteOptionsStepRunner implements StepRunnerInterface {
+	public function run(object $step, Runtime $runtime, Tracker $tracker): mixed {
+		$tracker->setCaption('Setting site options');
+		return $runtime->evalPhpInSubProcess(
 			'
 <?php
 		require getenv(\'DOCROOT\'). \'/wp-load.php\';
@@ -1076,10 +1198,9 @@ class SetSiteOptionsStepRunner extends BaseStepRunner {
 			update_option($name, $value);
 		}
 ',
-			array('OPTIONS' => json_encode( $input->options ),)
+			array('OPTIONS' => json_encode($step->getOptions()))
 		);
 	}
-	public function getDefaultCaption( $input ) { return 'Setting site options'; }
 }
 
 /**
@@ -1123,25 +1244,37 @@ class UnzipStep {
     }
 }
 
-class UnzipStepRunner extends BaseStepRunner {
-	public function run(
-		UnzipStep $input,
-		Tracker   $progress_tracker
-	) {
-		$progress_tracker->set( 10, 'Unzipping...' );
-		$target_fs = $this->getRuntime()->getTargetFilesystem();
-		$zip_stream = $this->getRuntime()->resolveDataReference( $input->zipFile );
-		if ( ! $zip_stream instanceof \WordPress\Blueprints\Resources\Model\File ) {
-			throw new \InvalidArgumentException( 'The provided resource is not a zip file.' );
+class UnzipStepRunner implements StepRunnerInterface {
+	public function run(object $step, Runtime $runtime, Tracker $tracker): mixed {
+		$tracker->set(10, 'Unzipping...');
+
+		$target_fs = $runtime->getTargetFilesystem();
+
+		// Create data reference for the zip file
+		$zipFile = $step->getZipFile();
+		$dataRef = DataReference::create($zipFile);
+
+		$zip_stream = $runtime->resolveDataReference($dataRef);
+
+		if (!$zip_stream instanceof File) {
+			throw new \InvalidArgumentException('The provided resource is not a zip file.');
 		}
-		$zip_fs = \WordPress\Zip\ZipFilesystem::create( $zip_stream->stream );
-		\WordPress\Filesystem\copy_between_filesystems([
+
+		$zip_fs = ZipFilesystem::create($zip_stream->stream);
+
+		$tracker->set(50, 'Extracting files...');
+
+		copy_between_filesystems([
 			'source_filesystem' => $zip_fs,
 			'source_path'       => '/',
 			'target_filesystem' => $target_fs,
-			'target_path'       => $input->extractToPath,
+			'target_path'       => $step->getExtractToPath(),
 			'recursive'         => true,
 		]);
+
+		$tracker->set(100, 'Extraction complete');
+
+		return true;
 	}
 }
 
@@ -1185,9 +1318,10 @@ class WPCLIStep {
     }
 }
 
-class WPCLIStepRunner extends BaseStepRunner {
-	function run( $input ) {
-		$this->getRuntime()->runShellCommand( $input->command );
+class WPCLIStepRunner implements StepRunnerInterface {
+	public function run(object $step, Runtime $runtime, Tracker $tracker): mixed {
+		$tracker->setCaption('Running WP-CLI command: ' . $step->getCommand());
+		return $runtime->runShellCommand($step->getCommand());
 	}
 }
 
@@ -1224,58 +1358,46 @@ class WriteFilesStep {
     }
 }
 
-class WriteFilesStepRunner extends BaseStepRunner {
-	public function run(
-		WriteFilesStep $input,
-		?Tracker      $progress_tracker = null
-	) {
-		if ($progress_tracker) {
-			$progress_tracker->set(10, 'Writing files...');
-		}
-		
-		$target_fs = $this->getRuntime()->getTargetFilesystem();
-		$files = $input->getFiles();
+class WriteFilesStepRunner {
+	public function run(object $step, Runtime $runtime, Tracker $tracker): mixed {
+		$files = $step->getFiles();
 		$total_files = count($files);
+
+		$tracker->set(10, 'Writing files...');
+
+		$target_fs = $runtime->getTargetFilesystem();
 		$files_written = 0;
-		
+
 		foreach ($files as $path => $data) {
-			if ($progress_tracker) {
+			if ($tracker) {
 				$progress_value = 10 + (($files_written / $total_files) * 80);
-				$progress_tracker->set((int)$progress_value, "Writing file {$files_written}/{$total_files}: {$path}");
+				$tracker->set((int)$progress_value, "Writing file {$files_written}/{$total_files}: {$path}");
 			}
-			
+
 			// Create directory if it doesn't exist
 			$dir = dirname($path);
 			if ($dir && $dir !== '/' && $dir !== '.') {
-				$target_fs->mkdir($dir, [ 'recursive' => true ]);
+				$target_fs->mkdir($dir, ['recursive' => true]);
 			}
-			
+
 			// Handle the data which can be a string or a DataReference
 			if (is_string($data)) {
-				$target_fs->put_contents($path, $data);
-			} else {
-				$data_ref = $data instanceof \WordPress\Blueprints\Resources\Model\DataReference ?
-					$data :
-					\WordPress\Blueprints\Resources\Model\DataReference::create($data);
-				$data_stream = $this->getRuntime()->resolveDataReference($data_ref);
-				if (!$data_stream instanceof \WordPress\Blueprints\Resources\Model\File) {
-					throw new \InvalidArgumentException("The provided resource for '{$path}' is not a valid file.");
-				}
-				$target_fs->put_contents($path, $data_stream->stream->consume_all());
+				$content = $data;
+			} else if(is_array($data)) {
+				$data_ref = $data['source'] instanceof DataReference ?
+					$data['source'] :
+					DataReference::create($data['source']);
+				$data_stream = $runtime->resolveDataReference($data_ref);
+				$content = $data_stream->stream->consume_all();
 			}
-			
+
+			$target_fs->put_contents($path, $content);
 			$files_written++;
 		}
-		
-		if ($progress_tracker) {
-			$progress_tracker->set(100, "All {$total_files} files written successfully.");
-		}
-	}
-	
-	public function getDefaultCaption($input) { 
-		$files = $input->getFiles();
-		$count = count($files);
-		return "Writing {$count} " . ($count === 1 ? 'file' : 'files');
+
+		$tracker->set(100, "All {$total_files} files written successfully.");
+
+		return true;
 	}
 }
 
@@ -1608,7 +1730,7 @@ class Blueprint
                 if (empty($data['roles']) || !is_array($data['roles'])) {
                     throw new InvalidArgumentException('Invalid roles data: must be a non-empty array.');
                 }
-                
+
                 $code = '<?php
 				require_once(DOCUMENT_ROOT . "/wp-load.php");
 				$roles = getenv("ROLES");
@@ -1653,12 +1775,12 @@ class Blueprint
                     null,
                     ['ROLES' => $data['roles']]
                 );
-                
+
             case 'createUsers':
                 if (empty($data['users']) || !is_array($data['users'])) {
                     throw new InvalidArgumentException('Invalid users data: must be a non-empty array.');
                 }
-                
+
                 $code = '<?php
                 require_once(DOCUMENT_ROOT . "/wp-load.php");
                 $users = getenv("USERS");
@@ -1705,12 +1827,12 @@ class Blueprint
                     null,
                     ['USERS' => $data['users']]
                 );
-                
+
             case 'createPostTypes':
                 if (empty($data['postTypes']) || !is_array($data['postTypes'])) {
                     throw new InvalidArgumentException('Invalid postTypes data: must be a non-empty array.');
                 }
-                
+
                 $files = [];
                 foreach ($data['postTypes'] as $slug => $args) {
                     if (!is_string($slug) || $slug === '') {
@@ -1771,29 +1893,29 @@ PHP,
 
                     $files[$pluginPath] = $pluginCode;
                 }
-                
+
                 if (empty($files)) {
                     throw new InvalidArgumentException('No valid post types to register.');
                 }
-                
+
                 return new WriteFilesStep($files);
-                
+
             case 'importPosts':
                 if (empty($data['posts']) || !is_array($data['posts'])) {
                     throw new InvalidArgumentException('Invalid posts data: must be a non-empty array.');
                 }
-                
+
                 $inlinePosts = array_values(
                     array_filter(
                         $data['posts'],
                         static fn($item) => is_array($item)
                     )
                 );
-                
+
                 if (empty($inlinePosts)) {
                     throw new InvalidArgumentException('No inline posts to import.');
                 }
-                
+
                 $postsArray = var_export($inlinePosts, true);
                 $code = <<<PHP
 <?php
@@ -1814,7 +1936,7 @@ foreach (\$__bp_posts as \$__bp_post) {
 unset(\$__bp_posts, \$__bp_post, \$postData);
 PHP;
                 return new RunPHPStep($code);
-                
+
             case 'runPHP':
                 $method = isset($data['method']) ? HttpMethod::from($data['method']) : HttpMethod::GET;
                 return new RunPHPStep(
@@ -1888,77 +2010,112 @@ PHP;
 class BlueprintRunner {
     private Blueprint $blueprint;
     private array $steps;
-    private array $stepRunners;
-    
-    public function __construct(Blueprint $blueprint) {
+    private Runtime $runtime;
+    private Tracker $mainTracker;
+
+    public function __construct(Blueprint $blueprint, Runtime $runtime, ?Tracker $mainTracker = null) {
         $this->blueprint = $blueprint;
         $this->steps = $blueprint->getExecutionPlan();
-        $this->stepRunners = [];
+        $this->runtime = $runtime;
+        $this->mainTracker = $mainTracker ?? new Tracker();
     }
 
-	public function run() {
-		foreach ($this->steps as $step) {
-			$this->stepRunners[$step->getType()] = $step->getRunner();
-		}
+    public function run() {
+		$this->runSteps();
+    }
+
+	private function runSteps() {
+        $results = [];
+        $stepCount = count($this->steps);
+
+        for ($i = 0; $i < $stepCount; $i++) {
+            $step = $this->steps[$i];
+            $stepWeight = 1 / $stepCount;
+            $stepTracker = $this->mainTracker->stage($stepWeight, $this->getStepCaption($step));
+
+            try {
+                $runner = $this->createStepRunner($step);
+                $results[$i] = $runner->run($step, $this->runtime, $stepTracker);
+                $stepTracker->finish();
+            } catch ( Exception $e) {
+                $results[$i] = $e;
+                $stepTracker->finish();
+
+                // Determine if we should continue or stop execution
+                $continueOnError = $step->continueOnError ?? false;
+                if (!$continueOnError) {
+                    throw new BlueprintException(
+                        "Error when executing step " . (get_class($step)) . " (number " . ($i + 1) . " in the plan)",
+                        0,
+                        $e
+                    );
+                }
+            }
+        }
+        return $results;
 	}
 
-	private function createStepRunner($step) {
-		if ($step instanceof ActivatePluginStep) {
-			return new ActivatePluginStepRunner();
-		}
-		if ($step instanceof ActivateThemeStep) {
-			return new ActivateThemeStepRunner();
-		}
-		if ($step instanceof CpStep) {
-			return new CpStepRunner();
-		}
-		if ($step instanceof DefineConstantsStep) {
-			return new DefineConstantsStepRunner();
-		}
-		if ($step instanceof InstallPluginStep) {
-			return new InstallPluginStepRunner();
-		}
-		if ($step instanceof InstallThemeStep) {
-			return new InstallThemeStepRunner();
-		}
-		if ($step instanceof MkdirStep) {
-			return new MkdirStepRunner();
-		}
-		if ($step instanceof MvStep) {
-			return new MvStepRunner();
-		}
-		if ($step instanceof RmStep) {
-			return new RmStepRunner();
-		}
-		if ($step instanceof RmDirStep) {
-			return new RmDirStepRunner();
-		}
-		if ($step instanceof RunPHPStep) {
-			return new RunPHPStepRunner();
-		}
-		if ($step instanceof RunSqlStep) {
-			return new RunSqlStepRunner();
-		}
-		if ($step instanceof SetSiteOptionsStep) {
-			return new SetSiteOptionsStepRunner();
-		}
-		if ($step instanceof UnzipStep) {
-			return new UnzipStepRunner();
-		}
-		if ($step instanceof WPCLIStep) {
-			return new WPCLIStepRunner();
-		}
-		if ($step instanceof WriteFilesStep) {
-			return new WriteFilesStepRunner();
-		}
-		
-		throw new \InvalidArgumentException('Unknown step type: ' . get_class($step));
-	}
-    
+    private function getStepCaption($step): string {
+        $stepClass = get_class($step);
+        return substr($stepClass, strrpos($stepClass, '\\') + 1);
+    }
+
+    private function createStepRunner($step) {
+        if ($step instanceof ActivatePluginStep) {
+            return new ActivatePluginStepRunner();
+        }
+        if ($step instanceof ActivateThemeStep) {
+            return new ActivateThemeStepRunner();
+        }
+        if ($step instanceof CpStep) {
+            return new CpStepRunner();
+        }
+        if ($step instanceof DefineConstantsStep) {
+            return new DefineConstantsStepRunner();
+        }
+        if ($step instanceof InstallPluginStep) {
+            return new InstallPluginStepRunner();
+        }
+        if ($step instanceof InstallThemeStep) {
+            return new InstallThemeStepRunner();
+        }
+        if ($step instanceof MkdirStep) {
+            return new MkdirStepRunner();
+        }
+        if ($step instanceof MvStep) {
+            return new MvStepRunner();
+        }
+        if ($step instanceof RmStep) {
+            return new RmStepRunner();
+        }
+        if ($step instanceof RmDirStep) {
+            return new RmDirStepRunner();
+        }
+        if ($step instanceof RunPHPStep) {
+            return new RunPHPStepRunner();
+        }
+        if ($step instanceof RunSqlStep) {
+            return new RunSQLStepRunner();
+        }
+        if ($step instanceof SetSiteOptionsStep) {
+            return new SetSiteOptionsStepRunner();
+        }
+        if ($step instanceof UnzipStep) {
+            return new UnzipStepRunner();
+        }
+        if ($step instanceof WPCLIStep) {
+            return new WPCLIStepRunner();
+        }
+        if ($step instanceof WriteFilesStep) {
+            return new WriteFilesStepRunner();
+        }
+
+        throw new \InvalidArgumentException('Unknown step type: ' . get_class($step));
+    }
 }
 
 
-$blueprint = Blueprint::fromValidatedArray(json_decode(<<<'JSON'
+$complex_blueprint = Blueprint::fromValidatedArray(json_decode(<<<'JSON'
 {
   "version": 2,
   "$schema": "https://raw.githubusercontent.com/WordPress/blueprints/trunk/blueprints/schema.json",
@@ -2069,4 +2226,41 @@ $blueprint = Blueprint::fromValidatedArray(json_decode(<<<'JSON'
 } 
 JSON, true, 512, JSON_THROW_ON_ERROR));
 
-print_r($blueprint);
+$simple_blueprint = Blueprint::fromValidatedArray(json_decode(<<<'JSON'
+{
+  "version": 2,
+  "$schema": "https://raw.githubusercontent.com/WordPress/blueprints/trunk/blueprints/schema.json",
+  "blueprintMeta": {
+    "name": "Full Featured Blueprint",
+    "description": "A blueprint demonstrating most of the available features",
+    "version": "1.0.0",
+    "authors": ["Test Author", "Another Author"],
+    "authorUrl": "https://example.com",
+    "donateLink": "https://example.com/donate",
+    "tags": ["test", "full-features", "demo"],
+    "license": "GPL-2.0"
+  },
+  "additionalStepsAfterExecution": [
+    {
+      "step": "writeFiles",
+      "files": {
+        "wp-content/uploads/custom-file.txt": "This is a custom file created by the Blueprint.",
+        "builder.php": {
+			"source": "./BlueprintBuilder.php"
+		}
+      }
+    }
+  ]
+} 
+JSON, true, 512, JSON_THROW_ON_ERROR));
+
+// Silence PHP deprecation warnings
+error_reporting(E_ALL & ~E_DEPRECATED & ~E_USER_DEPRECATED);
+
+// Initialize runtime for the given document root
+require_once __DIR__ . '/../../../../vendor/autoload.php';
+require_once __DIR__ . '/../../../../../../vendor/autoload.php';
+$runtime = new Runtime(__DIR__ . '/test_blueprint_runner', __DIR__);
+
+$runner = new BlueprintRunner($simple_blueprint, $runtime);
+$runner->run();

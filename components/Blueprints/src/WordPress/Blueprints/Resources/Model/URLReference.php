@@ -35,7 +35,7 @@ class URLReference extends DataReference {
 	 * @param string $url The URL to check.
 	 * @return bool Whether the URL is valid.
 	 */
-	public static function is_valid( string $url ): bool {
-		return strpos( $url, 'http://' ) === 0 || strpos( $url, 'https://' ) === 0;
+	public static function is_valid( $url ): bool {
+		return is_string($url) && (strpos( $url, 'http://' ) === 0 || strpos( $url, 'https://' ) === 0);
 	}
 } 

@@ -16,21 +16,34 @@ use function WordPress\Filesystem\wp_join_paths;
 
 class Runtime {
 
-	public $fs;
+	public $siteFs;
 	protected $documentRoot;
+
+	public $executionContext;
+	protected $executionContextRoot;
+
 	protected $dataReferenceResolver;
 
 	public function __construct(
-		string $documentRoot
+		string $documentRoot,
+		string $executionContextRoot
 	) {
-		$this->documentRoot = $documentRoot;
-		$this->fs           = LocalFilesystem::create( $this->getDocumentRoot() );
-		$http_client = new Client();
-		$this->dataReferenceResolver = new DataReferenceResolver( $http_client, $this->fs );
+		$this->documentRoot          = $documentRoot;
+		$this->siteFs                = LocalFilesystem::create( $this->getDocumentRoot() );
+
+		$this->executionContextRoot  = $executionContextRoot;
+		$this->executionContext      = LocalFilesystem::create( $executionContextRoot );
+
+		$http_client                 = new Client();
+		$this->dataReferenceResolver = new DataReferenceResolver( $http_client, $this->executionContext );
 	}
 
 	public function getDocumentRoot(): string {
 		return $this->documentRoot;
+	}
+
+	public function getExecutionContextRoot(): string {
+		return $this->executionContextRoot;
 	}
 
 	/**
@@ -47,15 +60,19 @@ class Runtime {
 	}
 
 	public function getTargetFilesystem(): Filesystem {
-		return $this->fs;
+		return $this->siteFs;
+	}
+
+	public function getExecutionContext(): Filesystem {
+		return $this->executionContext;
 	}
 
 	public function withTemporaryDirectory( callable $callback ) {
-		return FilesystemHelpers::withTemporaryDirectory( $this->fs, $callback );
+		return FilesystemHelpers::withTemporaryDirectory( $this->siteFs, $callback );
 	}
 
 	public function withTemporaryFile( callable $callback, ?string $suffix = null ) {
-		return FilesystemHelpers::withTemporaryFile( $this->fs, $callback, $suffix );
+		return FilesystemHelpers::withTemporaryFile( $this->siteFs, $callback, $suffix );
 	}
 
 	// @TODO: Move this to a separate class
@@ -69,22 +86,25 @@ class Runtime {
 		$input = null,
 		$timeout = 60
 	) {
-		return $this->runShellCommand(
-			array(
-				'php',
-				'-r',
-				'$_SERVER["HTTP_HOST"] = "localhost"; ?>' . $code,
-			),
-			null,
-			array_merge(
+		return $this->withTemporaryFile(function($tempFile) use ($code, $env, $input, $timeout) {
+			$this->siteFs->put_contents($tempFile, '<?php $_SERVER["HTTP_HOST"] = "localhost"; ?>' . $code);
+
+			return $this->runShellCommand(
 				array(
-					'DOCROOT' => $this->getDocumentRoot(),
+					'php',
+					$tempFile,
 				),
-				$env ?? array()
-			),
-			$input,
-			$timeout
-		);
+				null,
+				array_merge(
+					array(
+						'DOCROOT' => $this->getDocumentRoot(),
+					),
+					$env ?? array()
+				),
+				$input,
+				$timeout
+			);
+		});
 	}
 
 	// @TODO: Move this to a separate class
