@@ -5,28 +5,38 @@ namespace WordPress\Blueprints\Progress;
 use Symfony\Component\EventDispatcher\Event;
 
 /**
- * Custom event providing progress details.
+ * Event class for tracking progress updates
  */
 class ProgressEvent extends Event {
-	/**
-	 * The progress percentage as a number between 0 and 100.
-	 *
-	 * @var float $progress
-	 */
-	public $progress;
+	public float $progress;
+	public string $caption;
 
 	/**
-	 * The caption to display during progress, a string.
-	 *
-	 * @var ?string $caption
+	 * Create a new progress event
+	 * 
+	 * @param float $progress The progress value (0-100)
+	 * @param string $caption The caption describing current progress
 	 */
-	public $caption;
-
-	public function __construct(
-		float $progress,
-		string $caption
-	) {
-		$this->caption  = $caption;
+	public function __construct(float $progress, string $caption) {
 		$this->progress = $progress;
+		$this->caption = $caption;
+	}
+
+	/**
+	 * Get the progress value
+	 * 
+	 * @return float Progress value (0-100)
+	 */
+	public function getProgress(): float {
+		return $this->progress;
+	}
+
+	/**
+	 * Get the progress caption
+	 * 
+	 * @return string Caption describing current progress
+	 */
+	public function getCaption(): string {
+		return $this->caption;
 	}
 }

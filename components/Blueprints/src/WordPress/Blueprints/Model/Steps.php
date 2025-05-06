@@ -8,6 +8,8 @@ use JsonException; // Standard PHP exception
 use RuntimeException;
 use WordPress\Blueprints\BlueprintV2Validator;
 use WordPress\Blueprints\Progress\Tracker;
+use WordPress\Blueprints\Progress\ProgressEvent;
+use WordPress\Blueprints\Progress\DoneEvent;
 use WordPress\Blueprints\Resources\Model\DataReference;
 use WordPress\Blueprints\Resources\Model\Directory;
 use WordPress\Blueprints\Resources\Model\File;
@@ -2285,85 +2287,191 @@ class RunnerConfiguration
     }
 }
 
+/**
+ * Progress logging handler that listens to Tracker progress events
+ */
+class ProgressLogger {
+    /**
+     * @var callable
+     */
+    private $logCallback;
+    
+    /**
+     * Create a new progress logger with the given logging function
+     * 
+     * @param callable $logCallback Function that receives progress updates
+     */
+    public function __construct(callable $logCallback) {
+        $this->logCallback = $logCallback;
+    }
+    
+    /**
+     * Attach this logger to a Tracker instance
+     * 
+     * @param Tracker $tracker The tracker to log progress for
+     */
+    public function attachTo(Tracker $tracker) {
+        $tracker->events->addListener(
+            ProgressEvent::class,
+            function (ProgressEvent $event) {
+                call_user_func($this->logCallback, $event->getProgress(), $event->getCaption());
+            }
+        );
+        
+        $tracker->events->addListener(
+            DoneEvent::class,
+            function () {
+                call_user_func($this->logCallback, 100, 'Complete');
+            }
+        );
+    }
+}
 
 class BlueprintRunner {
     private ?Blueprint $blueprint;
     private Runtime $runtime;
     private Tracker $mainTracker;
-	private RunnerConfiguration $runnerConfiguration;
+    private RunnerConfiguration $runnerConfiguration;
+    private ProgressLogger $progressLogger;
 
-    public function __construct(RunnerConfiguration $runnerConfiguration) {
+    /**
+     * Create a new BlueprintRunner with the given configuration
+     * 
+     * @param RunnerConfiguration $runnerConfiguration Configuration for the runner
+     * @param callable|null $progressCallback Optional callback for progress updates
+     */
+    public function __construct(RunnerConfiguration $runnerConfiguration, ?callable $progressCallback = null) {
         $this->runnerConfiguration = $runnerConfiguration;
         $this->runtime = new Runtime(
-			$runnerConfiguration->getTargetSiteRoot(),
-			$runnerConfiguration->getExecutionContextRoot(),
-		);
+            $runnerConfiguration->getTargetSiteRoot(),
+            $runnerConfiguration->getExecutionContextRoot(),
+        );
         $this->mainTracker = new Tracker();
+        
+		// Default progress handler logs to stderr
+        $this->progressLogger = new ProgressLogger(
+            $progressCallback ?? function($progress, $caption) {
+                fprintf(STDERR, "[%3d%%] %s\n", $progress, $caption);
+            }
+        );
+        $this->progressLogger->attachTo($this->mainTracker);
     }
 
-	public function run() {
-		$this->resolveBlueprint();
-		$this->resolveSite();
-		$this->runSteps();
+    public function run() {
+        // Create all progress stages upfront for accurate progress tracking
+        $blueprintStage = $this->mainTracker->stage(0.2, 'Resolving Blueprint');
+        $siteStage = $this->mainTracker->stage(0.3, 'Setting up WordPress site');
+        $executionStage = $this->mainTracker->stage(0.5, 'Executing Blueprint steps');
+        
+        $blueprintStage->setCaption('Loading Blueprint data');
+        $this->resolveBlueprint();
+        $blueprintStage->finish();
+        
+        $siteStage->setCaption('Booting WordPress environment');
+        $this->resolveSite();
+        $siteStage->finish();
+        
+        $this->runSteps($executionStage);
     }
 
-	/**
-	 * @TODO: Support running the Blueprint on an existing site
-	 */
-	private function resolveSite() {
-		WordPressBootManager::boot(
-			BootOptions::parse([
-				'runtime' => $this->runtime,
-				'siteUrl' => $this->runnerConfiguration->getTargetSiteUrl(),
-			])
-		);
-	}
+    /**
+     * @TODO: Support running the Blueprint on an existing site
+     */
+    private function resolveSite() {
+        WordPressBootManager::boot(
+            BootOptions::parse([
+                'runtime' => $this->runtime,
+                'siteUrl' => $this->runnerConfiguration->getTargetSiteUrl(),
+            ])
+        );
+    }
 
-	/**
-	 * @TODO: support sourcing Blueprints from arbitrary sources
-	 */
-	private function resolveBlueprint() {
-		$rawBlueprint = $this->runnerConfiguration->getRawBlueprint();
-		if(is_string($rawBlueprint)) {
-			$this->blueprint = Blueprint::fromJsonString($rawBlueprint);
-		} else if(is_array($rawBlueprint)) {
-			$this->blueprint = Blueprint::fromArray($rawBlueprint);
-		} else {
-			throw new RuntimeException('Invalid blueprint source');
-		}
-	}
+    /**
+     * @TODO: support sourcing Blueprints from arbitrary sources
+     */
+    private function resolveBlueprint() {
+        $rawBlueprint = $this->runnerConfiguration->getRawBlueprint();
+        if(is_string($rawBlueprint)) {
+            $this->blueprint = Blueprint::fromJsonString($rawBlueprint);
+        } else if(is_array($rawBlueprint)) {
+            $this->blueprint = Blueprint::fromArray($rawBlueprint);
+        } else {
+            throw new RuntimeException('Invalid blueprint source');
+        }
+    }
 
-	private function runSteps() {
+    /**
+     * Run the steps in the execution plan with progress tracking
+     * 
+     * @param Tracker $parentTracker The parent tracker for step execution
+     * @return array Results from each step execution
+     */
+    private function runSteps(Tracker $parentTracker) {
         $results = [];
-		$steps = $this->blueprint->getExecutionPlan();
+        $steps = $this->blueprint->getExecutionPlan();
         $stepCount = count($steps);
-
+        
+        if ($stepCount === 0) {
+            $parentTracker->finish();
+            return $results;
+        }
+        
+        // Create sub-trackers for each step with equal weight
+        $stepWeight = 1.0 / $stepCount;
+        $stepTrackers = [];
+        
+        // Create all step trackers upfront for accurate progress calculation
         for ($i = 0; $i < $stepCount; $i++) {
             $step = $steps[$i];
-            $stepWeight = 1 / $stepCount;
-            $stepTracker = $this->mainTracker->stage($stepWeight, $this->getStepCaption($step));
-
+            $stepNumber = $i + 1;
+            $stepCaption = $this->getStepCaption($step);
+            $stepTrackers[$i] = $parentTracker->stage(
+                $stepWeight, 
+                sprintf("Step %d/%d: %s", $stepNumber, $stepCount, $stepCaption)
+            );
+        }
+        
+        // Execute each step
+        for ($i = 0; $i < $stepCount; $i++) {
+            $step = $steps[$i];
+            $stepTracker = $stepTrackers[$i];
+            
             try {
                 $runner = $this->createStepRunner($step);
                 $results[$i] = $runner->run($step, $this->runtime, $stepTracker);
-                $stepTracker->finish();
-            } catch ( Exception $e) {
+                
+                // If step didn't call finish(), do it for them
+                if (!$stepTracker->isDone()) {
+                    $stepTracker->finish();
+                }
+            } catch (Exception $e) {
                 $results[$i] = $e;
+                $stepTracker->setCaption(sprintf("%s (FAILED: %s)", 
+                    $stepTracker->getCaption(), 
+                    $e->getMessage()
+                ));
+                
+                // Mark as done but not 100% to indicate error
+                $stepTracker->set(99.9);
                 $stepTracker->finish();
 
                 // Determine if we should continue or stop execution
                 $continueOnError = $step->continueOnError ?? false;
                 if (!$continueOnError) {
                     throw new RuntimeException(
-                        "Error when executing step " . (get_class($step)) . " (number " . ($i + 1) . " in the plan)",
+                        sprintf("Error when executing step %s (number %d in the plan)",
+                            get_class($step),
+                            $i + 1
+                        ),
                         0,
                         $e
                     );
                 }
             }
         }
+        
         return $results;
-	}
+    }
 
     private function getStepCaption($step): string {
         $stepClass = get_class($step);
@@ -2423,7 +2531,6 @@ class BlueprintRunner {
         throw new \InvalidArgumentException('Unknown step type: ' . get_class($step));
     }
 }
-
 
 // $complex_blueprint = Blueprint::fromValidatedArray(json_decode(<<<'JSON'
 // {
@@ -2568,9 +2675,9 @@ $simple_blueprint = <<<'JSON'
       "step": "writeFiles",
       "files": {
         "wp-content/uploads/custom-file.txt": {
-		    "filename": "custom-file.txt",
-		    "content": "This is a custom file created by the Blueprint."
-		},
+            "filename": "custom-file.txt",
+            "content": "This is a custom file created by the Blueprint."
+        },
         "builder.php": "./test_file.txt"
       }
     }
@@ -2578,13 +2685,17 @@ $simple_blueprint = <<<'JSON'
 } 
 JSON;
 
+// Update the test run at the bottom to use the progress handler
 $runtime = new Runtime(__DIR__ . '/test_blueprint_runner', __DIR__);
 
 $runnerConfiguration = RunnerConfiguration::create()
-	->setRawBlueprint($simple_blueprint)
-	->setTargetSiteRoot(__DIR__ . '/test_blueprint_runner')
-	->setTargetSiteUrl('http://127.0.0.1:9850')
-	->setExecutionContextRoot(__DIR__);
+    ->setRawBlueprint($simple_blueprint)
+    ->setTargetSiteRoot(__DIR__ . '/test_blueprint_runner')
+    ->setTargetSiteUrl('http://127.0.0.1:9850')
+    ->setExecutionContextRoot(__DIR__);
 
-$runner = new BlueprintRunner($runnerConfiguration);
+// Create a BlueprintRunner with a custom progress logger that writes to STDOUT
+$runner = new BlueprintRunner($runnerConfiguration, function($progress, $caption) {
+    printf("[%3d%%] %s\n", $progress, $caption);
+});
 $runner->run();

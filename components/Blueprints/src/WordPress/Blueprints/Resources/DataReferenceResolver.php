@@ -46,7 +46,7 @@ class DataReferenceResolver {
 	 * Resolves a data reference into either a ByteReadStream or Filesystem instance.
 	 *
 	 * @param mixed $reference The reference to resolve (string or array)
-	 * @return The resolved reference
+	 * @return File|Directory The resolved reference
 	 * @throws \Exception If the reference type is unsupported
 	 */
 	public function resolve( DataReference $reference ): File|Directory {

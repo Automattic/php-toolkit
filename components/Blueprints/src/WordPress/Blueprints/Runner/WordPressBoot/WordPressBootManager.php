@@ -33,6 +33,7 @@ class WordPressBootManager {
 			$path_in_zip = '/wordpress';
 		}
 
+		// @TODO: Track unzipping progress
 		copy_between_filesystems([
 			'source_filesystem' => $zipFs,
 			'source_path'       => $path_in_zip,
@@ -54,6 +55,7 @@ class WordPressBootManager {
 			if ($zipFs->exists('sqlite-database-integration')) {
 				$sourcePath = '/sqlite-database-integration';
 			}
+			// @TODO: Track unzipping progress
 			copy_between_filesystems([
 				'source_filesystem' => $zipFs,
 				'source_path'       => $sourcePath,
