@@ -3,15 +3,16 @@
 namespace WordPress\Blueprints\Runner\WordPressBoot;
 
 use WordPress\Blueprints\Resources\Model\DataReference;
+use WordPress\Blueprints\Runtime\Runtime;
 
 class BootOptions {
 	public string $siteUrl;
-	public string $documentRoot;
+	public Runtime $runtime;
 	public ?DataReference $wordPressZip = null;
 	public ?DataReference $sqliteIntegrationPluginZip = null;
 
 	public static function parse(array $options): self {
-		$required = ['siteUrl', 'documentRoot'];
+		$required = ['siteUrl', 'runtime'];
 		foreach ($required as $key) {
 			if (!array_key_exists($key, $options)) {
 				throw new \InvalidArgumentException("Missing required option: {$key}");
@@ -19,7 +20,7 @@ class BootOptions {
 		}
 		$instance = new self();
 		$instance->siteUrl = $options['siteUrl'];
-		$instance->documentRoot = $options['documentRoot'];
+		$instance->runtime = $options['runtime'];
 
 		if (!isset($options['wordPressZip'])) {
 			$instance->wordPressZip = DataReference::create(self::resolveWordPressRelease('latest')['releaseUrl']);

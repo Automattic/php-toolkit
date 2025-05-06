@@ -16,7 +16,7 @@ class WordPressBootManager {
 
 	public static function boot(BootOptions $options): Runtime {
 		// Initialize runtime for the given document root
-		$runtime = new Runtime($options->documentRoot);
+		$runtime = $options->runtime;
 
 		// Ensure document root directory exists (LocalFilesystem::create creates it)
 		$targetFs = $runtime->getTargetFilesystem();

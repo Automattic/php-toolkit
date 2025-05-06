@@ -11,6 +11,9 @@ use WordPress\Blueprints\Progress\Tracker;
 use WordPress\Blueprints\Resources\Model\DataReference;
 use WordPress\Blueprints\Resources\Model\Directory;
 use WordPress\Blueprints\Resources\Model\File;
+use WordPress\Blueprints\Resources\Model\WordPressOrgPlugin;
+use WordPress\Blueprints\Runner\WordPressBoot\BootOptions;
+use WordPress\Blueprints\Runner\WordPressBoot\WordPressBootManager;
 use WordPress\Blueprints\Runtime\Runtime;
 use WordPress\Filesystem\FilesystemException;
 use WordPress\Filesystem\FilesystemHelpers;
@@ -1680,7 +1683,7 @@ class Blueprint
             case 'installPlugin':
                 $pluginDef = $data['plugin'];
                 if (is_string($pluginDef)) {
-                    return new InstallPluginStep($pluginDef);
+                    return new InstallPluginStep(new WordPressOrgPlugin($pluginDef));
                 } else {
                     $source = $pluginDef['source'];
                     $active = $pluginDef['active'] ?? true;
@@ -2026,6 +2029,9 @@ class RunnerConfiguration
     /** @var string File-system directory in which the Blueprint will be executed */
     private string $targetSiteRoot;
 
+	/** @var string The URL of the target site */
+	private string $targetSiteUrl;
+
 	/** @var string Local path to source the Blueprint context from */
 	private string $executionContextRoot;
     
@@ -2058,6 +2064,17 @@ class RunnerConfiguration
 	public function getRawBlueprint(): array|string
 	{
 		return $this->rawBlueprint;
+	}
+
+	public function getTargetSiteUrl(): string
+	{
+		return $this->targetSiteUrl;
+	}
+
+	public function setTargetSiteUrl(string $targetSiteUrl): self
+	{
+		$this->targetSiteUrl = $targetSiteUrl;
+		return $this;
 	}
     
     /**
@@ -2286,8 +2303,21 @@ class BlueprintRunner {
 
 	public function run() {
 		$this->resolveBlueprint();
+		$this->resolveSite();
 		$this->runSteps();
     }
+
+	/**
+	 * @TODO: Support running the Blueprint on an existing site
+	 */
+	private function resolveSite() {
+		WordPressBootManager::boot(
+			BootOptions::parse([
+				'runtime' => $this->runtime,
+				'siteUrl' => $this->runnerConfiguration->getTargetSiteUrl(),
+			])
+		);
+	}
 
 	/**
 	 * @TODO: support sourcing Blueprints from arbitrary sources
@@ -2510,6 +2540,9 @@ $simple_blueprint = <<<'JSON'
 {
   "version": 2,
   "$schema": "https://raw.githubusercontent.com/WordPress/blueprints/trunk/blueprints/schema.json",
+  "plugins": [
+    "friends"
+  ],
   "blueprintMeta": {
     "name": "Full Featured Blueprint",
     "description": "A blueprint demonstrating most of the available features",
@@ -2519,6 +2552,16 @@ $simple_blueprint = <<<'JSON'
     "donateLink": "https://example.com/donate",
     "tags": ["test", "full-features", "demo"],
     "license": "GPL-2.0"
+  },
+  "postTypes": {
+    "book": {
+      "label": "Books",
+      "description": "Books post type",
+      "public": true,
+      "has_archive": true,
+      "show_in_rest": true,
+      "supports": ["title", "editor", "author", "thumbnail", "excerpt", "comments"]
+    }
   },
   "additionalStepsAfterExecution": [
     {
@@ -2545,6 +2588,7 @@ $runtime = new Runtime(__DIR__ . '/test_blueprint_runner', __DIR__);
 $runnerConfiguration = RunnerConfiguration::create()
 	->setRawBlueprint($simple_blueprint)
 	->setTargetSiteRoot(__DIR__ . '/test_blueprint_runner')
+	->setTargetSiteUrl('http://127.0.0.1:9850')
 	->setExecutionContextRoot(__DIR__);
 
 $runner = new BlueprintRunner($runnerConfiguration);
