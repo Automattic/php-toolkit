@@ -18,6 +18,7 @@ class ExecutionContextPath extends DataReference {
 	 */
 	public function __construct( string $path ) {
 		$this->path = $path;
+		parent::__construct();
 	}
 
 	/**
@@ -57,5 +58,15 @@ class ExecutionContextPath extends DataReference {
 	 */
 	public static function is_valid( $path ): bool {
 		return is_string($path) && (strpos( $path, './' ) === 0 || strpos( $path, '/' ) === 0);
+	}
+
+	/**
+	 * Get a human-readable name for this reference.
+	 * Used in the progress tracker.
+	 *
+	 * @return string The human-readable name.
+	 */
+	public function get_human_readable_name(): string {
+		return "Context path: " . $this->path;
 	}
 } 

@@ -28,5 +28,16 @@ class File extends DataReference {
 	public function __construct( ByteReadStream $stream, string $filename ) {
 		$this->stream   = $stream;
 		$this->filename = $filename;
+		parent::__construct();
+	}
+
+	/**
+	 * Get a human-readable name for this reference.
+	 * Used in the progress tracker.
+	 *
+	 * @return string The human-readable name.
+	 */
+	public function get_human_readable_name(): string {
+		return "File: " . $this->filename;
 	}
 }

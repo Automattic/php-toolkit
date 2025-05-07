@@ -25,6 +25,7 @@ class InlineDirectory extends DataReference {
 	public function __construct( string $name, array $children ) {
 		$this->name     = $name;
 		$this->children = $children;
+		parent::__construct();
 	}
 
 	/**
@@ -78,5 +79,15 @@ class InlineDirectory extends DataReference {
 	 */
 	public static function is_valid( $data ): bool {
 		return is_array( $data ) && isset( $data['name'] ) && isset( $data['children'] ) && is_array( $data['children'] );
+	}
+
+	/**
+	 * Get a human-readable name for this reference.
+	 * Used in the progress tracker.
+	 *
+	 * @return string The human-readable name.
+	 */
+	public function get_human_readable_name(): string {
+		return "Inline directory: " . $this->name;
 	}
 } 

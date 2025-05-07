@@ -20,6 +20,9 @@ use WordPress\Blueprints\Runner\WordPressBoot\WordPressBootManager;
 use WordPress\Blueprints\Runtime\Runtime;
 use WordPress\Filesystem\FilesystemException;
 use WordPress\Filesystem\FilesystemHelpers;
+use WordPress\Filesystem\LocalFilesystem;
+use WordPress\HttpClient\Client;
+use WordPress\HttpClient\Request;
 use WordPress\Zip\FileEntry;
 use WordPress\Zip\ZipDecoder;
 use WordPress\Zip\ZipEncoder;
@@ -34,6 +37,43 @@ error_reporting(E_ALL & ~E_DEPRECATED & ~E_USER_DEPRECATED);
 // Initialize runtime for the given document root
 require_once __DIR__ . '/../../../../vendor/autoload.php';
 require_once __DIR__ . '/../../../../../../vendor/autoload.php';
+
+function fetch_http_headers(string $url): array {
+    $context = stream_context_create([
+        'http' => [
+            'method' => 'GET',
+            'follow_location' => 1,
+            'max_redirects' => 10,
+            'ignore_errors' => true,
+        ]
+    ]);
+
+    // Use a stream to only fetch headers without downloading the body
+    $fp = @fopen($url, 'r', false, $context);
+    if (!$fp) {
+        throw new RuntimeException("Failed to connect to: $url");
+    }
+
+    // Get headers from the stream
+    $meta_data = stream_get_meta_data($fp);
+    $headers = $meta_data['wrapper_data'];
+    
+    // Close the stream immediately to avoid downloading the body
+    fclose($fp);
+
+    // Convert headers to associative array
+    $result = [];
+    foreach ($headers as $header) {
+        if (strpos($header, ':') !== false) {
+            list($name, $value) = explode(':', $header, 2);
+            $result[trim($name)] = trim($value);
+        } elseif (strpos($header, 'HTTP/') === 0) {
+            $result[0] = $header;
+        }
+    }
+
+    return $result;
+}
 
 // --- Enums / Helper Data Objects ---
 
@@ -559,7 +599,7 @@ class InstallPluginStepRunner {
 
 		$fs = $runtime->getTargetFilesystem();
 		FilesystemHelpers::withTemporaryDirectory($fs, function($temp_dir) use ($fs, $runtime, $step, $tracker) {
-			$plugin_data = $runtime->resolveDataReference($step->getSource());
+			$plugin_data = $runtime->resolveReferencedData($step->getSource());
 
 			if ($plugin_data instanceof Directory) {
 				$zip_path = $temp_dir . '/' . $plugin_data->dirname . '.zip';
@@ -700,10 +740,8 @@ class InstallThemeStepRunner {
 		$fs = $runtime->getTargetFilesystem();
 		FilesystemHelpers::withTemporaryDirectory($fs, function($temp_dir) use ($fs, $runtime, $step, $tracker) {
 			// Create data reference for the theme source
-			$source = $step->getSource();
-			$dataRef = DataReference::create($source);
-
-			$theme_data = $runtime->resolveDataReference($dataRef);
+			$dataRef = $step->getSource();
+			$theme_data = $runtime->resolveReferencedData($dataRef);
 
 			if ($theme_data instanceof Directory) {
 				$zip_path = $temp_dir . '/' . $theme_data->dirname . '.zip';
@@ -1105,7 +1143,7 @@ class RunSQLStepRunner implements StepRunnerInterface {
 
 		// Get the data reference for the SQL file
 		$source = $step->getSource();
-		$sql = $runtime->resolveDataReference($source);
+		$sql = $runtime->resolveReferencedData($source);
 
 		if (!$sql instanceof File) {
 			throw new \InvalidArgumentException('The provided resource is not a file.');
@@ -1257,7 +1295,7 @@ class UnzipStepRunner implements StepRunnerInterface {
 
 		// Get the data reference for the zip file
 		$zipFile = $step->getZipFile();
-		$zip_stream = $runtime->resolveDataReference($zipFile);
+		$zip_stream = $runtime->resolveReferencedData($zipFile);
 
 		if (!$zip_stream instanceof File) {
 			throw new \InvalidArgumentException('The provided resource is not a zip file.');
@@ -1386,7 +1424,7 @@ class WriteFilesStepRunner {
 			if (is_string($data)) {
 				$content = $data;
 			} else {
-				$data_stream = $runtime->resolveDataReference($data);
+				$data_stream = $runtime->resolveReferencedData($data);
 				$content = $data_stream->stream->consume_all();
 			}
 
@@ -1411,7 +1449,7 @@ class WriteFilesStepRunner {
  */
 class Blueprint
 {
-    private array $originalData;
+    private array $validated_array;
     /** @var list<mixed> The calculated execution plan */
     private array $executionPlan;
     /** @var VersionConstraint|null Parsed WP version constraint */
@@ -1420,28 +1458,23 @@ class Blueprint
     private ?VersionConstraint $phpVersionConstraint;
     /** @var BlueprintMetadata Blueprint metadata */
     private BlueprintMetadata $metadata;
+	/** @var array<string, DataReference> Data references */
+	private array $dataReferences;
 
     /**
      * Private constructor to enforce creation via the static `create` method.
      *
-     * @param array $originalData
-     * @param list<mixed> $executionPlan
+     * @param array $validated_array
+     * @param list<mixed> $this->executionPlan
      * @param VersionConstraint|null $wordPressVersionConstraint
      * @param VersionConstraint|null $phpVersionConstraint
      * @param BlueprintMetadata $metadata
      */
     private function __construct(
-        array $originalData,
-        array $executionPlan,
-        ?VersionConstraint $wordPressVersionConstraint,
-        ?VersionConstraint $phpVersionConstraint,
-        BlueprintMetadata $metadata
+        array $validated_blueprint_array
     ) {
-        $this->originalData = $originalData;
-        $this->executionPlan = $executionPlan;
-        $this->wordPressVersionConstraint = $wordPressVersionConstraint;
-        $this->phpVersionConstraint = $phpVersionConstraint;
-        $this->metadata = $metadata;
+		$this->validated_array = $validated_blueprint_array;
+		$this->initialize();
     }
 
     public static function fromJsonString(string $jsonString): self
@@ -1478,30 +1511,33 @@ class Blueprint
      * @throws JsonException If the JSON string is invalid.
      * @throws InvalidArgumentException If the JSON structure is invalid for creating steps.
      */
-    public static function fromValidatedArray(array $data): self
+    public static function fromValidatedArray(array $validated_array): self
     {
-        $executionPlan = [];
+        return new self( $validated_array );
+    }
 
+	private function initialize(): void {
+		$validated_array = $this->validated_array;
         // --- Process Declarative Properties into Steps (in order) ---
 
         // 1. constants
-        if (!empty($data['constants']) && is_array($data['constants'])) {
-            $executionPlan[] = Blueprint::createStepObject('defineConstants', ['constants' => $data['constants']]);
+        if ( !empty($validated_array['constants']) && is_array($validated_array['constants'])) {
+            $this->executionPlan[] = $this->createStepObject('defineConstants', ['constants' => $validated_array['constants']]);
         }
 
         // 2. siteOptions
-        if (!empty($data['siteOptions']) && is_array($data['siteOptions'])) {
+        if ( !empty($validated_array['siteOptions']) && is_array($validated_array['siteOptions'])) {
             // Ensure siteUrl is not included as per schema Omit<>
-            unset($data['siteOptions']['siteUrl']);
-            if (!empty($data['siteOptions'])) {
-                $executionPlan[] = Blueprint::createStepObject('setSiteOptions', ['options' => $data['siteOptions']]);
+            unset($validated_array['siteOptions']['siteUrl']);
+            if (!empty($validated_array['siteOptions'])) {
+                $this->executionPlan[] = $this->createStepObject('setSiteOptions', ['options' => $validated_array['siteOptions']]);
             }
         }
 
         // 3. muPlugins - Install via writeFiles step
-        if (!empty($data['muPlugins']) && is_array($data['muPlugins'])) {
+        if ( !empty($validated_array['muPlugins']) && is_array($validated_array['muPlugins'])) {
             $files = [];
-            foreach ($data['muPlugins'] as $pluginPath => $pluginContent) {
+            foreach ($validated_array['muPlugins'] as $pluginPath => $pluginContent) {
                 if (is_string($pluginPath) && is_string($pluginContent)) {
                     $files['/wp-content/mu-plugins/' . $pluginPath] = $pluginContent;
                 } elseif (is_string($pluginContent)) {
@@ -1510,22 +1546,22 @@ class Blueprint
                 }
             }
             if (!empty($files)) {
-                $executionPlan[] = Blueprint::createStepObject('writeFiles', ['files' => $files]);
+                $this->executionPlan[] = $this->createStepObject('writeFiles', ['files' => $files]);
             }
         }
 
         // 4. themes (install non-active)
-        if (!empty($data['themes']) && is_array($data['themes'])) {
-            foreach ($data['themes'] as $themeRef) {
+        if ( !empty($validated_array['themes']) && is_array($validated_array['themes'])) {
+            foreach ($validated_array['themes'] as $themeRef) {
                 if (is_string($themeRef)) {
-                    $executionPlan[] = Blueprint::createStepObject('installTheme', [
+                    $this->executionPlan[] = $this->createStepObject('installTheme', [
                         'source' => $themeRef,
                         'activate' => false,
                         'importStarterContent' => false,
                     ]);
                 } elseif (is_array($themeRef) && isset($themeRef['source']) && is_string($themeRef['source'])) {
                     // Pass through the raw definition for extensibility.
-                    $executionPlan[] = Blueprint::createStepObject('installTheme', [
+                    $this->executionPlan[] = $this->createStepObject('installTheme', [
                         'source' => $themeRef['source'],
                         'activate' => $themeRef['activate'] ?? false,
                         'importStarterContent' => $themeRef['importStarterContent'] ?? false,
@@ -1538,16 +1574,16 @@ class Blueprint
         }
 
         // 5. activeTheme (install and activate)
-        if (isset($data['activeTheme'])) {
-            $themeRef = $data['activeTheme'];
+        if (isset($validated_array['activeTheme'])) {
+            $themeRef = $validated_array['activeTheme'];
             if (is_string($themeRef)) {
-                $executionPlan[] = Blueprint::createStepObject('installTheme', [
+                $this->executionPlan[] = $this->createStepObject('installTheme', [
                     'source' => $themeRef,
                     'activate' => true,
                     'importStarterContent' => false,
                 ]);
             } elseif (is_array($themeRef) && isset($themeRef['source']) && is_string($themeRef['source'])) {
-                $executionPlan[] = Blueprint::createStepObject('installTheme', [
+                $this->executionPlan[] = $this->createStepObject('installTheme', [
                     'source' => $themeRef['source'],
                     'activate' => true,
                     'importStarterContent' => $themeRef['importStarterContent'] ?? false,
@@ -1559,49 +1595,49 @@ class Blueprint
         }
 
         // 6. plugins
-        if (!empty($data['plugins']) && is_array($data['plugins'])) {
-            foreach ($data['plugins'] as $pluginDef) {
-                $executionPlan[] = Blueprint::createStepObject('installPlugin', ['plugin' => $pluginDef]);
+        if ( !empty($validated_array['plugins']) && is_array($validated_array['plugins'])) {
+            foreach ($validated_array['plugins'] as $pluginDef) {
+                $this->executionPlan[] = $this->createStepObject('installPlugin', ['plugin' => $pluginDef]);
             }
         }
 
         // 7. fonts – not directly supported; use RunPHP placeholders.
-        if (!empty($data['fonts']) && is_array($data['fonts'])) {
+        if ( !empty($validated_array['fonts']) && is_array($validated_array['fonts'])) {
 			throw new InvalidArgumentException('Fonts are not supported yet.');
-            $code = '// TODO: Install fonts declared in Blueprint. Fonts JSON: ' . var_export($data['fonts'], true) . ';';
-            $executionPlan[] = Blueprint::createStepObject('runPHP', ['code' => $code]);
+            $code = '// TODO: Install fonts declared in Blueprint. Fonts JSON: ' . var_export($validated_array['fonts'], true) . ';';
+            $this->executionPlan[] = $this->createStepObject('runPHP', ['code' => $code]);
         }
 
         // 8. media – use RunPHP placeholders.
-        if (!empty($data['media']) && is_array($data['media'])) {
+        if ( !empty($validated_array['media']) && is_array($validated_array['media'])) {
 			throw new InvalidArgumentException('Media is not supported yet.');
-            $code = '// TODO: Import media declared in Blueprint. Media JSON: ' . var_export($data['media'], true) . ';';
-            $executionPlan[] = Blueprint::createStepObject('runPHP', ['code' => $code]);
+            $code = '// TODO: Import media declared in Blueprint. Media JSON: ' . var_export($validated_array['media'], true) . ';';
+            $this->executionPlan[] = $this->createStepObject('runPHP', ['code' => $code]);
         }
 
         // 9. siteLanguage
-        if (!empty($data['siteLanguage']) && is_string($data['siteLanguage'])) {
-            $executionPlan[] = Blueprint::createStepObject('setSiteLanguage', ['language' => $data['siteLanguage']]);
+        if ( !empty($validated_array['siteLanguage']) && is_string($validated_array['siteLanguage'])) {
+            $this->executionPlan[] = $this->createStepObject('setSiteLanguage', ['language' => $validated_array['siteLanguage']]);
         }
 
         // 10. roles - create custom roles using WordPress role management
-        if (!empty($data['roles']) && is_array($data['roles'])) {
-            $executionPlan[] = Blueprint::createStepObject('createRoles', ['roles' => $data['roles']]);
+        if ( !empty($validated_array['roles']) && is_array($validated_array['roles'])) {
+            $this->executionPlan[] = $this->createStepObject('createRoles', ['roles' => $validated_array['roles']]);
         }
 
         // 11. users - create users using WordPress user management
-        if (!empty($data['users']) && is_array($data['users'])) {
-            $executionPlan[] = Blueprint::createStepObject('createUsers', ['users' => $data['users']]);
+        if ( !empty($validated_array['users']) && is_array($validated_array['users'])) {
+            $this->executionPlan[] = $this->createStepObject('createUsers', ['users' => $validated_array['users']]);
         }
 
         // 12. postTypes – generate one MU-plugin per post type, skipping those already registered.
-        if (!empty($data['postTypes']) && is_array($data['postTypes'])) {
-            $executionPlan[] = Blueprint::createStepObject('createPostTypes', ['postTypes' => $data['postTypes']]);
+        if ( !empty($validated_array['postTypes']) && is_array($validated_array['postTypes'])) {
+            $this->executionPlan[] = $this->createStepObject('createPostTypes', ['postTypes' => $validated_array['postTypes']]);
         }
 
         // 13. content – Import inline posts via wp_insert_post().
-        if (!empty($data['content']) && is_array($data['content'])) {
-            foreach ($data['content'] as $contentEntry) {
+        if ( !empty($validated_array['content']) && is_array($validated_array['content'])) {
+            foreach ($validated_array['content'] as $contentEntry) {
                 if (!isset($contentEntry['type'], $contentEntry['source'])) {
                     throw new InvalidArgumentException('Invalid content entry: missing "type" or "source" key.');
                 }
@@ -1630,30 +1666,28 @@ class Blueprint
                     continue;
                 }
 
-                $executionPlan[] = Blueprint::createStepObject('importPosts', ['posts' => $inlinePosts]);
+                $this->executionPlan[] = $this->createStepObject('importPosts', ['posts' => $inlinePosts]);
             }
         }
 
         // 14. additionalStepsAfterExecution
-        if (!empty($data['additionalStepsAfterExecution']) && is_array($data['additionalStepsAfterExecution'])) {
-            foreach ($data['additionalStepsAfterExecution'] as $stepData) {
-                $executionPlan[] = Blueprint::createStepObject($stepData['step'], $stepData);
+        if ( !empty($validated_array['additionalStepsAfterExecution']) && is_array($validated_array['additionalStepsAfterExecution'])) {
+            foreach ($validated_array['additionalStepsAfterExecution'] as $stepData) {
+                $this->executionPlan[] = $this->createStepObject($stepData['step'], $stepData);
             }
         }
 
         // --- Extract Metadata and Constraints ---
-        $wpConstraint  = $data['wordpressVersion'] ?? null;
-        $phpConstraint = $data['phpVersion'] ?? null;
-        $metadata      = $data['blueprintMeta'] ?? null;
-
-        return new self(
-            $data,
-            $executionPlan,
-            VersionConstraint::fromMixed($wpConstraint, false),
-            VersionConstraint::fromMixed($phpConstraint, true),
-            BlueprintMetadata::fromArray($metadata)
-        );
-    }
+        $this->wordPressVersionConstraint  = VersionConstraint::fromMixed(
+	        $validated_array['wordpressVersion'] ?? null,
+			false
+		);
+        $this->phpVersionConstraint = VersionConstraint::fromMixed(
+	        $validated_array['phpVersion'] ?? null,
+			true
+		);
+        $this->metadata      = BlueprintMetadata::fromArray( $validated_array['blueprintMeta'] ?? null);
+	}
 
     /**
      * Helper method to create a specific step object from its type and data.
@@ -1663,7 +1697,7 @@ class Blueprint
      * @return mixed A Step object instance.
      * @throws InvalidArgumentException If the step type is unknown or data is invalid.
      */
-    private static function createStepObject(string $stepType, array $data): mixed
+    private function createStepObject(string $stepType, array $data): mixed
     {
         switch ($stepType) {
             case 'activatePlugin':
@@ -1679,11 +1713,11 @@ class Blueprint
             case 'installPlugin':
                 $pluginDef = $data['plugin'];
                 if (is_string($pluginDef)) {
-                    return new InstallPluginStep(DataReference::create($pluginDef, [
+                    return new InstallPluginStep($this->createDataReference($pluginDef, [
 						WordPressOrgPlugin::class,
 					]));
                 } else {
-                    $source = DataReference::create($pluginDef['source'], [
+					$source = $this->createDataReference($pluginDef['source'], [
 						WordPressOrgPlugin::class,
 					]);
                     $active = $pluginDef['active'] ?? true;
@@ -1692,7 +1726,7 @@ class Blueprint
                     return new InstallPluginStep($source, $active, $options, $onError);
                 }
             case 'installTheme':
-                $source = DataReference::create($data['source'], [
+                $source = $this->createDataReference($data['source'], [
 					WordPressOrgTheme::class,
 				]);
                 return new InstallThemeStep(
@@ -1723,7 +1757,7 @@ class Blueprint
                     $data['$_SERVER'] ?? null
                 );
             case 'runSql':
-                $source = $data['source'] instanceof DataReference ? $data['source'] : DataReference::create($data['source']);
+                $source = $this->createDataReference($data['source']);
                 return new RunSqlStep($source);
             case 'setSiteLanguage':
                 return new SetSiteLanguageStep($data['language']);
@@ -1955,7 +1989,7 @@ PHP;
                     $data['$_SERVER'] ?? null
                 );
             case 'unzip':
-                $zipFile = $data['zipFile'] instanceof DataReference ? $data['zipFile'] : DataReference::create($data['zipFile']);
+                $zipFile = $this->createDataReference($data['zipFile']);
                 return new UnzipStep($zipFile, $data['extractToPath']);
             case 'wp-cli':
                 return new WPCLIStep($data['command'], $data['wpCliPath'] ?? null);
@@ -1965,7 +1999,7 @@ PHP;
                     if (is_string($content)) {
                         $files[$path] = $content;
                     } else {
-                        $files[$path] = $content instanceof DataReference ? $content : DataReference::create($content);
+                        $files[$path] = $this->createDataReference($content);
                     }
                 }
                 return new WriteFilesStep($files);
@@ -1974,11 +2008,22 @@ PHP;
         }
     }
 
+	private function createDataReference(mixed $data, array $additional_reference_classes = []): DataReference {
+		$reference = $data instanceof DataReference ? $data : DataReference::create($data, $additional_reference_classes);
+		$this->dataReferences[$reference->id] = $reference;
+		return $reference;
+	}
+
     // --- Getters ---
 
-    public function getOriginalData(): array
+	public function getDataReferences(): array
+	{
+		return $this->dataReferences;
+	}
+
+    public function getvalidated_array(): array
     {
-        return $this->originalData;
+        return $this->validated_array;
     }
 
     /**
@@ -2017,7 +2062,7 @@ PHP;
 
 /**
  * Represents the configuration for the Blueprint Runner.
- * 
+ *
  * These settings are provided out-of-band (CLI flags, ENV variables, etc.)
  * and are never stored inside a Blueprint document.
  */
@@ -2027,7 +2072,7 @@ class RunnerConfiguration
 
     /** @var string Either 'create-new-site' or 'apply-to-existing-site' */
     private string $executionMode;
-    
+
     /** @var string File-system directory in which the Blueprint will be executed */
     private string $targetSiteRoot;
 
@@ -2036,19 +2081,19 @@ class RunnerConfiguration
 
 	/** @var string Local path to source the Blueprint context from */
 	private string $executionContextRoot;
-    
+
     /** @var string Database engine to use when executing the Blueprint */
     private string $databaseEngine = 'mysql';
-    
+
     /** @var array|null Connection parameters for the database */
     private ?array $databaseCredentials = null;
-    
+
     /** @var bool Whether to override user passwords with randomly-generated ones */
     private bool $generatePasswords = false;
-    
+
     /** @var string|false Path to save randomly-generated passwords */
     private $savePasswords = false;
-    
+
     /** @var string Strategy for importing content objects */
     private string $contentImportMode;
 
@@ -2078,7 +2123,7 @@ class RunnerConfiguration
 		$this->targetSiteUrl = $targetSiteUrl;
 		return $this;
 	}
-    
+
     /**
      * Sets the execution mode.
      *
@@ -2091,11 +2136,11 @@ class RunnerConfiguration
         if (!in_array($executionMode, ['create-new-site', 'apply-to-existing-site'])) {
             throw new InvalidArgumentException("Invalid execution mode: {$executionMode}");
         }
-        
+
         $this->executionMode = $executionMode;
         return $this;
     }
-    
+
     /**
      * Sets the target site reference.
      *
@@ -2112,7 +2157,7 @@ class RunnerConfiguration
 	{
 		return $this->targetSiteRoot;
 	}
-    
+
     /**
      * Sets the database engine.
      *
@@ -2125,11 +2170,11 @@ class RunnerConfiguration
         if (!in_array($databaseEngine, ['mysql', 'sqlite'])) {
             throw new InvalidArgumentException("Invalid database engine: {$databaseEngine}");
         }
-        
+
         $this->databaseEngine = $databaseEngine;
         return $this;
     }
-    
+
     /**
      * Sets the database credentials.
      *
@@ -2141,7 +2186,7 @@ class RunnerConfiguration
         $this->databaseCredentials = $databaseCredentials;
         return $this;
     }
-    
+
     /**
      * Sets whether to generate passwords.
      *
@@ -2153,7 +2198,7 @@ class RunnerConfiguration
         $this->generatePasswords = $generatePasswords;
         return $this;
     }
-    
+
     /**
      * Sets the path to save passwords.
      *
@@ -2171,7 +2216,7 @@ class RunnerConfiguration
 		$this->executionContextRoot = $executionContextRoot;
 		return $this;
 	}
-	
+
     /**
      * Sets the content import mode.
      *
@@ -2184,11 +2229,11 @@ class RunnerConfiguration
         if (!in_array($contentImportMode, ['append', 'replace-all', 'merge'])) {
             throw new InvalidArgumentException("Invalid content import mode: {$contentImportMode}");
         }
-        
+
         $this->contentImportMode = $contentImportMode;
         return $this;
     }
-    
+
     /**
      * Validates the configuration.
      *
@@ -2200,22 +2245,22 @@ class RunnerConfiguration
         if (!isset($this->executionMode)) {
             throw new InvalidArgumentException('Execution mode must be set');
         }
-        
+
         if (!isset($this->targetSiteRef)) {
             throw new InvalidArgumentException('Target site reference must be set');
         }
-        
+
         if (!isset($this->contentImportMode)) {
             throw new InvalidArgumentException('Content import mode must be set');
         }
-        
+
         if ($this->databaseEngine === 'mysql' && $this->executionMode === 'create-new-site' && empty($this->databaseCredentials)) {
             throw new InvalidArgumentException('MySQL credentials are required for create-new-site mode');
         }
-        
+
         return true;
     }
-    
+
     /**
      * Gets the execution mode.
      *
@@ -2225,7 +2270,7 @@ class RunnerConfiguration
     {
         return $this->executionMode;
     }
-    
+
     /**
      * Gets the target site reference.
      *
@@ -2235,7 +2280,7 @@ class RunnerConfiguration
     {
         return $this->executionContextRoot;
     }
-    
+
     /**
      * Gets the database engine.
      *
@@ -2245,7 +2290,7 @@ class RunnerConfiguration
     {
         return $this->databaseEngine;
     }
-    
+
     /**
      * Gets the database credentials.
      *
@@ -2255,7 +2300,7 @@ class RunnerConfiguration
     {
         return $this->databaseCredentials;
     }
-    
+
     /**
      * Checks if passwords should be generated.
      *
@@ -2265,7 +2310,7 @@ class RunnerConfiguration
     {
         return $this->generatePasswords;
     }
-    
+
     /**
      * Gets the path to save passwords.
      *
@@ -2275,7 +2320,7 @@ class RunnerConfiguration
     {
         return $this->savePasswords;
     }
-    
+
     /**
      * Gets the content import mode.
      *
@@ -2295,19 +2340,19 @@ class ProgressLogger {
      * @var callable
      */
     private $logCallback;
-    
+
     /**
      * Create a new progress logger with the given logging function
-     * 
+     *
      * @param callable $logCallback Function that receives progress updates
      */
     public function __construct(callable $logCallback) {
         $this->logCallback = $logCallback;
     }
-    
+
     /**
      * Attach this logger to a Tracker instance
-     * 
+     *
      * @param Tracker $tracker The tracker to log progress for
      */
     public function attachTo(Tracker $tracker) {
@@ -2317,7 +2362,7 @@ class ProgressLogger {
                 call_user_func($this->logCallback, $event->getProgress(), $event->getCaption());
             }
         );
-        
+
         $tracker->events->addListener(
             DoneEvent::class,
             function () {
@@ -2336,18 +2381,14 @@ class BlueprintRunner {
 
     /**
      * Create a new BlueprintRunner with the given configuration
-     * 
+     *
      * @param RunnerConfiguration $runnerConfiguration Configuration for the runner
      * @param callable|null $progressCallback Optional callback for progress updates
      */
     public function __construct(RunnerConfiguration $runnerConfiguration, ?callable $progressCallback = null) {
         $this->runnerConfiguration = $runnerConfiguration;
-        $this->runtime = new Runtime(
-            $runnerConfiguration->getTargetSiteRoot(),
-            $runnerConfiguration->getExecutionContextRoot(),
-        );
         $this->mainTracker = new Tracker();
-        
+
 		// Default progress handler logs to stderr
         $this->progressLogger = new ProgressLogger(
             $progressCallback ?? function($progress, $caption) {
@@ -2358,38 +2399,21 @@ class BlueprintRunner {
     }
 
     public function run() {
-        // Create all progress stages upfront for accurate progress tracking
-        $blueprintStage = $this->mainTracker->stage(0.2, 'Resolving Blueprint');
-        $siteStage = $this->mainTracker->stage(0.3, 'Setting up WordPress site');
+        // Create all top-level progress stages upfront so the tracker knows what %
+		// of the total work is being done with every progress update.
+		//
+		// The stage weights are arbitrary and can be tweaked as needed.
+		// They have to add up to 1.
+        $dataResolutionStage = $this->mainTracker->stage(0.25, 'Resolving data references');
+        $blueprintStage = $this->mainTracker->stage(0.05, 'Resolving Blueprint');
+        $siteStage = $this->mainTracker->stage(0.2, 'Setting up WordPress site');
         $executionStage = $this->mainTracker->stage(0.5, 'Executing Blueprint steps');
-        
+
         $blueprintStage->setCaption('Loading Blueprint data');
-        $this->resolveBlueprint();
-        $blueprintStage->finish();
-        
-        $siteStage->setCaption('Booting WordPress environment');
-        $this->resolveSite();
-        $siteStage->finish();
-        
-        $this->runSteps($executionStage);
-    }
-
-    /**
-     * @TODO: Support running the Blueprint on an existing site
-     */
-    private function resolveSite() {
-        WordPressBootManager::boot(
-            BootOptions::parse([
-                'runtime' => $this->runtime,
-                'siteUrl' => $this->runnerConfiguration->getTargetSiteUrl(),
-            ])
-        );
-    }
-
-    /**
-     * @TODO: support sourcing Blueprints from arbitrary sources
-     */
-    private function resolveBlueprint() {
+		// Resolve the blueprint.
+		// @TODO: Support more data sources.
+		// @TODO: Rename Blueprint class to ExecutionPlan. Separate it from
+		//        the execution target resolution.
         $rawBlueprint = $this->runnerConfiguration->getRawBlueprint();
         if(is_string($rawBlueprint)) {
             $this->blueprint = Blueprint::fromJsonString($rawBlueprint);
@@ -2398,11 +2422,141 @@ class BlueprintRunner {
         } else {
             throw new RuntimeException('Invalid blueprint source');
         }
+        $blueprintStage->finish();
+
+		// @TODO: Resolve just like any other resource (but only if we're creating a new site)
+		if (!isset($options['wordPressZip'])) {
+			$wordPressZip = DataReference::create('https://wordpress.org/latest.zip');
+		} else if(is_string($options['wordPressZip'])) {
+			$wordPressZip = DataReference::create($options['wordPressZip']);
+		} else {
+			throw new \InvalidArgumentException('The wordPressZip option must be a DataReference but was ' . gettype($options['wordPressZip']));
+		}
+
+		// @TODO: Resolve just like any other resource (but only if we're creating a new site)
+		if(!isset($options['sqliteIntegrationPluginZip'])) {
+			$sqliteIntegrationPluginZip = DataReference::create('https://downloads.wordpress.org/plugin/sqlite-database-integration.zip');
+		} else if(is_string($options['sqliteIntegrationPluginZip'])) {
+			$sqliteIntegrationPluginZip = DataReference::create($options['sqliteIntegrationPluginZip']);
+		} else {
+			throw new \InvalidArgumentException('The sqliteIntegrationPluginZip option must be a DataReference but was ' . gettype($options['sqliteIntegrationPluginZip']));
+		}
+
+		$data_references = [
+			...$this->blueprint->getDataReferences(),
+			$wordPressZip,
+			$sqliteIntegrationPluginZip,
+		];
+
+        $this->runtime = new Runtime(
+            documentRoot: $this->runnerConfiguration->getTargetSiteRoot(),
+			executionContext: LocalFilesystem::create(
+				$this->runnerConfiguration->getExecutionContextRoot()
+			),
+			dataReferences: $data_references,
+			dataResolutionTracker: $dataResolutionStage,
+        );
+
+        $siteStage->setCaption('Booting WordPress environment');
+		// Resolve the execution target.
+		// @TODO: Support existing sites.
+		echo "Booting WordPress environment\n";
+        WordPressBootManager::boot( [
+			'runtime' => $this->runtime,
+			'siteUrl' => $this->runnerConfiguration->getTargetSiteUrl(),
+			'wordPressZip' => $wordPressZip,
+			'sqliteIntegrationPluginZip' => $sqliteIntegrationPluginZip,
+		] );
+        $siteStage->finish();
+
+        $this->runSteps($executionStage);
     }
 
+	/**
+	 * Resolves a specific WordPress release URL and version string based on
+	 * a version query string such as "latest", "beta", or "6.6".
+	 *
+	 * Examples:
+	 * ```php
+	 * $result = resolveWordPressRelease('latest');
+	 * // becomes ['releaseUrl' => 'https://wordpress.org/wordpress-6.6.2.zip', 'version' => '6.6.2']
+	 *
+	 * $result = resolveWordPressRelease('beta');
+	 * // becomes ['releaseUrl' => 'https://wordpress.org/wordpress-6.6.2-RC1.zip', 'version' => '6.6.2-RC1']
+	 *
+	 * $result = resolveWordPressRelease('6.6');
+	 * // becomes ['releaseUrl' => 'https://wordpress.org/wordpress-6.6.2.zip', 'version' => '6.6.2']
+	 * ```
+	 *
+	 * @param string $versionQuery The WordPress version query string to resolve.
+	 * @return array The resolved WordPress release URL and version string.
+	 */
+	static public function resolveWordPressRelease($versionQuery = 'latest')
+	{
+		if (
+			str_starts_with($versionQuery, 'https://') ||
+			str_starts_with($versionQuery, 'http://')
+		) {
+			$sha1 = substr(sha1($versionQuery), 0, 8);
+			return [
+				'releaseUrl' => $versionQuery,
+				'version' => 'custom-' . $sha1,
+				'source' => 'inferred',
+			];
+		} else if ($versionQuery === 'trunk' || $versionQuery === 'nightly') {
+			return [
+				'releaseUrl' => 'https://wordpress.org/nightly-builds/wordpress-latest.zip',
+				'version' => 'nightly-' . date('Y-m-d'),
+				'source' => 'inferred',
+			];
+		}
+
+		$response = file_get_contents('https://api.wordpress.org/core/version-check/1.7/?channel=beta');
+		$latestVersions = json_decode($response, true);
+
+		$latestVersions = array_filter($latestVersions['offers'], function($v) {
+			return $v['response'] === 'autoupdate';
+		});
+
+		foreach ($latestVersions as $apiVersion) {
+			if ($versionQuery === 'beta' && strpos($apiVersion['version'], 'beta') !== false) {
+				return [
+					'releaseUrl' => $apiVersion['download'],
+					'version' => $apiVersion['version'],
+					'source' => 'api',
+				];
+			} else if (
+				$versionQuery === 'latest' &&
+				strpos($apiVersion['version'], 'beta') === false
+			) {
+				// The first non-beta item in the list is the latest version.
+				return [
+					'releaseUrl' => $apiVersion['download'],
+					'version' => $apiVersion['version'],
+					'source' => 'api',
+				];
+			} else if (
+				substr($apiVersion['version'], 0, strlen($versionQuery)) ===
+				$versionQuery
+			) {
+				return [
+					'releaseUrl' => $apiVersion['download'],
+					'version' => $apiVersion['version'],
+					'source' => 'api',
+				];
+			}
+		}
+
+		return [
+			'releaseUrl' => "https://wordpress.org/wordpress-{$versionQuery}.zip",
+			'version' => $versionQuery,
+			'source' => 'inferred',
+		];
+	}
+	
     /**
      * Run the steps in the execution plan with progress tracking
-     * 
+     *
      * @param Tracker $parentTracker The parent tracker for step execution
      * @return array Results from each step execution
      */
@@ -2410,47 +2564,47 @@ class BlueprintRunner {
         $results = [];
         $steps = $this->blueprint->getExecutionPlan();
         $stepCount = count($steps);
-        
+
         if ($stepCount === 0) {
             $parentTracker->finish();
             return $results;
         }
-        
+
         // Create sub-trackers for each step with equal weight
         $stepWeight = 1.0 / $stepCount;
         $stepTrackers = [];
-        
+
         // Create all step trackers upfront for accurate progress calculation
         for ($i = 0; $i < $stepCount; $i++) {
             $step = $steps[$i];
             $stepNumber = $i + 1;
             $stepCaption = $this->getStepCaption($step);
             $stepTrackers[$i] = $parentTracker->stage(
-                $stepWeight, 
+                $stepWeight,
                 sprintf("Step %d/%d: %s", $stepNumber, $stepCount, $stepCaption)
             );
         }
-        
+
         // Execute each step
         for ($i = 0; $i < $stepCount; $i++) {
             $step = $steps[$i];
             $stepTracker = $stepTrackers[$i];
-            
+
             try {
                 $runner = $this->createStepRunner($step);
                 $results[$i] = $runner->run($step, $this->runtime, $stepTracker);
-                
+
                 // If step didn't call finish(), do it for them
                 if (!$stepTracker->isDone()) {
                     $stepTracker->finish();
                 }
             } catch (Exception $e) {
                 $results[$i] = $e;
-                $stepTracker->setCaption(sprintf("%s (FAILED: %s)", 
-                    $stepTracker->getCaption(), 
+                $stepTracker->setCaption(sprintf("%s (FAILED: %s)",
+                    $stepTracker->getCaption(),
                     $e->getMessage()
                 ));
-                
+
                 // Mark as done but not 100% to indicate error
                 $stepTracker->set(99.9);
                 $stepTracker->finish();
@@ -2469,7 +2623,7 @@ class BlueprintRunner {
                 }
             }
         }
-        
+
         return $results;
     }
 
@@ -2640,7 +2794,7 @@ class BlueprintRunner {
 //       "code": "echo 'Blueprint execution completed!';"
 //     }
 //   ]
-// } 
+// }
 // JSON, true, 512, JSON_THROW_ON_ERROR));
 
 $simple_blueprint = <<<'JSON'
@@ -2686,8 +2840,6 @@ $simple_blueprint = <<<'JSON'
 JSON;
 
 // Update the test run at the bottom to use the progress handler
-$runtime = new Runtime(__DIR__ . '/test_blueprint_runner', __DIR__);
-
 $runnerConfiguration = RunnerConfiguration::create()
     ->setRawBlueprint($simple_blueprint)
     ->setTargetSiteRoot(__DIR__ . '/test_blueprint_runner')

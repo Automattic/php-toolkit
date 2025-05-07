@@ -33,6 +33,10 @@ class RequestReadStream extends BaseByteReadStream {
 	 * @var int
 	 */
 	private $remote_file_length;
+	/**
+	 * @var Tracker
+	 */
+	private $progress_tracker;
 
 	public function __construct( $request, $options = array() ) {
 		if ( is_string( $request ) ) {
@@ -43,25 +47,18 @@ class RequestReadStream extends BaseByteReadStream {
 		if(isset($options['buffer_size'])) {
 			$this->buffer_size = $options['buffer_size'];
 		}
+		if(isset($options['progress_tracker'])) {
+			$this->progress_tracker = $options['progress_tracker'];
+		}
 	}
 
 	public function get_request(): Request {
 		return $this->request;
 	}
 
-	public function get_response(): Response {
-		if ( ! $this->response ) {
-			$this->pull_until_event(
-				array(
-					'event' => Client::EVENT_GOT_HEADERS,
-				)
-			);
-		}
-		return $this->response;
-	}
-
 	protected function seek_outside_of_buffer( int $target_offset ): void {
 		if($target_offset > $this->tell()) {
+			echo "seek outside of buffer: " . $this->request->url . " " . $this->progress_tracker->getProgress() . "\n";
 			$pulled = $this->pull_exactly($target_offset - $this->tell());
 			$this->consume($pulled);
 		} else {
@@ -113,7 +110,18 @@ class RequestReadStream extends BaseByteReadStream {
 					break;
 				case Client::EVENT_BODY_CHUNK_AVAILABLE:
 					if ( $stop_at_event === Client::EVENT_BODY_CHUNK_AVAILABLE ) {
-						return $this->client->get_response_body_chunk();
+						$body_chunk = $this->client->get_response_body_chunk();
+
+						if($this->progress_tracker) {
+							$bytes_downloaded = $this->bytes_already_forgotten + strlen($this->buffer) + strlen($body_chunk);
+							// Arbitrarily assume 15MB if no length is provided
+							$length = $this->length();
+							if(!$length) {
+								$length = 15 * 1024 * 1024;
+							}
+							$this->progress_tracker->set($bytes_downloaded / $length * 100);
+						}
+						return $body_chunk;
 					}
 					break;
 				case Client::EVENT_FINISHED:

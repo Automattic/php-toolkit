@@ -58,11 +58,6 @@ abstract class BaseByteReadStream implements ByteReadStream {
 		return $this->pull_exactly( $n );
 	}
 
-	protected function pull_no_more_than( $n ): int {
-		$this->buffer .= $this->internal_pull( self::CHUNK_SIZE );
-		return min( $n, $this->count_consumable_bytes() );
-	}
-
 	protected function pull_exactly( $n ): int {
 		$empty_pulls = 0;
 		while ( $this->count_consumable_bytes() < $n ) {
@@ -82,6 +77,11 @@ abstract class BaseByteReadStream implements ByteReadStream {
 			}
 		}
 		return $n;
+	}
+
+	protected function pull_no_more_than( $n ): int {
+		$this->buffer .= $this->internal_pull( self::CHUNK_SIZE );
+		return min( $n, $this->count_consumable_bytes() );
 	}
 
 	public function consume_all(): string {

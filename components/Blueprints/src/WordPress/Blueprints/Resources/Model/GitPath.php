@@ -44,6 +44,7 @@ class GitPath extends DataReference {
 		$this->ref                 = $ref;
 		$this->path                = $path;
 		$this->local_directory_name = $local_directory_name;
+		parent::__construct();
 	}
 
 	/**
@@ -109,5 +110,17 @@ class GitPath extends DataReference {
 	 */
 	public static function is_valid( $data ): bool {
 		return is_array( $data ) && isset( $data['gitRepository'] );
+	}
+
+	/**
+	 * Get a human-readable name for this reference.
+	 * Used in the progress tracker.
+	 *
+	 * @return string The human-readable name.
+	 */
+	public function get_human_readable_name(): string {
+		$ref = $this->ref ? "#{$this->ref}" : "";
+		$path = $this->path ? "/{$this->path}" : "";
+		return "Git: {$this->git_repository}{$ref}{$path}";
 	}
 } 

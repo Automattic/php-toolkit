@@ -28,5 +28,16 @@ class Directory extends DataReference {
 	public function __construct( Filesystem $filesystem, string $dirname ) {
 		$this->filesystem = $filesystem;
 		$this->dirname    = $dirname;
+		parent::__construct();
+	}
+
+	/**
+	 * Get a human-readable name for this reference.
+	 * Used in the progress tracker.
+	 *
+	 * @return string The human-readable name.
+	 */
+	public function get_human_readable_name(): string {
+		return "Directory: " . $this->dirname;
 	}
 }

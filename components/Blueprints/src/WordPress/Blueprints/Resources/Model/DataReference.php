@@ -4,6 +4,13 @@ namespace WordPress\Blueprints\Resources\Model;
 
 class DataReference {
 
+	public int $id;
+	private static int $instanceCounter = 0;
+
+	public function __construct() {
+		$this->id = self::$instanceCounter++;
+	}
+
 	static public function create( $reference, array $additional_reference_classes = [] ) {
 		$classes = array(
 			URLReference::class,

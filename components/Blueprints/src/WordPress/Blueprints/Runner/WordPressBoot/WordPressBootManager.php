@@ -14,26 +14,31 @@ use function WordPress\Filesystem\wp_join_paths;
 
 class WordPressBootManager {
 
-	public static function boot(BootOptions $options): Runtime {
+	public static function boot(array $options): Runtime {
 		// Initialize runtime for the given document root
-		$runtime = $options->runtime;
+		$runtime = $options['runtime'];
 
 		// Ensure document root directory exists (LocalFilesystem::create creates it)
 		$targetFs = $runtime->getTargetFilesystem();
 
 		// Unzip WordPress core into document root
-		$resolved = $runtime->resolveDataReference($options->wordPressZip);
+		echo "Resolving WordPress zip\n";
+		$resolved = $runtime->resolveReferencedData($options['wordPressZip']);
 		if (!$resolved instanceof File) {
 			throw new \InvalidArgumentException('Provided zip reference does not resolve to a file');
 		}
 		$zipFs = ZipFilesystem::create($resolved->stream);
+		echo "Resolved WordPress zip\n";
 
 		$path_in_zip = '/';
+		echo "zipFs exists\n";
 		if(!$zipFs->exists('/wp-content') && $zipFs->exists('/wordpress')) {
 			$path_in_zip = '/wordpress';
 		}
+		echo "zipFs exists done\n";
 
 		// @TODO: Track unzipping progress
+		echo "Copying WordPress zip\n";
 		copy_between_filesystems([
 			'source_filesystem' => $zipFs,
 			'source_path'       => $path_in_zip,
@@ -41,10 +46,11 @@ class WordPressBootManager {
 			'target_path'       => '/',
 			'recursive'         => true,
 		]);
+		echo "Copied WordPress zip\n";
 
 		// If SQLite integration zip provided, unzip into appropriate folder
-		if ($options->sqliteIntegrationPluginZip) {
-			$resolved = $runtime->resolveDataReference($options->sqliteIntegrationPluginZip);
+		if ($options['sqliteIntegrationPluginZip']) {
+			$resolved = $runtime->resolveReferencedData($options['sqliteIntegrationPluginZip']);
 			if (!$resolved instanceof File) {
 				throw new \InvalidArgumentException('Provided zip reference does not resolve to a file');
 			}
@@ -110,7 +116,7 @@ PHP
 				$wp_cli_path,
 				'core',
 				'install',
-				'--url=' . $options->siteUrl,
+				'--url=' . $options['siteUrl'],
 				'--title=WordPress Site',
 				'--admin_user=admin',
 				'--admin_password=password',

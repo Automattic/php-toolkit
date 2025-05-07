@@ -2,6 +2,7 @@
 
 namespace WordPress\Blueprints\references;
 
+use WordPress\Blueprints\Progress\ProgressTrackedReadStream;
 use WordPress\Blueprints\RuntimeException;
 use WordPress\Blueprints\Resources\Model\DataReference;
 use WordPress\HttpClient\Client;
@@ -54,24 +55,26 @@ class DataReferenceResolver {
 			$url = $reference->get_url();
 			$filename = basename( parse_url( $url, PHP_URL_PATH ) );
 
-			// @TODO: Don't cache files like this. Memoize downloads to the disk
-			//        – probably by adding support for that in the Client class.
-
+			// @TODO: Memoize downloads to the disk – probably by adding 
+			//        disk cache (or even http cache) support to the Client 
+			//        class.
+			$stream = new RequestReadStream(
+				new Request( $url ),
+				array(
+					'client' => $this->http_client,
+					/**
+					 * Use a 100MB buffer to support seek()-ing in the streamed ZIP files.
+					 * To support ZIPs larger than 100MB, we'll need a custom SeekableRequestReadStream that:
+					 *
+					 * * Uses range headers when possible.
+					 * * Buffers data on disk for seeking(), not in memory.
+					 */
+					'buffer_size' => 100 * 1024 * 1024
+				)
+			);
+			$tracked_stream = new ProgressTrackedReadStream( $stream, $tracker );
 			return new File(
-				new RequestReadStream(
-					new Request( $url ),
-					array(
-						'client' => $this->http_client,
-						/**
-						 * Use a 100MB buffer to support seek()-ing in the streamed ZIP files.
-						 * To support ZIPs larger than 100MB, we'll need a custom SeekableRequestReadStream that:
-						 *
-						 * * Uses range headers when possible.
-						 * * Buffers data on disk for seeking(), not in memory.
-						 */
-						'buffer_size' => 100 * 1024 * 1024
-					)
-				),
+				$tracked_stream,
 				$filename
 			);
 		} elseif ( $reference instanceof ExecutionContextPath ) {

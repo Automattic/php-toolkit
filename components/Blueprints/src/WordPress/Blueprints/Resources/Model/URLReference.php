@@ -18,6 +18,7 @@ class URLReference extends DataReference {
 	 */
 	public function __construct( string $url ) {
 		$this->url = $url;
+		parent::__construct();
 	}
 
 	/**
@@ -37,5 +38,15 @@ class URLReference extends DataReference {
 	 */
 	public static function is_valid( $url ): bool {
 		return is_string($url) && (strpos( $url, 'http://' ) === 0 || strpos( $url, 'https://' ) === 0);
+	}
+
+	/**
+	 * Get a human-readable name for this reference.
+	 * Used in the progress tracker.
+	 *
+	 * @return string The human-readable name.
+	 */
+	public function get_human_readable_name(): string {
+		return $this->url;
 	}
 } 

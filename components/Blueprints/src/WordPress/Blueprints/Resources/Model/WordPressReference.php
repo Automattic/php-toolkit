@@ -45,6 +45,7 @@ class WordPressReference extends DataReference {
             $this->slug = $reference;
             $this->version = null;
         }
+        parent::__construct();
     }
     
     /**
@@ -135,5 +136,15 @@ class WordPressReference extends DataReference {
      */
     public function __toString(): string {
         return $this->version ? "{$this->slug}@{$this->version}" : $this->slug;
+    }
+    
+    /**
+     * Get a human-readable name for this reference.
+     * Used in the progress tracker.
+     *
+     * @return string The human-readable name.
+     */
+    public function get_human_readable_name(): string {
+        return "WordPress: " . ($this->version ?: 'Latest');
     }
 } 

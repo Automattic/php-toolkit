@@ -8,7 +8,6 @@ use WordPress\ByteStream\ByteTransformer\InflateTransformer;
 use WordPress\HttpClient\ByteStream\ChunkedDecoderReadStream;
 use WordPress\HttpClient\ByteStream\ChunkedEncoderByteTransformer;
 use WordPress\HttpClient\ByteStream\RequestReadStream;
-use WordPress\HttpClient\ByteStream\SeekableRequestReadStream;
 
 /**
  * An asynchronous HTTP client library.
@@ -357,9 +356,29 @@ class Client {
 			$this->get_active_requests( Request::STATE_WILL_SEND_BODY )
 		);
 
-		$this->receive_response_headers(
+		$nb_headers_received = $this->receive_response_headers(
 			$this->get_active_requests( Request::STATE_RECEIVING_HEADERS )
 		);
+
+		/**
+		 * Allows the caller to consume the headers before we start polling
+		 * for the body of those requests.
+		 * 
+		 * This prevents the following scenario:
+		 * 
+		 * 1. The consumer calls await_next_event() and they're only interested in
+		 *    the EVENT_GOT_HEADERS event.
+		 * 2. In the same event_loop_tick:
+		 *    * The headers arrive
+		 *    * The request is promoted to STATE_RECEIVING_BODY
+		 *    * We poll for the response body
+		 *    * We wait 10 more seconds before the body starts arriving
+		 * 3. The consumer gets the EVENT_GOT_HEADERS event 10 seconds later
+		 *    than they could have.
+		 */
+		if ($nb_headers_received > 0) {
+			return true;
+		}
 
 		$this->receive_response_body(
 			$this->get_active_requests( Request::STATE_RECEIVING_BODY )
@@ -626,6 +645,7 @@ class Client {
 	 * @param  array $requests  An array of requests.
 	 */
 	protected function receive_response_headers( $requests ) {
+		$nb_headers_received = 0;
 		foreach ( $this->stream_select( $requests, static::STREAM_SELECT_READ ) as $request ) {
 			if ( ! $request->response ) {
 				$request->response = new Response( $request );
@@ -667,6 +687,7 @@ class Client {
 				}
 
 				$this->events[ $request->id ][ self::EVENT_GOT_HEADERS ] = true;
+				$nb_headers_received++;
 
 				if ( $response->total_bytes === 0 ) {
 					$request->state = Request::STATE_RECEIVED;
@@ -683,6 +704,7 @@ class Client {
 				break;
 			}
 		}
+		return $nb_headers_received;
 	}
 
 	/**
@@ -710,6 +732,7 @@ class Client {
 					$this->connections[ $request->id ]->response_buffer .= $body_chunk;
 
 					$this->events[ $request->id ][ self::EVENT_BODY_CHUNK_AVAILABLE ] = true;
+					break;
 				} elseif ( $stream->reached_end_of_data() ) {
 					// No data came in during this poll, we need to break out of the loop
 					// and get a chance to call stream_select() one more time to receive

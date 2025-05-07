@@ -23,6 +23,7 @@ class WordPressOrgTheme extends DataReference {
 	public function __construct( string $slug, ?string $version = null ) {
 		$this->slug    = $slug;
 		$this->version = $version;
+		parent::__construct();
 	}
 
 	/**
@@ -76,6 +77,19 @@ class WordPressOrgTheme extends DataReference {
 		$version = isset( $parts[1] ) ? $parts[1] : null;
 
 		return [ $slug, $version ];
+	}
+
+	/**
+	 * Get a human-readable name for this reference.
+	 * Used in the progress tracker.
+	 *
+	 * @return string The human-readable name.
+	 */
+	public function get_human_readable_name(): string {
+		if ($this->version) {
+			return "Theme: {$this->slug} (version {$this->version})";
+		}
+		return "Theme: {$this->slug}";
 	}
 
 }

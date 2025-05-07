@@ -25,6 +25,7 @@ class InlineFile extends DataReference {
 	public function __construct( string $filename, string $content ) {
 		$this->filename = $filename;
 		$this->content  = $content;
+		parent::__construct();
 	}
 
 	/**
@@ -67,5 +68,15 @@ class InlineFile extends DataReference {
 	 */
 	public static function is_valid( $data ): bool {
 		return is_array( $data ) && isset( $data['filename'] ) && isset( $data['content'] );
+	}
+
+	/**
+	 * Get a human-readable name for this reference.
+	 * Used in the progress tracker.
+	 *
+	 * @return string The human-readable name.
+	 */
+	public function get_human_readable_name(): string {
+		return "Inline file: " . basename($this->filename);
 	}
 } 
