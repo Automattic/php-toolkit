@@ -34,9 +34,11 @@ class Runtime {
 	protected $documentRoot;
 
 	protected $executionContext;
+	protected $dataReferences;
 	protected $dataResolutionTracker;
 	protected $subTrackers;
 	protected $http_client;
+	protected $resolvedDataReferences;
 
 	public function __construct(
 		string $documentRoot,
@@ -49,7 +51,9 @@ class Runtime {
 		$this->executionContext      = $executionContext;
 		$this->http_client           = new Client();
 		$this->dataResolutionTracker = $dataResolutionTracker;
+		$this->resolvedDataReferences = [];
 
+		$this->dataReferences = $dataReferences;
 		$nb_data_references = count( $dataReferences );
 		foreach( $dataReferences as $dataReference ) {
 			$this->subTrackers[$dataReference->id] = $this->dataResolutionTracker->stage(
@@ -63,7 +67,21 @@ class Runtime {
 		return $this->documentRoot;
 	}
 
+	/**
+	 * This starts eager resolution of all data references, e.g. it starts
+	 * fetching HTTP resources in parallel by eagerly initiating RequestReadStreams.
+	 */
+	public function startResolvingAllDataReferences() {
+		foreach( $this->dataReferences as $dataReference ) {
+			$this->resolvedDataReferences[$dataReference->id] = $this->resolveReferencedData( $dataReference );
+		}
+	}
+
 	public function resolveReferencedData( DataReference $reference ): File|Directory {
+		if( isset( $this->resolvedDataReferences[$reference->id] ) ) {
+			return $this->resolvedDataReferences[$reference->id];
+		}
+
 		$progress_tracker = $this->subTrackers[$reference->id];
 
 		if ( $reference instanceof WordPressOrgPlugin ) {
@@ -92,6 +110,7 @@ class Runtime {
 					 */
 					'buffer_size' => 100 * 1024 * 1024,
 					'progress_tracker' => $progress_tracker,
+					'eagerly_enqueue' => true,
 				)
 			);
 			return new File(

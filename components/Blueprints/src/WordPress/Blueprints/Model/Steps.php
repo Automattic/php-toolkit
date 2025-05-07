@@ -2456,6 +2456,7 @@ class BlueprintRunner {
 			dataReferences: $data_references,
 			dataResolutionTracker: $dataResolutionStage,
         );
+		$this->runtime->startResolvingAllDataReferences();
 
         $siteStage->setCaption('Booting WordPress environment');
 		// Resolve the execution target.

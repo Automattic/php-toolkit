@@ -42,7 +42,7 @@ class RequestReadStream extends BaseByteReadStream {
 		if ( is_string( $request ) ) {
 			$request = new Request( $request );
 		}
-		$this->client  = $options['client'] ?? new Client();
+		$this->client  = $options['client'];
 		$this->request = $request;
 		if(isset($options['buffer_size'])) {
 			$this->buffer_size = $options['buffer_size'];
@@ -50,10 +50,20 @@ class RequestReadStream extends BaseByteReadStream {
 		if(isset($options['progress_tracker'])) {
 			$this->progress_tracker = $options['progress_tracker'];
 		}
+		if(isset($options['eagerly_enqueue'])) {
+			$this->ensure_is_enqueued();
+		}
 	}
 
 	public function get_request(): Request {
 		return $this->request;
+	}
+
+	private function ensure_is_enqueued() {
+		if ( ! $this->is_enqueued ) {
+			$this->client->enqueue( $this->request );
+			$this->is_enqueued = true;
+		}
 	}
 
 	protected function seek_outside_of_buffer( int $target_offset ): void {
@@ -81,10 +91,8 @@ class RequestReadStream extends BaseByteReadStream {
 	private function pull_until_event( $options = array() ) {
 		$stop_at_event = $options['event'] ?? Client::EVENT_BODY_CHUNK_AVAILABLE;
 
-		if ( ! $this->is_enqueued ) {
-			$this->client->enqueue( $this->request );
-			$this->is_enqueued = true;
-		}
+		$this->ensure_is_enqueued();
+
 		while ( $this->client->await_next_event(
 			array(
 				'requests' => array( $this->request ),
