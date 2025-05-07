@@ -7,7 +7,7 @@ use Symfony\Component\EventDispatcher\EventDispatcher;
 /**
  * The ProgressTracker class is a tool for tracking progress in an operation that is
  * divided into multiple stages. It allows you to create sub-trackers for each stage,
- * with individual weights and captions. The main tracker automatically calculates the
+ * with vidual weights and captions. The main tracker automatically calculates the
  * progress based on the weighted sum of each sub-tracker's progress. This makes it easy
  * to keep track of a complex, multi-stage process and report progress in a user-friendly way.
  *
@@ -45,6 +45,18 @@ class Tracker {
 	private $selfCaption  = '';
 	private $weight;
 	private $subTrackers = array();
+
+	/**
+	 * Most recently updated tracker or sub-tracker, used to expose
+	 * the latest caption.
+	 * 
+	 * One of:
+	 * 
+	 * * Tracker instance – the last sub-tracker that was updated
+	 * * null – when this tracker was updated more recently than 
+	 *          any of its sub-trackers
+	 */
+	private $lastUpdatedTracker = null;
 
 	public $events;
 
@@ -109,7 +121,8 @@ class Tracker {
 		$this->subTrackers[] = $subTracker;
 		$subTracker->events->addListener(
 			ProgressEvent::class,
-			function () {
+			function () use ($subTracker) {
+				$this->lastUpdatedTracker = $subTracker;
 				$this->notifyProgress();
 			}
 		);
@@ -141,6 +154,9 @@ class Tracker {
 		if ( $caption !== null ) {
 			$this->selfCaption = $caption;
 		}
+		
+		$this->lastUpdatedTracker = null;
+		
 		$this->notifyProgress();
 		if ( $this->selfProgress + 0.00001 >= 100 ) {
 			$this->finish();
@@ -149,26 +165,27 @@ class Tracker {
 
 	public function setCaption( $caption ) {
 		$this->selfCaption = $caption;
+		$this->lastUpdatedTracker = null;
 		$this->notifyProgress();
 	}
 
 	public function finish() {
 		$this->selfDone     = true;
 		$this->selfProgress = 100;
+		$this->lastUpdatedTracker = null;
 		$this->notifyProgress();
 		$this->notifyDone();
 	}
 
 	public function getCaption() {
-		foreach ( $this->subTrackers as $subTracker ) {
-			if ( ! $subTracker->isDone() ) {
-				return $subTracker->getCaption();
-			}
+		// If this tracker was most recently updated, return its caption
+		if ($this->lastUpdatedTracker === null) {
+			return $this->selfCaption;
 		}
-
-		return $this->selfCaption;
+		
+		// Otherwise return the caption of the most recently updated sub-tracker
+		return $this->lastUpdatedTracker->getCaption();
 	}
-
 
 	public function isDone() {
 		return $this->getProgress() + 0.00001 >= 100;
