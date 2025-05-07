@@ -595,12 +595,11 @@ class InstallPluginStep {
 
 class InstallPluginStepRunner {
 	public function run(object $step, Runtime $runtime, Tracker $tracker): mixed {
-		$tracker->setCaption('Installing plugin');
+		$plugin_data = $runtime->resolveReferencedData($step->getSource());
 
 		$fs = $runtime->getTargetFilesystem();
-		FilesystemHelpers::withTemporaryDirectory($fs, function($temp_dir) use ($fs, $runtime, $step, $tracker) {
-			$plugin_data = $runtime->resolveReferencedData($step->getSource());
-
+		FilesystemHelpers::withTemporaryDirectory($fs, function($temp_dir) use ($fs, $runtime, $step, $tracker, $plugin_data) {
+			$tracker->setCaption('Installing plugin ' . $plugin_data->get_human_readable_name());
 			if ($plugin_data instanceof Directory) {
 				$zip_path = $temp_dir . '/' . $plugin_data->dirname . '.zip';
 				$zip_stream = $fs->open_write_stream($zip_path);
@@ -626,7 +625,7 @@ class InstallPluginStepRunner {
 			}
 			$zip_stream->close_writing();
 
-			$tracker->set(50, 'Installing plugin');
+			$tracker->set(50);
 
 			$runtime->evalPhpInSubProcess(
 				file_get_contents(__DIR__ . '/InstallPlugin/wp_install_plugin.php'),
@@ -636,14 +635,14 @@ class InstallPluginStepRunner {
 			$relative_path = $fs->get_contents($temp_dir . '/plugin_path.txt');
 
 			if ($step->isActive()) {
-				$tracker->set(75, 'Activating plugin');
+				$tracker->set(75, 'Activating plugin ' . $plugin_data->get_human_readable_name());
 				$runtime->evalPhpInSubProcess(
 					file_get_contents(__DIR__ . '/ActivatePlugin/wp_activate_plugin.php'),
 					['PLUGIN_PATH' => $relative_path]
 				);
 			}
 
-			$tracker->set(100, 'Plugin installation complete');
+			$tracker->set(100);
 		}, '');
 
 		return true;
@@ -735,13 +734,12 @@ class InstallThemeStepRunner {
 	 * @return mixed The result of running the step
 	 */
 	public function run(InstallThemeStep $step, Runtime $runtime, Tracker $tracker): mixed {
-		$tracker->setCaption('Installing theme ' . $step->getSource());
-
 		$fs = $runtime->getTargetFilesystem();
 		FilesystemHelpers::withTemporaryDirectory($fs, function($temp_dir) use ($fs, $runtime, $step, $tracker) {
 			// Create data reference for the theme source
 			$dataRef = $step->getSource();
 			$theme_data = $runtime->resolveReferencedData($dataRef);
+			$tracker->setCaption('Installing theme ' . $theme_data->get_human_readable_name());
 
 			if ($theme_data instanceof Directory) {
 				$zip_path = $temp_dir . '/' . $theme_data->dirname . '.zip';
@@ -762,7 +760,7 @@ class InstallThemeStepRunner {
 				$zip_stream->close_writing();
 			}
 
-			$tracker->set(50, 'Installing theme files');
+			$tracker->set(50);
 
 			$output_file = $temp_dir . '/theme_stylesheet.txt';
 			$install_script_result = $runtime->evalPhpInSubProcess(
@@ -784,14 +782,14 @@ class InstallThemeStepRunner {
 			}
 
 			if ($step->isActivate()) {
-				$tracker->set(75, 'Activating theme');
+				$tracker->set(75, 'Activating theme ' . $theme_folder_name);
 				$runtime->evalPhpInSubProcess(
 					file_get_contents(__DIR__ . '/ActivateTheme/wp_activate_theme.php'),
 					['THEME_FOLDER_NAME' => $theme_folder_name]
 				);
 			}
 
-			$tracker->set(100, 'Theme installation complete');
+			$tracker->set(100);
 		}, '');
 
 		return true;
@@ -2461,7 +2459,6 @@ class BlueprintRunner {
         $siteStage->setCaption('Booting WordPress environment');
 		// Resolve the execution target.
 		// @TODO: Support existing sites.
-		echo "Booting WordPress environment\n";
         WordPressBootManager::boot( [
 			'runtime' => $this->runtime,
 			'siteUrl' => $this->runnerConfiguration->getTargetSiteUrl(),
@@ -2849,6 +2846,24 @@ $runnerConfiguration = RunnerConfiguration::create()
 
 // Create a BlueprintRunner with a custom progress logger that writes to STDOUT
 $runner = new BlueprintRunner($runnerConfiguration, function($progress, $caption) {
+    static $called_before = false;
+    static $last_caption = '';
+
+	$caption = trim($caption);
+    
+    // Clear the line before printing the new progress
+    if ($called_before) {
+        // Move up one line and clear it
+        echo "\033[1A\033[K";
+        
+        // If the caption is longer than the previous one, we might need to clear additional lines
+        if (strlen($last_caption) > strlen($caption)) {
+            echo "\033[K"; // Clear the current line again to ensure no artifacts
+        }
+    }
+    
     printf("[%3d%%] %s\n", $progress, $caption);
+    $called_before = true;
+    $last_caption = $caption;
 });
 $runner->run();

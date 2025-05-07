@@ -22,23 +22,18 @@ class WordPressBootManager {
 		$targetFs = $runtime->getTargetFilesystem();
 
 		// Unzip WordPress core into document root
-		echo "Resolving WordPress zip\n";
 		$resolved = $runtime->resolveReferencedData($options['wordPressZip']);
 		if (!$resolved instanceof File) {
 			throw new \InvalidArgumentException('Provided zip reference does not resolve to a file');
 		}
 		$zipFs = ZipFilesystem::create($resolved->stream);
-		echo "Resolved WordPress zip\n";
 
 		$path_in_zip = '/';
-		echo "zipFs exists\n";
 		if(!$zipFs->exists('/wp-content') && $zipFs->exists('/wordpress')) {
 			$path_in_zip = '/wordpress';
 		}
-		echo "zipFs exists done\n";
 
 		// @TODO: Track unzipping progress
-		echo "Copying WordPress zip\n";
 		copy_between_filesystems([
 			'source_filesystem' => $zipFs,
 			'source_path'       => $path_in_zip,
@@ -46,7 +41,6 @@ class WordPressBootManager {
 			'target_path'       => '/',
 			'recursive'         => true,
 		]);
-		echo "Copied WordPress zip\n";
 
 		// If SQLite integration zip provided, unzip into appropriate folder
 		if ($options['sqliteIntegrationPluginZip']) {

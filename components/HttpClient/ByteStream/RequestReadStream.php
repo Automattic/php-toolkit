@@ -68,7 +68,6 @@ class RequestReadStream extends BaseByteReadStream {
 
 	protected function seek_outside_of_buffer( int $target_offset ): void {
 		if($target_offset > $this->tell()) {
-			echo "seek outside of buffer: " . $this->request->url . " " . $this->progress_tracker->getProgress() . "\n";
 			$pulled = $this->pull_exactly($target_offset - $this->tell());
 			$this->consume($pulled);
 		} else {
