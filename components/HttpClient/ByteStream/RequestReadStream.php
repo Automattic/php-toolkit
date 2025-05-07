@@ -40,6 +40,9 @@ class RequestReadStream extends BaseByteReadStream {
 		}
 		$this->client  = $options['client'] ?? new Client();
 		$this->request = $request;
+		if(isset($options['buffer_size'])) {
+			$this->buffer_size = $options['buffer_size'];
+		}
 	}
 
 	public function get_request(): Request {
@@ -58,13 +61,18 @@ class RequestReadStream extends BaseByteReadStream {
 	}
 
 	protected function seek_outside_of_buffer( int $target_offset ): void {
-		throw new ByteStreamException(
-			'Cannot seek() a RequestReadStream instance once the request was initialized. ' .
-			'Use SeekableRequestReadStream to seek() using range requests instead.'
-		);
+		if($target_offset > $this->tell()) {
+			$pulled = $this->pull_exactly($target_offset - $this->tell());
+			$this->consume($pulled);
+		} else {
+			throw new ByteStreamException(
+				'RequestReadStream cannot seek() backwards outside of the in-memory data buffer. ' .
+				'You can either increase the buffer size or implement a custom SeekableRequestReadStream.'
+			);
+		}
 	}
 
-	protected function internal_pull( $max_bytes = 8096 ): string {
+	protected function internal_pull( $max_bytes = 65536 ): string {
 		return $this->pull_until_event(
 			array(
 				'max_bytes' => $max_bytes,
@@ -161,6 +169,10 @@ class RequestReadStream extends BaseByteReadStream {
 			! $this->client->has_pending_event( $this->request, Client::EVENT_BODY_CHUNK_AVAILABLE ) &&
 			strlen( $this->buffer ) === $this->offset_in_current_buffer
 		);
+	}
+
+	public function close_reading(): void {
+		$this->is_closed = true;
 	}
 
 	protected function internal_close_reading(): void {

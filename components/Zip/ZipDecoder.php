@@ -3,6 +3,7 @@
 namespace WordPress\Zip;
 
 use WordPress\ByteStream\ByteStreamException;
+use WordPress\ByteStream\NotEnoughDataException;
 use WordPress\ByteStream\ReadStream\ByteReadStream;
 use WordPress\ByteStream\ReadStream\InflateReadStream;
 use WordPress\ByteStream\ReadStream\LimitedByteReadStream;
@@ -42,8 +43,9 @@ class ZipDecoder {
 		while ( true ) {
 			switch ( $this->state ) {
 				case self::STATE_SCAN:
-					$n = $this->byte_reader->pull( 4, ByteReadStream::PULL_EXACTLY );
-					if ( $n !== 4 ) {
+					try {
+						$this->byte_reader->pull( 4, ByteReadStream::PULL_EXACTLY );
+					} catch (NotEnoughDataException $e) {
 						$this->state = self::STATE_COMPLETE;
 						return false;
 					}

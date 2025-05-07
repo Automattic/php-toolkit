@@ -3,12 +3,9 @@
 namespace WordPress\Blueprints\references;
 
 use WordPress\Blueprints\RuntimeException;
-use WordPress\Blueprints\Model\DataClass\WordPressPluginDirectoryReference;
-use WordPress\Blueprints\Model\DataClass\WordPressThemeDirectoryReference;
 use WordPress\Blueprints\Resources\Model\DataReference;
 use WordPress\HttpClient\Client;
 use WordPress\Filesystem\Filesystem;
-use WordPress\ByteStream\ReadStream\ByteReadStream;
 use WordPress\Blueprints\Resources\Model\URLReference;
 use WordPress\Blueprints\Resources\Model\ExecutionContextPath;
 use WordPress\Blueprints\Resources\Model\InlineFile;
@@ -19,15 +16,12 @@ use WordPress\Blueprints\Resources\Model\Directory;
 use WordPress\Blueprints\Resources\Model\WordPressOrgPlugin;
 use WordPress\Blueprints\Resources\Model\WordPressOrgTheme;
 use WordPress\ByteStream\MemoryPipe;
-use WordPress\ByteStream\ReadStream\FileReadStream;
-use WordPress\ByteStream\WriteStream\FileWriteStream;
 use WordPress\Filesystem\InMemoryFilesystem;
 use WordPress\Filesystem\Layer\ChrootLayer;
 use WordPress\Git\GitFilesystem;
 use WordPress\Git\GitRepository;
-
-use function WordPress\Filesystem\pipe_stream;
-use function WordPress\Filesystem\wp_join_paths;
+use WordPress\HttpClient\ByteStream\RequestReadStream;
+use WordPress\HttpClient\Request;
 
 class DataReferenceResolver {
 
@@ -52,7 +46,6 @@ class DataReferenceResolver {
 	public function resolve( DataReference $reference ): File|Directory {
 		if ( $reference instanceof WordPressOrgPlugin ) {
 			$reference = new URLReference('https://downloads.wordpress.org/plugin/' . $reference->get_slug() . '.latest-stable.zip');
-			var_dump($reference);
 		} elseif ( $reference instanceof WordPressOrgTheme ) {
 			$reference = new URLReference('https://downloads.wordpress.org/theme/' . $reference->get_slug() . '.latest-stable.zip');
 		}
@@ -61,35 +54,24 @@ class DataReferenceResolver {
 			$url = $reference->get_url();
 			$filename = basename( parse_url( $url, PHP_URL_PATH ) );
 
-			// @TODO: Get the SeekableRequestReadStream to work instead of
-			//        pre-emptively buffering the entire file to the disk.
-
 			// @TODO: Don't cache files like this. Memoize downloads to the disk
 			//        – probably by adding support for that in the Client class.
 
-			// @TODO: Parallelize the downloads.
-			$sha1_hash = hash( 'sha1', $url );
-			$tmp_dir = sys_get_temp_dir();
-			$temp_file_path = wp_join_paths( $tmp_dir, $sha1_hash . '.zip' );
-			if( !file_exists( $temp_file_path ) ) {
-				$remote_stream = $this->http_client->fetch( $url );
-				$response = $remote_stream->get_response();
-				if( $response->status_code !== 200 ) {
-					$remote_stream->pull( 50 );
-					throw new \RuntimeException( sprintf( 'Failed to download file: %s (status code: %d, response: %s)', 
-						$url, 
-						$response->status_code, 
-						substr( $remote_stream->peek( 50 ), 0, 50 ) 
-					) );
-				}
-				$write_stream = FileWriteStream::from_path( $temp_file_path, 'truncate' );
-				pipe_stream( $remote_stream, $write_stream );
-				$remote_stream->close_reading();
-				$write_stream->close_writing();
-			}
-
 			return new File(
-				FileReadStream::from_path( $temp_file_path ),
+				new RequestReadStream(
+					new Request( $url ),
+					array(
+						'client' => $this->http_client,
+						/**
+						 * Use a 100MB buffer to support seek()-ing in the streamed ZIP files.
+						 * To support ZIPs larger than 100MB, we'll need a custom SeekableRequestReadStream that:
+						 *
+						 * * Uses range headers when possible.
+						 * * Buffers data on disk for seeking(), not in memory.
+						 */
+						'buffer_size' => 100 * 1024 * 1024
+					)
+				),
 				$filename
 			);
 		} elseif ( $reference instanceof ExecutionContextPath ) {

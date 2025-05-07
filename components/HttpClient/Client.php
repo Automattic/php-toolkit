@@ -50,6 +50,8 @@ use WordPress\HttpClient\ByteStream\SeekableRequestReadStream;
  * * Request headers – accept string lines such as "Content-type: text/plain" instead of key-value pairs. K/V pairs
  *   are confusing and lead to accidental errors such as `0: Content-type: text/plain`. They also diverge from the
  *   format that curl accepts.
+ * * Response caching – add a custom cache handler for easy caching of the same URLs
+ * * Response caching – support HTTP cache-control headers
  *
  * @since    Next Release
  * @package  WordPress

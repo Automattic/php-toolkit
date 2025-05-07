@@ -7,10 +7,9 @@ use WordPress\ByteStream\NotEnoughDataException;
 
 abstract class BaseByteReadStream implements ByteReadStream {
 
-	const CHUNK_SIZE = 8096;
+	const CHUNK_SIZE = 64 * 1024;
 
-	protected $context_size_min = 1024;
-	protected $context_size_max = 2048;
+	protected $buffer_size = 2048;
 
 	protected $buffer                   = '';
 	protected $offset_in_current_buffer = 0;
@@ -34,10 +33,6 @@ abstract class BaseByteReadStream implements ByteReadStream {
 			throw new ByteStreamException( 'Cannot pull() on a closed producer' );
 		}
 
-		if ( $this->reached_end_of_data() ) {
-			return 0;
-		}
-
 		if ( $n === 0 ) {
 			return 0;
 		}
@@ -48,6 +43,13 @@ abstract class BaseByteReadStream implements ByteReadStream {
 
 		if ( $n <= $this->count_consumable_bytes() ) {
 			return $n;
+		}
+
+		if ( $this->reached_end_of_data() ) {
+			if ( $mode === ByteReadStream::PULL_EXACTLY ) {
+				throw new NotEnoughDataException( 'End of data reached while pulling' );
+			}
+			return 0;
 		}
 
 		if ( $mode === ByteReadStream::PULL_NO_MORE_THAN ) {
@@ -63,14 +65,13 @@ abstract class BaseByteReadStream implements ByteReadStream {
 
 	protected function pull_exactly( $n ): int {
 		$empty_pulls = 0;
-		while ( true ) {
-			$pulled = $this->pull_no_more_than( $n );
-			if ( 0 === $pulled ) {
-				++$empty_pulls;
-			}
+		while ( $this->count_consumable_bytes() < $n ) {
+			$consumable_before = $this->count_consumable_bytes();
+			$this->pull_no_more_than( $n );
+			$consumable_after = $this->count_consumable_bytes();
 
-			if ( $n <= $this->count_consumable_bytes() ) {
-				return $n;
+			if ( $consumable_after === $consumable_before ) {
+				++$empty_pulls;
 			}
 
 			if ( $this->reached_end_of_data() ) {
@@ -110,8 +111,8 @@ abstract class BaseByteReadStream implements ByteReadStream {
 		}
 		$bytes                           = substr( $this->buffer, $this->offset_in_current_buffer, $n );
 		$this->offset_in_current_buffer += $n;
-		if ( $this->offset_in_current_buffer > $this->context_size_max ) {
-			$overflow                        = $this->offset_in_current_buffer - $this->context_size_min;
+		if ( $this->offset_in_current_buffer > $this->buffer_size ) {
+			$overflow                        = $this->offset_in_current_buffer - $this->buffer_size;
 			$this->offset_in_current_buffer -= $overflow;
 			$this->bytes_already_forgotten  += $overflow;
 			$this->buffer                    = substr( $this->buffer, $overflow );

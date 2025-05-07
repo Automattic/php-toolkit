@@ -10,9 +10,6 @@ use WordPress\Git\Protocol\Parser\PackParser;
 
 class PackfileEncoderReadStream extends BaseByteReadStream {
 
-	protected $context_size_min = 100;
-	protected $context_size_max = 100;
-
 	protected $oids;
 	protected $objects_source;
 	protected $object_reader;
