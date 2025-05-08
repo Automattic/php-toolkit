@@ -59,6 +59,10 @@ class RequestReadStream extends BaseByteReadStream {
 		return $this->request;
 	}
 
+	public function json() {
+		return json_decode($this->consume_all(), true);
+	}
+
 	private function ensure_is_enqueued() {
 		if ( ! $this->is_enqueued ) {
 			$this->client->enqueue( $this->request );
@@ -72,7 +76,7 @@ class RequestReadStream extends BaseByteReadStream {
 			$this->consume($pulled);
 		} else {
 			throw new ByteStreamException(
-				'RequestReadStream cannot seek() backwards outside of the in-memory data buffer. ' .
+				'RequestReadStream cannot seek() backwards to offset ' . $target_offset . ' outside of the in-memory data buffer. ' .
 				'You can either increase the buffer size or implement a custom SeekableRequestReadStream.'
 			);
 		}
@@ -122,10 +126,7 @@ class RequestReadStream extends BaseByteReadStream {
 						if($this->progress_tracker) {
 							$bytes_downloaded = $this->bytes_already_forgotten + strlen($this->buffer) + strlen($body_chunk);
 							// Arbitrarily assume 15MB if no length is provided
-							$length = $this->length();
-							if(!$length) {
-								$length = 15 * 1024 * 1024;
-							}
+							$length = $this->remote_file_length ?: 15 * 1024 * 1024;
 							$this->progress_tracker->set($bytes_downloaded / $length * 100);
 						}
 						return $body_chunk;
@@ -157,9 +158,6 @@ class RequestReadStream extends BaseByteReadStream {
 			);
 		}
 		$content_length = $this->response->get_header( 'Content-Length' );
-		if ( null === $content_length ) {
-			return null;
-		}
 		$this->remote_file_length = (int) $content_length;
 		return $this->remote_file_length;
 	}

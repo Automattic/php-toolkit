@@ -125,8 +125,8 @@ class Client {
 	 *
 	 * @return RequestReadStream
 	 */
-	public function fetch( $request ) {
-		return new RequestReadStream( $request, array( 'client' => $this ) );
+	public function fetch( $request, $options = array() ) {
+		return new RequestReadStream( $request, array( 'client' => $this, ...$options ) );
 	}
 
 	/**
@@ -137,11 +137,11 @@ class Client {
 	 *
 	 * @return RequestReadStream[]
 	 */
-	public function fetch_many( array $requests ) {
+	public function fetch_many( array $requests, $options = array() ) {
 		$streams = array();
 		
 		foreach ( $requests as $request ) {
-			$streams[] = $this->fetch( $request );
+			$streams[] = $this->fetch( $request, $options );
 		}
 		
 		return $streams;

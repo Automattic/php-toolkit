@@ -4,9 +4,8 @@ namespace WordPress\Blueprints\Runtime;
 
 use Symfony\Component\Process\Process;
 use Throwable;
-use WordPress\Blueprints\BlueprintException;
 
-class ProcessFailedException extends BlueprintException {
+class ProcessFailedException extends \Exception {
 
 	/**
 	 * @var \Symfony\Component\Process\Process

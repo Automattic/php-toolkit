@@ -90,7 +90,7 @@ abstract class BaseByteReadStream implements ByteReadStream {
 			if ( $this->reached_end_of_data() ) {
 				return $body;
 			}
-			$consumable = $this->pull( 8096 );
+			$consumable = $this->pull( 64 * 1024 );
 			$body      .= $this->consume( $consumable );
 		}
 	}
@@ -128,6 +128,10 @@ abstract class BaseByteReadStream implements ByteReadStream {
 		}
 		if ( null !== $this->length() && $target_offset > $this->length() ) {
 			throw new NotEnoughDataException( 'Cannot seek past the available data. Call append_bytes() first.' );
+		}
+
+		if($target_offset < 0) {
+			throw new ByteStreamException( 'Cannot seek to a negative offset' );
 		}
 
 		// Seeking outside of buffer range, we need a producer-specific implementation

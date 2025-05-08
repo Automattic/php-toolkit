@@ -1,5 +1,11 @@
 <?php
 
+/**
+ * @TODO: Fast unzipping of remote Zip Files by iterating over the entries
+ *        instead of skipping over to the end central directory index entry.
+ * @TODO: Processing Zip Files without the Content-Length header.
+ */
+
 namespace WordPress\Blueprints\Model;
 
 use Exception;
@@ -15,7 +21,6 @@ use WordPress\Blueprints\Resources\Model\Directory;
 use WordPress\Blueprints\Resources\Model\File;
 use WordPress\Blueprints\Resources\Model\WordPressOrgPlugin;
 use WordPress\Blueprints\Resources\Model\WordPressOrgTheme;
-use WordPress\Blueprints\Runner\WordPressBoot\BootOptions;
 use WordPress\Blueprints\Runner\WordPressBoot\WordPressBootManager;
 use WordPress\Blueprints\Runtime\Runtime;
 use WordPress\Filesystem\FilesystemException;
@@ -1196,6 +1201,208 @@ class SetSiteLanguageStep {
     }
 }
 
+class SetSiteLanguageStepRunner implements StepRunnerInterface {
+    public function run(object $step, Runtime $runtime, Tracker $tracker): mixed {
+        $tracker->setCaption('Translating');
+        $language = $step->getLanguage();
+        
+        // Define WPLANG constant
+		$runner = new DefineConstantsStepRunner();
+        $runner->run(new DefineConstantsStep(['WPLANG' => $language]), $runtime, new Tracker());
+    
+        
+        // Create language directories if they don't exist
+        $fs = $runtime->getTargetFilesystem();
+        $languages_dir = "wp-content/languages";
+        $plugins_languages_dir = "{$languages_dir}/plugins";
+        $themes_languages_dir = "{$languages_dir}/themes";
+        
+        if (!$fs->is_dir($languages_dir)) {
+            $fs->mkdir($languages_dir, 0755, true);
+        }
+        if (!$fs->is_dir($plugins_languages_dir)) {
+            $fs->mkdir($plugins_languages_dir, 0755, true);
+        }
+        if (!$fs->is_dir($themes_languages_dir)) {
+            $fs->mkdir($themes_languages_dir, 0755, true);
+        }
+        
+        // Get core translation package URL
+        $wp_version = trim($runtime->evalPhpInSubProcess(
+            "<?php
+            require getenv('DOCROOT') . '/wp-includes/version.php';
+            echo \$wp_version;
+            "
+        ));
+        
+        // Get plugin translations
+        $plugins_data = json_decode($runtime->evalPhpInSubProcess(
+            "<?php
+            require_once(getenv('DOCROOT') . '/wp-load.php');
+            require_once(getenv('DOCROOT') . '/wp-admin/includes/plugin.php');
+            echo json_encode(
+                array_values(
+                    array_map(
+                        function(\$plugin) {
+                            return [
+                                'slug'    => \$plugin['TextDomain'],
+                                'version' => \$plugin['Version']
+                            ];
+                        },
+                        array_filter(
+                            get_plugins(),
+                            function(\$plugin) {
+                                return !empty(\$plugin['TextDomain']);
+                            }
+                        )
+                    )
+                )
+            );"
+        ), true);
+        
+        // Get theme translations
+        $themes_data = json_decode($runtime->evalPhpInSubProcess(
+            "<?php
+            require_once(getenv('DOCROOT') . '/wp-load.php');
+            require_once(getenv('DOCROOT') . '/wp-admin/includes/theme.php');
+            echo json_encode(
+                array_values(
+                    array_map(
+                        function(\$theme) {
+                            return [
+                                'slug'    => \$theme->get('TextDomain'),
+                                'version' => \$theme->get('Version')
+                            ];
+                        },
+                        wp_get_themes()
+                    )
+                )
+            );"
+        ), true);
+
+		$client = $runtime->getHttpClient();
+        
+        // Prepare all download URLs
+        $download_targets = [];
+        
+        // Core translation
+		if($language === 'en_US') {
+			$core_translation_url = $this->getWordPressTranslationUrl($wp_version, $language, $client);
+			if($core_translation_url) {
+				$download_targets[] = [
+					'request' => new Request($core_translation_url),
+					'target_dir' => $languages_dir,
+					'name' => "core-{$language}"
+				];
+			}
+		}
+        
+        // Plugin translations
+        if (is_array($plugins_data)) {
+            foreach ($plugins_data as $plugin) {
+                if (empty($plugin['slug']) || empty($plugin['version'])) {
+                    continue;
+                }
+                
+                $plugin_translation_url = "https://downloads.wordpress.org/translation/plugin/{$plugin['slug']}/{$plugin['version']}/{$language}.zip";
+                $download_targets[] = [
+					'request' => new Request($plugin_translation_url),
+                    'target_dir' => $plugins_languages_dir,
+                    'name' => "plugin-{$plugin['slug']}-{$language}",
+                    'is_plugin' => true,
+                    'slug' => $plugin['slug']
+                ];
+            }
+        }
+
+        // Theme translations
+        if (is_array($themes_data)) {
+            foreach ($themes_data as $theme) {
+                if (empty($theme['slug']) || empty($theme['version'])) {
+                    continue;
+                }
+                
+                $theme_translation_url = "https://downloads.wordpress.org/translation/theme/{$theme['slug']}/{$theme['version']}/{$language}.zip";
+                $download_targets[] = [
+					'request' => new Request($theme_translation_url),
+                    'target_dir' => $themes_languages_dir,
+                    'name' => "theme-{$theme['slug']}-{$language}",
+                    'is_theme' => true,
+                    'slug' => $theme['slug']
+                ];
+            }
+        }
+        
+        // Download all translations in parallel
+		$nb_requests = count($download_targets);
+		foreach($download_targets as $k => $target) {
+			$stage = $tracker->stage( 1 / $nb_requests, 'Fetching translations for ');
+			$download_targets[$k]['stream'] = $client->fetch($target['request'], [
+				// @see Runtime for more details on these options
+				'progress_tracker' => $stage,
+				'eagerly_enqueue' => true,
+				'buffer_size' => 100 * 1024 * 1024,
+			]);
+		}
+        
+        foreach ($download_targets as $target) {
+            try {
+                $zipFs = ZipFilesystem::create($target['stream']);
+                copy_between_filesystems([
+                    'source_filesystem' => $zipFs,
+                    'source_path' => '/',
+                    'target_filesystem' => $runtime->getTargetFilesystem(),
+                    'target_path' => $target['target_dir'],
+                    'recursive' => true,
+                ]);
+            } catch (\Exception $e) {
+                // Only log warnings for plugin and theme translations
+				// @TODO: Find a more useful way of communicating warnings
+                if (isset($target['is_plugin'])) {
+                    echo "Warning: Failed to download translations for plugin {$target['slug']}: " . $e->getMessage() . "\n";
+                } elseif (isset($target['is_theme'])) {
+                    echo "Warning: Failed to download translations for theme {$target['slug']}: " . $e->getMessage() . "\n";
+                } else {
+                    // For core translations, we should re-throw the exception
+                    throw new \Exception("Failed to download core translations: " . $e->getMessage(), 0, $e);
+                }
+            }
+        }
+        
+        return true;
+    }
+    
+    /**
+     * Get the translation package URL for a given WordPress version and language.
+     *
+     * @param string $wpVersion WordPress version
+     * @param string $language Language code
+     * @return string Translation package URL
+     * @throws \Exception If translation package is not found
+     */
+    private function getWordPressTranslationUrl(string $wpVersion, string $language, Client $client): string|false {
+		try {
+			$api_url = "https://api.wordpress.org/translations/core/1.0/?version={$wpVersion}";
+			$translations_data = $client->fetch($api_url)->json();
+			
+			if (!isset($translations_data['translations']) || !is_array($translations_data['translations'])) {
+				throw new \Exception("Invalid response from WordPress.org translations API");
+			}
+			
+			foreach ($translations_data['translations'] as $translation) {
+				if (strtolower($translation['language']) === strtolower($language)) {
+					return $translation['package'];
+				}
+			}
+		} catch (\Exception $e) {
+			// Log warning about translation API failure
+			error_log("Warning: Failed to fetch translations from WordPress.org API: " . $e->getMessage());
+		}
+		return false;
+	}
+}
+
+
 /**
  * Represents the 'setSiteOptions' step.
  */
@@ -1768,7 +1975,7 @@ class Blueprint
                 }
 
                 $code = '<?php
-				require_once(DOCUMENT_ROOT . "/wp-load.php");
+				require_once(getenv("DOCROOT") . "/wp-load.php");
 				$roles = getenv("ROLES");
                 foreach ($roles as $role) {
                     if (empty($role["name"]) || !is_string($role["name"])) {
@@ -1818,7 +2025,7 @@ class Blueprint
                 }
 
                 $code = '<?php
-                require_once(DOCUMENT_ROOT . "/wp-load.php");
+                require_once(getenv("DOCROOT") . "/wp-load.php");
                 $users = getenv("USERS");
                 foreach ($users as $user) {
                     if (empty($user["username"]) || !is_string($user["username"])) {
@@ -1955,6 +2162,8 @@ PHP,
                 $postsArray = var_export($inlinePosts, true);
                 $code = <<<PHP
 <?php
+require_once(getenv("DOCROOT") . "/wp-load.php");
+
 // Blueprint Content Import – inline posts.
 \$__bp_posts = {$postsArray};
 
@@ -2667,6 +2876,9 @@ class BlueprintRunner {
         if ($step instanceof RunSqlStep) {
             return new RunSQLStepRunner();
         }
+        if ($step instanceof SetSiteLanguageStep) {
+            return new SetSiteLanguageStepRunner();
+        }
         if ($step instanceof SetSiteOptionsStep) {
             return new SetSiteOptionsStepRunner();
         }
@@ -2684,124 +2896,10 @@ class BlueprintRunner {
     }
 }
 
-// $complex_blueprint = Blueprint::fromValidatedArray(json_decode(<<<'JSON'
-// {
-//   "version": 2,
-//   "$schema": "https://raw.githubusercontent.com/WordPress/blueprints/trunk/blueprints/schema.json",
-//   "blueprintMeta": {
-//     "name": "Full Featured Blueprint",
-//     "description": "A blueprint demonstrating most of the available features",
-//     "version": "1.0.0",
-//     "authors": ["Test Author", "Another Author"],
-//     "authorUrl": "https://example.com",
-//     "donateLink": "https://example.com/donate",
-//     "tags": ["test", "full-features", "demo"],
-//     "license": "GPL-2.0"
-//   },
-//   "siteLanguage": "en_US",
-//   "siteOptions": {
-//     "blogname": "Full Featured Test Site",
-//     "timezone_string": "America/New_York",
-//     "permalink_structure": "/%postname%/"
-//   },
-//   "constants": {
-//     "WP_DEBUG": true,
-//     "WP_DEBUG_LOG": true,
-//     "WP_DEBUG_DISPLAY": false,
-//     "SCRIPT_DEBUG": true,
-//     "CUSTOM_CONSTANT": "custom-value"
-//   },
-//   "wordpressVersion": "6.4",
-//   "phpVersion": "8.0",
-//   "activeTheme": "twentytwentythree",
-//   "themes": [
-//     "twentytwentyfour"
-//   ],
-//   "plugins": [
-//     "akismet",
-//     {
-//       "source": "woocommerce",
-//       "active": true,
-//       "activationOptions": {
-//         "option1": "value1"
-//       }
-//     }
-//   ],
-//   "postTypes": {
-//     "book": {
-//       "label": "Books",
-//       "description": "Books post type",
-//       "public": true,
-//       "has_archive": true,
-//       "show_in_rest": true,
-//       "supports": ["title", "editor", "author", "thumbnail", "excerpt", "comments"]
-//     }
-//   },
-//   "content": [
-//     {
-//       "type": "posts",
-//       "source": [
-//         {
-//           "post_title": "Sample Post",
-//           "post_content": "This is a sample post content.",
-//           "post_status": "publish",
-//           "post_type": "post"
-//         },
-//         {
-//           "post_title": "Sample Page",
-//           "post_content": "This is a sample page content.",
-//           "post_status": "publish",
-//           "post_type": "page"
-//         }
-//       ]
-//     }
-//   ],
-//   "users": [
-//     {
-//       "username": "editor",
-//       "email": "editor@example.com",
-//       "role": "editor",
-//       "meta": {
-//         "first_name": "Test",
-//         "last_name": "Editor"
-//       }
-//     }
-//   ],
-//   "roles": [
-//     {
-//       "name": "book_editor",
-//       "capabilities": {
-//         "read": "true",
-//         "edit_books": "true",
-//         "publish_books": "true"
-//       }
-//     }
-//   ],
-//   "additionalStepsAfterExecution": [
-//     {
-//       "step": "writeFiles",
-//       "files": [
-//         {
-//           "path": "wp-content/uploads/custom-file.txt",
-//           "content": "This is a custom file created by the Blueprint."
-//         }
-//       ]
-//     },
-//     {
-//       "step": "runPHP",
-//       "code": "echo 'Blueprint execution completed!';"
-//     }
-//   ]
-// }
-// JSON, true, 512, JSON_THROW_ON_ERROR));
-
-$simple_blueprint = <<<'JSON'
+$complex_blueprint = <<<'JSON'
 {
   "version": 2,
   "$schema": "https://raw.githubusercontent.com/WordPress/blueprints/trunk/blueprints/schema.json",
-  "plugins": [
-    "friends"
-  ],
   "blueprintMeta": {
     "name": "Full Featured Blueprint",
     "description": "A blueprint demonstrating most of the available features",
@@ -2812,6 +2910,35 @@ $simple_blueprint = <<<'JSON'
     "tags": ["test", "full-features", "demo"],
     "license": "GPL-2.0"
   },
+  "siteLanguage": "de_DE",
+  "siteOptions": {
+    "blogname": "Full Featured Test Site",
+    "timezone_string": "America/New_York",
+    "permalink_structure": "/%postname%/"
+  },
+  "constants": {
+    "WP_DEBUG": true,
+    "WP_DEBUG_LOG": true,
+    "WP_DEBUG_DISPLAY": false,
+    "SCRIPT_DEBUG": true,
+    "CUSTOM_CONSTANT": "custom-value"
+  },
+  "wordpressVersion": "6.4",
+  "phpVersion": "8.0",
+  "activeTheme": "twentytwentythree",
+  "themes": [
+    "twentytwentyfour"
+  ],
+  "plugins": [
+    "akismet",
+    {
+      "source": "woocommerce",
+      "active": true,
+      "activationOptions": {
+        "option1": "value1"
+      }
+    }
+  ],
   "postTypes": {
     "book": {
       "label": "Books",
@@ -2822,24 +2949,100 @@ $simple_blueprint = <<<'JSON'
       "supports": ["title", "editor", "author", "thumbnail", "excerpt", "comments"]
     }
   },
-  "additionalStepsAfterExecution": [
+  "content": [
     {
-      "step": "writeFiles",
-      "files": {
-        "wp-content/uploads/custom-file.txt": {
-            "filename": "custom-file.txt",
-            "content": "This is a custom file created by the Blueprint."
+      "type": "posts",
+      "source": [
+        {
+          "post_title": "Sample Post",
+          "post_content": "This is a sample post content.",
+          "post_status": "publish",
+          "post_type": "post"
         },
-        "builder.php": "./test_file.txt"
+        {
+          "post_title": "Sample Page",
+          "post_content": "This is a sample page content.",
+          "post_status": "publish",
+          "post_type": "page"
+        }
+      ]
+    }
+  ],
+  "users": [
+    {
+      "username": "editor",
+      "email": "editor@example.com",
+      "role": "editor",
+      "meta": {
+        "first_name": "Test",
+        "last_name": "Editor"
       }
     }
+  ],
+  "roles": [
+    {
+      "name": "book_editor",
+      "capabilities": {
+        "read": "true",
+        "edit_books": "true",
+        "publish_books": "true"
+      }
+    }
+  ],
+  "additionalStepsAfterExecution": [
+    {
+      "step": "runPHP",
+      "code": "echo 'Blueprint execution completed!';"
+    }
   ]
-} 
+}
 JSON;
+
+// $simple_blueprint = <<<'JSON'
+// {
+//   "version": 2,
+//   "$schema": "https://raw.githubusercontent.com/WordPress/blueprints/trunk/blueprints/schema.json",
+//   "plugins": [
+//     "friends"
+//   ],
+//   "blueprintMeta": {
+//     "name": "Full Featured Blueprint",
+//     "description": "A blueprint demonstrating most of the available features",
+//     "version": "1.0.0",
+//     "authors": ["Test Author", "Another Author"],
+//     "authorUrl": "https://example.com",
+//     "donateLink": "https://example.com/donate",
+//     "tags": ["test", "full-features", "demo"],
+//     "license": "GPL-2.0"
+//   },
+//   "postTypes": {
+//     "book": {
+//       "label": "Books",
+//       "description": "Books post type",
+//       "public": true,
+//       "has_archive": true,
+//       "show_in_rest": true,
+//       "supports": ["title", "editor", "author", "thumbnail", "excerpt", "comments"]
+//     }
+//   },
+//   "additionalStepsAfterExecution": [
+//     {
+//       "step": "writeFiles",
+//       "files": {
+//         "wp-content/uploads/custom-file.txt": {
+//             "filename": "custom-file.txt",
+//             "content": "This is a custom file created by the Blueprint."
+//         },
+//         "builder.php": "./test_file.txt"
+//       }
+//     }
+//   ]
+// } 
+// JSON;
 
 // Update the test run at the bottom to use the progress handler
 $runnerConfiguration = RunnerConfiguration::create()
-    ->setRawBlueprint($simple_blueprint)
+    ->setRawBlueprint($complex_blueprint)
     ->setTargetSiteRoot(__DIR__ . '/test_blueprint_runner')
     ->setTargetSiteUrl('http://127.0.0.1:9850')
     ->setExecutionContextRoot(__DIR__);

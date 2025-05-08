@@ -63,6 +63,10 @@ class Runtime {
 		}
 	}
 
+	public function getHttpClient(): Client {
+		return $this->http_client;
+	}
+
 	public function getDocumentRoot(): string {
 		return $this->documentRoot;
 	}
@@ -97,10 +101,9 @@ class Runtime {
 			// @TODO: Memoize downloads to the disk – probably by adding
 			//        disk cache (or even http cache) support to the Client
 			//        class.
-			$tracked_stream = new RequestReadStream(
-				new Request( $url ),
+			$tracked_stream = $this->http_client->fetch(
+				$url,
 				array(
-					'client' => $this->http_client,
 					/**
 					 * Use a 100MB buffer to support seek()-ing in the streamed ZIP files.
 					 * To support ZIPs larger than 100MB, we'll need a custom SeekableRequestReadStream that:
