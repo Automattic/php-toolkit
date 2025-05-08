@@ -28,8 +28,8 @@ use WordPress\Blueprints\Resources\Model\InlineFile;
 use WordPress\Blueprints\Resources\Model\URLReference;
 use WordPress\Blueprints\Resources\Model\WordPressOrgPlugin;
 use WordPress\Blueprints\Resources\Model\WordPressOrgTheme;
-use WordPress\Blueprints\Runner\WordPressBoot\WordPressBootManager;
 use WordPress\ByteStream\MemoryPipe;
+use WordPress\ByteStream\WriteStream\FileWriteStream;
 use WordPress\Filesystem\Filesystem;
 use WordPress\Filesystem\FilesystemException;
 use WordPress\Filesystem\FilesystemHelpers;
@@ -47,6 +47,7 @@ use WordPress\Zip\ZipFilesystem;
 
 use function WordPress\Filesystem\copy_between_filesystems;
 use function WordPress\Filesystem\pipe_stream;
+use function WordPress\Filesystem\wp_join_paths;
 
 // Silence PHP deprecation warnings
 error_reporting(E_ALL & ~E_DEPRECATED & ~E_USER_DEPRECATED);
@@ -1662,7 +1663,7 @@ class ProcessFailedException extends \Exception {
 	 */
 	protected $process;
 
-	public function __construct( Process $process, \Throwable $previous = null ) {
+	public function __construct( Process $process, ?\Throwable $previous = null ) {
 		$this->process = $process;
 		parent::__construct(
 			'Process `' . $process->getCommandLine() . '` failed with exit code ' . $process->getExitCode() . " and the following stderr output: \n" . $process->getErrorOutput() . "\n" . $process->getOutput(),
@@ -1673,6 +1674,117 @@ class ProcessFailedException extends \Exception {
 
 	public function getProcess(): Process {
 		return $this->process;
+	}
+}
+
+class WordPressBootManager {
+
+	public static function boot(array $options): Runtime {
+		// Initialize runtime for the given document root
+		$runtime = $options['runtime'];
+
+		// Ensure document root directory exists (LocalFilesystem::create creates it)
+		$targetFs = $runtime->getTargetFilesystem();
+
+		// Unzip WordPress core into document root
+		$resolved = $runtime->resolveReferencedData($options['wordPressZip']);
+		if (!$resolved instanceof File) {
+			throw new \InvalidArgumentException('Provided zip reference does not resolve to a file');
+		}
+		$zipFs = ZipFilesystem::create($resolved->stream);
+
+		$path_in_zip = '/';
+		if(!$zipFs->exists('/wp-content') && $zipFs->exists('/wordpress')) {
+			$path_in_zip = '/wordpress';
+		}
+
+		// @TODO: Track unzipping progress
+		copy_between_filesystems([
+			'source_filesystem' => $zipFs,
+			'source_path'       => $path_in_zip,
+			'target_filesystem' => $targetFs,
+			'target_path'       => '/',
+			'recursive'         => true,
+		]);
+
+		// If SQLite integration zip provided, unzip into appropriate folder
+		if ($options['sqliteIntegrationPluginZip']) {
+			$resolved = $runtime->resolveReferencedData($options['sqliteIntegrationPluginZip']);
+			if (!$resolved instanceof File) {
+				throw new \InvalidArgumentException('Provided zip reference does not resolve to a file');
+			}
+			$zipFs = ZipFilesystem::create($resolved->stream);
+
+			$targetPath = '/wp-content/plugins/sqlite-database-integration';
+			$sourcePath = '/';
+			if ($zipFs->exists('sqlite-database-integration')) {
+				$sourcePath = '/sqlite-database-integration';
+			}
+			// @TODO: Track unzipping progress
+			copy_between_filesystems([
+				'source_filesystem' => $zipFs,
+				'source_path'       => $sourcePath,
+				'target_filesystem' => $targetFs,
+				'target_path'       => $targetPath,
+				'recursive'         => true,
+			]);
+
+			$targetFs->copy(
+				wp_join_paths($targetPath, 'db.copy'),
+				'/wp-content/db.php'
+			);
+		}
+
+		// 3. Install WordPress if not installed
+		$installCheck = $runtime->evalPhpInSubProcess(
+<<<'PHP'
+$wp_load = getenv('DOCROOT') . '/wp-load.php';
+if (!file_exists($wp_load)) {
+	echo '0';
+	exit;
+}
+require $wp_load;
+
+echo function_exists('is_blog_installed') && is_blog_installed() ? '1' : '0';
+PHP
+		);
+
+		if (trim($installCheck) !== '1') {
+			$wp_cli_path = wp_join_paths($runtime->getDocumentRoot(), 'wp-cli.phar');
+			if(!file_exists($wp_cli_path)) {
+				$read_stream = (new Client())->fetch('https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar');
+				$write_stream = FileWriteStream::from_path($wp_cli_path);
+				pipe_stream($read_stream, $write_stream);
+				$read_stream->close_reading();
+				$write_stream->close_writing();
+			}
+
+			$fs = $runtime->getTargetFilesystem();
+			if(!$fs->exists('/wp-config.php')) {
+				if ( $fs->exists( 'wp-config-sample.php' ) ) {
+					$fs->copy( 'wp-config-sample.php', 'wp-config.php' );
+				} else {
+					throw new \RuntimeException( 'Neither wp-config.php, nor wp-config-sample.php was found in the WordPress archive.' );
+				}
+			}
+
+			// Perform installation using WP-CLI
+			// @TODO: Remove the WP-CLI dependency to lower the download size for blueprints.phar.
+			$runtime->runShellCommand([
+				'php',
+				$wp_cli_path,
+				'core',
+				'install',
+				'--url=' . $options['siteUrl'],
+				'--title=WordPress Site',
+				'--admin_user=admin',
+				'--admin_password=password',
+				'--admin_email=admin@example.com',
+				'--skip-email'
+			]);
+		}
+
+		return $runtime;
 	}
 }
 
