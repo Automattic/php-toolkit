@@ -50,6 +50,7 @@ use WordPress\Zip\ZipFilesystem;
 use function WordPress\Filesystem\copy_between_filesystems;
 use function WordPress\Filesystem\pipe_stream;
 use function WordPress\Filesystem\wp_join_paths;
+use function WordPress\Zip\is_zip_file_stream;
 
 // Silence PHP deprecation warnings
 error_reporting(E_ALL & ~E_DEPRECATED & ~E_USER_DEPRECATED);
@@ -563,14 +564,7 @@ class InstallPluginStepRunner {
 				$zip_path = $temp_dir . '/' . $zip_filename;
 				$zip_stream = $fs->open_write_stream($zip_path);
 
-				try {
-					$plugin_data->stream->pull(4, RequestReadStream::PULL_EXACTLY);
-				} catch (NotEnoughDataException $e) {
-					// Ignore the exception. The if/else below handles files that are
-					// shorter than 4 bytes.
-				}
-
-				if ($plugin_data->stream->peek(4) === "PK\x03\x04") {
+				if (is_zip_file_stream($plugin_data->stream)) {
 					pipe_stream($plugin_data->stream, $zip_stream);
 					$plugin_data->stream->close_reading();
 				} else {
@@ -711,14 +705,7 @@ class InstallThemeStepRunner {
 				$zip_path = $temp_dir . '/' . $zip_filename;
 				$zip_stream = $fs->open_write_stream($zip_path);
 				
-				try {
-					$theme_data->stream->pull(4, RequestReadStream::PULL_EXACTLY);
-				} catch (NotEnoughDataException $e) {
-					// Ignore the exception. The if/else below handles files that are
-					// shorter than 4 bytes.
-				}
-
-				if ($theme_data->stream->peek(4) === "PK\x03\x04") {
+				if (is_zip_file_stream($theme_data->stream)) {
 					pipe_stream($theme_data->stream, $zip_stream);
 				} else {
 					throw new \RuntimeException("Theme is not a valid zip file.");
@@ -2677,16 +2664,7 @@ class BlueprintRunner
         if ($resolved instanceof File) {
 			$stream = $resolved->stream;
 
-			// @TODO: Helper method for "stream is a zip file"
-			try {
-				$stream->pull(4, RequestReadStream::PULL_EXACTLY);
-			} catch (NotEnoughDataException $e) {
-				// Ignore the exception. The if/else below handles files that are
-				// shorter than 4 bytes.
-			}
-
-			if ($stream->length() > 4 && $stream->peek(4) === "PK\x03\x04") {
-				// Zip file
+			if (is_zip_file_stream($stream)) {
 				$this->executionContext = new ZipFilesystem($stream);
 				$blueprintString = $this->executionContext->get_contents('/blueprint.json');
 			} else {
@@ -3440,6 +3418,10 @@ $config = (new RunnerConfiguration())
 		'$schema' => "https://raw.githubusercontent.com/WordPress/blueprints/trunk/blueprints/schema.json",
 		"plugins" => [
 			"friends"
+		],
+		// @TODO: Should the default WordPress theme stay? Do we need an option for this!
+		"themes" => [
+			"adventurer"
 		],
 		"blueprintMeta" => [
 			"name" => "Full Featured Blueprint",
