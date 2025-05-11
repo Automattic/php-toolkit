@@ -237,6 +237,7 @@ class Client {
 
 		$start_time = microtime( true );
 		$timeout    = $query['timeout'] ?? $this->timeout * 1000;
+
 		do {
 			if ( false !== $timeout && ( microtime( true ) - $start_time ) * 1000 >= $timeout ) {
 				return false;
@@ -360,6 +361,10 @@ class Client {
 			$this->get_active_requests( Request::STATE_RECEIVING_HEADERS )
 		);
 
+		$this->handle_redirects(
+			$this->get_active_requests( Request::STATE_RECEIVED )
+		);
+
 		/**
 		 * Allows the caller to consume the headers before we start polling
 		 * for the body of those requests.
@@ -382,10 +387,6 @@ class Client {
 
 		$this->receive_response_body(
 			$this->get_active_requests( Request::STATE_RECEIVING_BODY )
-		);
-
-		$this->handle_redirects(
-			$this->get_active_requests( Request::STATE_RECEIVED )
 		);
 
 		return true;

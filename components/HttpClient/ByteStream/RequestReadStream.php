@@ -82,7 +82,7 @@ class RequestReadStream extends BaseByteReadStream {
 		}
 	}
 
-	protected function internal_pull( $max_bytes = 65536 ): string {
+	protected function internal_pull( $max_bytes = 8096 ): string {
 		return $this->pull_until_event(
 			array(
 				'max_bytes' => $max_bytes,
