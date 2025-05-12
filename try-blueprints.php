@@ -82,10 +82,9 @@ $config = (new RunnerConfiguration())
 		]
 	])
 	->setDatabaseEngine('sqlite')
-    ->setExecutionMode('create-new-site')
-    // ->setExecutionMode('apply-to-existing-site')
+    ->setExecutionMode('create-new-site') // or 'apply-to-existing-site'
     ->setTargetSiteRoot(__DIR__ . '/my-new-site')
-    ->setTargetSiteUrl('http://127.0.0.1:2456')
+    ->setTargetSiteUrl('http://127.0.0.1:2456') // Arbitrary URL for the new site
 	->setProgressObserver(new ProgressObserver(function ($progress, $caption) {
 		static $lastLength = 0;
 		static $columns = null;
