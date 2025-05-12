@@ -3,15 +3,14 @@
 namespace unit\steps;
 
 use PHPUnitTestCase;
-use WordPress\Blueprints\Model\DataClass\RunSQLStep;
+use WordPress\Blueprints\DataReference\DataReference;
+use WordPress\Blueprints\Steps\DataClass\RunSQLStep;
 use WordPress\Blueprints\Progress\Tracker;
-use WordPress\Blueprints\Resources\Model\DataReference;
 use WordPress\Blueprints\Resources\ResourceManager;
 use WordPress\Blueprints\Runner\Step\RunSQLStepRunner;
 use WordPress\Blueprints\Runner\WordPressBoot\BootOptions;
 use WordPress\Blueprints\Runner\WordPressBoot\WordPressBootManager;
 use WordPress\Blueprints\Runtime\Runtime;
-use WordPress\ByteStream\MemoryPipe;
 
 use function WordPress\Filesystem\wp_join_paths;
 
@@ -25,14 +24,14 @@ class RunSQLStepRunnerTest extends PHPUnitTestCase {
      * @var Runtime
      */
     private $runtime;
-    
+
     /**
      * @var ResourceManager|\PHPUnit\Framework\MockObject\MockObject
      */
     private $resource_manager;
 
     /**
-     * @before 
+     * @before
      */
     public function setUp(): void {
         $this->document_root = wp_join_paths(sys_get_temp_dir(), 'test_runsql_' . uniqid());
@@ -66,7 +65,7 @@ class RunSQLStepRunnerTest extends PHPUnitTestCase {
         $objects = scandir($dir);
         foreach ($objects as $object) {
             if ($object == "." || $object == "..") continue;
-            
+
             $path = $dir . DIRECTORY_SEPARATOR . $object;
             if (is_dir($path)) {
                 $this->removeDirectory($path);
@@ -84,15 +83,15 @@ class RunSQLStepRunnerTest extends PHPUnitTestCase {
         // Create a test table SQL
         $sql = "CREATE TABLE IF NOT EXISTS test_table (id INT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(100));";
 		file_put_contents($this->document_root . '/test.sql', $sql);
-        
+
         $step = new RunSQLStep();
         $step->sql = DataReference::create('test.sql');
-        
+
         $tracker = new Tracker();
         $step_runner = new RunSQLStepRunner();
         $step_runner->setRuntime($this->runtime);
         $step_runner->run($step, $tracker);
-        
+
         // Verify the table was created
         $table_exists = $this->runtime->evalPhpInSubProcess(
             <<<'PHP'
@@ -104,10 +103,10 @@ class RunSQLStepRunnerTest extends PHPUnitTestCase {
             echo ($result === $table_name) ? 'true' : 'false';
             PHP
         );
-        
+
         $this->assertEquals('true', $table_exists);
     }
-    
+
     /**
      * Test running SQL queries that insert data
      */
@@ -120,16 +119,16 @@ INSERT INTO test_table (name) VALUES ('Test 2');
 INSERT INTO test_table (name) VALUES ('Test 3');
 SQL;
 		file_put_contents($this->document_root . '/test.sql', $sql);
-        
+
         $step_runner = new RunSQLStepRunner();
         $step_runner->setRuntime($this->runtime);
-        
+
         $step = new RunSQLStep();
         $step->sql = DataReference::create('test.sql');
-        
+
         $tracker = new Tracker();
         $step_runner->run($step, $tracker);
-        
+
         // Verify the data was inserted
         $result = $this->runtime->evalPhpInSubProcess(
             <<<'PHP'
@@ -144,14 +143,14 @@ SQL;
             ]);
             PHP
         );
-        
+
         $data = json_decode($result, true);
         $this->assertEquals(3, $data['count']);
         $this->assertEquals('Test 1', $data['rows'][0]['name']);
         $this->assertEquals('Test 2', $data['rows'][1]['name']);
         $this->assertEquals('Test 3', $data['rows'][2]['name']);
     }
-    
+
     /**
      * Test running SQL queries that modify WordPress options
      */
@@ -162,16 +161,16 @@ INSERT INTO wp_options (option_name, option_value, autoload) VALUES ('sql_test_o
 UPDATE wp_options SET option_value = 'updated_via_sql' WHERE option_name = 'sql_test_option';
 SQL;
 		file_put_contents($this->document_root . '/test.sql', $sql);
-        
+
         $step_runner = new RunSQLStepRunner();
         $step_runner->setRuntime($this->runtime);
-        
+
         $step = new RunSQLStep();
         $step->sql = DataReference::create('test.sql');
-        
+
         $tracker = new Tracker();
         $step_runner->run($step, $tracker);
-        
+
         // Verify the option was set through WordPress API
         $option_value = $this->runtime->evalPhpInSubProcess(
             <<<'PHP'
@@ -180,10 +179,10 @@ SQL;
             echo get_option('sql_test_option');
             PHP
         );
-        
+
         $this->assertEquals('updated_via_sql', $option_value);
     }
-    
+
     /**
      * Test running multiple SQL statements
      */
@@ -196,16 +195,16 @@ INSERT INTO test_table_1 (value) VALUES ('table_1_data');
 INSERT INTO test_table_2 (value) VALUES ('table_2_data');
 SQL;
 		file_put_contents($this->document_root . '/test.sql', $sql);
-        
+
         $step_runner = new RunSQLStepRunner();
         $step_runner->setRuntime($this->runtime);
-        
+
         $step = new RunSQLStep();
         $step->sql = DataReference::create('test.sql');
-        
+
         $tracker = new Tracker();
         $step_runner->run($step, $tracker);
-        
+
         // Verify both tables were created with data
         $result = $this->runtime->evalPhpInSubProcess(
             <<<'PHP'
@@ -222,12 +221,12 @@ SQL;
             ]);
             PHP
         );
-        
+
         $data = json_decode($result, true);
         $this->assertEquals('table_1_data', $data['table1']);
         $this->assertEquals('table_2_data', $data['table2']);
     }
-    
+
     /**
      * Test handling SQL errors
      */
@@ -235,19 +234,19 @@ SQL;
         // Create SQL with an error (invalid syntax)
         $sql = "CREATE TABLE test_table (id INT PRIMARY KEY); INSERT INTO nonexistent_table VALUES (1);";
 		file_put_contents($this->document_root . '/test.sql', $sql);
-        
+
         $step_runner = new RunSQLStepRunner();
         $step_runner->setRuntime($this->runtime);
-        
+
         $step = new RunSQLStep();
         $step->sql = DataReference::create('test.sql');
-        
+
         $tracker = new Tracker();
-        
+
         // We expect the second statement to fail, but the runner shouldn't throw
         // But should continue processing the valid statements
         $step_runner->run($step, $tracker);
-        
+
         // Verify the first table was created despite the error
         $table_exists = $this->runtime->evalPhpInSubProcess(
             <<<'PHP'
@@ -259,7 +258,7 @@ SQL;
             echo ($result === $table_name) ? 'true' : 'false';
             PHP
         );
-        
+
         $this->assertEquals('true', $table_exists);
     }
-} 
+}

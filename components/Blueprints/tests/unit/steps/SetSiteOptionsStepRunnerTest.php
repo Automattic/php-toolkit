@@ -3,7 +3,7 @@
 namespace unit\steps;
 
 use PHPUnitTestCase;
-use WordPress\Blueprints\Model\DataClass\SetSiteOptionsStep;
+use WordPress\Blueprints\Steps\DataClass\SetSiteOptionsStep;
 use WordPress\Blueprints\Progress\Tracker;
 use WordPress\Blueprints\Runner\Step\SetSiteOptionsStepRunner;
 use WordPress\Blueprints\Runner\WordPressBoot\BootOptions;
@@ -24,7 +24,7 @@ class SetSiteOptionsStepRunnerTest extends PHPUnitTestCase {
     private $runtime;
 
     /**
-     * @before 
+     * @before
      */
     public function setUp(): void {
         $this->document_root = wp_join_paths(sys_get_temp_dir(), 'test_set_options_' . uniqid());
@@ -58,7 +58,7 @@ class SetSiteOptionsStepRunnerTest extends PHPUnitTestCase {
         $objects = scandir($dir);
         foreach ($objects as $object) {
             if ($object == "." || $object == "..") continue;
-            
+
             $path = $dir . DIRECTORY_SEPARATOR . $object;
             if (is_dir($path)) {
                 $this->removeDirectory($path);
@@ -68,7 +68,7 @@ class SetSiteOptionsStepRunnerTest extends PHPUnitTestCase {
         }
         rmdir($dir);
     }
-    
+
     /**
      * Helper to verify options in WordPress
      * Note: This handles the fact that objects become arrays when serialized and deserialized through JSON
@@ -93,9 +93,9 @@ class SetSiteOptionsStepRunnerTest extends PHPUnitTestCase {
                 'OPTIONS' => json_encode($expected_options)
             ]
         );
-        
+
         $actual_options = json_decode($result, true);
-        
+
         foreach ($expected_options as $name => $expected_value) {
             // Convert stdClass objects to arrays for comparison
             // This is because WordPress stores them as arrays in the database
@@ -103,12 +103,12 @@ class SetSiteOptionsStepRunnerTest extends PHPUnitTestCase {
             if (is_object($expected_value)) {
                 $expected_value = json_decode(json_encode($expected_value), true);
             }
-            
+
             // Compare complex nested structures
             if (is_array($expected_value) && is_array($actual_options[$name])) {
                 $this->assertSame(
-                    json_encode($expected_value, JSON_PRETTY_PRINT), 
-                    json_encode($actual_options[$name], JSON_PRETTY_PRINT), 
+                    json_encode($expected_value, JSON_PRETTY_PRINT),
+                    json_encode($actual_options[$name], JSON_PRETTY_PRINT),
                     "Option '$name' should have the expected structure"
                 );
             } else {
@@ -123,30 +123,30 @@ class SetSiteOptionsStepRunnerTest extends PHPUnitTestCase {
     public function testSetSimpleStringOptions() {
         $step_runner = new SetSiteOptionsStepRunner();
         $step_runner->setRuntime($this->runtime);
-        
+
         $options = [
             'blogname' => 'Test Blog',
             'blogdescription' => 'Test Description',
             'admin_email' => 'test@example.com'
         ];
-        
+
         $step = new SetSiteOptionsStep();
         $step->options = $options;
-        
+
         $tracker = new Tracker();
         $step_runner->run($step, $tracker);
-        
+
         // Verify options were set correctly
         $this->verifyOptions($options);
     }
-    
+
     /**
      * Test setting options with different data types
      */
     public function testSetOptionsWithDifferentTypes() {
         $step_runner = new SetSiteOptionsStepRunner();
         $step_runner->setRuntime($this->runtime);
-        
+
         $options = [
             'string_option' => 'String Value',
             'int_option' => 42,
@@ -159,17 +159,17 @@ class SetSiteOptionsStepRunnerTest extends PHPUnitTestCase {
                 ]
             ]
         ];
-        
+
         $step = new SetSiteOptionsStep();
         $step->options = $options;
-        
+
         $tracker = new Tracker();
         $step_runner->run($step, $tracker);
-        
+
         // Verify options were set correctly
         $this->verifyOptions($options);
     }
-    
+
     /**
      * Test updating existing WordPress options
      */
@@ -183,45 +183,45 @@ class SetSiteOptionsStepRunnerTest extends PHPUnitTestCase {
             update_option('default_role', 'subscriber');
             PHP
         );
-        
+
         // Now update them
         $step_runner = new SetSiteOptionsStepRunner();
         $step_runner->setRuntime($this->runtime);
-        
+
         $options = [
             'users_can_register' => 1,
             'default_role' => 'author'
         ];
-        
+
         $step = new SetSiteOptionsStep();
         $step->options = $options;
-        
+
         $tracker = new Tracker();
         $step_runner->run($step, $tracker);
-        
+
         // Verify options were updated
         $this->verifyOptions($options);
     }
-    
+
     /**
      * Test setting a large number of options at once
      */
     public function testSetLargeNumberOfOptions() {
         $step_runner = new SetSiteOptionsStepRunner();
         $step_runner->setRuntime($this->runtime);
-        
+
         // Create a large number of options
         $options = [];
         for ($i = 1; $i <= 50; $i++) {
             $options["test_option_$i"] = "value_$i";
         }
-        
+
         $step = new SetSiteOptionsStep();
         $step->options = $options;
-        
+
         $tracker = new Tracker();
         $step_runner->run($step, $tracker);
-        
+
         // Verify a sample of the options
         $sample_options = [
             'test_option_1' => 'value_1',
@@ -229,17 +229,17 @@ class SetSiteOptionsStepRunnerTest extends PHPUnitTestCase {
             'test_option_25' => 'value_25',
             'test_option_50' => 'value_50'
         ];
-        
+
         $this->verifyOptions($sample_options);
     }
-    
+
     /**
      * Test setting WordPress core settings
      */
     public function testSetWordPressCoreSettings() {
         $step_runner = new SetSiteOptionsStepRunner();
         $step_runner->setRuntime($this->runtime);
-        
+
         $options = [
             'permalink_structure' => '/%year%/%monthnum%/%postname%/',
             'timezone_string' => 'America/New_York',
@@ -250,24 +250,24 @@ class SetSiteOptionsStepRunnerTest extends PHPUnitTestCase {
             'page_on_front' => 2,
             'page_for_posts' => 3
         ];
-        
+
         $step = new SetSiteOptionsStep();
         $step->options = $options;
-        
+
         $tracker = new Tracker();
         $step_runner->run($step, $tracker);
-        
+
         // Verify the core settings were applied
         $this->verifyOptions($options);
     }
-    
+
     /**
      * Test setting serialized options
      */
     public function testSetSerializedOptions() {
         $step_runner = new SetSiteOptionsStepRunner();
         $step_runner->setRuntime($this->runtime);
-        
+
         // Create a complex nested structure that will be serialized
         $options = [
             'complex_option' => [
@@ -283,14 +283,14 @@ class SetSiteOptionsStepRunnerTest extends PHPUnitTestCase {
                 ]
             ]
         ];
-        
+
         $step = new SetSiteOptionsStep();
         $step->options = $options;
-        
+
         $tracker = new Tracker();
         $step_runner->run($step, $tracker);
-        
+
         // Verify the complex option was stored and can be retrieved correctly
         $this->verifyOptions($options);
     }
-} 
+}

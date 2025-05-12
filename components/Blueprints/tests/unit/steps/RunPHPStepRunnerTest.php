@@ -3,7 +3,7 @@
 namespace unit\steps;
 
 use PHPUnitTestCase;
-use WordPress\Blueprints\Model\DataClass\RunPHPStep;
+use WordPress\Blueprints\Steps\DataClass\RunPHPStep;
 use WordPress\Blueprints\Progress\Tracker;
 use WordPress\Blueprints\Runner\Step\RunPHPStepRunner;
 use WordPress\Blueprints\Runner\WordPressBoot\BootOptions;
@@ -24,7 +24,7 @@ class RunPHPStepRunnerTest extends PHPUnitTestCase {
     private $runtime;
 
     /**
-     * @before 
+     * @before
      */
     public function setUp(): void {
         $this->document_root = wp_join_paths(sys_get_temp_dir(), 'test_runphp_' . uniqid());
@@ -58,7 +58,7 @@ class RunPHPStepRunnerTest extends PHPUnitTestCase {
         $objects = scandir($dir);
         foreach ($objects as $object) {
             if ($object == "." || $object == "..") continue;
-            
+
             $path = $dir . DIRECTORY_SEPARATOR . $object;
             if (is_dir($path)) {
                 $this->removeDirectory($path);
@@ -75,26 +75,26 @@ class RunPHPStepRunnerTest extends PHPUnitTestCase {
     public function testRunSimplePHPCode() {
         $step_runner = new RunPHPStepRunner();
         $step_runner->setRuntime($this->runtime);
-        
+
         $step = new RunPHPStep();
         $step->code = '<?php echo "Hello World";';
-        
+
         $tracker = new Tracker();
         $result = $step_runner->run($step, $tracker);
-        
+
         $this->assertEquals('Hello World', $result);
     }
-    
+
     /**
      * Test running PHP code that creates a file
      */
     public function testRunPHPCodeCreatingFile() {
         $step_runner = new RunPHPStepRunner();
         $step_runner->setRuntime($this->runtime);
-        
+
         $test_file_path = $this->document_root . '/test_file.txt';
         $test_content = 'This is a test file created by PHP';
-        
+
         $step = new RunPHPStep();
         $step->code = <<<PHP
 <?php
@@ -103,22 +103,22 @@ class RunPHPStepRunnerTest extends PHPUnitTestCase {
 file_put_contents(\$test_file_path, 'This is a test file created by PHP');
 echo "File created";
 PHP;
-        
+
         $tracker = new Tracker();
         $result = $step_runner->run($step, $tracker);
-        
+
         $this->assertEquals('File created', $result);
         $this->assertFileExists($test_file_path);
         $this->assertEquals($test_content, file_get_contents($test_file_path));
     }
-    
+
     /**
      * Test running PHP code that loads WordPress
      */
     public function testRunPHPCodeWithWordPress() {
         $step_runner = new RunPHPStepRunner();
         $step_runner->setRuntime($this->runtime);
-        
+
         $step = new RunPHPStep();
         $step->code = <<<PHP
 <?php
@@ -130,12 +130,12 @@ update_option('test_option', 'test_value');
 // Return the option value
 echo get_option('test_option');
 PHP;
-        
+
         $tracker = new Tracker();
         $result = $step_runner->run($step, $tracker);
-        
+
         $this->assertEquals('test_value', $result);
-        
+
         // Verify the option was actually set in WordPress
         $option_value = $this->runtime->evalPhpInSubProcess(
             <<<'PHP'
@@ -144,17 +144,17 @@ PHP;
             echo get_option('test_option');
             PHP
         );
-        
+
         $this->assertEquals('test_value', $option_value);
     }
-    
+
     /**
      * Test running PHP code that returns complex data
      */
     public function testRunPHPCodeReturningComplexData() {
         $step_runner = new RunPHPStepRunner();
         $step_runner->setRuntime($this->runtime);
-        
+
         $step = new RunPHPStep();
         $step->code = <<<PHP
 <?php
@@ -168,11 +168,11 @@ PHP;
 
 echo json_encode(\$data);
 PHP;
-        
+
         $tracker = new Tracker();
         $result = $step_runner->run($step, $tracker);
         $data = json_decode($result, true);
-        
+
         $this->assertIsArray($data);
         $this->assertEquals('Hello', $data['string']);
         $this->assertEquals(42, $data['number']);
@@ -180,21 +180,21 @@ PHP;
         $this->assertEquals([1, 2, 3], $data['array']);
         $this->assertEquals(['name' => 'Test'], $data['object']);
     }
-    
+
     /**
      * Test running PHP code with syntax error
      */
     public function testRunPHPCodeWithSyntaxError() {
         $step_runner = new RunPHPStepRunner();
         $step_runner->setRuntime($this->runtime);
-        
+
         $step = new RunPHPStep();
         $step->code = '<?php echo "Missing semicolon" echo "Another string";';
-        
+
         $tracker = new Tracker();
-        
+
         // The code contains a syntax error, so we expect an exception
         $this->expectException(\Exception::class);
         $step_runner->run($step, $tracker);
     }
-} 
+}

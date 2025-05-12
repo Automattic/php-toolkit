@@ -25,19 +25,9 @@
 		],
 		"psr-4": {
 			"WordPress\\": "src/WordPress",
-			"Pimple\\": "src/pimple/pimple/src/Pimple",
-			"Psr\\Container\\": "src/psr/container",
-			"Psr\\SimpleCache\\": "src/psr/simple-cache",
 			"Symfony\\Component\\Process\\": "src/Symfony/process",
-			"Symfony\\Component\\EventDispatcher\\": "src/Symfony/event-dispatcher",
-			"Symfony\\Component\\filesystem\\": "src/Symfony/filesystem",
-			"Opis\\JsonSchema\\": "src/opis/json-schema/src",
-			"Opis\\String\\": "src/opis/string/src",
-			"Opis\\Uri\\": "src/opis/uri/src"
+			"Symfony\\Component\\EventDispatcher\\": "src/Symfony/event-dispatcher"
 		},
-		"files": [
-			"src/WordPress/Blueprints/functions.php"
-		],
         "exclude-from-classmap": [
             "/Tests/"
         ]

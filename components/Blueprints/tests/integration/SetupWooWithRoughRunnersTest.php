@@ -3,14 +3,14 @@
 namespace unit\steps;
 
 use PHPUnitTestCase;
-use WordPress\Blueprints\Model\DataClass\DefineWpConfigConstsStep;
-use WordPress\Blueprints\Model\DataClass\InstallPluginStep;
-use WordPress\Blueprints\Model\DataClass\MkdirStep;
-use WordPress\Blueprints\Model\DataClass\RunPHPStep;
-use WordPress\Blueprints\Model\DataClass\SetSiteOptionsStep;
-use WordPress\Blueprints\Model\DataClass\WordPressPluginDirectoryReference;
-use WordPress\Blueprints\Model\DataClass\WordPressThemeDirectoryReference;
-use WordPress\Blueprints\Model\DataClass\WriteFileStep;
+use WordPress\Blueprints\Steps\DataClass\DefineWpConfigConstsStep;
+use WordPress\Blueprints\Steps\DataClass\InstallPluginStep;
+use WordPress\Blueprints\Steps\DataClass\MkdirStep;
+use WordPress\Blueprints\Steps\DataClass\RunPHPStep;
+use WordPress\Blueprints\Steps\DataClass\SetSiteOptionsStep;
+use WordPress\Blueprints\Steps\DataClass\WordPressPluginDirectoryReference;
+use WordPress\Blueprints\Steps\DataClass\WordPressThemeDirectoryReference;
+use WordPress\Blueprints\Steps\DataClass\WriteFileStep;
 use WordPress\Blueprints\Progress\Tracker;
 use WordPress\Blueprints\Runner\Step\DefineWpConfigConstsStepRunner;
 use WordPress\Blueprints\Runner\Step\InstallPluginStepRunner;
@@ -31,7 +31,7 @@ class SetupWooWithRoughRunnersTest extends PHPUnitTestCase {
         if (!is_dir($document_root)) {
             mkdir($document_root, 0777, true);
         }
-		
+
         // Boot WordPress using WordPressBootManager
         $options = BootOptions::parse([
             'siteUrl'     => 'https://example.com',
@@ -92,4 +92,4 @@ class SetupWooWithRoughRunnersTest extends PHPUnitTestCase {
 		}
     }
 
-} 
+}

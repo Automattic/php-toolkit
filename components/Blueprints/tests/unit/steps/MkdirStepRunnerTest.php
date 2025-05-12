@@ -3,7 +3,7 @@
 namespace unit\steps;
 
 use PHPUnitTestCase;
-use WordPress\Blueprints\Model\DataClass\MkdirStep;
+use WordPress\Blueprints\Steps\DataClass\MkdirStep;
 use WordPress\Blueprints\Runner\Step\MkdirStepRunner;
 use WordPress\Blueprints\Runtime\Runtime;
 use WordPress\Filesystem\FilesystemException;

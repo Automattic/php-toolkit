@@ -2,16 +2,13 @@
 
 namespace unit\steps;
 
-use InvalidArgumentException;
 use PHPUnitTestCase;
-use WordPress\Blueprints\Model\DataClass\WriteFileStep;
+use WordPress\Blueprints\DataReference\DataReference;
+use WordPress\Blueprints\Steps\DataClass\WriteFileStep;
 use WordPress\Blueprints\Progress\Tracker;
-use WordPress\Blueprints\Resources\Model\DataReference;
-use WordPress\Blueprints\Resources\Model\File;
 use WordPress\Blueprints\Runner\Step\WriteFileStepRunner;
 use WordPress\Blueprints\Runtime\Runtime;
 use WordPress\Filesystem\Filesystem;
-use WordPress\Filesystem\FilesystemException;
 use WordPress\Filesystem\LocalFilesystem;
 
 use function WordPress\Filesystem\wp_join_paths;

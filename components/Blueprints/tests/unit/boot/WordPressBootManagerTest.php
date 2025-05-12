@@ -5,9 +5,6 @@ namespace unit\boot;
 use PHPUnitTestCase;
 use WordPress\Blueprints\Runner\WordPressBoot\BootOptions;
 use WordPress\Blueprints\Runner\WordPressBoot\WordPressBootManager;
-use WordPress\Blueprints\Resources\Model\DataReference;
-use WordPress\Blueprints\Resources\Model\File;
-use WordPress\Blueprints\Resources\Model\InlineFile;
 use WordPress\Blueprints\Runtime\Runtime;
 use WordPress\Filesystem\LocalFilesystem;
 

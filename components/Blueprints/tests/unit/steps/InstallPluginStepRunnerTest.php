@@ -3,9 +3,9 @@
 namespace unit\steps;
 
 use PHPUnitTestCase;
-use WordPress\Blueprints\Model\DataClass\InstallPluginStep;
+use WordPress\Blueprints\DataReference\DataReference;
+use WordPress\Blueprints\Steps\DataClass\InstallPluginStep;
 use WordPress\Blueprints\Progress\Tracker;
-use WordPress\Blueprints\Resources\Model\DataReference;
 use WordPress\Blueprints\Runner\Step\InstallPluginStepRunner;
 use WordPress\Blueprints\Runner\WordPressBoot\BootOptions;
 use WordPress\Blueprints\Runner\WordPressBoot\WordPressBootManager;
@@ -75,7 +75,7 @@ class InstallPluginStepRunnerTest extends PHPUnitTestCase {
         $objects = scandir($dir);
         foreach ($objects as $object) {
             if ($object == "." || $object == "..") continue;
-            
+
             $path = $dir . DIRECTORY_SEPARATOR . $object;
             if (is_dir($path)) {
                 $this->removeDirectory($path);
@@ -175,7 +175,7 @@ class InstallPluginStepRunnerTest extends PHPUnitTestCase {
         $active_plugins = json_decode($active_plugins, true);
         $this->assertNotContains('test-plugin/test-plugin.php', $active_plugins);
     }
-    
+
     public function testInstallPluginFromZip() {
         $zip_file = wp_join_paths($this->document_root, 'zipped-test-plugin.zip');
         $zip = new \ZipArchive();
@@ -186,19 +186,19 @@ class InstallPluginStepRunnerTest extends PHPUnitTestCase {
 
         $step_runner = new InstallPluginStepRunner();
         $step_runner->setRuntime($this->runtime);
-        
+
         $step = new InstallPluginStep();
         $step->pluginData = DataReference::create('zipped-test-plugin.zip');
         $step->activate = true;
-        
+
         $tracker = new Tracker();
         $step_runner->run($step, $tracker);
-        
+
         // Check if plugin is installed
         $fs = $this->runtime->getTargetFilesystem();
         $this->assertTrue($fs->exists('wp-content/plugins/zipped-test-plugin'));
         $this->assertTrue($fs->exists('wp-content/plugins/zipped-test-plugin/test-plugin.php'));
-        
+
         // Check if plugin is activated
         $active_plugins = $this->runtime->evalPhpInSubProcess(
             <<<'PHP'
@@ -207,7 +207,7 @@ class InstallPluginStepRunnerTest extends PHPUnitTestCase {
             echo json_encode(get_option('active_plugins'));
             PHP
         );
-        
+
         $active_plugins = json_decode($active_plugins, true);
         $this->assertContains('zipped-test-plugin/test-plugin.php', $active_plugins);
     }
@@ -222,19 +222,19 @@ class InstallPluginStepRunnerTest extends PHPUnitTestCase {
 
         $step_runner = new InstallPluginStepRunner();
         $step_runner->setRuntime($this->runtime);
-        
+
         $step = new InstallPluginStep();
         $step->pluginData = DataReference::create('zipped-test-plugin.zip');
         $step->activate = true;
-        
+
         $tracker = new Tracker();
         $step_runner->run($step, $tracker);
-        
+
         // Check if plugin is installed
         $fs = $this->runtime->getTargetFilesystem();
         $this->assertTrue($fs->exists('wp-content/plugins/subfolder-name'));
         $this->assertTrue($fs->exists('wp-content/plugins/subfolder-name/test-plugin.php'));
-        
+
         // Check if plugin is activated
         $active_plugins = $this->runtime->evalPhpInSubProcess(
             <<<'PHP'
@@ -243,7 +243,7 @@ class InstallPluginStepRunnerTest extends PHPUnitTestCase {
             echo json_encode(get_option('active_plugins'));
             PHP
         );
-        
+
         $active_plugins = json_decode($active_plugins, true);
         $this->assertContains('subfolder-name/test-plugin.php', $active_plugins);
     }
@@ -259,18 +259,18 @@ class InstallPluginStepRunnerTest extends PHPUnitTestCase {
 
         $step_runner = new InstallPluginStepRunner();
         $step_runner->setRuntime($this->runtime);
-        
+
         $step = new InstallPluginStep();
         $step->pluginData = DataReference::create('plugin-directory');
         $step->activate = true;
-        
+
         $tracker = new Tracker();
         $step_runner->run($step, $tracker);
-        
+
         // Check if plugin is installed
         $fs = $this->runtime->getTargetFilesystem();
         $this->assertTrue($fs->exists('wp-content/plugins/test-plugin/test-plugin.php'));
-        
+
         // Check if plugin is activated
         $active_plugins = $this->runtime->evalPhpInSubProcess(
             <<<'PHP'
@@ -279,10 +279,10 @@ class InstallPluginStepRunnerTest extends PHPUnitTestCase {
             echo json_encode(get_option('active_plugins'));
             PHP
         );
-        
+
         $active_plugins = json_decode($active_plugins, true);
         $this->assertContains('test-plugin/test-plugin.php', $active_plugins);
     }
 
 
-} 
+}

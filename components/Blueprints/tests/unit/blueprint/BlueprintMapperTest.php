@@ -4,11 +4,11 @@ namespace unit\blueprint;
 
 use ArrayObject;
 use PHPUnitTestCase;
-use WordPress\Blueprints\Model\DataClass\MkdirStep;
-use WordPress\Blueprints\Model\DataClass\RmStep;
+use WordPress\Blueprints\Steps\DataClass\MkdirStep;
+use WordPress\Blueprints\Steps\DataClass\RmStep;
 use WordPress\Blueprints\BlueprintMapper;
-use WordPress\Blueprints\Model\DataClass\Blueprint;
-use WordPress\Blueprints\Model\DataClass\UrlResource;
+use WordPress\Blueprints\Steps\DataClass\Blueprint;
+use WordPress\Blueprints\Steps\DataClass\UrlResource;
 use WordPress\JsonMapper\JsonMapperException;
 
 class BlueprintMapperTest extends PHPUnitTestCase {

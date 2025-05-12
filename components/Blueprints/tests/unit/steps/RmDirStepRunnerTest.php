@@ -3,7 +3,7 @@
 namespace unit\steps;
 
 use PHPUnitTestCase;
-use WordPress\Blueprints\Model\DataClass\RmDirStep;
+use WordPress\Blueprints\Steps\DataClass\RmDirStep;
 use WordPress\Blueprints\Runner\Step\RmDirStepRunner;
 use WordPress\Blueprints\Runtime\Runtime;
 use WordPress\Filesystem\FilesystemException;
@@ -41,7 +41,7 @@ class RmDirStepRunnerTest extends PHPUnitTestCase {
 		$this->runtime       = new Runtime( $this->document_root );
 
 		$this->filesystem = LocalFilesystem::create($this->document_root);
-		
+
 		// Create the document root directory if it doesn't exist
 		if (!$this->filesystem->exists('/')) {
 			$this->filesystem->mkdir('/');
@@ -68,7 +68,7 @@ class RmDirStepRunnerTest extends PHPUnitTestCase {
 
 	public function testRemoveEmptyDirectory() {
 		$this->filesystem->mkdir('empty_dir');
-		
+
 		$step = new RmDirStep();
 		$step->setPath('empty_dir');
 		$step->setRecursive(false);
@@ -85,7 +85,7 @@ class RmDirStepRunnerTest extends PHPUnitTestCase {
 		$this->filesystem->mkdir('parent/child', ['recursive' => true]);
 		$this->filesystem->put_contents('parent/file.txt', 'test content');
 		$this->filesystem->put_contents('parent/child/nested_file.txt', 'nested content');
-		
+
 		$step = new RmDirStep();
 		$step->setPath('parent');
 		$step->setRecursive(true);
@@ -101,7 +101,7 @@ class RmDirStepRunnerTest extends PHPUnitTestCase {
 	public function testNonRecursiveRemovalFailsForNonEmptyDirectory() {
 		$this->filesystem->mkdir('non_empty_dir');
 		$this->filesystem->put_contents('non_empty_dir/file.txt', 'test content');
-		
+
 		$step = new RmDirStep();
 		$step->setPath('non_empty_dir');
 		$step->setRecursive(false);
@@ -118,7 +118,7 @@ class RmDirStepRunnerTest extends PHPUnitTestCase {
 		$this->filesystem->put_contents('complex/nested1/file3.txt', 'content 3');
 		$this->filesystem->put_contents('complex/nested1/sub1/file4.txt', 'content 4');
 		$this->filesystem->put_contents('complex/nested2/file5.txt', 'content 5');
-		
+
 		$step = new RmDirStep();
 		$step->setPath('complex');
 		$step->setRecursive(true);
@@ -142,7 +142,7 @@ class RmDirStepRunnerTest extends PHPUnitTestCase {
 
 	public function testRemoveFileWithRmDirFails() {
 		$this->filesystem->put_contents('test_file.txt', 'test content');
-		
+
 		$step = new RmDirStep();
 		$step->setPath('test_file.txt');
 		$step->setRecursive(false);
@@ -150,4 +150,4 @@ class RmDirStepRunnerTest extends PHPUnitTestCase {
 		self::expectException(FilesystemException::class);
 		$this->step_runner->run($step);
 	}
-} 
+}

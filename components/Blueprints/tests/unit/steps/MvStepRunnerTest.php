@@ -3,7 +3,7 @@
 namespace unit\steps;
 
 use PHPUnitTestCase;
-use WordPress\Blueprints\Model\DataClass\MvStep;
+use WordPress\Blueprints\Steps\DataClass\MvStep;
 use WordPress\Blueprints\Runner\Step\MvStepRunner;
 use WordPress\Blueprints\Runtime\Runtime;
 use WordPress\Filesystem\FilesystemException;
@@ -41,7 +41,7 @@ class MvStepRunnerTest extends PHPUnitTestCase {
 		$this->runtime       = new Runtime( $this->document_root );
 
 		$this->filesystem = LocalFilesystem::create($this->document_root);
-		
+
 		// Create the document root directory if it doesn't exist
 		if (!$this->filesystem->exists('/')) {
 			$this->filesystem->mkdir('/');
@@ -68,7 +68,7 @@ class MvStepRunnerTest extends PHPUnitTestCase {
 
 	public function testMoveFile() {
 		$this->filesystem->put_contents('source_file.txt', 'test content');
-		
+
 		$step = new MvStep();
 		$step->fromPath = 'source_file.txt';
 		$step->toPath = 'target_file.txt';
@@ -93,7 +93,7 @@ class MvStepRunnerTest extends PHPUnitTestCase {
 	public function testMoveFileToDirectory() {
 		$this->filesystem->put_contents('source_file.txt', 'test content');
 		$this->filesystem->mkdir('target_dir');
-		
+
 		$step = new MvStep();
 		$step->fromPath = 'source_file.txt';
 		$step->toPath = 'target_dir/file.txt';
@@ -113,7 +113,7 @@ class MvStepRunnerTest extends PHPUnitTestCase {
 	public function testMoveDirectory() {
 		$this->filesystem->mkdir('source_dir');
 		$this->filesystem->put_contents('source_dir/file.txt', 'test content');
-		
+
 		$step = new MvStep();
 		$step->fromPath = 'source_dir';
 		$step->toPath = 'target_dir';
@@ -138,7 +138,7 @@ class MvStepRunnerTest extends PHPUnitTestCase {
 		$this->filesystem->mkdir('source_dir/nested_dir', ['recursive' => true]);
 		$this->filesystem->put_contents('source_dir/file1.txt', 'test content 1');
 		$this->filesystem->put_contents('source_dir/nested_dir/file2.txt', 'test content 2');
-		
+
 		$step = new MvStep();
 		$step->fromPath = 'source_dir';
 		$step->toPath = 'target_dir';
@@ -176,4 +176,4 @@ class MvStepRunnerTest extends PHPUnitTestCase {
 		self::expectException(FilesystemException::class);
 		$this->step_runner->run($step);
 	}
-} 
+}

@@ -3,9 +3,9 @@
 namespace unit\steps;
 
 use PHPUnitTestCase;
-use WordPress\Blueprints\Model\DataClass\InstallThemeStep;
+use WordPress\Blueprints\DataReference\DataReference;
+use WordPress\Blueprints\Steps\DataClass\InstallThemeStep;
 use WordPress\Blueprints\Progress\Tracker;
-use WordPress\Blueprints\Resources\Model\DataReference;
 use WordPress\Blueprints\Runner\Step\InstallThemeStepRunner;
 use WordPress\Blueprints\Runner\WordPressBoot\BootOptions;
 use WordPress\Blueprints\Runner\WordPressBoot\WordPressBootManager;
@@ -89,7 +89,7 @@ class InstallThemeStepRunnerTest extends PHPUnitTestCase {
         $objects = scandir($dir);
         foreach ($objects as $object) {
             if ($object == "." || $object == "..") continue;
-            
+
             $path = $dir . DIRECTORY_SEPARATOR . $object;
             if (is_dir($path)) {
                 $this->removeDirectory($path);
@@ -181,7 +181,7 @@ class InstallThemeStepRunnerTest extends PHPUnitTestCase {
 
         $this->assertNotEquals('test-theme', trim($active_theme));
     }
-    
+
     public function testInstallThemeFromZip() {
         $zip_file = wp_join_paths($this->document_root, 'zipped-test-theme.zip');
         $zip = new \ZipArchive();
@@ -193,20 +193,20 @@ class InstallThemeStepRunnerTest extends PHPUnitTestCase {
 
         $step_runner = new InstallThemeStepRunner();
         $step_runner->setRuntime($this->runtime);
-        
+
         $step = new InstallThemeStep();
         $step->themeData = DataReference::create('zipped-test-theme.zip');
         $step->activate = true;
-        
+
         $tracker = new Tracker();
         $step_runner->run($step, $tracker);
-        
+
         // Check if theme is installed
         $fs = $this->runtime->getTargetFilesystem();
         $this->assertTrue($fs->exists('wp-content/themes/test-theme'));
         $this->assertTrue($fs->exists('wp-content/themes/test-theme/style.css'));
         $this->assertTrue($fs->exists('wp-content/themes/test-theme/index.php'));
-        
+
         // Check if theme is activated
         $active_theme = $this->runtime->evalPhpInSubProcess(
             <<<'PHP'
@@ -215,7 +215,7 @@ class InstallThemeStepRunnerTest extends PHPUnitTestCase {
             echo get_option('stylesheet');
             PHP
         );
-        
+
         $this->assertEquals('test-theme', trim($active_theme));
     }
-} 
+}

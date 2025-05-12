@@ -3,7 +3,7 @@
 namespace unit\steps;
 
 use PHPUnitTestCase;
-use WordPress\Blueprints\Model\DataClass\DefineWpConfigConstsStep;
+use WordPress\Blueprints\Steps\DataClass\DefineWpConfigConstsStep;
 use WordPress\Blueprints\Progress\Tracker;
 use WordPress\Blueprints\Runner\Step\DefineWpConfigConstsStepRunner;
 use WordPress\Blueprints\Runner\WordPressBoot\BootOptions;
@@ -63,7 +63,7 @@ require_once ABSPATH . 'wp-settings.php';
 PHP;
 
     /**
-     * @before 
+     * @before
      */
     public function setUp(): void {
         $this->document_root = wp_join_paths(sys_get_temp_dir(), 'test_wp_config_' . uniqid());
@@ -100,7 +100,7 @@ PHP;
         $objects = scandir($dir);
         foreach ($objects as $object) {
             if ($object == "." || $object == "..") continue;
-            
+
             $path = $dir . DIRECTORY_SEPARATOR . $object;
             if (is_dir($path)) {
                 $this->removeDirectory($path);
@@ -118,23 +118,23 @@ PHP;
         // Create and configure the step runner
         $step_runner = new DefineWpConfigConstsStepRunner();
         $step_runner->setRuntime($this->runtime);
-        
+
         // Create the step with constants to define
         $constants = [
             'WP_DEBUG' => true,
             'DB_NAME' => 'updated_db'
         ];
-        
+
         $step = new DefineWpConfigConstsStep();
         $step->consts = $constants;
-        
+
         // Run the step
         $tracker = new Tracker();
         $step_runner->run($step, $tracker);
-        
+
         $this->assertWordPressConstants($constants);
     }
-    
+
     /**
      * Test adding new constants
      */
@@ -142,23 +142,23 @@ PHP;
         // Create and configure the step runner
         $step_runner = new DefineWpConfigConstsStepRunner();
         $step_runner->setRuntime($this->runtime);
-        
+
         // Create the step with constants to define
         $constants = [
             'WP_MEMORY_LIMIT' => '256M',
             'AUTOMATIC_UPDATER_DISABLED' => true
         ];
-        
+
         $step = new DefineWpConfigConstsStep();
         $step->consts = $constants;
-        
+
         // Run the step
         $tracker = new Tracker();
         $step_runner->run($step, $tracker);
-        
+
         $this->assertWordPressConstants($constants);
     }
-    
+
     /**
      * Test defining constants with different data types
      */
@@ -166,7 +166,7 @@ PHP;
         // Create and configure the step runner
         $step_runner = new DefineWpConfigConstsStepRunner();
         $step_runner->setRuntime($this->runtime);
-        
+
         // Create the step with constants of different types
         $constants = [
             'STRING_CONST' => 'string value',
@@ -176,34 +176,34 @@ PHP;
             'ARRAY_CONST' => ['one', 'two', 'three'],
             'NULL_CONST' => null
         ];
-        
+
         $step = new DefineWpConfigConstsStep();
         $step->consts = $constants;
-        
+
         // Run the step
         $tracker = new Tracker();
         $step_runner->run($step, $tracker);
-        
+
         $this->assertWordPressConstants($constants);
     }
-    
+
     /**
      * Test error handling when wp-config.php does not exist
      */
     public function testErrorHandlingWhenWpConfigNotExists() {
         // Remove the wp-config.php file
         unlink($this->document_root . '/wp-config.php');
-        
+
         // Create and configure the step runner
         $step_runner = new DefineWpConfigConstsStepRunner();
         $step_runner->setRuntime($this->runtime);
-        
+
         // Create the step with constants to define
         $step = new DefineWpConfigConstsStep();
         $step->consts = [
             'WP_DEBUG' => true
         ];
-        
+
         // Run the step with a try-catch to capture the expected error
         $tracker = new Tracker();
         try {
@@ -214,7 +214,7 @@ PHP;
             $this->assertTrue(true);
         }
     }
-    
+
     /**
      * Test defining multiple constants at once
      */
@@ -222,7 +222,7 @@ PHP;
         // Create and configure the step runner
         $step_runner = new DefineWpConfigConstsStepRunner();
         $step_runner->setRuntime($this->runtime);
-        
+
         // Define a large set of constants
         $constants = [
             'WP_DEBUG' => true,
@@ -236,21 +236,21 @@ PHP;
             'COMPRESS_CSS' => false,
             'ENFORCE_GZIP' => false
         ];
-        
+
         // Create the step with constants to define
         $step = new DefineWpConfigConstsStep();
         $step->consts = $constants;
-        
+
         // Run the step
         $tracker = new Tracker();
         $step_runner->run($step, $tracker);
-        
+
         $this->assertWordPressConstants($constants);
     }
-    
+
     /**
      * Helper method to verify constants are defined in WordPress
-     * 
+     *
      * @param array $constants Array of constants to check
      * @return array Results of constant verification
      */
@@ -275,9 +275,9 @@ PHP;
                 'CONSTANTS' => json_encode($expected_constants)
             ]
         );
-        
+
         $actual_constants = json_decode($result, true);
 		$this->assertEquals($expected_constants, $actual_constants);
     }
 
-} 
+}

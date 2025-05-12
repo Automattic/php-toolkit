@@ -3,7 +3,7 @@
 namespace unit\steps;
 
 use PHPUnitTestCase;
-use WordPress\Blueprints\Model\DataClass\CpStep;
+use WordPress\Blueprints\Steps\DataClass\CpStep;
 use WordPress\Blueprints\Runner\Step\CpStepRunner;
 use WordPress\Blueprints\Runtime\Runtime;
 use WordPress\Filesystem\FilesystemException;
@@ -41,7 +41,7 @@ class CpStepRunnerTest extends PHPUnitTestCase {
 		$this->runtime       = new Runtime( $this->document_root );
 
 		$this->filesystem = LocalFilesystem::create($this->document_root);
-		
+
 		// Create the document root directory if it doesn't exist
 		if (!$this->filesystem->exists('/')) {
 			$this->filesystem->mkdir('/');
@@ -68,7 +68,7 @@ class CpStepRunnerTest extends PHPUnitTestCase {
 
 	public function testCopyFile() {
 		$this->filesystem->put_contents('source_file.txt', 'test content');
-		
+
 		$step = new CpStep();
 		$step->fromPath = 'source_file.txt';
 		$step->toPath = 'target_file.txt';
@@ -94,7 +94,7 @@ class CpStepRunnerTest extends PHPUnitTestCase {
 	public function testCopyFileToDirectory() {
 		$this->filesystem->put_contents('source_file.txt', 'test content');
 		$this->filesystem->mkdir('target_dir');
-		
+
 		$step = new CpStep();
 		$step->fromPath = 'source_file.txt';
 		$step->toPath = 'target_dir/file.txt';
@@ -120,7 +120,7 @@ class CpStepRunnerTest extends PHPUnitTestCase {
 	public function testCopyDirectoryWithRecursiveOption() {
 		$this->filesystem->mkdir('source_dir');
 		$this->filesystem->put_contents('source_dir/file.txt', 'test content');
-		
+
 		$step = new CpStep();
 		$step->fromPath = 'source_dir';
 		$step->toPath = 'target_dir';
@@ -151,7 +151,7 @@ class CpStepRunnerTest extends PHPUnitTestCase {
 		$this->filesystem->mkdir('source_dir/nested_dir', ['recursive' => true]);
 		$this->filesystem->put_contents('source_dir/file1.txt', 'test content 1');
 		$this->filesystem->put_contents('source_dir/nested_dir/file2.txt', 'test content 2');
-		
+
 		$step = new CpStep();
 		$step->fromPath = 'source_dir';
 		$step->toPath = 'target_dir';
@@ -185,7 +185,7 @@ class CpStepRunnerTest extends PHPUnitTestCase {
 	public function testCopyDirectoryWithoutRecursiveOptionFails() {
 		$this->filesystem->mkdir('source_dir');
 		$this->filesystem->put_contents('source_dir/file.txt', 'test content');
-		
+
 		$step = new CpStep();
 		$step->fromPath = 'source_dir';
 		$step->toPath = 'target_dir';
@@ -208,7 +208,7 @@ class CpStepRunnerTest extends PHPUnitTestCase {
 	public function testCopyToExistingFile() {
 		$this->filesystem->put_contents('source_file.txt', 'source content');
 		$this->filesystem->put_contents('target_file.txt', 'target content');
-		
+
 		$step = new CpStep();
 		$step->fromPath = 'source_file.txt';
 		$step->toPath = 'target_file.txt';
@@ -222,4 +222,4 @@ class CpStepRunnerTest extends PHPUnitTestCase {
 			'Failed to assert that target file was overwritten with source content'
 		);
 	}
-} 
+}

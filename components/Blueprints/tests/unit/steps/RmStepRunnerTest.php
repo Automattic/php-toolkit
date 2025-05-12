@@ -3,7 +3,7 @@
 namespace unit\steps;
 
 use PHPUnitTestCase;
-use WordPress\Blueprints\Model\DataClass\RmStep;
+use WordPress\Blueprints\Steps\DataClass\RmStep;
 use WordPress\Blueprints\Runner\Step\RmStepRunner;
 use WordPress\Blueprints\Runtime\Runtime;
 use WordPress\Filesystem\FilesystemException;
@@ -41,7 +41,7 @@ class RmStepRunnerTest extends PHPUnitTestCase {
 		$this->runtime       = new Runtime( $this->document_root );
 
 		$this->filesystem = LocalFilesystem::create($this->document_root);
-		
+
 		// Create the document root directory if it doesn't exist
 		if (!$this->filesystem->exists('/')) {
 			$this->filesystem->mkdir('/');
@@ -68,7 +68,7 @@ class RmStepRunnerTest extends PHPUnitTestCase {
 
 	public function testRemoveDirectoryWhenUsingRelativePath() {
 		$this->filesystem->mkdir('test_dir');
-		
+
 		$step = new RmStep();
 		$step->path = 'test_dir';
 
@@ -82,7 +82,7 @@ class RmStepRunnerTest extends PHPUnitTestCase {
 
 	public function testRemoveDirectoryWithSubdirectory() {
 		$this->filesystem->mkdir('parent/child', ['recursive' => true]);
-		
+
 		$step = new RmStep();
 		$step->path = 'parent';
 
@@ -99,7 +99,7 @@ class RmStepRunnerTest extends PHPUnitTestCase {
 		// Create directory with file
 		$this->filesystem->mkdir('dir_with_file', ['recursive' => true]);
 		$this->filesystem->put_contents('dir_with_file/test.txt', 'test content');
-		
+
 		// Create RmStep for removing the directory
 		$step = new RmStep();
 		$step->path = 'dir_with_file';
@@ -114,7 +114,7 @@ class RmStepRunnerTest extends PHPUnitTestCase {
 
 	public function testRemoveFile() {
 		$this->filesystem->put_contents('test_file.txt', 'test content');
-		
+
 		$step = new RmStep();
 		$step->path = 'test_file.txt';
 
@@ -132,7 +132,7 @@ class RmStepRunnerTest extends PHPUnitTestCase {
 
 		self::expectException(FilesystemException::class);
 		self::expectExceptionMessageMatches('/Path does not exist:/');
-		
+
 		$this->step_runner->run($step);
 	}
 
@@ -142,7 +142,7 @@ class RmStepRunnerTest extends PHPUnitTestCase {
 
 		self::expectException(FilesystemException::class);
 		self::expectExceptionMessageMatches('/Path does not exist:/');
-		
+
 		$this->step_runner->run($step);
 	}
 }
