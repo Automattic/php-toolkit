@@ -37,6 +37,10 @@ class InlineDirectory extends DataReference {
 		return $this->name;
 	}
 
+	public function get_filename(): string {
+		return $this->name;
+	}
+
 	/**
 	 * Get the directory children.
 	 *

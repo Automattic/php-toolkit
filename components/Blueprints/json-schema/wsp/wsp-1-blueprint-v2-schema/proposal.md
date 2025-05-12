@@ -517,14 +517,12 @@ Before execution, the Blueprint Runner **MUST** validate the provided Blueprint 
 2.  **JSON Validity:** Assert the input is a valid JSON document.
 3.  **Schema Conformance:** Assert the JSON document conforms to the schema defined in [Appendix A](./appendix-A-blueprint-v2-schema.ts).
     This validates the structure, data types, and allowed values for all properties.
-4.  **PHP Version Compatibility:** Assert the PHP version specified in the Blueprint (`phpVersion`, if present) is compatible
-    with the execution environment's PHP version.
-5.  **Plugin/Theme Reference Check (WordPress.org):**
+4.  **Plugin/Theme Reference Check (WordPress.org):**
     -   The validator **MAY** assert that plugin and theme slugs and version references pointing to the WordPress.org
         directory correspond to existing releases.
     -   Alternatively, this check **MAY** be deferred until the specific execution step that installs the relevant plugin or theme.
-6.  **Bundle Path Validation (If validating a Bundle):**
-    -   If the Blueprint is part of a Bundle, the validator **MUST** assert that all relative and absolute file paths referenced
+5.  **Bundle Path Validation (If validating a Bundle):**
+    -   If the Blueprint is part of a Bundle, the validator **MAY** assert that all relative and absolute file paths referenced
         within the `blueprint.json` (e.g., in `plugins`, `themes`, `content` sources) point to files actually included within the bundle.
     -   A Bundle validator **MAY** also assert that all files shipped within the bundle _are_ referenced somewhere in the
         `blueprint.json` file (to detect unused files).
@@ -562,6 +560,7 @@ determining this target depends heavily on the `executionMode` specified in the
     -   The runner **MUST** verify that the provided `targetSiteRef` points to a directory containing a valid WordPress installation (e.g., by checking for the presence of `wp-load.php`), as required by the Runner Configuration. If not, the process stops with an error.
     -   This existing site becomes the Execution Target.
     -   The runner **MUST** verify that the WordPress version of this existing site is compatible with the `wordpressVersion` specified in the Blueprint. If not, the process stops with an error.
+    -   The runner **MUST** verify that the PHP version specified in the Blueprint (`phpVersion`, if present) is compatible with the execution environment's PHP version.
     -   The runner **MUST** verify that the existing site's database engine matches the `databaseEngine` specified in the Runner Configuration. If not, the process stops with an error.
 
 -   **If `executionMode` is `'create-new-site'`: (Creating a New Site)**
@@ -573,6 +572,7 @@ determining this target depends heavily on the `executionMode` specified in the
         -   _(Note: If `databaseEngine` is 'sqlite', the runner **MUST** ensure the `sqlite-database-integration` plugin is installed and activated before database operations, as detailed in [Appendix C](./appendix-C-runner-configuration.ts)._
         -   Setting the administrator username to `admin` and password to `password`. The Blueprint may both specify a different password and the Blueprint runner may override this default with a randomly-generated secure password.
         -   Applying initial site settings like `siteLanguage` and `siteOptions.timezone` as defined in the Blueprint.
+    -   The runner **MUST** verify that the PHP version specified in the Blueprint (`phpVersion`, if present) is compatible with the execution environment's PHP version.
     -   The runner **MUST** verify that the installation completed successfully. If not, the process stops with an error.
     -   This newly created site becomes the Execution Target.
 

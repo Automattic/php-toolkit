@@ -138,6 +138,10 @@ class Tracker {
 		return $subTracker;
 	}
 
+	public function increment( $value = 1, $caption = null ) {
+		$this->set( $this->getProgress() + $value, $caption );
+	}
+
 	/**
 	 * @param float       $value
 	 * @param string|null $caption

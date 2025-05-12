@@ -74,6 +74,10 @@ class GitPath extends DataReference {
 		return $this->path;
 	}
 
+	public function get_filename(): string {
+		return basename($this->path);
+	}
+
 	/**
 	 * Get the local directory name.
 	 *

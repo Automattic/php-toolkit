@@ -2,6 +2,8 @@
 
 namespace WordPress\Blueprints\Resources\Model;
 
+use WordPress\DataLiberation\URL\WPURL;
+
 /**
  * Represents a HTTP or HTTPS URL reference.
  */
@@ -28,6 +30,10 @@ class URLReference extends DataReference {
 	 */
 	public function get_url(): string {
 		return $this->url;
+	}
+
+	public function get_filename(): string {
+		return basename(WPURL::parse($this->url)->pathname);
 	}
 
 	/**

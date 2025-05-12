@@ -4,6 +4,9 @@
  * @TODO: Fast unzipping of remote Zip Files by iterating over the entries
  *        instead of skipping over to the end central directory index entry.
  * @TODO: Processing Zip Files without the Content-Length header.
+ * @TODO: HTTP Cache support for remote files.
+ * @TODO: Restrictions on supported step types, media files types, SQL queries types, etc.
+ * @TODO: Add importMedia step to the specification.
  */
 
 namespace WordPress\Blueprints\Model;
@@ -1906,6 +1909,7 @@ class NewSiteResolver
 {
     static public function resolve(Runtime $runtime, Tracker $targetResolutionStage)
     {
+		return;
 		$stages = [
 			'resolve_assets' => $targetResolutionStage->stage(0.66),
 			'install_wordpress' => $targetResolutionStage->stage(0.33, 'Installing WordPress'),
@@ -2468,11 +2472,9 @@ class BlueprintRunner
             $plan[] = $this->createStepObject('runPHP', ['code' => $code]);
         }
 
-        // 8. media – use RunPHP placeholders.
+        // 8. media – Import media files
         if ( !empty($validated_array['media']) && is_array($validated_array['media'])) {
-			throw new InvalidArgumentException('Media is not supported yet.');
-            $code = '// TODO: Import media declared in Blueprint. Media JSON: ' . var_export($validated_array['media'], true) . ';';
-            $plan[] = $this->createStepObject('runPHP', ['code' => $code]);
+            $plan[] = $this->createStepObject('importMedia', ['media' => $validated_array['media']]);
         }
 
         // 9. siteLanguage
@@ -2856,6 +2858,23 @@ class BlueprintRunner
                     }
                 }
                 return new WriteFilesStep($files);
+            case 'importMedia':
+                $media = [];
+                foreach ($data['media'] as $path => $content) {
+                    if (is_string($content)) {
+						$media[$path] = (new MediaFileDefinition())
+							->setSource( $this->createDataReference($content) );
+						continue;
+                    }
+
+					$media[$path] = (new MediaFileDefinition())
+						->setSource( $this->createDataReference($content['source']) )
+						->setTitle( $content['title'] ?? null )
+						->setDescription( $content['description'] ?? null )
+						->setAlt( $content['alt'] ?? null )
+						->setCaption( $content['caption'] ?? null );
+                }
+                return new ImportMediaStep($media);
             default:
                 throw new InvalidArgumentException("Unknown step type: {$stepType}");
         }
@@ -3000,44 +3019,299 @@ class BlueprintRunner
         if ($step instanceof WriteFilesStep) {
             return new WriteFilesStepRunner();
         }
+        if ($step instanceof ImportMediaStep) {
+            return new ImportMediaStepRunner();
+        }
 
         throw new \InvalidArgumentException('Unknown step type: ' . get_class($step));
     }
 }
 
+
+/**
+ * Represents the 'importMedia' step.
+ */
+class ImportMediaStep {
+    /**
+     * An associative array of media files to import.
+     * @var array<string, DataReference|string>
+     */
+    private array $media;
+
+    /**
+     * @param array<string, DataReference|string> $media Media files to import.
+     */
+    public function __construct(array $media) {
+        $this->media = $media;
+    }
+
+    /**
+     * @return array<string, DataReference|string>
+     */
+    public function getMedia(): array {
+        return $this->media;
+    }
+
+    /**
+     * @param array<string, DataReference|string> $media
+     */
+    public function setMedia(array $media): void {
+        $this->media = $media;
+    }
+}
+
+class ImportMediaStepRunner implements StepRunnerInterface {
+    public function run(object $step, Runtime $runtime, Tracker $tracker) {
+        $tracker->setCaption('Importing media files');
+		$medias = $step->getMedia();
+        $total_files = count($medias);
+        
+        if ($total_files === 0) {
+            $tracker->finish();
+            return true;
+        }
+        
+        $files_imported = 0;
+        $fs = $runtime->getTargetFilesystem();
+        $wp_upload_dir = FilesystemHelpers::withTemporaryDirectory($fs, function($temp_dir) use ($fs, $runtime) {
+            $output_file = $temp_dir . '/upload_dir.json';
+            $runtime->evalPhpInSubProcess(
+                '<?php
+                require_once(getenv("DOCROOT") . "/wp-load.php");
+                $upload_dir = wp_upload_dir();
+                file_put_contents(getenv("OUTPUT_FILE"), json_encode($upload_dir));
+                ',
+                ['OUTPUT_FILE' => $output_file]
+            );
+            return $fs->get_contents($output_file);
+        }, '');
+        
+        $upload_dir = json_decode($wp_upload_dir, true);
+        if (!$upload_dir || !isset($upload_dir['path'])) {
+            throw new RuntimeException('Failed to get WordPress upload directory');
+        }
+
+        // Get the upload path relative to the WordPress root
+        $upload_base_dir = ltrim(substr($upload_dir['path'], strlen($runtime->getConfiguration()->getTargetSiteRoot())), '/');
+        $upload_base_url = $upload_dir['url'];
+        
+        // Ensure the uploads directory exists
+        $fs = $runtime->getTargetFilesystem();
+        if (!$fs->is_dir($upload_base_dir)) {
+            $fs->mkdir($upload_base_dir, ['recursive' => true]);
+        }
+
+		$progress_download = $tracker->stage(0.5 / $total_files);
+		$progress_import = $tracker->stage(0.5 / $total_files);
+
+		$data_references = [];
+        foreach ($medias as $media_definition) {
+			$data_references[] = $media_definition->source;
+		}
+
+		$resolved = $runtime->getDataReferenceResolver()->startEagerResolution(
+			$data_references,
+			$progress_download
+		);
+        
+		$progress_import_step = 1.0/$total_files;
+        foreach ($medias as $media_definition) {
+			$human_readable_name = $media_definition->source->get_human_readable_name();
+            $progress_import->setCaption("Importing media file {$files_imported}/{$total_files}: {$human_readable_name}");
+            
+            try {
+				$resolved = $runtime->resolve($media_definition->source);
+                
+                if (!$resolved instanceof File) {
+                    throw new RuntimeException("Failed to resolve media file: $human_readable_name");
+                }
+                
+                // Create a new file in the uploads directory
+                $target_path = $this->resolveTargetPath(
+					$runtime,
+					$media_definition->source,
+					$upload_base_dir
+				);
+                
+                $write_stream = $fs->open_write_stream($target_path);
+                pipe_stream($resolved->stream, $write_stream);
+                $resolved->stream->close_reading();
+                $write_stream->close_writing();
+                
+                // Add to WordPress media library                
+                $attachment_id = $runtime->evalPhpInSubProcess(
+                    <<<'CODE'
+                    <?php
+                    require_once(getenv("DOCROOT") . "/wp-load.php");
+                    require_once(getenv("DOCROOT") . "/wp-admin/includes/image.php");
+                    
+                    $file_path = getenv("MEDIA_FILE_PATH");
+                    $attachment_meta = json_decode(getenv("ATTACHMENT_META"), true);
+                    $attachment_data = [
+                        'post_title' => $attachment_meta['title'] ?? preg_replace('/\.[^.]+$/', '', basename($file_path)),
+                        'post_mime_type' => wp_check_filetype(basename($file_path), null)['type'] ?? 'application/octet-stream',
+                        'post_content' => $attachment_meta['description'] ?? '',
+                        'post_status' => 'inherit',
+                        'post_excerpt' => $attachment_meta['caption'] ?? '',
+                        'meta_input' => [
+                            '_wp_attachment_image_alt' => $attachment_meta['alt'] ?? '',
+                        ],
+                    ];                    
+                    $attachment_id = wp_insert_attachment($attachment_data, $file_path);
+                    
+                    if (is_wp_error($attachment_id)) {
+                        echo "0";
+                        exit(1);
+                    }
+                    
+                    // Generate metadata and create thumbnails if needed
+                    $mime_type = $attachment_data['post_mime_type'];
+                    if (strpos($mime_type, 'image/') === 0) {
+                        $attachment_metadata = wp_generate_attachment_metadata($attachment_id, $file_path);
+                        wp_update_attachment_metadata($attachment_id, $attachment_metadata);
+                    }
+                    
+                    echo $attachment_id;
+                    CODE,
+                    [
+                        'MEDIA_FILE_PATH' => $target_path,
+                        'ATTACHMENT_META' => json_encode([
+                            'title' => $media_definition->title,
+                            'description' => $media_definition->description,
+                            'alt' => $media_definition->alt,
+                            'caption' => $media_definition->caption
+                        ])
+                    ]
+                );
+
+                if(!$attachment_id) {
+                    throw new RuntimeException("Failed to import media file: $human_readable_name");
+                }
+                
+                $progress_import->increment($progress_import_step);
+            } catch (Exception $e) {
+                // Log error but continue with other media files
+                error_log("Failed to import media file {$target_path}: " . $e->getMessage());
+            }
+            
+            $files_imported++;
+        }
+        
+        $tracker->finish();
+    }
+
+	private function resolveTargetPath(
+		Runtime $runtime,
+		DataReference $source,
+		string $upload_base_dir
+	): string {
+		$fs = $runtime->getTargetFilesystem();
+
+		$filename = $source->get_filename();			
+		if(!$filename) {
+			throw new RuntimeException(sprintf(
+				'Failed to get filename for media file: %s. We can\'t infer the extension.',
+				$source->get_human_readable_name()
+			));
+		}
+		
+		/**
+		 * If we already have a file with the same name, choose a random
+		 * filename.
+		 */
+        $extension = pathinfo($filename, PATHINFO_EXTENSION);
+		$target_path = $upload_base_dir . '/' . $filename;
+		while ($fs->exists($target_path)) {
+			$filename = substr(sha1(uniqid('media_', true)), 0, 12) . '.' . $extension;
+            $target_path = $upload_base_dir . '/' . $filename;
+		}
+
+		$parent_dir = dirname($target_path);
+		if(!$fs->is_dir($parent_dir)) {
+			$fs->mkdir($parent_dir, ['recursive' => true]);
+		}
+
+		return $target_path;
+	}
+}
+
+class MediaFileDefinition {
+	public DataReference $source;
+	public ?string $title = null;
+	public ?string $description = null;
+	public ?string $alt = null;
+	public ?string $caption = null;
+
+	/**
+	 * Set the source for the media file
+	 * 
+	 * @param DataReference $source The source reference for the media file
+	 * @return self
+	 */
+	public function setSource(DataReference $source): self {
+		$this->source = $source;
+		return $this;
+	}
+	
+	/**
+	 * Set the title for the media file
+	 * 
+	 * @param string|null $title The title for the media file
+	 * @return self
+	 */
+	public function setTitle(?string $title): self {
+		$this->title = $title;
+		return $this;
+	}
+	
+	/**
+	 * Set the description for the media file
+	 * 
+	 * @param string|null $description The description for the media file
+	 * @return self
+	 */
+	public function setDescription(?string $description): self {
+		$this->description = $description;
+		return $this;
+	}
+	
+	/**
+	 * Set the alt text for the media file
+	 * 
+	 * @param string|null $alt The alt text for the media file
+	 * @return self
+	 */
+	public function setAlt(?string $alt): self {
+		$this->alt = $alt;
+		return $this;
+	}
+	
+	/**
+	 * Set the caption for the media file
+	 * 
+	 * @param string|null $caption The caption for the media file
+	 * @return self
+	 */
+	public function setCaption(?string $caption): self {
+		$this->caption = $caption;
+		return $this;
+	}
+}
+
+
 /*────────────────────────── Example usage ─────────────────────────*/
 
-// $progress_tracker = new Tracker();
-// $client = new Client();
-// $http_stream = $client->fetch(
-// 	new Request('https://downloads.wordpress.org/plugin/friends.latest-stable.zip'),
-// 	[
-// 		'buffer_size' => 100 * 1024 * 1024,
-// 		'progress_tracker' => $progress_tracker,
-// 		'eagerly_enqueue' => true,
-// 	]
-// );
-// $http_stream->peek(4);
-// $http_stream->pull(4);
-// $http_stream->peek(4);
-
-// $write_stream = FileWriteStream::from_path(__DIR__ . '/friends.zip');
-
-// pipe_stream($http_stream, $write_stream);
-// // file_put_contents(__DIR__ . '/friends.zip', $stream->consume_all());
-
-// die();
 $config = (new RunnerConfiguration())
     ->setBlueprint([
 		"version" => 2,
 		'$schema' => "https://raw.githubusercontent.com/WordPress/blueprints/trunk/blueprints/schema.json",
-		"plugins" => [
-			"friends"
-		],
+		// "plugins" => [
+		// 	"friends"
+		// ],
 		// @TODO: Should the default WordPress theme stay? Do we need an option for this!
-		"themes" => [
-			"adventurer"
-		],
+		// "themes" => [
+		// 	"adventurer"
+		// ],
 		"blueprintMeta" => [
 			"name" => "Full Featured Blueprint",
 			"description" => "A blueprint demonstrating most of the available features",
@@ -3057,6 +3331,15 @@ $config = (new RunnerConfiguration())
 				"show_in_rest" => true,
 				"supports" => ["title", "editor", "author", "thumbnail", "excerpt", "comments"]
 			]
+		],
+		"media" => [
+			"https://wordpress.org/files/2024/10/design-visual-6-7.png",
+            [
+                "source" => "https://wordpress.org/files/2024/10/design-visual-6-7.png",
+                "title" => "Introduction Video",
+                "description" => "A brief introduction to our company",
+                "alt" => "Company introduction video"
+            ],
 		],
 		"additionalStepsAfterExecution" => [
 			[

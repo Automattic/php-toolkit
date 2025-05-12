@@ -30,6 +30,10 @@ class ExecutionContextPath extends DataReference {
 		return $this->path;
 	}
 
+	public function get_filename(): string {
+		return basename($this->path);
+	}
+
 	/**
 	 * Get the normalized path (without ./ or / prefix).
 	 *

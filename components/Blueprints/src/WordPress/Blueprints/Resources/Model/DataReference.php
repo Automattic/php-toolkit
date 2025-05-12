@@ -2,6 +2,8 @@
 
 namespace WordPress\Blueprints\Resources\Model;
 
+use Nette\NotImplementedException;
+
 class DataReference {
 
 	public int $id;
@@ -35,6 +37,14 @@ class DataReference {
 				is_string( $reference ) ? $reference : json_encode( $reference )
 			)
 		);
+	}
+
+	public function get_filename(): string {
+		throw new NotImplementedException('get_filename is not implemented for this data reference');
+	}
+
+	public function get_human_readable_name(): string {
+		throw new NotImplementedException('get_human_readable_name is not implemented for this data reference');
 	}
 
 }
