@@ -2,6 +2,7 @@
 
 namespace WordPress\Blueprints;
 
+use InvalidArgumentException;
 use WordPress\Blueprints\DataReference\DataReference;
 use WordPress\Blueprints\DataReference\DataReferenceResolver;
 use WordPress\Blueprints\DataReference\Directory;
@@ -23,7 +24,6 @@ use WordPress\Blueprints\Steps\ImportMediaStep;
 use WordPress\Blueprints\Steps\ImportThemeStarterContentStep;
 use WordPress\Blueprints\Steps\InstallPluginStep;
 use WordPress\Blueprints\Steps\InstallThemeStep;
-use WordPress\Blueprints\Steps\InvalidArgumentException;
 use WordPress\Blueprints\Steps\MkdirStep;
 use WordPress\Blueprints\Steps\MvStep;
 use WordPress\Blueprints\Steps\RmDirStep;
@@ -53,7 +53,7 @@ class Runner {
 	private array $dataReferences;
 	private ?VersionConstraint $phpVersionConstraint;
 	private Tracker $mainTracker;
-	private ProgressLogger $progressLogger;
+	private ProgressObserver $progressObserver;
 
 	public function __construct( private RunnerConfiguration $configuration ) {
 		$cache             = new FilesystemCache( LocalFilesystem::create( __DIR__ . '/cache' ) );
@@ -61,12 +61,12 @@ class Runner {
 		$this->mainTracker = new Tracker();
 
 		// Set up progress logging
-		$this->progressLogger = new ProgressLogger(
+		$this->progressObserver = $configuration->getProgressObserver() ?? new ProgressObserver(
 			function ( $progress, $caption ) {
 				fprintf( STDERR, "[%3d%%] %s\n", $progress, $caption );
 			}
 		);
-		$this->progressLogger->attachTo( $this->mainTracker );
+		$this->progressObserver->attachTo( $this->mainTracker );
 	}
 
 	public function run(): void {
@@ -647,7 +647,7 @@ class Runner {
 				] );
 
 			case 'runPHP':
-				$method = isset( $data['method'] ) ? HttpMethod::from( $data['method'] ) : HttpMethod::GET;
+				$method = isset( $data['method'] ) ? $data['method'] : 'GET';
 
 				return RunPHPStep::fromArray( $data );
 			case 'unzip':
@@ -743,7 +743,7 @@ class Runner {
 				if ( ! $stepTracker->isDone() ) {
 					$stepTracker->finish();
 				}
-			} catch ( Exception $e ) {
+			} catch ( \Exception $e ) {
 				$results[ $i ] = $e;
 				$stepTracker->setCaption( sprintf( "%s (FAILED: %s)",
 					$stepTracker->getCaption(),
@@ -757,7 +757,7 @@ class Runner {
 				// Determine if we should continue or stop execution
 				$continueOnError = $this->continueOnError ?? false;
 				if ( ! $continueOnError ) {
-					throw new RuntimeException(
+					throw new \RuntimeException(
 						sprintf( "Error when executing step %s (number %d in the plan)",
 							get_class( $step ),
 							$i + 1

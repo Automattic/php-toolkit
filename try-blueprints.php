@@ -13,6 +13,7 @@
 
 namespace WordPress\Blueprints\Steps;
 
+use WordPress\Blueprints\ProgressObserver;
 use WordPress\Blueprints\Runner;
 use WordPress\Blueprints\RunnerConfiguration;
 
@@ -85,6 +86,33 @@ $config = (new RunnerConfiguration())
     // ->setExecutionMode('apply-to-existing-site')
     ->setTargetSiteRoot(__DIR__ . '/my-new-site')
     ->setTargetSiteUrl('http://127.0.0.1:2456')
+	->setProgressObserver(new ProgressObserver(function ($progress, $caption) {
+		static $lastLength = 0;
+		static $columns = null;
+		$output = sprintf("[%3d%%] %s", $progress, $caption);
+		$currentLength = strlen($output);
+		
+		// Get terminal width if possible
+		if (null === $columns) {
+			if (function_exists('exec') && false !== exec('tput cols 2>/dev/null', $out)) {
+				$columns = (int) $out[0];
+			} elseif (function_exists('shell_exec') && ($shellColumns = shell_exec('tput cols 2>/dev/null'))) {
+				$columns = (int) $shellColumns;
+			}
+			if (null === $columns) {
+				$columns = 80;
+			}
+		}
+		
+		// Truncate if longer than terminal width
+		if ($currentLength > $columns - 1) {
+			$output = substr($output, 0, $columns - 4) . '...';
+			$currentLength = $columns - 1;
+		}
+		
+		fprintf(STDERR, "\r%s%s", $output, $currentLength < $lastLength ? str_repeat(' ', $lastLength - $currentLength) : '');
+		$lastLength = $currentLength;
+	}));
 ;
 
 (new Runner($config))->run();

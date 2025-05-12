@@ -3,7 +3,6 @@
 namespace WordPress\Blueprints;
 
 use WordPress\Blueprints\DataReference\DataReference;
-use WordPress\Blueprints\Steps\InvalidArgumentException;
 use WordPress\Filesystem\Filesystem;
 
 class RunnerConfiguration {
@@ -14,6 +13,7 @@ class RunnerConfiguration {
 	private ?Filesystem $executionContext = null;
 	private string $databaseEngine = 'mysql';
 	private array $databaseCredentials = [];
+	private $progressObserver = null;
 
 	public function setBlueprint( DataReference|array $r ): self {
 		$this->blueprintRef = $r;
@@ -71,11 +71,11 @@ class RunnerConfiguration {
 	 * @param  string  $databaseEngine  Database engine to use ('mysql' or 'sqlite')
 	 *
 	 * @return self
-	 * @throws InvalidArgumentException If the database engine is invalid
+	 * @throws \InvalidArgumentException If the database engine is invalid
 	 */
 	public function setDatabaseEngine( string $databaseEngine ): self {
 		if ( ! in_array( $databaseEngine, [ 'mysql', 'sqlite' ] ) ) {
-			throw new InvalidArgumentException( "Invalid database engine: {$databaseEngine}" );
+			throw new \InvalidArgumentException( "Invalid database engine: {$databaseEngine}" );
 		}
 
 		$this->databaseEngine = $databaseEngine;
@@ -102,5 +102,27 @@ class RunnerConfiguration {
 
 	public function getDatabaseCredentials(): array {
 		return $this->databaseCredentials;
+	}
+
+	/**
+	 * Sets a callback function to be called to report progress during execution.
+	 *
+	 * @param  callable|null  $callback  A function that accepts progress information
+	 *
+	 * @return self
+	 */
+	public function setProgressObserver( ProgressObserver $observer ): self {
+		$this->progressObserver = $observer;
+
+		return $this;
+	}
+
+	/**
+	 * Gets the progress callback function.
+	 *
+	 * @return callable|null
+	 */
+	public function getProgressObserver() {
+		return $this->progressObserver;
 	}
 }

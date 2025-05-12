@@ -9,7 +9,7 @@ use WordPress\Blueprints\Progress\Tracker;
 /**
  * Progress logging handler that listens to Tracker progress events
  */
-class ProgressLogger {
+class ProgressObserver {
 	/**
 	 * @var callable
 	 */
