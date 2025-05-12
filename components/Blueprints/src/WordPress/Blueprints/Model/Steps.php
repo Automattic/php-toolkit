@@ -1474,14 +1474,20 @@ class WriteFilesStep implements StepInterface {
 			}
 
 			// Handle the data which can be a string or a DataReference
-			if (is_string($data)) {
-				$content = $data;
+			$file_or_directory = $runtime->resolve($data);
+			if ($file_or_directory instanceof Directory) {
+				copy_between_filesystems([
+					'source_filesystem' => $file_or_directory->filesystem,
+					'source_path'       => '/',
+					'target_filesystem' => $target_fs,
+					'target_path'       => $path,
+					'recursive'         => true,
+				]);
 			} else {
-				$data_stream = $runtime->resolve($data);
-				$content = $data_stream->stream->consume_all();
+				$content = $file_or_directory->stream->consume_all();
+				$target_fs->put_contents($path, $content);
 			}
 
-			$target_fs->put_contents($path, $content);
 			$files_written++;
 		}
 
@@ -1687,7 +1693,7 @@ class DataReferenceResolver
 				1 / $nb_data_references,
 				'Resolving data reference #' . $dataReference->id . ': ' . $dataReference->get_human_readable_name()
 			);
-			$this->resolve($dataReference);
+			$this->resolve($dataReference, $this->subTrackers[$dataReference->id]);
 		}
 	}
 
@@ -1772,16 +1778,17 @@ class DataReferenceResolver
 			 */
 			$repo = new GitRepository( InMemoryFilesystem::create() );
 			$repo->add_remote( 'origin', $reference->get_git_repository() );
-			$remote = $repo->get_remote( 'origin' );
-			$remote->pull(
+			$client = $repo->get_remote_client( 'origin' );
+			$client->pull(
 				$reference->get_ref(),
                 // Sparse checkout
 				array(
 					'path' => $reference->get_path(),
+					'shallow' => true,
 				)
 			);
 			return new Directory(
-				new GitFilesystem( $repo ),
+				new ChrootLayer( GitFilesystem::create( $repo ), $reference->get_path() ),
 				basename( $reference->get_path() ) ?: 'git-repo'
 			);
 		}
@@ -2809,7 +2816,10 @@ class BlueprintRunner
                         var_export($args, true),
                     );
 
-                    $files[$pluginPath] = $pluginCode;
+                    $files[$pluginPath] = $this->createDataReference([
+						'filename' => $pluginPath,
+						'content'  => $pluginCode,
+					]);
                 }
 
                 if (empty($files)) {
@@ -2878,11 +2888,7 @@ class BlueprintRunner
             case 'writeFiles':
                 $files = [];
                 foreach ($data['files'] as $path => $content) {
-                    if (is_string($content)) {
-                        $files[$path] = $content;
-                    } else {
-                        $files[$path] = $this->createDataReference($content);
-                    }
+					$files[$path] = $this->createDataReference($content);
                 }
                 return new WriteFilesStep($files);
             case 'importMedia':
@@ -3007,14 +3013,14 @@ class ImportMediaStep implements StepInterface {
     }
 
     /**
-     * @return array<string, DataReference|string>
+     * @return array<string, MediaFileDefinition>
      */
     public function getMedia(): array {
         return $this->media;
     }
 
     /**
-     * @param array<string, DataReference|string> $media
+     * @param array<string, MediaFileDefinition> $media
      */
     public function setMedia(array $media): void {
         $this->media = $media;
@@ -3052,7 +3058,6 @@ class ImportMediaStep implements StepInterface {
 
         // Get the upload path relative to the WordPress root
         $upload_base_dir = ltrim(substr($upload_dir['path'], strlen($runtime->getConfiguration()->getTargetSiteRoot())), '/');
-        $upload_base_url = $upload_dir['url'];
         
         // Ensure the uploads directory exists
         $fs = $runtime->getTargetFilesystem();
@@ -3060,20 +3065,15 @@ class ImportMediaStep implements StepInterface {
             $fs->mkdir($upload_base_dir, ['recursive' => true]);
         }
 
-		$progress_download = $tracker->stage(0.5 / $total_files);
-		$progress_import = $tracker->stage(0.5 / $total_files);
-
-		$data_references = [];
-        foreach ($medias as $media_definition) {
-			$data_references[] = $media_definition->source;
-		}
+		$progress_import = $tracker->stage(0.5);
+		$progress_download = $tracker->stage(0.5);
 
 		$resolved = $runtime->getDataReferenceResolver()->startEagerResolution(
-			$data_references,
+			array_map(fn($media) => $media->source, $medias),
 			$progress_download
 		);
         
-		$progress_import_step = 1.0/$total_files;
+		$progress_import_step = 1.0 / $total_files;
         foreach ($medias as $media_definition) {
 			$human_readable_name = $media_definition->source->get_human_readable_name();
             $progress_import->setCaption("Importing media file {$files_imported}/{$total_files}: {$human_readable_name}");
@@ -3258,8 +3258,6 @@ class MediaFileDefinition {
 }
 
 
-/*────────────────────────── Example usage ─────────────────────────*/
-
 $config = (new RunnerConfiguration())
     ->setBlueprint([
 		"version" => 2,
@@ -3307,7 +3305,13 @@ $config = (new RunnerConfiguration())
 						"filename" => "custom-file.txt",
 						"content" => "This is a custom file created by the Blueprint."
 					],
-					"builder.php" => "./test_file.txt"
+					"0_readme.md" => "https://gist.githubusercontent.com/adamziel/a93297e21f37612751a2904c193d44fa/raw/5f25cdc900c0a44aefa0e1c06352c09c67312f1e/0_README.md",
+					"playground" => [
+						"gitRepository" => "https://github.com/adamziel/mysql-sqlite-network-proxy.git",
+						"path" => "php-implementation",
+						// @TODO: Accept branch names without the refs/heads/ prefix
+						"ref" => "refs/heads/trunk"
+					]
 				]
 			]
 		]

@@ -71,7 +71,6 @@ class GitFilesystem implements Filesystem {
 	public function is_dir( $path ) {
 		try {
 			$reader = $this->repo->read_object_by_path( $path );
-
 			return $reader->get_object_type_name() === 'tree';
 		} catch ( GitException $e ) {
 			return false;
@@ -81,7 +80,6 @@ class GitFilesystem implements Filesystem {
 	public function is_file( $path ) {
 		try {
 			$reader = $this->repo->read_object_by_path( $path );
-
 			return $reader->get_object_type_name() === 'blob';
 		} catch ( GitException $e ) {
 			return false;
@@ -89,7 +87,8 @@ class GitFilesystem implements Filesystem {
 	}
 
 	public function exists( $path ) {
-		return $this->is_file( $path ) || $this->is_dir( $path );
+		$children = $this->ls( dirname( $path ) );
+		return in_array( basename( $path ), $children, true );
 	}
 
 	public function get_contents( $path ) {

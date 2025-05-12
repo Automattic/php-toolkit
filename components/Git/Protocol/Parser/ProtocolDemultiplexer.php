@@ -74,15 +74,19 @@ class ProtocolDemultiplexer {
 		$length = hexdec( $length_hex );
 
 		$stream_code = 'unknown';
-		// Peek the next byte to determine the stream code.
-		$this->upstream->pull( 1, ByteReadStream::PULL_EXACTLY );
-		$stream_code_byte      = $this->upstream->peek( 1 );
-		$potential_stream_code = ord( $stream_code_byte );
-		if ( isset( self::STREAM_CODE_MAP[ $potential_stream_code ] ) ) {
-			$stream_code = self::STREAM_CODE_MAP[ $potential_stream_code ];
-			// Skip over the stream code byte.
-			$this->upstream->consume( 1 );
-			$length -= 1;
+		try {
+			// Peek the next byte to determine the stream code.
+			$this->upstream->pull( 1, ByteReadStream::PULL_EXACTLY );
+			$stream_code_byte      = $this->upstream->peek( 1 );
+			$potential_stream_code = ord( $stream_code_byte );
+			if ( isset( self::STREAM_CODE_MAP[ $potential_stream_code ] ) ) {
+				$stream_code = self::STREAM_CODE_MAP[ $potential_stream_code ];
+				// Skip over the stream code byte.
+				$this->upstream->consume( 1 );
+				$length -= 1;
+			}
+		} catch ( NotEnoughDataException $e ) {
+			// Ignore.
 		}
 
 		if ( $length_hex === '0000' || $length_hex === '0001' || $length_hex === '0002' ) {

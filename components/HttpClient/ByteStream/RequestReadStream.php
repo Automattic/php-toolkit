@@ -93,7 +93,6 @@ class RequestReadStream extends BaseByteReadStream {
 
 	private function pull_until_event( $options = array() ) {
 		$stop_at_event = $options['event'] ?? Client::EVENT_BODY_CHUNK_AVAILABLE;
-
 		$this->ensure_is_enqueued();
 
 		while ( $this->client->await_next_event(
@@ -158,7 +157,16 @@ class RequestReadStream extends BaseByteReadStream {
 			);
 		}
 		$content_length = $this->response->get_header( 'Content-Length' );
-		$this->remote_file_length = (int) $content_length;
+		if ( null !== $content_length ) {
+			/**
+			 * Set the content-length based on the header, but make sure it stays null
+			 * when the Content-Length header is not set.
+			 * 
+			 * Important: Don't set the content-length to 0 if the header is missing! This
+			 * would tell the streaming machinery there's no body to consume.
+			 */
+			$this->remote_file_length = (int) $content_length;
+		}
 		return $this->remote_file_length;
 	}
 

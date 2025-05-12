@@ -87,7 +87,11 @@ function copy_between_filesystems( array $args ) {
 				)
 			);
 		}
+	} else if($source->exists($source_path)) {
+		// For now ignore paths that are neither files nor directories.
+		// For example, in GitFilesystem that could be a submodule.
 	} else {
+		// When a path does not exist, throw a clear error.
 		throw new FilesystemException( 'Path does not exist in the source filesystem: ' . $source_path );
 	}
 }

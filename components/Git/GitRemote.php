@@ -61,10 +61,10 @@ class GitRemote {
 				case '#packet-footer':
 					$ref_line = $protocol->get_packet_body();
 					$ref      = $this->parse_ref_line( $ref_line );
+					$refs[ $ref['ref_name'] ] = $ref['hash'];
 					if ( false === $ref ) {
 						continue 2;
 					}
-					$refs[ $ref['ref_name'] ] = $ref['hash'];
 
 					if ( str_starts_with( $ref['ref_name'], 'refs/heads/' ) ) {
 						$branch_name = substr( $ref['ref_name'], strlen( 'refs/heads/' ) );

@@ -22,28 +22,20 @@ class GitPath extends DataReference {
 	protected $path;
 
 	/**
-	 * @var string|null The local directory name.
-	 */
-	protected $local_directory_name;
-
-	/**
 	 * Constructor.
 	 *
 	 * @param string      $git_repository      The git repository URL.
 	 * @param string|null $ref                 The git reference.
 	 * @param string|null $path                The path within the repository.
-	 * @param string|null $local_directory_name The local directory name.
 	 */
 	public function __construct(
 		string $git_repository,
 		?string $ref = null,
 		?string $path = null,
-		?string $local_directory_name = null
 	) {
 		$this->git_repository      = $git_repository;
 		$this->ref                 = $ref;
 		$this->path                = $path;
-		$this->local_directory_name = $local_directory_name;
 		parent::__construct();
 	}
 
@@ -79,30 +71,20 @@ class GitPath extends DataReference {
 	}
 
 	/**
-	 * Get the local directory name.
-	 *
-	 * @return string|null The local directory name.
-	 */
-	public function get_local_directory_name(): ?string {
-		return $this->local_directory_name;
-	}
-
-	/**
 	 * Create an instance from an array.
 	 *
 	 * @param array $data The array data.
 	 * @return self The created instance.
 	 */
-	public static function from_array( array $data ): self {
+	public static function from_blueprint_data( array $data ): self {
 		if ( ! isset( $data['gitRepository'] ) ) {
 			throw new \InvalidArgumentException( 'Invalid git path data' );
 		}
-
+		
 		return new self(
 			$data['gitRepository'],
 			$data['ref'] ?? null,
-			$data['path'] ?? null,
-			$data['localDirectoryName'] ?? null
+			$data['path'] ?? null
 		);
 	}
 
