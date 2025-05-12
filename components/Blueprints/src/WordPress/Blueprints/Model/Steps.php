@@ -1612,117 +1612,6 @@ class ProcessFailedException extends \Exception {
 	}
 }
 
-class WordPressBootManager {
-
-	public static function boot(array $options): Runtime {
-		// Initialize runtime for the given document root
-		$runtime = $options['runtime'];
-
-		// Ensure document root directory exists (LocalFilesystem::create creates it)
-		$targetFs = $runtime->getTargetFilesystem();
-
-		// Unzip WordPress core into document root
-		$resolved = $runtime->resolve($options['wordPressZip']);
-		if (!$resolved instanceof File) {
-			throw new \InvalidArgumentException('Provided zip reference does not resolve to a file');
-		}
-		$zipFs = ZipFilesystem::create($resolved->stream);
-
-		$path_in_zip = '/';
-		if(!$zipFs->exists('/wp-content') && $zipFs->exists('/wordpress')) {
-			$path_in_zip = '/wordpress';
-		}
-
-		// @TODO: Track unzipping progress
-		copy_between_filesystems([
-			'source_filesystem' => $zipFs,
-			'source_path'       => $path_in_zip,
-			'target_filesystem' => $targetFs,
-			'target_path'       => '/',
-			'recursive'         => true,
-		]);
-
-		// If SQLite integration zip provided, unzip into appropriate folder
-		if ($options['sqliteIntegrationPluginZip']) {
-			$resolved = $runtime->resolve($options['sqliteIntegrationPluginZip']);
-			if (!$resolved instanceof File) {
-				throw new \InvalidArgumentException('Provided zip reference does not resolve to a file');
-			}
-			$zipFs = ZipFilesystem::create($resolved->stream);
-
-			$targetPath = '/wp-content/plugins/sqlite-database-integration';
-			$sourcePath = '/';
-			if ($zipFs->exists('sqlite-database-integration')) {
-				$sourcePath = '/sqlite-database-integration';
-			}
-			// @TODO: Track unzipping progress
-			copy_between_filesystems([
-				'source_filesystem' => $zipFs,
-				'source_path'       => $sourcePath,
-				'target_filesystem' => $targetFs,
-				'target_path'       => $targetPath,
-				'recursive'         => true,
-			]);
-
-			$targetFs->copy(
-				wp_join_paths($targetPath, 'db.copy'),
-				'/wp-content/db.php'
-			);
-		}
-
-		// 3. Install WordPress if not installed
-		$installCheck = $runtime->evalPhpInSubProcess(
-<<<'PHP'
-$wp_load = getenv('DOCROOT') . '/wp-load.php';
-if (!file_exists($wp_load)) {
-	echo '0';
-	exit;
-}
-require $wp_load;
-
-echo function_exists('is_blog_installed') && is_blog_installed() ? '1' : '0';
-PHP
-		);
-
-		if (trim($installCheck) !== '1') {
-			$wp_cli_path = wp_join_paths($runtime->getDocumentRoot(), 'wp-cli.phar');
-			if(!file_exists($wp_cli_path)) {
-				$read_stream = (new Client())->fetch('https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar');
-				$write_stream = FileWriteStream::from_path($wp_cli_path);
-				pipe_stream($read_stream, $write_stream);
-				$read_stream->close_reading();
-				$write_stream->close_writing();
-			}
-
-			$fs = $runtime->getTargetFilesystem();
-			if(!$fs->exists('/wp-config.php')) {
-				if ( $fs->exists( 'wp-config-sample.php' ) ) {
-					$fs->copy( 'wp-config-sample.php', 'wp-config.php' );
-				} else {
-					throw new \RuntimeException( 'Neither wp-config.php, nor wp-config-sample.php was found in the WordPress archive.' );
-				}
-			}
-
-			// Perform installation using WP-CLI
-			// @TODO: Remove the WP-CLI dependency to lower the download size for blueprints.phar.
-			$runtime->runShellCommand([
-				'php',
-				$wp_cli_path,
-				'core',
-				'install',
-				'--url=' . $options['siteUrl'],
-				'--title=WordPress Site',
-				'--admin_user=admin',
-				'--admin_password=password',
-				'--admin_email=admin@example.com',
-				'--skip-email'
-			]);
-		}
-
-		return $runtime;
-	}
-}
-
 /**
  * Progress logging handler that listens to Tracker progress events
  */
@@ -2333,8 +2222,7 @@ class NewSiteResolver
     static public function resolve(Runtime $runtime, Tracker $targetResolutionStage)
     {
 		$stages = [
-			'resolve_wordpress' => $targetResolutionStage->stage(0.33, 'Resolving WordPress core'),
-			'resolve_sqlite' => $targetResolutionStage->stage(0.33, 'Resolving SQLite integration'),
+			'resolve_assets' => $targetResolutionStage->stage(0.66),
 			'install_wordpress' => $targetResolutionStage->stage(0.33, 'Installing WordPress'),
 		];
 
@@ -2347,8 +2235,23 @@ class NewSiteResolver
 		$wpVersionConstraint = isset($blueprint['wordpressVersion'])
 			? VersionConstraint::fromMixed($blueprint['wordpressVersion'])
 			: null;
+
 		$wpZip = self::resolveWordPressZipUrl($wpVersionConstraint);
-		$resolved = $runtime->resolve(DataReference::create($wpZip), $stages['resolve_wordpress']);
+
+		$assets = [
+			'wordpress' => DataReference::create($wpZip),
+		];
+		if ($runtime->getConfiguration()->getDatabaseEngine() === 'sqlite') {
+			// @TODO: configurable sqlite integration plugin zip URL
+			$assets['sqlite-integration'] = DataReference::create('https://downloads.wordpress.org/plugin/sqlite-database-integration.zip');
+		}
+		$assets['wp-cli'] = DataReference::create('https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar');
+
+		$runtime->getDataReferenceResolver()->startEagerResolution($assets, $stages['resolve_assets']);
+
+		$stages['resolve_assets']->setCaption('Downloading WordPress');
+
+		$resolved = $runtime->resolve($assets['wordpress']);
 		if (!$resolved instanceof File) {
 			throw new \InvalidArgumentException('Provided zip reference does not resolve to a file');
 		}
@@ -2373,12 +2276,8 @@ class NewSiteResolver
 
 		// If SQLite integration zip provided, unzip into appropriate folder
 		if ($runtime->getConfiguration()->getDatabaseEngine() === 'sqlite') {
-			// @TODO: configurable sqlite integration plugin zip
-			// @TODO: parallelize downloading WordPress and the SQLite plugin
-			$resolved = $runtime->resolve(
-				DataReference::create('https://downloads.wordpress.org/plugin/sqlite-database-integration.zip'),
-				$stages['resolve_sqlite']
-			);
+			$stages['resolve_assets']->setCaption('Downloading SQLite integration plugin');
+			$resolved = $runtime->resolve($assets['sqlite-integration']);
 			if (!$resolved instanceof File) {
 				throw new \InvalidArgumentException('Provided zip reference does not resolve to a file');
 			}
@@ -2402,11 +2301,12 @@ class NewSiteResolver
 				wp_join_paths($targetPath, 'db.copy'),
 				'/wp-content/db.php'
 			);
-		} else {
-			$stages['resolve_sqlite']->finish();
 		}
 
-		// 3. Install WordPress if not installed
+		// 3. Install WordPress if not installed yet.
+		//    Technically, this is a "new site" resolver, but it's entirely possible
+		//    the developer-provided WordPress zip already has a sqlite database with the
+		//    a WordPress site installed..
 		$installCheck = $runtime->evalPhpInSubProcess(
 			<<<'PHP'
 			$wp_load = getenv('DOCROOT') . '/wp-load.php';
@@ -2421,15 +2321,16 @@ class NewSiteResolver
 		);
 
 		if (trim($installCheck) !== '1') {
-			$stages['install_wordpress']->set(0.7, 'Installing WordPress');
-
 			$wp_cli_filename = 'wp-cli.phar';
 			if(!$targetFs->exists($wp_cli_filename)) {
 				// @TODO: parallelize downloading WordPress and wp-cli.phar
-				$read_stream = (new Client())->fetch('https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar');
+				$stages['resolve_assets']->setCaption('Downloading wp-cli');
+				$resolved = $runtime->resolve($assets['wp-cli']);
+				if (!$resolved instanceof File) {
+					throw new \InvalidArgumentException('Provided zip reference does not resolve to a file');
+				}
 				$write_stream = $targetFs->open_write_stream($wp_cli_filename);
-				pipe_stream($read_stream, $write_stream);
-				$read_stream->close_reading();
+				pipe_stream($resolved->stream, $write_stream);
 				$write_stream->close_writing();
 			}
 
@@ -2443,6 +2344,7 @@ class NewSiteResolver
 
 			// Perform installation using WP-CLI
 			// @TODO: Remove the WP-CLI dependency to lower the download size for blueprints.phar.
+			$stages['install_wordpress']->set(0.7, 'Installing WordPress');
 			$wp_cli_path = wp_join_paths($runtime->getConfiguration()->getTargetSiteRoot(), 'wp-cli.phar');
 			$runtime->runShellCommand([
 				'php',
@@ -2503,6 +2405,7 @@ class Runtime
 	public function getBlueprint(): array { return $this->blueprint; }
 	public function getConfiguration(): RunnerConfiguration { return $this->configuration; }
     public function getTargetFilesystem(): Filesystem        { return $this->targetFs; }
+	public function getDataReferenceResolver(): DataReferenceResolver { return $this->assets; }
     public function resolve(DataReference $r, ?Tracker $progress_tracker = null): File|Directory{
 		return $this->assets->resolve($r, $progress_tracker);
 	}
@@ -2547,6 +2450,11 @@ class Runtime
 	}
 
 	/**
+	 * @TODO: Migrate from Symfony Process to a more lightweight implementation.
+	 * @TODO: Expose stdout and stderr as byte streams.
+	 * @TODO: Don't wait until the process terminates. Just return the streams and
+	 *        some kind of wait() method for the caller to decide.
+	 * 
 	 * @param mixed[]      $command
 	 * @param string|null  $cwd
 	 * @param mixed[]|null $env
