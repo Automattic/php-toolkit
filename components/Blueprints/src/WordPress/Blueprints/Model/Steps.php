@@ -2109,7 +2109,7 @@ class DataReferenceResolver
     /** Core service method shared by runner, target resolvers and steps */
     public function resolve( DataReference $reference, ?Tracker $progress_tracker = null ): File|Directory {
 		if( isset( $this->resolvedDataReferences[$reference->id] ) ) {
-			// return $this->resolvedDataReferences[$reference->id];
+			return $this->resolvedDataReferences[$reference->id];
 		}
 
 		if( $progress_tracker === null ) {
@@ -2323,7 +2323,6 @@ class NewSiteResolver
 		if (trim($installCheck) !== '1') {
 			$wp_cli_filename = 'wp-cli.phar';
 			if(!$targetFs->exists($wp_cli_filename)) {
-				// @TODO: parallelize downloading WordPress and wp-cli.phar
 				$stages['resolve_assets']->setCaption('Downloading wp-cli');
 				$resolved = $runtime->resolve($assets['wp-cli']);
 				if (!$resolved instanceof File) {
