@@ -158,9 +158,9 @@ class ActivatePluginStep implements StepInterface {
     /**
      * Executes the activatePlugin step.
      */
-    public function run(Runtime $runtime, Tracker $tracker): mixed {
+    public function run(Runtime $runtime, Tracker $tracker) {
 		$tracker->setCaption('Activating plugin ' . ($this->pluginPath ?? ''));
- 		return $runtime->evalPhpInSubProcess(
+ 		$runtime->evalPhpInSubProcess(
  			file_get_contents(__DIR__ . '/scripts/ActivatePlugin/wp_activate_plugin.php'),
  			[
  				'PLUGIN_PATH' => $this->pluginPath,
@@ -189,9 +189,9 @@ class ActivateThemeStep implements StepInterface {
     /**
      * Executes the activateTheme step.
      */
-    public function run(Runtime $runtime, Tracker $tracker): mixed {
+    public function run(Runtime $runtime, Tracker $tracker) {
 		$tracker->setCaption('Activating theme ' . $this->themeFolderName);
- 		return $runtime->evalPhpInSubProcess(
+ 		$runtime->evalPhpInSubProcess(
  			file_get_contents(__DIR__ . '/scripts/ActivateTheme/wp_activate_theme.php'),
  			[
  				'THEME_FOLDER_NAME' => $this->themeFolderName,
@@ -219,9 +219,9 @@ class CpStep implements StepInterface {
     /**
      * Executes the cp step.
      */
-    public function run(Runtime $runtime, Tracker $tracker): mixed {
+    public function run(Runtime $runtime, Tracker $tracker) {
 		$tracker->setCaption('Copying from ' . $this->fromPath . ' to ' . $this->toPath);
- 		return $runtime->getTargetFilesystem()->copy(
+ 		$runtime->getTargetFilesystem()->copy(
  			$this->fromPath,
  			$this->toPath,
  			[ 'recursive' => true ]
@@ -249,27 +249,15 @@ class DefineConstantsStep implements StepInterface {
     /**
      * Executes the defineConstants step.
      */
-    public function run(Runtime $runtime, Tracker $tracker): mixed {
+    public function run(Runtime $runtime, Tracker $tracker) {
 		$tracker->setCaption('Defining wp-config constants');
- 		$functions = file_get_contents(__DIR__ . '/scripts/DefineWpConfigConsts/functions.php');
- 		return $runtime->evalPhpInSubProcess(
- 			"$functions ?>" . '<?php
-    $wp_config_path = getenv("DOCROOT") . "/wp-config.php";
-    if (!file_exists($wp_config_path)) { error_log("Blueprint Error: wp-config.php file not found at " . $wp_config_path); exit(1); }
-    if (!is_readable($wp_config_path) || !is_writable($wp_config_path)) { error_log("Blueprint Error: wp-config.php is not readable or writable at " . $wp_config_path); exit(1); }
-	$consts = json_decode(getenv("CONSTS"), true);
-	$wp_config = file_get_contents($wp_config_path);
-	$new_wp_config = rewrite_wp_config_to_define_constants($wp_config, $consts);
-	file_put_contents($wp_config_path, $new_wp_config);
-',
+ 		$runtime->evalPhpInSubProcess(
+			file_get_contents(__DIR__ . '/scripts/DefineWpConfigConsts/define.php'),
  			array('CONSTS' => json_encode($this->constants))
  		);
  	}
 }
 
-/**
- * Represents the 'importThemeStarterContent' step.
- */
 class ImportThemeStarterContentStep implements StepInterface {
     /**
      * Optional slug of the theme to import content from.
@@ -284,31 +272,17 @@ class ImportThemeStarterContentStep implements StepInterface {
         $this->themeSlug = $themeSlug;
     }
 
-    /**
-     * Executes the importThemeStarterContent step.
-     * @TODO Implement this logic
-     */
-    public function run(Runtime $runtime, Tracker $tracker): mixed {
+    public function run(Runtime $runtime, Tracker $tracker) {
 		$tracker->setCaption('Importing theme starter content' . ($this->themeSlug ? ' for ' . $this->themeSlug : ''));
-		// Placeholder: Actual implementation needed
-		error_log("Warning: importThemeStarterContent step is not fully implemented yet.");
-		$tracker->finish();
-		return true;
+		$runtime->evalPhpInSubProcess(
+			file_get_contents(__DIR__ . '/scripts/ImportThemeStarterContent/import.php'),
+			[
+				'THEME_SLUG' => $this->themeSlug,
+			]
+		);
 	}
-
-    public function getThemeSlug(): ?string {
-        return $this->themeSlug;
-    }
-
-    public function setThemeSlug(?string $themeSlug): void {
-        $this->themeSlug = $themeSlug;
-    }
 }
 
-/**
- * Represents the 'installPlugin' step.
- * Simplified by embedding PluginDefinition properties.
- */
 class InstallPluginStep implements StepInterface {
     /**
      * Plugin source reference.
@@ -349,10 +323,7 @@ class InstallPluginStep implements StepInterface {
         $this->onError = $onError;
     }
 
-    /**
-     * Executes the installPlugin step.
-     */
-    public function run(Runtime $runtime, Tracker $tracker): mixed {
+    public function run(Runtime $runtime, Tracker $tracker) {
         $plugin_data = $runtime->resolve($this->source);
 
         $fs = $runtime->getTargetFilesystem();
@@ -402,8 +373,6 @@ class InstallPluginStep implements StepInterface {
 
 			$tracker->set(100);
 		}, '');
-
-		return true;
 	}
 }
 
@@ -449,7 +418,7 @@ class InstallThemeStep implements StepInterface {
         $this->targetFolderName = $targetFolderName;
     }
 
-	public function run(Runtime $runtime, Tracker $tracker): mixed {
+	public function run(Runtime $runtime, Tracker $tracker) {
 		$fs = $runtime->getTargetFilesystem();
 		FilesystemHelpers::withTemporaryDirectory($fs, function($temp_dir) use ($fs, $runtime, $tracker) {
 			$theme_data = $runtime->resolve($this->source);
@@ -505,8 +474,6 @@ class InstallThemeStep implements StepInterface {
 
 			$tracker->set(100);
 		}, '');
-
-		return true;
 	}
 }
 
@@ -526,9 +493,9 @@ class MkdirStep implements StepInterface {
     /**
      * Executes the mkdir step.
      */
-    public function run(Runtime $runtime, Tracker $tracker): mixed {
+    public function run(Runtime $runtime, Tracker $tracker) {
 		$tracker->setCaption('Creating directory ' . $this->path);
- 		return $runtime->getTargetFilesystem()->mkdir($this->path, ['recursive' => true]);
+ 		$runtime->getTargetFilesystem()->mkdir($this->path, ['recursive' => true]);
  	}
 }
 
@@ -548,9 +515,9 @@ class MvStep implements StepInterface {
         $this->toPath = $toPath;
     }
 
-    public function run(Runtime $runtime, Tracker $tracker): mixed {
+    public function run(Runtime $runtime, Tracker $tracker) {
 		$tracker->setCaption('Moving from ' . $this->fromPath . ' to ' . $this->toPath);
-		return $runtime->getTargetFilesystem()->rename($this->fromPath, $this->toPath);
+		$runtime->getTargetFilesystem()->rename($this->fromPath, $this->toPath);
 	}
 }
 
@@ -567,7 +534,7 @@ class RmStep implements StepInterface {
         $this->path = $path;
     }
 
-	public function run(Runtime $runtime, Tracker $tracker): mixed {
+	public function run(Runtime $runtime, Tracker $tracker) {
 		$tracker->setCaption('Removing ' . $this->path);
 
 		$filesystem = $runtime->getTargetFilesystem();
@@ -578,9 +545,9 @@ class RmStep implements StepInterface {
 		}
 
 		if ($filesystem->is_dir($path)) {
-			return $filesystem->rmdir($path, ['recursive' => true]);
+			$filesystem->rmdir($path, ['recursive' => true]);
 		} else {
-			return $filesystem->rm($path);
+			$filesystem->rm($path);
 		}
 	}
 }
@@ -598,17 +565,9 @@ class RmDirStep implements StepInterface {
         $this->path = $path;
     }
 
-	/**
-	 * Runs the rmdir step.
-	 *
-	 * @param RmDirStep $step The rmdir step configuration
-	 * @param Runtime $runtime The runtime providing environment access
-	 * @param Tracker $tracker The tracker for reporting progress
-	 * @return mixed The result of running the step
-	 */
 	public function run(Runtime $runtime, Tracker $tracker) {
 		$tracker->setCaption('Removing directory ' . $this->path);
-		return $runtime->getTargetFilesystem()->rmdir($this->path, ['recursive' => true]);
+		$runtime->getTargetFilesystem()->rmdir($this->path, ['recursive' => true]);
 	}
 }
 
@@ -640,36 +599,24 @@ class RunPHPStep implements StepInterface {
      * @param array<string, string>|null $env         Environment variables.
      * @param array<string, string>|null $__SERVER     $__SERVER variables.
      */
-    public function __construct(
-        ?string $code = null,
-        ?string $scriptPath = null,
-        ?string $relativeUri = null,
-        HttpMethod $method = HttpMethod::GET,
-        ?string $protocol = null,
-        ?array $headers = null,
-        ?string $body = null,
-        ?array $env = null,
-        ?array $__SERVER = null
-    ) {
-        // Basic validation: Ensure at least one execution target is provided
-        if ($code === null && $scriptPath === null) {
-             throw new \InvalidArgumentException('Either "code" or "scriptPath" must be provided for RunPHPStep.');
-        }
-        $this->code = $code;
-        $this->scriptPath = $scriptPath;
-        $this->relativeUri = $relativeUri;
-        $this->method = $method;
-        $this->protocol = $protocol;
-        $this->headers = $headers;
-        $this->body = $body;
-        $this->env = $env;
-        $this->__SERVER = $__SERVER;
+    static public function fromArray(array $data): self {
+        $instance = new self();
+        $instance->code = $data['code'] ?? null;
+        $instance->scriptPath = $data['scriptPath'] ?? null;
+        $instance->relativeUri = $data['relativeUri'] ?? null;
+        $instance->method = $data['method'] ?? HttpMethod::GET;
+        $instance->protocol = $data['protocol'] ?? null;
+        $instance->headers = $data['headers'] ?? null;
+        $instance->body = $data['body'] ?? null;
+        $instance->env = $data['env'] ?? null;
+        $instance->__SERVER = $data['$_SERVER'] ?? null;
+        return $instance;
     }
 
-	public function run(Runtime $runtime, Tracker $tracker): mixed {
+	public function run(Runtime $runtime, Tracker $tracker) {
 		// @TODO: Use the provided step options
 		$tracker->setCaption('Running custom PHP code');
-		return $runtime->evalPhpInSubProcess($this->code, [
+		$runtime->evalPhpInSubProcess($this->code, [
 			'DOCROOT' => $runtime->getConfiguration()->getTargetSiteRoot(),
 		]);
 	}
@@ -691,7 +638,7 @@ class RunSqlStep implements StepInterface {
         $this->source = $source;
     }
 
-	public function run(Runtime $runtime, Tracker $tracker): mixed {
+	public function run(Runtime $runtime, Tracker $tracker) {
 		$tracker->setCaption('Running SQL queries');
 
 		// Get the data reference for the SQL file
@@ -701,7 +648,7 @@ class RunSqlStep implements StepInterface {
 			throw new \InvalidArgumentException('The provided resource is not a file.');
 		}
 
-		return $runtime->evalPhpInSubProcess(
+		$runtime->evalPhpInSubProcess(
 			<<<'CODE'
 <?php
 		require_once getenv("DOCROOT") . '/wp-load.php';
@@ -741,7 +688,7 @@ class SetSiteLanguageStep implements StepInterface {
         $this->language = $language;
     }
 
-    public function run(Runtime $runtime, Tracker $tracker): mixed {
+    public function run(Runtime $runtime, Tracker $tracker) {
         $tracker->setCaption('Translating');
         $language = $this->language;
 
@@ -907,8 +854,6 @@ class SetSiteLanguageStep implements StepInterface {
                 }
             }
         }
-
-        return true;
     }
 
     /**
@@ -916,7 +861,6 @@ class SetSiteLanguageStep implements StepInterface {
      *
      * @param string $wpVersion WordPress version
      * @param string $language Language code
-     * @return string Translation package URL
      * @throws \Exception If translation package is not found
      */
     private function getWordPressTranslationUrl(string $wpVersion, string $language, Client $client): string|false {
@@ -959,9 +903,9 @@ class SetSiteOptionsStep implements StepInterface {
         $this->options = $options;
     }
 
-	public function run(Runtime $runtime, Tracker $tracker): mixed {
+	public function run(Runtime $runtime, Tracker $tracker) {
 		$tracker->setCaption('Setting site options');
-		return $runtime->evalPhpInSubProcess(
+		$runtime->evalPhpInSubProcess(
 			'<?php
 		require getenv(\'DOCROOT\'). \'/wp-load.php\';
 		$site_options = getenv("OPTIONS") ? json_decode(getenv("OPTIONS"), true) : [];
@@ -1048,9 +992,9 @@ class WPCLIStep implements StepInterface {
         $this->wpCliPath = $wpCliPath;
     }
 
-	public function run(Runtime $runtime, Tracker $tracker): mixed {
+	public function run(Runtime $runtime, Tracker $tracker) {
 		$tracker->setCaption('Running WP-CLI command: ' . $this->command);
-		return $runtime->runShellCommand($this->command);
+		$runtime->runShellCommand($this->command);
 	}
 }
 
@@ -2484,17 +2428,17 @@ class BlueprintRunner
 
             case 'runPHP':
                 $method = isset($data['method']) ? HttpMethod::from($data['method']) : HttpMethod::GET;
-                return new RunPHPStep(
-                    $data['code'] ?? null,
-                    $data['scriptPath'] ?? null,
-                    $data['relativeUri'] ?? null,
-                    $method,
-                    $data['protocol'] ?? null,
-                    $data['headers'] ?? null,
-                    $data['body'] ?? null,
-                    $data['env'] ?? null,
-                    $data['$_SERVER'] ?? null
-                );
+                return RunPHPStep::fromArray([
+                    'code' => $data['code'] ?? null,
+                    'scriptPath' => $data['scriptPath'] ?? null,
+                    'relativeUri' => $data['relativeUri'] ?? null,
+                    'method' => $method,
+                    'protocol' => $data['protocol'] ?? null,
+                    'headers' => $data['headers'] ?? null,
+                    'body' => $data['body'] ?? null,
+                    'env' => $data['env'] ?? null,
+                    '$_SERVER' => $data['$_SERVER'] ?? null
+                ]);
             case 'unzip':
                 $zipFile = $this->createDataReference($data['zipFile']);
                 return new UnzipStep($zipFile, $data['extractToPath']);
@@ -2510,17 +2454,19 @@ class BlueprintRunner
                 $media = [];
                 foreach ($data['media'] as $path => $content) {
                     if (is_string($content)) {
-						$media[$path] = (new MediaFileDefinition())
-							->setSource( $this->createDataReference($content) );
+						$media[$path] = MediaFileDefinition::fromArray([
+							'source' => $this->createDataReference($content),
+						]);
 						continue;
                     }
 
-					$media[$path] = (new MediaFileDefinition())
-						->setSource( $this->createDataReference($content['source']) )
-						->setTitle( $content['title'] ?? null )
-						->setDescription( $content['description'] ?? null )
-						->setAlt( $content['alt'] ?? null )
-						->setCaption( $content['caption'] ?? null );
+					$media[$path] = MediaFileDefinition::fromArray([
+						'source' => $this->createDataReference($content['source']),
+						'title' => $content['title'] ?? null,
+						'description' => $content['description'] ?? null,
+						'alt' => $content['alt'] ?? null,
+						'caption' => $content['caption'] ?? null,
+					]);
                 }
                 return new ImportMediaStep($media);
             default:
@@ -2816,59 +2762,14 @@ class MediaFileDefinition {
 	public ?string $alt = null;
 	public ?string $caption = null;
 
-	/**
-	 * Set the source for the media file
-	 *
-	 * @param DataReference $source The source reference for the media file
-	 * @return self
-	 */
-	public function setSource(DataReference $source): self {
-		$this->source = $source;
-		return $this;
-	}
-
-	/**
-	 * Set the title for the media file
-	 *
-	 * @param string|null $title The title for the media file
-	 * @return self
-	 */
-	public function setTitle(?string $title): self {
-		$this->title = $title;
-		return $this;
-	}
-
-	/**
-	 * Set the description for the media file
-	 *
-	 * @param string|null $description The description for the media file
-	 * @return self
-	 */
-	public function setDescription(?string $description): self {
-		$this->description = $description;
-		return $this;
-	}
-
-	/**
-	 * Set the alt text for the media file
-	 *
-	 * @param string|null $alt The alt text for the media file
-	 * @return self
-	 */
-	public function setAlt(?string $alt): self {
-		$this->alt = $alt;
-		return $this;
-	}
-
-	/**
-	 * Set the caption for the media file
-	 *
-	 * @param string|null $caption The caption for the media file
-	 * @return self
-	 */
-	public function setCaption(?string $caption): self {
-		$this->caption = $caption;
-		return $this;
+	static public function fromArray(array $data): self {
+		$instance = new self();
+		$instance->source = $data['source'];
+		$instance->title = $data['title'] ?? null;
+		$instance->description = $data['description'] ?? null;
+		$instance->alt = $data['alt'] ?? null;
+		$instance->caption = $data['caption'] ?? null;
+		return $instance;
 	}
 }
 
