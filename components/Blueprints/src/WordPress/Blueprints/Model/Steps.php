@@ -2722,6 +2722,10 @@ class BlueprintRunner
                     throw new InvalidArgumentException('Invalid postTypes data: must be a non-empty array.');
                 }
 
+                // @TODO: Do we need a separate step here? To make sure we're not overwriting existing post types?
+                //        Or would WriteFilesStep be enough, perhaps with a "no override" flag?
+                // @TODO: Install SCF and use it to register post types.
+
                 $files = [];
                 foreach ($data['postTypes'] as $slug => $args) {
                     if (!is_string($slug) || $slug === '') {
@@ -2739,6 +2743,9 @@ class BlueprintRunner
 
                     // Human-friendly default label.
                     $defaultLabel = addslashes(ucwords(str_replace(['-', '_'], ' ', $slug)));
+                    if(!isset($args['label'])) {
+                        $args['label'] = $defaultLabel;
+                    }
 
                     // Compose the plugin source.
                     $pluginCode = sprintf(
@@ -2752,32 +2759,13 @@ class BlueprintRunner
 						add_action(
 							'init',
 							static function () {
-								// Skip if a plugin or theme already registered this post type.
-								if (post_type_exists('%1$s')) {
-									return;
-								}
-
-								$args = %2$s;
-
-								// Fallback to an empty array if malformed.
-								if (!is_array($args)) {
-									$args = [];
-								}
-
-								$defaults = [
-									'public'       => true,
-									'show_in_rest' => true,
-									'label'        => '%3$s',
-								];
-
-								register_post_type('%1$s', array_merge($defaults, $args));
+								register_post_type('%1$s', %2$s);
 							},
 							0
 						);
 						PHP,
-                        $slug,
+                        var_export($slug, true),
                         var_export($args, true),
-                        $defaultLabel
                     );
 
                     $files[$pluginPath] = $pluginCode;
