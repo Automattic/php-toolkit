@@ -19,8 +19,8 @@ class InlineFile extends DataReference {
 	/**
 	 * Constructor.
 	 *
-	 * @param string $filename The filename.
-	 * @param string $content  The content.
+	 * @param  string  $filename  The filename.
+	 * @param  string  $content  The content.
 	 */
 	public function __construct( string $filename, string $content ) {
 		$this->filename = $filename;
@@ -49,7 +49,8 @@ class InlineFile extends DataReference {
 	/**
 	 * Create an instance from an array.
 	 *
-	 * @param array $data The array data.
+	 * @param  array  $data  The array data.
+	 *
 	 * @return self The created instance.
 	 */
 	public static function from_blueprint_data( array $data ): self {
@@ -63,7 +64,8 @@ class InlineFile extends DataReference {
 	/**
 	 * Check if an array represents a valid inline file.
 	 *
-	 * @param array $data The array to check.
+	 * @param  array  $data  The array to check.
+	 *
 	 * @return bool Whether the array is valid.
 	 */
 	public static function is_valid( $data ): bool {
@@ -77,6 +79,6 @@ class InlineFile extends DataReference {
 	 * @return string The human-readable name.
 	 */
 	public function get_human_readable_name(): string {
-		return "Inline file: " . basename($this->filename);
+		return "Inline file: " . basename( $this->filename );
 	}
 }

@@ -22,8 +22,8 @@ class File extends DataReference {
 	/**
 	 * Constructor.
 	 *
-	 * @param ByteReadStream $stream   The stream representing the file content.
-	 * @param string         $filename The name of the file.
+	 * @param  ByteReadStream  $stream  The stream representing the file content.
+	 * @param  string  $filename  The name of the file.
 	 */
 	public function __construct( ByteReadStream $stream, string $filename ) {
 		$this->stream   = $stream;

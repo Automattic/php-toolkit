@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Returns the username to auto-login as, if any.
  * @return string|false
@@ -11,16 +12,17 @@ function playground_get_username_for_auto_login() {
 	 * playground_auto_login_already_happened cookie.
 	 * This is used to allow the user to logout.
 	 */
-	if ( defined('PLAYGROUND_AUTO_LOGIN_AS_USER') && !isset($_COOKIE['playground_auto_login_already_happened']) ) {
+	if ( defined( 'PLAYGROUND_AUTO_LOGIN_AS_USER' ) && ! isset( $_COOKIE['playground_auto_login_already_happened'] ) ) {
 		return PLAYGROUND_AUTO_LOGIN_AS_USER;
 	}
 	/**
 	 * Allow users to auto-login as a specific user by passing the
 	 * playground_force_auto_login_as_user GET parameter.
 	 */
-	if ( defined('PLAYGROUND_FORCE_AUTO_LOGIN_ENABLED') && isset($_GET['playground_force_auto_login_as_user']) ) {
+	if ( defined( 'PLAYGROUND_FORCE_AUTO_LOGIN_ENABLED' ) && isset( $_GET['playground_force_auto_login_as_user'] ) ) {
 		return $_GET['playground_force_auto_login_as_user'];
 	}
+
 	return false;
 }
 
@@ -40,21 +42,21 @@ function playground_auto_login() {
 	 *
 	 * If $_SERVER['REQUEST_URI'] is not set, we assume it's a CLI run.
 	 */
-	if (empty($_SERVER['REQUEST_URI'])) {
+	if ( empty( $_SERVER['REQUEST_URI'] ) ) {
 		return;
 	}
 	$user_name = playground_get_username_for_auto_login();
 	if ( false === $user_name ) {
 		return;
 	}
-	if (wp_doing_ajax() || defined('REST_REQUEST')) {
+	if ( wp_doing_ajax() || defined( 'REST_REQUEST' ) ) {
 		return;
 	}
 	if ( is_user_logged_in() ) {
 		return;
 	}
-	$user = get_user_by('login', $user_name);
-	if (!$user) {
+	$user = get_user_by( 'login', $user_name );
+	if ( ! $user ) {
 		return;
 	}
 
@@ -72,8 +74,9 @@ function playground_auto_login() {
 	 * we'll be able to finish the operation in one of the future requests
 	 * or maybe not, but at least we won't end up with a permanent white screen.
 	 */
-	if (headers_sent()) {
-		_doing_it_wrong('playground_auto_login', 'Headers already sent, the Playground runtime will not auto-login the user', '1.0.0');
+	if ( headers_sent() ) {
+		_doing_it_wrong( 'playground_auto_login', 'Headers already sent, the Playground runtime will not auto-login the user', '1.0.0' );
+
 		return;
 	}
 
@@ -85,14 +88,15 @@ function playground_auto_login() {
 	wp_set_auth_cookie( $user->ID );
 	do_action( 'wp_login', $user->user_login, $user );
 
-	setcookie('playground_auto_login_already_happened', '1');
+	setcookie( 'playground_auto_login_already_happened', '1' );
 
 	/**
 	 * Confirm that nothing in WordPress, plugins, or filters have finalized
 	 * the headers sending phase. See the comment above for more context.
 	 */
-	if (headers_sent()) {
-		_doing_it_wrong('playground_auto_login', 'Headers already sent, the Playground runtime will not auto-login the user', '1.0.0');
+	if ( headers_sent() ) {
+		_doing_it_wrong( 'playground_auto_login', 'Headers already sent, the Playground runtime will not auto-login the user', '1.0.0' );
+
 		return;
 	}
 
@@ -112,20 +116,22 @@ function playground_auto_login() {
 	header( "Location: $redirect_url", true, 302 );
 	exit;
 }
+
 /**
  * Autologin users from the wp-login.php page.
  *
  * The wp hook isn't triggered on
  **/
-add_action('init', 'playground_auto_login', 1);
+add_action( 'init', 'playground_auto_login', 1 );
 
 /**
  * Disable the Site Admin Email Verification Screen for any session started
  * via autologin.
  */
-add_filter('admin_email_check_interval', function($interval) {
-	if(false === playground_get_username_for_auto_login()) {
+add_filter( 'admin_email_check_interval', function ( $interval ) {
+	if ( false === playground_get_username_for_auto_login() ) {
 		return 0;
 	}
+
 	return $interval;
-});
+} );

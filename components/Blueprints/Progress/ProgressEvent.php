@@ -13,18 +13,18 @@ class ProgressEvent extends Event {
 
 	/**
 	 * Create a new progress event
-	 * 
-	 * @param float $progress The progress value (0-100)
-	 * @param string $caption The caption describing current progress
+	 *
+	 * @param  float  $progress  The progress value (0-100)
+	 * @param  string  $caption  The caption describing current progress
 	 */
-	public function __construct(float $progress, string $caption) {
+	public function __construct( float $progress, string $caption ) {
 		$this->progress = $progress;
-		$this->caption = $caption;
+		$this->caption  = $caption;
 	}
 
 	/**
 	 * Get the progress value
-	 * 
+	 *
 	 * @return float Progress value (0-100)
 	 */
 	public function getProgress(): float {
@@ -33,7 +33,7 @@ class ProgressEvent extends Event {
 
 	/**
 	 * Get the progress caption
-	 * 
+	 *
 	 * @return string Caption describing current progress
 	 */
 	public function getCaption(): string {

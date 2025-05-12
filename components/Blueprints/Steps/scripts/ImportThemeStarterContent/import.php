@@ -21,7 +21,7 @@ function importThemeStarterContent_plugins_loaded() {
 		* See _wp_customize_include()
 		*/
 	$_REQUEST['wp_customize']    = 'on';
-	$_REQUEST['customize_theme'] = getenv("THEME_SLUG") ?: get_stylesheet();
+	$_REQUEST['customize_theme'] = getenv( "THEME_SLUG" ) ?: get_stylesheet();
 
 	/*
 		* Claim this is a ajax request saving settings, to avoid the preview filters being applied.
@@ -31,9 +31,10 @@ function importThemeStarterContent_plugins_loaded() {
 
 	$_GET = $_REQUEST;
 }
-$wp_filter['plugins_loaded'][0] = array('function' => 'importThemeStarterContent_plugins_loaded', 'accepted_args' => 0);
 
-require getenv("DOCUMENT_ROOT") . '/wp-load.php';
+$wp_filter['plugins_loaded'][0] = array( 'function' => 'importThemeStarterContent_plugins_loaded', 'accepted_args' => 0 );
+
+require getenv( "DOCUMENT_ROOT" ) . '/wp-load.php';
 
 // Return early if there's no starter content.
 if ( ! get_theme_starter_content() ) {

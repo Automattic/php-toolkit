@@ -1,1361 +1,1971 @@
 {
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "WordPress Blueprint v2 Schema",
-  "description": "JSON Schema for WordPress Blueprint v2 format",
-  "type": "object",
-  "required": ["version", "content"],
-  "properties": {
-    "version": {
-      "type": "integer",
-      "enum": [2],
-      "description": "Not a generic 'number' type – this schema is specifically for Blueprints v2. Version 1 had no \"version\" field and versions 3, 4, 5, etc will be different from version 2."
-    },
-    "$schema": {
-      "anyOf": [
-        { "$ref": "#/definitions/URLReference" },
-        { "$ref": "#/definitions/ExecutionContextPath" }
-      ],
-      "description": "JSON Schema URL."
-    },
-    "blueprintMeta": {
-      "type": "object",
-      "properties": {
-        "name": {
-          "type": "string",
-          "description": "Example: 'WooCommerce Starter Store with Books'"
-        },
-        "description": {
-          "type": "string",
-          "description": "Example: \"A possible WooCommerce setup for selling books\""
-        },
-        "version": {
-          "type": "string",
-          "description": "Example: \"0.0.8\""
-        },
-        "authors": {
-          "type": "array",
-          "items": { "type": "string" },
-          "description": "Example: [\"Riad Benguella\", \"Adam Zieliński\"]"
-        },
-        "authorUrl": {
-          "$ref": "#/definitions/URLReference",
-          "description": "Example: \"https://example.com\""
-        },
-        "donateLink": {
-          "$ref": "#/definitions/URLReference",
-          "description": "Example: \"https://example.com\""
-        },
-        "tags": {
-          "type": "array",
-          "items": { "type": "string" },
-          "description": "Example: [\"woocommerce\", \"developer environment\"]"
-        },
-        "license": {
-          "anyOf": [
-            { "$ref": "#/definitions/LicenseKeyword" },
-            { "type": "string" }
-          ],
-          "description": "Example: \"GPLv2 or later\""
-        }
-      }
-    },
-    "siteLanguage": {
-      "type": "string",
-      "default": "en_US",
-      "description": "Sets the WPLANG constant and downloads any missing translations for WordPress core and all the installed plugins and themes. If you need a fine-grained control over the translations, use imperative steps in the `additionalStepsAfterExecution` array."
-    },
-    "siteOptions": {
-      "type": "object",
-      "additionalProperties": { "$ref": "#/definitions/JsonValue" },
-      "not": {
-        "required": ["siteUrl"]
-      },
-      "properties": {
-        "blogname": {
-          "type": "string",
-          "default": "My WordPress Site",
-          "description": "Site title. Example: \"Adam's Movies\""
-        },
-        "timezone_string": {
-          "type": "string",
-          "default": "UTC",
-          "description": "Example: \"Poland/Warsaw\""
-        },
-        "permalink_structure": {
-          "anyOf": [
-            { "type": "string" },
-            { "type": "boolean", "enum": [false] }
-          ],
-          "default": "/%postname%/",
-          "description": "Site permalink structure. If present and different from the current permalink structure, the Blueprint runner will run `$wp_rewrite->flush_rules();`. If you only want to set this option without flushing the rules, use an explicit `additionalStepsAfterExecution` step."
-        }
-      },
-      "description": "Site options. In WordPress, the values are PHP-serializable, but Blueprints are intentionally restricted to a subset of those: JSON-serializable values. This is to prevent passing JavaScript Date objects."
-    },
-    "constants": {
-      "type": "object",
-      "properties": {
-        "WP_DEBUG": { "type": "boolean" },
-        "WP_DEBUG_LOG": { "type": "boolean" },
-        "WP_DEBUG_DISPLAY": { "type": "boolean" },
-        "SCRIPT_DEBUG": { "type": "boolean" }
-      },
-      "additionalProperties": {
-        "anyOf": [
-          { "type": "boolean" },
-          { "type": "string" },
-          { "type": "number" }
-        ]
-      },
-      "description": "Constants to define in the wp-config.php file."
-    },
-    "wordpressVersion": {
-      "anyOf": [
-        { "$ref": "#/definitions/WordPressVersion" },
-        { "$ref": "#/definitions/URLReference" },
-        { "$ref": "#/definitions/ExecutionContextPath" },
-        {
-          "type": "object",
-          "required": ["minVersion"],
-          "properties": {
-            "minVersion": { "$ref": "#/definitions/WordPressVersion" },
-            "maxVersion": { "$ref": "#/definitions/WordPressVersion" },
-            "preferredVersion": {
-              "$ref": "#/definitions/WordPressVersion",
-              "default": "latest"
-            }
-          }
-        }
-      ],
-      "default": "latest",
-      "description": "WordPress version to install."
-    },
-    "phpVersion": {
-      "anyOf": [
-        { "$ref": "#/definitions/PHPVersion" },
-        {
-          "type": "object",
-          "properties": {
-            "minVersion": { "$ref": "#/definitions/PHPVersion" },
-            "recommendedVersion": { "$ref": "#/definitions/PHPVersion" },
-            "maxVersion": { "$ref": "#/definitions/PHPVersion" }
-          }
-        }
-      ],
-      "default": "8.0",
-      "description": "The PHP version required for this Blueprint to work."
-    },
-    "activeTheme": {
-      "$ref": "#/definitions/ThemeReference",
-      "description": "The theme to install and also activate."
-    },
-    "themes": {
-      "type": "array",
-      "items": { "$ref": "#/definitions/ThemeReference" },
-      "description": "Installed themes to install without activating them."
-    },
-    "plugins": {
-      "type": "array",
-      "items": { "$ref": "#/definitions/PluginDefinition" },
-      "description": "A list of plugins to install and activate."
-    },
-    "muPlugins": {
-      "anyOf": [
-        { "$ref": "#/definitions/URLReference" },
-        {
-          "type": "array",
-          "items": { "$ref": "#/definitions/ExecutionContextPath" }
-        }
-      ],
-      "description": "A list of mu-plugins to install."
-    },
-    "postTypes": {
-      "type": "object",
-      "additionalProperties": {
-        "anyOf": [
-          { "$ref": "#/definitions/PostType" },
-          { "$ref": "#/definitions/ExecutionContextPath" }
-        ]
-      },
-      "description": "Very basic schema for defining custom post types."
-    },
-    "fonts": {
-      "type": "object",
-      "additionalProperties": {
-        "anyOf": [
-          { "$ref": "#/definitions/DataReference" },
-          { "$ref": "#/definitions/FontCollection" }
-        ]
-      },
-      "description": "A list of fonts to register in the site's Font Library."
-    },
-    "media": {
-      "type": "array",
-      "items": {
-        "anyOf": [
-          { "$ref": "#/definitions/DataReference" },
-          {
-            "type": "object",
-            "required": ["source"],
-            "properties": {
-              "source": { "$ref": "#/definitions/DataReference" },
-              "title": { "type": "string" },
-              "description": { "type": "string" },
-              "alt": { "type": "string" },
-              "caption": { "type": "string" }
-            }
-          }
-        ]
-      },
-      "description": "A list of media files to upload to the WordPress Media Library."
-    },
-    "content": {
-      "type": "array",
-      "items": {
-        "anyOf": [
-          {
-            "type": "object",
-            "required": ["type", "source"],
-            "properties": {
-              "type": { "type": "string", "enum": ["mysql-dump"] },
-              "source": {
-                "anyOf": [
-                  { "$ref": "#/definitions/DataReference" },
-                  {
-                    "type": "array",
-                    "items": { "$ref": "#/definitions/DataReference" }
-                  }
-                ]
-              },
-              "urlsMode": {
-                "type": "string",
-                "enum": ["rewrite", "preserve"],
-                "default": "rewrite"
-              },
-              "urlsMap": {
-                "type": "object",
-                "additionalProperties": { "$ref": "#/definitions/URLReference" }
-              }
-            }
-          },
-          {
-            "type": "object",
-            "required": ["type", "source"],
-            "properties": {
-              "type": { "type": "string", "enum": ["posts"] },
-              "source": {
-                "anyOf": [
-                  { "$ref": "#/definitions/DataReference" },
-                  {
-                    "type": "array",
-                    "items": { "$ref": "#/definitions/DataReference" }
-                  },
-                  { "$ref": "#/definitions/WordPressPost" },
-                  {
-                    "type": "array",
-                    "items": { "$ref": "#/definitions/WordPressPost" }
-                  }
-                ]
-              },
-              "urlsMode": {
-                "type": "string",
-                "enum": ["rewrite", "preserve"],
-                "default": "rewrite"
-              },
-              "urlsMap": {
-                "type": "object",
-                "additionalProperties": { "$ref": "#/definitions/URLReference" }
-              }
-            }
-          },
-          {
-            "type": "object",
-            "required": ["type", "source"],
-            "properties": {
-              "type": { "type": "string", "enum": ["wxr"] },
-              "source": { "$ref": "#/definitions/DataReference" },
-              "staticAssets": {
-                "type": "string",
-                "enum": ["fetch", "hotlink"],
-                "default": "fetch"
-              },
-              "authorsMode": {
-                "type": "string",
-                "enum": ["create", "default-author", "map"],
-                "default": "create"
-              },
-              "defaultAuthorUsername": {
-                "type": "string",
-                "default": "admin"
-              },
-              "authorsMap": {
-                "type": "object",
-                "additionalProperties": { "type": "string" }
-              },
-              "importUsers": {
-                "type": "boolean",
-                "default": false
-              },
-              "importComments": {
-                "type": "boolean",
-                "default": false
-              },
-              "importSiteOptions": {
-                "type": "boolean",
-                "default": false
-              },
-              "urlsMode": {
-                "type": "string",
-                "enum": ["rewrite", "preserve"],
-                "default": "rewrite"
-              },
-              "urlsMap": {
-                "type": "object",
-                "additionalProperties": { "$ref": "#/definitions/URLReference" }
-              }
-            }
-          }
-        ]
-      },
-      "description": "Content to import into the site."
-    },
-    "users": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "required": ["username", "email", "role"],
-        "properties": {
-          "username": { "type": "string" },
-          "email": { "type": "string" },
-          "role": { "type": "string" },
-          "meta": {
-            "type": "object",
-            "additionalProperties": { "type": "string" }
-          }
-        }
-      },
-      "description": "A list of users to create."
-    },
-    "roles": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "required": ["name", "capabilities"],
-        "properties": {
-          "name": { "type": "string" },
-          "capabilities": {
-            "type": "object",
-            "additionalProperties": { "type": "string" }
-          }
-        }
-      },
-      "description": "A list of roles to create."
-    },
-    "additionalStepsAfterExecution": {
-      "type": "array",
-      "items": { "$ref": "#/definitions/Step" },
-      "description": "Additional steps to execute after the blueprint has been executed."
-    }
-  },
-  "definitions": {
-    "URLReference": {
-      "type": "string",
-      "pattern": "^https?://.*",
-      "description": "A reference to a HTTP or HTTPS URL."
-    },
-    "ExecutionContextPath": {
-      "type": "string",
-      "pattern": "^(/|\\./)+.*",
-      "description": "A reference to a file in the Blueprint Execution Context."
-    },
-    "DataReference": {
-      "anyOf": [
-        { "$ref": "#/definitions/URLReference" },
-        { "$ref": "#/definitions/ExecutionContextPath" },
-        { "$ref": "#/definitions/InlineFile" },
-        { "$ref": "#/definitions/InlineDirectory" },
-        { "$ref": "#/definitions/GitPath" },
-        {
-          "type": "object",
-          "required": ["file"],
-          "properties": {
-            "file": {
-              "anyOf": [
-                { "$ref": "#/definitions/URLReference" },
-                { "$ref": "#/definitions/ExecutionContextPath" },
-                { "$ref": "#/definitions/InlineFile" },
-                { "$ref": "#/definitions/InlineDirectory" },
-                { "$ref": "#/definitions/GitPath" }
-              ]
-            },
-            "humanReadableName": {
-              "type": "string",
-              "description": "Human-readable name of the file."
-            }
-          }
-        }
-      ]
-    },
-    "InlineFile": {
-      "type": "object",
-      "required": ["filename", "content"],
-      "properties": {
-        "filename": { "type": "string" },
-        "content": { "type": "string" }
-      }
-    },
-    "InlineDirectory": {
-      "type": "object",
-      "required": ["name", "children"],
-      "properties": {
-        "name": { "type": "string" },
-        "children": {
-          "type": "array",
-          "items": {
-            "anyOf": [
-              { "$ref": "#/definitions/InlineFile" },
-              { "$ref": "#/definitions/InlineDirectory" }
-            ]
-          }
-        }
-      }
-    },
-    "GitPath": {
-      "type": "object",
-      "required": ["gitRepository"],
-      "properties": {
-        "gitRepository": { "$ref": "#/definitions/URLReference" },
-        "ref": { "type": "string" },
-        "path": { "type": "string" },
-        "localDirectoryName": { "type": "string" }
-      }
-    },
-    "LicenseKeyword": {
-      "type": "string",
-      "enum": ["AFL-3.0", "Apache-2.0", "Artistic-2.0", "BSL-1.0", "BSD-2-Clause", "BSD-3-Clause", "BSD-3-Clause-Clear", "BSD-4-Clause", "0BSD", "CC", "CC0-1.0", "CC-BY-4.0", "CC-BY-SA-4.0", "WTFPL", "ECL-2.0", "EPL-1.0", "EPL-2.0", "EUPL-1.1", "AGPL-3.0", "GPL", "GPL-2.0", "GPL-3.0", "LGPL", "LGPL-2.1", "LGPL-3.0", "ISC", "LPPL-1.3c", "MS-PL", "MIT", "MPL-2.0", "OSL-3.0", "PostgreSQL", "OFL-1.1", "NCSA", "Unlicense", "Zlib"]
-    },
-    "JsonValue": {
-      "anyOf": [
-        { "type": "string" },
-        { "type": "boolean" },
-        { "type": "number" },
-        {
-          "type": "array",
-          "items": { "$ref": "#/definitions/JsonValue" }
-        },
-        {
-          "type": "object",
-          "additionalProperties": { "$ref": "#/definitions/JsonValue" }
-        }
-      ]
-    },
-    "WordPressVersion": {
-      "anyOf": [
-        {
-          "type": "string",
-          "enum": ["latest"]
-        },
-        {
-          "type": "string",
-          "pattern": "^\\d+\\.\\d+$"
-        },
-        {
-          "type": "string",
-          "pattern": "^\\d+\\.\\d+\\.\\d+$"
-        },
-        {
-          "type": "string",
-          "pattern": "^\\d+\\.\\d+(\\.\\d+)?-(beta\\d+|rc\\d+)$"
-        }
-      ],
-      "description": "WordPress version, e.g. \"6.4\", \"6.4.3\", \"6.8-RC1\", or \"6.7-beta2\"."
-    },
-    "PHPVersion": {
-      "anyOf": [
-        {
-          "type": "string",
-          "enum": ["latest"]
-        },
-        {
-          "type": "string",
-          "pattern": "^\\d+\\.\\d+$"
-        },
-        {
-          "type": "string",
-          "pattern": "^\\d+\\.\\d+\\.\\d+$"
-        }
-      ],
-      "description": "PHP version, e.g. \"8.1\" or \"8.1.3\"."
-    },
-    "ThemeReference": {
-      "anyOf": [
-        { "$ref": "#/definitions/ThemeDirectoryReference" },
-        { "$ref": "#/definitions/URLReference" },
-        { "$ref": "#/definitions/ExecutionContextPath" }
-      ]
-    },
-    "ThemeDirectoryReference": {
-      "anyOf": [
-        {
-          "type": "string",
-          "pattern": "^[a-zA-Z0-9_-]+$"
-        },
-        {
-          "type": "string",
-          "pattern": "^[a-zA-Z0-9_-]+@(latest|\\d+\\.\\d+(\\.\\d+)?)$"
-        }
-      ],
-      "description": "Theme directory reference, e.g. \"twentytwentythree\", \"adventurer@4.6.0\", or \"twentytwentyfour@latest\"."
-    },
-    "PluginDefinition": {
-      "anyOf": [
-        { "$ref": "#/definitions/PluginStringReference" },
-        {
-          "type": "object",
-          "required": ["source"],
-          "properties": {
-            "source": { "$ref": "#/definitions/PluginStringReference" },
-            "active": {
-              "type": "boolean",
-              "default": true
-            },
-            "activationOptions": {
-              "type": "object",
-              "additionalProperties": { "$ref": "#/definitions/JsonValue" }
-            },
-            "onError": {
-              "type": "string",
-              "enum": ["skip-plugin", "throw"],
-              "default": "throw"
-            }
-          }
-        }
-      ]
-    },
-    "PluginStringReference": {
-      "anyOf": [
-        { "$ref": "#/definitions/PluginDirectoryReference" },
-        { "$ref": "#/definitions/URLReference" },
-        { "$ref": "#/definitions/ExecutionContextPath" }
-      ]
-    },
-    "PluginDirectoryReference": {
-      "anyOf": [
-        {
-          "type": "string",
-          "pattern": "^[a-zA-Z0-9_-]+$"
-        },
-        {
-          "type": "string",
-          "pattern": "^[a-zA-Z0-9_-]+@(latest|\\d+\\.\\d+(\\.\\d+)?)$"
-        }
-      ],
-      "description": "Plugin directory reference, e.g. \"jetpack\", \"jetpack@6.4\", or \"akismet@6.4.3\"."
-    },
-    "PostType": {
-      "type": "object",
-      "properties": {
-        "label": {
-          "type": "string",
-          "description": "Name of the post type shown in the menu. Usually plural."
-        },
-        "labels": {
-          "type": "object",
-          "properties": {
-            "name": {
-              "type": "string",
-              "description": "General name for the post type, usually plural. Default is 'Posts' / 'Pages'."
-            },
-            "singular_name": {
-              "type": "string",
-              "description": "Name for one object of this post type. Default is 'Post' / 'Page'."
-            },
-            "add_new": {
-              "type": "string",
-              "description": "Label for adding a new item. Default is 'Add New' / 'Add New'."
-            },
-            "add_new_item": {
-              "type": "string",
-              "description": "Label for adding a new singular item. Default is 'Add New Post' / 'Add New Page'."
-            },
-            "edit_item": {
-              "type": "string",
-              "description": "Label for editing a singular item. Default is 'Edit Post' / 'Edit Page'."
-            },
-            "new_item": {
-              "type": "string",
-              "description": "Label for the new item page title. Default is 'New Post' / 'New Page'."
-            },
-            "view_item": {
-              "type": "string",
-              "description": "Label for viewing a singular item. Default is 'View Post' / 'View Page'."
-            },
-            "view_items": {
-              "type": "string",
-              "description": "Label for viewing post type archives. Default is 'View Posts' / 'View Pages'."
-            },
-            "search_items": {
-              "type": "string",
-              "description": "Label for searching plural items. Default is 'Search Posts' / 'Search Pages'."
-            },
-            "not_found": {
-              "type": "string",
-              "description": "Label used when no items are found. Default is 'No posts found' / 'No pages found'."
-            },
-            "not_found_in_trash": {
-              "type": "string",
-              "description": "Label used when no items are in the Trash. Default is 'No posts found in Trash' / 'No pages found in Trash'."
-            },
-            "parent_item_colon": {
-              "type": "string",
-              "description": "Label used to prefix parents of hierarchical items. Default is 'Parent Page:'."
-            },
-            "all_items": {
-              "type": "string",
-              "description": "Label to signify all items in a submenu link. Default is 'All Posts' / 'All Pages'."
-            },
-            "archives": {
-              "type": "string",
-              "description": "Label for archives in nav menus. Default is 'Post Archives' / 'Page Archives'."
-            },
-            "attributes": {
-              "type": "string",
-              "description": "Label for the attributes meta box. Default is 'Post Attributes' / 'Page Attributes'."
-            },
-            "insert_into_item": {
-              "type": "string",
-              "description": "Label for the media frame button. Default is 'Insert into post' / 'Insert into page'."
-            },
-            "uploaded_to_this_item": {
-              "type": "string",
-              "description": "Label for the media frame filter. Default is 'Uploaded to this post' / 'Uploaded to this page'."
-            },
-            "featured_image": {
-              "type": "string",
-              "description": "Label for the featured image meta box title. Default is 'Featured image'."
-            },
-            "set_featured_image": {
-              "type": "string",
-              "description": "Label for setting the featured image. Default is 'Set featured image'."
-            },
-            "remove_featured_image": {
-              "type": "string",
-              "description": "Label for removing the featured image. Default is 'Remove featured image'."
-            },
-            "use_featured_image": {
-              "type": "string",
-              "description": "Label in the media frame for using a featured image. Default is 'Use as featured image'."
-            },
-            "menu_name": {
-              "type": "string",
-              "description": "Label for the menu name. Default is the same as name."
-            },
-            "filter_items_list": {
-              "type": "string",
-              "description": "Label for the table views hidden heading. Default is 'Filter posts list' / 'Filter pages list'."
-            },
-            "filter_by_date": {
-              "type": "string",
-              "description": "Label for the date filter in list tables. Default is 'Filter by date'."
-            },
-            "items_list_navigation": {
-              "type": "string",
-              "description": "Label for the table pagination hidden heading. Default is 'Posts list navigation' / 'Pages list navigation'."
-            },
-            "items_list": {
-              "type": "string",
-              "description": "Label for the table hidden heading. Default is 'Posts list' / 'Pages list'."
-            },
-            "item_published": {
-              "type": "string",
-              "description": "Label used when an item is published. Default is 'Post published.' / 'Page published.'"
-            },
-            "item_published_privately": {
-              "type": "string",
-              "description": "Label used when an item is published with private visibility. Default is 'Post published privately.' / 'Page published privately.'"
-            },
-            "item_reverted_to_draft": {
-              "type": "string",
-              "description": "Label used when an item is switched to a draft. Default is 'Post reverted to draft.' / 'Page reverted to draft.'"
-            },
-            "item_trashed": {
-              "type": "string",
-              "description": "Label used when an item is moved to Trash. Default is 'Post trashed.' / 'Page trashed.'"
-            },
-            "item_scheduled": {
-              "type": "string",
-              "description": "Label used when an item is scheduled for publishing. Default is 'Post scheduled.' / 'Page scheduled.'"
-            },
-            "item_updated": {
-              "type": "string",
-              "description": "Label used when an item is updated. Default is 'Post updated.' / 'Page updated.'"
-            },
-            "item_link": {
-              "type": "string",
-              "description": "Title for a navigation link block variation. Default is 'Post Link' / 'Page Link'."
-            },
-            "item_link_description": {
-              "type": "string",
-              "description": "Description for a navigation link block variation. Default is 'A link to a post.' / 'A link to a page.'"
-            }
-          },
-          "additionalProperties": {
-            "type": "string"
-          },
-          "description": "An array of labels for this post type."
-        },
-        "description": {
-          "type": "string",
-          "description": "A short descriptive summary of what the post type is."
-        },
-        "public": {
-          "type": "boolean",
-          "default": false,
-          "description": "Whether a post type is intended for use publicly either via the admin interface or by front-end users."
-        },
-        "hierarchical": {
-          "type": "boolean",
-          "default": false,
-          "description": "Whether the post type is hierarchical (e.g. page)."
-        },
-        "exclude_from_search": {
-          "type": "boolean",
-          "description": "Whether to exclude posts with this post type from front end search results."
-        },
-        "publicly_queryable": {
-          "type": "boolean",
-          "description": "Whether queries can be performed on the front end for the post type as part of parse_request()."
-        },
-        "show_ui": {
-          "type": "boolean",
-          "description": "Whether to generate and allow a UI for managing this post type in the admin."
-        },
-        "show_in_menu": {
-          "anyOf": [
-            { "type": "boolean" },
-            { "type": "string" }
-          ],
-          "description": "Where to show the post type in the admin menu. To work, $show_ui must be true."
-        },
-        "show_in_admin_bar": {
-          "type": "boolean",
-          "description": "Makes this post type available via the admin bar."
-        },
-        "show_in_nav_menus": {
-          "type": "boolean",
-          "description": "Makes this post type available for selection in navigation menus."
-        },
-        "show_in_rest": {
-          "type": "boolean",
-          "description": "Whether to include the post type in the REST API."
-        },
-        "rest_base": {
-          "type": "string",
-          "description": "To change the base URL of REST API route."
-        },
-        "rest_namespace": {
-          "type": "string",
-          "description": "To change the namespace URL of REST API route."
-        },
-        "rest_controller_class": {
-          "type": "string",
-          "description": "REST API controller class name."
-        },
-        "menu_icon": {
-          "type": "string",
-          "description": "The URL to the icon to be used for this menu."
-        },
-        "menu_position": {
-          "anyOf": [
-            { "type": "string" },
-            { "type": "number" }
-          ],
-          "description": "The position in the menu order the post type should appear."
-        },
-        "rename_capabilities": {
-          "type": "boolean",
-          "description": "Whether to rename the capabilities for this post type."
-        },
-        "singular_capability_name": {
-          "type": "string",
-          "description": "The singular capability name for this post type."
-        },
-        "plural_capability_name": {
-          "type": "string",
-          "description": "The plural capability name for this post type."
-        },
-        "taxonomies": {
-          "type": "array",
-          "items": { "type": "string" },
-          "description": "An array of taxonomy identifiers that will be registered for the post type."
-        },
-        "query_var_name": {
-          "type": "string",
-          "description": "The query var name for this post type."
-        },
-        "register_meta_box_cb": {
-          "type": "string",
-          "description": "Provide a callback function that sets up the meta boxes for the edit form."
-        },
-        "enter_title_here": {
-          "type": "string",
-          "description": "Custom text for the \"Enter title here\" placeholder in the title field."
-        },
-        "capability_type": {
-          "anyOf": [
-            { "type": "string" },
-            {
-              "type": "array",
-              "items": { "type": "string" },
-              "minItems": 2,
-              "maxItems": 2
-            }
-          ],
-          "description": "The string to use to build the read, edit, and delete capabilities."
-        },
-        "capabilities": {
-          "type": "object",
-          "additionalProperties": { "type": "string" },
-          "description": "Array of capabilities for this post type."
-        },
-        "map_meta_cap": {
-          "type": "boolean",
-          "default": false,
-          "description": "Whether to use the internal default meta capability handling."
-        },
-        "supports": {
-          "type": "array",
-          "items": { "type": "string" },
-          "description": "Core feature(s) the post type supports."
-        },
-        "has_archive": {
-          "anyOf": [
-            { "type": "boolean" },
-            { "type": "string" }
-          ],
-          "default": false,
-          "description": "Whether there should be post type archives, or if a string, the archive slug to use."
-        },
-        "rewrite": {
-          "anyOf": [
-            { "type": "boolean" },
-            {
-              "type": "object",
-              "properties": {
-                "slug": { "type": "string" },
-                "with_front": { "type": "boolean" },
-                "pages": { "type": "boolean" },
-                "feeds": { "type": "boolean" },
-                "ep_mask": { "type": "number" }
-              }
-            }
-          ],
-          "description": "Triggers the handling of rewrites for this post type."
-        },
-        "query_var": {
-          "anyOf": [
-            { "type": "boolean" },
-            { "type": "string" }
-          ],
-          "description": "Sets the query_var key for this post type."
-        },
-        "can_export": {
-          "type": "boolean",
-          "default": true,
-          "description": "Whether to allow this post type to be exported."
-        },
-        "delete_with_user": {
-          "type": "boolean",
-          "description": "Whether to delete posts of this type when deleting a user."
-        },
-        "template": {
-          "type": "array",
-          "items": {
-            "type": "array",
-            "minItems": 1,
-            "maxItems": 2,
-            "items": [
-              { "type": "string" },
-              { "type": "object", "additionalProperties": { "$ref": "#/definitions/JsonValue" } }
-            ]
-          },
-          "description": "Array of blocks to use as the default initial state for an editor session."
-        },
-        "template_lock": {
-          "anyOf": [
-            { "type": "string", "enum": ["all", "insert"] },
-            { "type": "boolean", "enum": [false] }
-          ],
-          "default": false,
-          "description": "Whether the block template should be locked if $template is set."
-        }
-      }
-    },
-    "FontFace": {
-      "type": "object",
-      "required": ["fontFamily", "src"],
-      "properties": {
-        "preview": {
-          "type": "string",
-          "description": "URL to a preview image of the font."
-        },
-        "fontFamily": {
-          "type": "string",
-          "description": "CSS font-family value."
-        },
-        "fontStyle": {
-          "type": "string",
-          "description": "CSS font-style value."
-        },
-        "fontWeight": {
-          "anyOf": [
-            { "type": "string" },
-            { "type": "number" }
-          ],
-          "description": "List of available font weights, separated by a space."
-        },
-        "fontDisplay": {
-          "type": "string",
-          "enum": ["auto", "block", "fallback", "swap", "optional"],
-          "description": "CSS font-display value."
-        },
-        "src": {
-          "anyOf": [
-            { "$ref": "#/definitions/DataReference" },
-            {
-              "type": "array",
-              "items": { "$ref": "#/definitions/DataReference" }
-            }
-          ],
-          "description": "Paths or URLs to the font files."
-        },
-        "fontStretch": {
-          "type": "string",
-          "description": "CSS font-stretch value."
-        },
-        "ascentOverride": {
-          "type": "string",
-          "description": "CSS ascent-override value."
-        },
-        "descentOverride": {
-          "type": "string",
-          "description": "CSS descent-override value."
-        },
-        "fontVariant": {
-          "type": "string",
-          "description": "CSS font-variant value."
-        },
-        "fontFeatureSettings": {
-          "type": "string",
-          "description": "CSS font-feature-settings value."
-        },
-        "fontVariationSettings": {
-          "type": "string",
-          "description": "CSS font-variation-settings value."
-        },
-        "lineGapOverride": {
-          "type": "string",
-          "description": "CSS line-gap-override value."
-        },
-        "sizeAdjust": {
-          "type": "string",
-          "description": "CSS size-adjust value."
-        },
-        "unicodeRange": {
-          "type": "string",
-          "description": "CSS unicode-range value."
-        }
-      }
-    },
-    "FontCollection": {
-      "type": "object",
-      "required": ["font_families"],
-      "properties": {
-        "$schema": {
-          "type": "string",
-          "description": "JSON schema URI for font-collection.json."
-        },
-        "font_families": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "required": ["font_family_settings"],
-            "properties": {
-              "font_family_settings": {
-                "type": "object",
-                "required": ["name", "slug", "fontFamily"],
-                "properties": {
-                  "name": {
-                    "type": "string",
-                    "description": "Name of the font family preset, translatable."
-                  },
-                  "slug": {
-                    "type": "string",
-                    "description": "Kebab-case unique identifier for the font family preset."
-                  },
-                  "fontFamily": {
-                    "type": "string",
-                    "description": "CSS font-family value."
-                  },
-                  "preview": {
-                    "type": "string",
-                    "description": "URL to a preview image of the font family."
-                  },
-                  "fontFace": {
-                    "type": "array",
-                    "items": { "$ref": "#/definitions/FontFace" },
-                    "description": "Array of font-face definitions."
-                  }
-                }
-              },
-              "categories": {
-                "type": "array",
-                "items": { "type": "string" },
-                "description": "Array of category slugs."
-              }
-            }
-          }
-        }
-      },
-      "description": "Font collection schema for WordPress Font Library."
-    },
-    "WordPressPost": {
-      "type": "object",
-      "required": ["post_title"],
-      "properties": {
-        "post_author": {
-          "type": "number",
-          "description": "Username of the post author."
-        },
-        "post_date": {
-          "type": "string",
-          "description": "The date of the post in UTC. Accepts format 'YYYY-MM-DD HH:MM:SS'."
-        },
-        "post_content": {
-          "type": "string",
-          "default": "",
-          "description": "The main post content. Can contain HTML, shortcodes, etc."
-        },
-        "post_title": {
-          "type": "string",
-          "description": "The post title."
-        },
-        "post_excerpt": {
-          "type": "string",
-          "description": "The post excerpt. Default empty."
-        },
-        "post_status": {
-          "type": "string",
-          "enum": ["publish", "pending", "draft", "auto-draft", "future", "private", "inherit", "trash"],
-          "description": "The post status."
-        },
-        "post_type": {
-          "type": "string",
-          "description": "The post type (e.g., 'post', 'page'). Default 'post'."
-        },
-        "comment_status": {
-          "type": "string",
-          "enum": ["open", "closed"],
-          "default": "open",
-          "description": "Whether comments are allowed."
-        },
-        "post_password": {
-          "type": "string",
-          "description": "A password to protect access. Default empty."
-        },
-        "post_name": {
-          "type": "string",
-          "description": "The URL slug. Default sanitized post_title for new posts."
-        },
-        "post_parent_name": {
-          "type": "string",
-          "description": "Post parent name for hierarchical post types (e.g., pages). Default empty."
-        },
-        "menu_order": {
-          "type": "number",
-          "default": 0,
-          "description": "Menu order within a post type. Default 0."
-        },
-        "post_mime_type": {
-          "type": "string",
-          "description": "MIME type for attachments. Default empty."
-        },
-        "guid": {
-          "type": "string",
-          "description": "Global Unique ID. Default empty."
-        },
-        "post_category": {
-          "type": "array",
-          "items": { "type": "string" },
-          "description": "Array of category slugs. Defaults to the site's default category."
-        },
-        "post_tags": {
-          "type": "array",
-          "items": { "type": "string" },
-          "description": "Array of tag names. Default empty."
-        },
-        "tax_input": {
-          "type": "object",
-          "additionalProperties": {
-            "type": "array",
-            "items": { "type": "string" }
-          },
-          "description": "Taxonomy terms keyed by taxonomy name."
-        },
-        "meta_input": {
-          "type": "object",
-          "additionalProperties": { "$ref": "#/definitions/JsonValue" },
-          "description": "Post meta keyed by meta key to value. Default empty."
-        },
-        "page_template": {
-          "type": "string",
-          "default": "",
-          "description": "Specifies the page template file to use."
-        }
-      }
-    },
-    "Step": {
-      "oneOf": [
-        {
-          "type": "object",
-          "required": ["step", "pluginPath"],
-          "properties": {
-            "step": { "type": "string", "enum": ["activatePlugin"] },
-            "pluginPath": {
-              "type": "string",
-              "description": "Path to the plugin directory as absolute path or the plugin entry file relative to the plugins directory."
-            }
-          }
-        },
-        {
-          "type": "object",
-          "required": ["step", "themeFolderName"],
-          "properties": {
-            "step": { "type": "string", "enum": ["activateTheme"] },
-            "themeFolderName": {
-              "type": "string",
-              "description": "The name of the theme folder inside wp-content/themes/"
-            }
-          }
-        },
-        {
-          "type": "object",
-          "required": ["step", "fromPath", "toPath"],
-          "properties": {
-            "step": { "type": "string", "enum": ["cp"] },
-            "fromPath": { "type": "string" },
-            "toPath": { "type": "string" }
-          }
-        },
-        {
-          "type": "object",
-          "required": ["step", "constants"],
-          "properties": {
-            "step": { "type": "string", "enum": ["defineConstants"] },
-            "constants": {
-              "type": "object",
-              "additionalProperties": { "type": "string" }
-            }
-          }
-        },
-        {
-          "type": "object",
-          "required": ["step"],
-          "properties": {
-            "step": { "type": "string", "enum": ["importThemeStarterContent"] },
-            "themeSlug": {
-              "type": "string",
-              "description": "The name of the theme to import content from."
-            }
-          }
-        },
-        {
-          "type": "object",
-          "required": ["step", "plugin"],
-          "properties": {
-            "step": { "type": "string", "enum": ["installPlugin"] },
-            "plugin": { "$ref": "#/definitions/PluginDefinition" }
-          }
-        },
-        {
-          "type": "object",
-          "required": ["step", "source"],
-          "properties": {
-            "step": { "type": "string", "enum": ["installTheme"] },
-            "source": { "$ref": "#/definitions/ThemeReference" },
-            "activate": {
-              "type": "boolean",
-              "description": "Whether to activate the theme after installing it."
-            },
-            "importStarterContent": {
-              "type": "boolean",
-              "description": "Whether to import the theme's starter content after installing it."
-            },
-            "targetFolderName": {
-              "type": "string",
-              "description": "The name of the folder to install the theme to. Defaults to guessing from themeData."
-            }
-          }
-        },
-        {
-          "type": "object",
-          "required": ["step", "path"],
-          "properties": {
-            "step": { "type": "string", "enum": ["mkdir"] },
-            "path": { "type": "string" }
-          }
-        },
-        {
-          "type": "object",
-          "required": ["step", "fromPath", "toPath"],
-          "properties": {
-            "step": { "type": "string", "enum": ["mv"] },
-            "fromPath": { "type": "string" },
-            "toPath": { "type": "string" }
-          }
-        },
-        {
-          "type": "object",
-          "required": ["step", "path"],
-          "properties": {
-            "step": { "type": "string", "enum": ["rm"] },
-            "path": { "type": "string" }
-          }
-        },
-        {
-          "type": "object",
-          "required": ["step", "path"],
-          "properties": {
-            "step": { "type": "string", "enum": ["rmdir"] },
-            "path": { "type": "string" }
-          }
-        },
-        {
-          "type": "object",
-          "required": ["step"],
-          "properties": {
-            "step": { "type": "string", "enum": ["runPHP"] },
-            "code": {
-              "type": "string",
-              "description": "The code snippet to eval instead of a php file."
-            },
-            "relativeUri": {
-              "type": "string",
-              "description": "Request path following the domain:port part."
-            },
-            "scriptPath": {
-              "type": "string",
-              "description": "Path of the .php file to execute."
-            },
-            "protocol": {
-              "type": "string",
-              "description": "Request protocol."
-            },
-            "method": {
-              "type": "string",
-              "enum": ["GET", "POST", "HEAD", "OPTIONS", "PATCH", "PUT", "DELETE"],
-              "default": "GET",
-              "description": "Request method."
-            },
-            "headers": {
-              "type": "object",
-              "additionalProperties": { "type": "string" },
-              "description": "Request headers."
-            },
-            "body": {
-              "type": "string",
-              "description": "Request body."
-            },
-            "env": {
-              "type": "object",
-              "additionalProperties": { "type": "string" },
-              "description": "Environment variables to set for this run."
-            },
-            "$_SERVER": {
-              "type": "object",
-              "additionalProperties": { "type": "string" },
-              "description": "$_SERVER entries to set for this run."
-            }
-          }
-        },
-        {
-          "type": "object",
-          "required": ["step", "source"],
-          "properties": {
-            "step": { "type": "string", "enum": ["runSql"] },
-            "source": { "$ref": "#/definitions/DataReference" }
-          }
-        },
-        {
-          "type": "object",
-          "required": ["step", "language"],
-          "properties": {
-            "step": { "type": "string", "enum": ["setSiteLanguage"] },
-            "language": {
-              "type": "string",
-              "description": "The language to set, e.g. 'en_US'"
-            }
-          }
-        },
-        {
-          "type": "object",
-          "required": ["step", "options"],
-          "properties": {
-            "step": { "type": "string", "enum": ["setSiteOptions"] },
-            "options": {
-              "type": "object",
-              "additionalProperties": { "$ref": "#/definitions/JsonValue" }
-            }
-          }
-        },
-        {
-          "type": "object",
-          "required": ["step", "zipFile", "extractToPath"],
-          "properties": {
-            "step": { "type": "string", "enum": ["unzip"] },
-            "zipFile": {
-              "anyOf": [
-                { "$ref": "#/definitions/URLReference" },
-                { "$ref": "#/definitions/ExecutionContextPath" }
-              ],
-              "description": "The zip file resource to extract."
-            },
-            "extractToPath": {
-              "type": "string",
-              "description": "The path to extract the zip file to inside the virtual filesystem."
-            }
-          }
-        },
-        {
-          "type": "object",
-          "required": ["step", "command"],
-          "properties": {
-            "step": { "type": "string", "enum": ["wp-cli"] },
-            "command": { "type": "string" },
-            "wpCliPath": { "type": "string" }
-          }
-        },
-        {
-          "type": "object",
-          "required": ["step", "path", "content"],
-          "properties": {
-            "step": { "type": "string", "enum": ["writeFile"] },
-            "path": { "type": "string" },
-            "content": { "$ref": "#/definitions/DataReference" }
-          }
-        },
-        {
-          "type": "object",
-          "required": ["step", "files"],
-          "properties": {
-            "step": { "type": "string", "enum": ["writeFiles"] },
-            "files": {
-              "type": "object",
-              "additionalProperties": { "$ref": "#/definitions/DataReference" }
-            }
-          }
-        }
-      ]
-    }
-  }
-} 
+	"$schema": "http://json-schema.org/draft-07/schema#",
+	"title": "WordPress Blueprint v2 Schema",
+	"description": "JSON Schema for WordPress Blueprint v2 format",
+	"type": "object",
+	"required": [
+		"version",
+		"content"
+	],
+	"properties": {
+		"version": {
+			"type": "integer",
+			"enum": [
+				2
+			],
+			"description": "Not a generic 'number' type – this schema is specifically for Blueprints v2. Version 1 had no \"version\" field and versions 3, 4, 5, etc will be different from version 2."
+		},
+		"$schema": {
+			"anyOf": [
+				{
+					"$ref": "#/definitions/URLReference"
+				},
+				{
+					"$ref": "#/definitions/ExecutionContextPath"
+				}
+			],
+			"description": "JSON Schema URL."
+		},
+		"blueprintMeta": {
+			"type": "object",
+			"properties": {
+				"name": {
+					"type": "string",
+					"description": "Example: 'WooCommerce Starter Store with Books'"
+				},
+				"description": {
+					"type": "string",
+					"description": "Example: \"A possible WooCommerce setup for selling books\""
+				},
+				"version": {
+					"type": "string",
+					"description": "Example: \"0.0.8\""
+				},
+				"authors": {
+					"type": "array",
+					"items": {
+						"type": "string"
+					},
+					"description": "Example: [\"Riad Benguella\", \"Adam Zieliński\"]"
+				},
+				"authorUrl": {
+					"$ref": "#/definitions/URLReference",
+					"description": "Example: \"https://example.com\""
+				},
+				"donateLink": {
+					"$ref": "#/definitions/URLReference",
+					"description": "Example: \"https://example.com\""
+				},
+				"tags": {
+					"type": "array",
+					"items": {
+						"type": "string"
+					},
+					"description": "Example: [\"woocommerce\", \"developer environment\"]"
+				},
+				"license": {
+					"anyOf": [
+						{
+							"$ref": "#/definitions/LicenseKeyword"
+						},
+						{
+							"type": "string"
+						}
+					],
+					"description": "Example: \"GPLv2 or later\""
+				}
+			}
+		},
+		"siteLanguage": {
+			"type": "string",
+			"default": "en_US",
+			"description": "Sets the WPLANG constant and downloads any missing translations for WordPress core and all the installed plugins and themes. If you need a fine-grained control over the translations, use imperative steps in the `additionalStepsAfterExecution` array."
+		},
+		"siteOptions": {
+			"type": "object",
+			"additionalProperties": {
+				"$ref": "#/definitions/JsonValue"
+			},
+			"not": {
+				"required": [
+					"siteUrl"
+				]
+			},
+			"properties": {
+				"blogname": {
+					"type": "string",
+					"default": "My WordPress Site",
+					"description": "Site title. Example: \"Adam's Movies\""
+				},
+				"timezone_string": {
+					"type": "string",
+					"default": "UTC",
+					"description": "Example: \"Poland/Warsaw\""
+				},
+				"permalink_structure": {
+					"anyOf": [
+						{
+							"type": "string"
+						},
+						{
+							"type": "boolean",
+							"enum": [
+								false
+							]
+						}
+					],
+					"default": "/%postname%/",
+					"description": "Site permalink structure. If present and different from the current permalink structure, the Blueprint runner will run `$wp_rewrite->flush_rules();`. If you only want to set this option without flushing the rules, use an explicit `additionalStepsAfterExecution` step."
+				}
+			},
+			"description": "Site options. In WordPress, the values are PHP-serializable, but Blueprints are intentionally restricted to a subset of those: JSON-serializable values. This is to prevent passing JavaScript Date objects."
+		},
+		"constants": {
+			"type": "object",
+			"properties": {
+				"WP_DEBUG": {
+					"type": "boolean"
+				},
+				"WP_DEBUG_LOG": {
+					"type": "boolean"
+				},
+				"WP_DEBUG_DISPLAY": {
+					"type": "boolean"
+				},
+				"SCRIPT_DEBUG": {
+					"type": "boolean"
+				}
+			},
+			"additionalProperties": {
+				"anyOf": [
+					{
+						"type": "boolean"
+					},
+					{
+						"type": "string"
+					},
+					{
+						"type": "number"
+					}
+				]
+			},
+			"description": "Constants to define in the wp-config.php file."
+		},
+		"wordpressVersion": {
+			"anyOf": [
+				{
+					"$ref": "#/definitions/WordPressVersion"
+				},
+				{
+					"$ref": "#/definitions/URLReference"
+				},
+				{
+					"$ref": "#/definitions/ExecutionContextPath"
+				},
+				{
+					"type": "object",
+					"required": [
+						"minVersion"
+					],
+					"properties": {
+						"minVersion": {
+							"$ref": "#/definitions/WordPressVersion"
+						},
+						"maxVersion": {
+							"$ref": "#/definitions/WordPressVersion"
+						},
+						"preferredVersion": {
+							"$ref": "#/definitions/WordPressVersion",
+							"default": "latest"
+						}
+					}
+				}
+			],
+			"default": "latest",
+			"description": "WordPress version to install."
+		},
+		"phpVersion": {
+			"anyOf": [
+				{
+					"$ref": "#/definitions/PHPVersion"
+				},
+				{
+					"type": "object",
+					"properties": {
+						"minVersion": {
+							"$ref": "#/definitions/PHPVersion"
+						},
+						"recommendedVersion": {
+							"$ref": "#/definitions/PHPVersion"
+						},
+						"maxVersion": {
+							"$ref": "#/definitions/PHPVersion"
+						}
+					}
+				}
+			],
+			"default": "8.0",
+			"description": "The PHP version required for this Blueprint to work."
+		},
+		"activeTheme": {
+			"$ref": "#/definitions/ThemeReference",
+			"description": "The theme to install and also activate."
+		},
+		"themes": {
+			"type": "array",
+			"items": {
+				"$ref": "#/definitions/ThemeReference"
+			},
+			"description": "Installed themes to install without activating them."
+		},
+		"plugins": {
+			"type": "array",
+			"items": {
+				"$ref": "#/definitions/PluginDefinition"
+			},
+			"description": "A list of plugins to install and activate."
+		},
+		"muPlugins": {
+			"anyOf": [
+				{
+					"$ref": "#/definitions/URLReference"
+				},
+				{
+					"type": "array",
+					"items": {
+						"$ref": "#/definitions/ExecutionContextPath"
+					}
+				}
+			],
+			"description": "A list of mu-plugins to install."
+		},
+		"postTypes": {
+			"type": "object",
+			"additionalProperties": {
+				"anyOf": [
+					{
+						"$ref": "#/definitions/PostType"
+					},
+					{
+						"$ref": "#/definitions/ExecutionContextPath"
+					}
+				]
+			},
+			"description": "Very basic schema for defining custom post types."
+		},
+		"fonts": {
+			"type": "object",
+			"additionalProperties": {
+				"anyOf": [
+					{
+						"$ref": "#/definitions/DataReference"
+					},
+					{
+						"$ref": "#/definitions/FontCollection"
+					}
+				]
+			},
+			"description": "A list of fonts to register in the site's Font Library."
+		},
+		"media": {
+			"type": "array",
+			"items": {
+				"anyOf": [
+					{
+						"$ref": "#/definitions/DataReference"
+					},
+					{
+						"type": "object",
+						"required": [
+							"source"
+						],
+						"properties": {
+							"source": {
+								"$ref": "#/definitions/DataReference"
+							},
+							"title": {
+								"type": "string"
+							},
+							"description": {
+								"type": "string"
+							},
+							"alt": {
+								"type": "string"
+							},
+							"caption": {
+								"type": "string"
+							}
+						}
+					}
+				]
+			},
+			"description": "A list of media files to upload to the WordPress Media Library."
+		},
+		"content": {
+			"type": "array",
+			"items": {
+				"anyOf": [
+					{
+						"type": "object",
+						"required": [
+							"type",
+							"source"
+						],
+						"properties": {
+							"type": {
+								"type": "string",
+								"enum": [
+									"mysql-dump"
+								]
+							},
+							"source": {
+								"anyOf": [
+									{
+										"$ref": "#/definitions/DataReference"
+									},
+									{
+										"type": "array",
+										"items": {
+											"$ref": "#/definitions/DataReference"
+										}
+									}
+								]
+							},
+							"urlsMode": {
+								"type": "string",
+								"enum": [
+									"rewrite",
+									"preserve"
+								],
+								"default": "rewrite"
+							},
+							"urlsMap": {
+								"type": "object",
+								"additionalProperties": {
+									"$ref": "#/definitions/URLReference"
+								}
+							}
+						}
+					},
+					{
+						"type": "object",
+						"required": [
+							"type",
+							"source"
+						],
+						"properties": {
+							"type": {
+								"type": "string",
+								"enum": [
+									"posts"
+								]
+							},
+							"source": {
+								"anyOf": [
+									{
+										"$ref": "#/definitions/DataReference"
+									},
+									{
+										"type": "array",
+										"items": {
+											"$ref": "#/definitions/DataReference"
+										}
+									},
+									{
+										"$ref": "#/definitions/WordPressPost"
+									},
+									{
+										"type": "array",
+										"items": {
+											"$ref": "#/definitions/WordPressPost"
+										}
+									}
+								]
+							},
+							"urlsMode": {
+								"type": "string",
+								"enum": [
+									"rewrite",
+									"preserve"
+								],
+								"default": "rewrite"
+							},
+							"urlsMap": {
+								"type": "object",
+								"additionalProperties": {
+									"$ref": "#/definitions/URLReference"
+								}
+							}
+						}
+					},
+					{
+						"type": "object",
+						"required": [
+							"type",
+							"source"
+						],
+						"properties": {
+							"type": {
+								"type": "string",
+								"enum": [
+									"wxr"
+								]
+							},
+							"source": {
+								"$ref": "#/definitions/DataReference"
+							},
+							"staticAssets": {
+								"type": "string",
+								"enum": [
+									"fetch",
+									"hotlink"
+								],
+								"default": "fetch"
+							},
+							"authorsMode": {
+								"type": "string",
+								"enum": [
+									"create",
+									"default-author",
+									"map"
+								],
+								"default": "create"
+							},
+							"defaultAuthorUsername": {
+								"type": "string",
+								"default": "admin"
+							},
+							"authorsMap": {
+								"type": "object",
+								"additionalProperties": {
+									"type": "string"
+								}
+							},
+							"importUsers": {
+								"type": "boolean",
+								"default": false
+							},
+							"importComments": {
+								"type": "boolean",
+								"default": false
+							},
+							"importSiteOptions": {
+								"type": "boolean",
+								"default": false
+							},
+							"urlsMode": {
+								"type": "string",
+								"enum": [
+									"rewrite",
+									"preserve"
+								],
+								"default": "rewrite"
+							},
+							"urlsMap": {
+								"type": "object",
+								"additionalProperties": {
+									"$ref": "#/definitions/URLReference"
+								}
+							}
+						}
+					}
+				]
+			},
+			"description": "Content to import into the site."
+		},
+		"users": {
+			"type": "array",
+			"items": {
+				"type": "object",
+				"required": [
+					"username",
+					"email",
+					"role"
+				],
+				"properties": {
+					"username": {
+						"type": "string"
+					},
+					"email": {
+						"type": "string"
+					},
+					"role": {
+						"type": "string"
+					},
+					"meta": {
+						"type": "object",
+						"additionalProperties": {
+							"type": "string"
+						}
+					}
+				}
+			},
+			"description": "A list of users to create."
+		},
+		"roles": {
+			"type": "array",
+			"items": {
+				"type": "object",
+				"required": [
+					"name",
+					"capabilities"
+				],
+				"properties": {
+					"name": {
+						"type": "string"
+					},
+					"capabilities": {
+						"type": "object",
+						"additionalProperties": {
+							"type": "string"
+						}
+					}
+				}
+			},
+			"description": "A list of roles to create."
+		},
+		"additionalStepsAfterExecution": {
+			"type": "array",
+			"items": {
+				"$ref": "#/definitions/Step"
+			},
+			"description": "Additional steps to execute after the blueprint has been executed."
+		}
+	},
+	"definitions": {
+		"URLReference": {
+			"type": "string",
+			"pattern": "^https?://.*",
+			"description": "A reference to a HTTP or HTTPS URL."
+		},
+		"ExecutionContextPath": {
+			"type": "string",
+			"pattern": "^(/|\\./)+.*",
+			"description": "A reference to a file in the Blueprint Execution Context."
+		},
+		"DataReference": {
+			"anyOf": [
+				{
+					"$ref": "#/definitions/URLReference"
+				},
+				{
+					"$ref": "#/definitions/ExecutionContextPath"
+				},
+				{
+					"$ref": "#/definitions/InlineFile"
+				},
+				{
+					"$ref": "#/definitions/InlineDirectory"
+				},
+				{
+					"$ref": "#/definitions/GitPath"
+				},
+				{
+					"type": "object",
+					"required": [
+						"file"
+					],
+					"properties": {
+						"file": {
+							"anyOf": [
+								{
+									"$ref": "#/definitions/URLReference"
+								},
+								{
+									"$ref": "#/definitions/ExecutionContextPath"
+								},
+								{
+									"$ref": "#/definitions/InlineFile"
+								},
+								{
+									"$ref": "#/definitions/InlineDirectory"
+								},
+								{
+									"$ref": "#/definitions/GitPath"
+								}
+							]
+						},
+						"humanReadableName": {
+							"type": "string",
+							"description": "Human-readable name of the file."
+						}
+					}
+				}
+			]
+		},
+		"InlineFile": {
+			"type": "object",
+			"required": [
+				"filename",
+				"content"
+			],
+			"properties": {
+				"filename": {
+					"type": "string"
+				},
+				"content": {
+					"type": "string"
+				}
+			}
+		},
+		"InlineDirectory": {
+			"type": "object",
+			"required": [
+				"name",
+				"children"
+			],
+			"properties": {
+				"name": {
+					"type": "string"
+				},
+				"children": {
+					"type": "array",
+					"items": {
+						"anyOf": [
+							{
+								"$ref": "#/definitions/InlineFile"
+							},
+							{
+								"$ref": "#/definitions/InlineDirectory"
+							}
+						]
+					}
+				}
+			}
+		},
+		"GitPath": {
+			"type": "object",
+			"required": [
+				"gitRepository"
+			],
+			"properties": {
+				"gitRepository": {
+					"$ref": "#/definitions/URLReference"
+				},
+				"ref": {
+					"type": "string"
+				},
+				"path": {
+					"type": "string"
+				},
+				"localDirectoryName": {
+					"type": "string"
+				}
+			}
+		},
+		"LicenseKeyword": {
+			"type": "string",
+			"enum": [
+				"AFL-3.0",
+				"Apache-2.0",
+				"Artistic-2.0",
+				"BSL-1.0",
+				"BSD-2-Clause",
+				"BSD-3-Clause",
+				"BSD-3-Clause-Clear",
+				"BSD-4-Clause",
+				"0BSD",
+				"CC",
+				"CC0-1.0",
+				"CC-BY-4.0",
+				"CC-BY-SA-4.0",
+				"WTFPL",
+				"ECL-2.0",
+				"EPL-1.0",
+				"EPL-2.0",
+				"EUPL-1.1",
+				"AGPL-3.0",
+				"GPL",
+				"GPL-2.0",
+				"GPL-3.0",
+				"LGPL",
+				"LGPL-2.1",
+				"LGPL-3.0",
+				"ISC",
+				"LPPL-1.3c",
+				"MS-PL",
+				"MIT",
+				"MPL-2.0",
+				"OSL-3.0",
+				"PostgreSQL",
+				"OFL-1.1",
+				"NCSA",
+				"Unlicense",
+				"Zlib"
+			]
+		},
+		"JsonValue": {
+			"anyOf": [
+				{
+					"type": "string"
+				},
+				{
+					"type": "boolean"
+				},
+				{
+					"type": "number"
+				},
+				{
+					"type": "array",
+					"items": {
+						"$ref": "#/definitions/JsonValue"
+					}
+				},
+				{
+					"type": "object",
+					"additionalProperties": {
+						"$ref": "#/definitions/JsonValue"
+					}
+				}
+			]
+		},
+		"WordPressVersion": {
+			"anyOf": [
+				{
+					"type": "string",
+					"enum": [
+						"latest"
+					]
+				},
+				{
+					"type": "string",
+					"pattern": "^\\d+\\.\\d+$"
+				},
+				{
+					"type": "string",
+					"pattern": "^\\d+\\.\\d+\\.\\d+$"
+				},
+				{
+					"type": "string",
+					"pattern": "^\\d+\\.\\d+(\\.\\d+)?-(beta\\d+|rc\\d+)$"
+				}
+			],
+			"description": "WordPress version, e.g. \"6.4\", \"6.4.3\", \"6.8-RC1\", or \"6.7-beta2\"."
+		},
+		"PHPVersion": {
+			"anyOf": [
+				{
+					"type": "string",
+					"enum": [
+						"latest"
+					]
+				},
+				{
+					"type": "string",
+					"pattern": "^\\d+\\.\\d+$"
+				},
+				{
+					"type": "string",
+					"pattern": "^\\d+\\.\\d+\\.\\d+$"
+				}
+			],
+			"description": "PHP version, e.g. \"8.1\" or \"8.1.3\"."
+		},
+		"ThemeReference": {
+			"anyOf": [
+				{
+					"$ref": "#/definitions/ThemeDirectoryReference"
+				},
+				{
+					"$ref": "#/definitions/URLReference"
+				},
+				{
+					"$ref": "#/definitions/ExecutionContextPath"
+				}
+			]
+		},
+		"ThemeDirectoryReference": {
+			"anyOf": [
+				{
+					"type": "string",
+					"pattern": "^[a-zA-Z0-9_-]+$"
+				},
+				{
+					"type": "string",
+					"pattern": "^[a-zA-Z0-9_-]+@(latest|\\d+\\.\\d+(\\.\\d+)?)$"
+				}
+			],
+			"description": "Theme directory reference, e.g. \"twentytwentythree\", \"adventurer@4.6.0\", or \"twentytwentyfour@latest\"."
+		},
+		"PluginDefinition": {
+			"anyOf": [
+				{
+					"$ref": "#/definitions/PluginStringReference"
+				},
+				{
+					"type": "object",
+					"required": [
+						"source"
+					],
+					"properties": {
+						"source": {
+							"$ref": "#/definitions/PluginStringReference"
+						},
+						"active": {
+							"type": "boolean",
+							"default": true
+						},
+						"activationOptions": {
+							"type": "object",
+							"additionalProperties": {
+								"$ref": "#/definitions/JsonValue"
+							}
+						},
+						"onError": {
+							"type": "string",
+							"enum": [
+								"skip-plugin",
+								"throw"
+							],
+							"default": "throw"
+						}
+					}
+				}
+			]
+		},
+		"PluginStringReference": {
+			"anyOf": [
+				{
+					"$ref": "#/definitions/PluginDirectoryReference"
+				},
+				{
+					"$ref": "#/definitions/URLReference"
+				},
+				{
+					"$ref": "#/definitions/ExecutionContextPath"
+				}
+			]
+		},
+		"PluginDirectoryReference": {
+			"anyOf": [
+				{
+					"type": "string",
+					"pattern": "^[a-zA-Z0-9_-]+$"
+				},
+				{
+					"type": "string",
+					"pattern": "^[a-zA-Z0-9_-]+@(latest|\\d+\\.\\d+(\\.\\d+)?)$"
+				}
+			],
+			"description": "Plugin directory reference, e.g. \"jetpack\", \"jetpack@6.4\", or \"akismet@6.4.3\"."
+		},
+		"PostType": {
+			"type": "object",
+			"properties": {
+				"label": {
+					"type": "string",
+					"description": "Name of the post type shown in the menu. Usually plural."
+				},
+				"labels": {
+					"type": "object",
+					"properties": {
+						"name": {
+							"type": "string",
+							"description": "General name for the post type, usually plural. Default is 'Posts' / 'Pages'."
+						},
+						"singular_name": {
+							"type": "string",
+							"description": "Name for one object of this post type. Default is 'Post' / 'Page'."
+						},
+						"add_new": {
+							"type": "string",
+							"description": "Label for adding a new item. Default is 'Add New' / 'Add New'."
+						},
+						"add_new_item": {
+							"type": "string",
+							"description": "Label for adding a new singular item. Default is 'Add New Post' / 'Add New Page'."
+						},
+						"edit_item": {
+							"type": "string",
+							"description": "Label for editing a singular item. Default is 'Edit Post' / 'Edit Page'."
+						},
+						"new_item": {
+							"type": "string",
+							"description": "Label for the new item page title. Default is 'New Post' / 'New Page'."
+						},
+						"view_item": {
+							"type": "string",
+							"description": "Label for viewing a singular item. Default is 'View Post' / 'View Page'."
+						},
+						"view_items": {
+							"type": "string",
+							"description": "Label for viewing post type archives. Default is 'View Posts' / 'View Pages'."
+						},
+						"search_items": {
+							"type": "string",
+							"description": "Label for searching plural items. Default is 'Search Posts' / 'Search Pages'."
+						},
+						"not_found": {
+							"type": "string",
+							"description": "Label used when no items are found. Default is 'No posts found' / 'No pages found'."
+						},
+						"not_found_in_trash": {
+							"type": "string",
+							"description": "Label used when no items are in the Trash. Default is 'No posts found in Trash' / 'No pages found in Trash'."
+						},
+						"parent_item_colon": {
+							"type": "string",
+							"description": "Label used to prefix parents of hierarchical items. Default is 'Parent Page:'."
+						},
+						"all_items": {
+							"type": "string",
+							"description": "Label to signify all items in a submenu link. Default is 'All Posts' / 'All Pages'."
+						},
+						"archives": {
+							"type": "string",
+							"description": "Label for archives in nav menus. Default is 'Post Archives' / 'Page Archives'."
+						},
+						"attributes": {
+							"type": "string",
+							"description": "Label for the attributes meta box. Default is 'Post Attributes' / 'Page Attributes'."
+						},
+						"insert_into_item": {
+							"type": "string",
+							"description": "Label for the media frame button. Default is 'Insert into post' / 'Insert into page'."
+						},
+						"uploaded_to_this_item": {
+							"type": "string",
+							"description": "Label for the media frame filter. Default is 'Uploaded to this post' / 'Uploaded to this page'."
+						},
+						"featured_image": {
+							"type": "string",
+							"description": "Label for the featured image meta box title. Default is 'Featured image'."
+						},
+						"set_featured_image": {
+							"type": "string",
+							"description": "Label for setting the featured image. Default is 'Set featured image'."
+						},
+						"remove_featured_image": {
+							"type": "string",
+							"description": "Label for removing the featured image. Default is 'Remove featured image'."
+						},
+						"use_featured_image": {
+							"type": "string",
+							"description": "Label in the media frame for using a featured image. Default is 'Use as featured image'."
+						},
+						"menu_name": {
+							"type": "string",
+							"description": "Label for the menu name. Default is the same as name."
+						},
+						"filter_items_list": {
+							"type": "string",
+							"description": "Label for the table views hidden heading. Default is 'Filter posts list' / 'Filter pages list'."
+						},
+						"filter_by_date": {
+							"type": "string",
+							"description": "Label for the date filter in list tables. Default is 'Filter by date'."
+						},
+						"items_list_navigation": {
+							"type": "string",
+							"description": "Label for the table pagination hidden heading. Default is 'Posts list navigation' / 'Pages list navigation'."
+						},
+						"items_list": {
+							"type": "string",
+							"description": "Label for the table hidden heading. Default is 'Posts list' / 'Pages list'."
+						},
+						"item_published": {
+							"type": "string",
+							"description": "Label used when an item is published. Default is 'Post published.' / 'Page published.'"
+						},
+						"item_published_privately": {
+							"type": "string",
+							"description": "Label used when an item is published with private visibility. Default is 'Post published privately.' / 'Page published privately.'"
+						},
+						"item_reverted_to_draft": {
+							"type": "string",
+							"description": "Label used when an item is switched to a draft. Default is 'Post reverted to draft.' / 'Page reverted to draft.'"
+						},
+						"item_trashed": {
+							"type": "string",
+							"description": "Label used when an item is moved to Trash. Default is 'Post trashed.' / 'Page trashed.'"
+						},
+						"item_scheduled": {
+							"type": "string",
+							"description": "Label used when an item is scheduled for publishing. Default is 'Post scheduled.' / 'Page scheduled.'"
+						},
+						"item_updated": {
+							"type": "string",
+							"description": "Label used when an item is updated. Default is 'Post updated.' / 'Page updated.'"
+						},
+						"item_link": {
+							"type": "string",
+							"description": "Title for a navigation link block variation. Default is 'Post Link' / 'Page Link'."
+						},
+						"item_link_description": {
+							"type": "string",
+							"description": "Description for a navigation link block variation. Default is 'A link to a post.' / 'A link to a page.'"
+						}
+					},
+					"additionalProperties": {
+						"type": "string"
+					},
+					"description": "An array of labels for this post type."
+				},
+				"description": {
+					"type": "string",
+					"description": "A short descriptive summary of what the post type is."
+				},
+				"public": {
+					"type": "boolean",
+					"default": false,
+					"description": "Whether a post type is intended for use publicly either via the admin interface or by front-end users."
+				},
+				"hierarchical": {
+					"type": "boolean",
+					"default": false,
+					"description": "Whether the post type is hierarchical (e.g. page)."
+				},
+				"exclude_from_search": {
+					"type": "boolean",
+					"description": "Whether to exclude posts with this post type from front end search results."
+				},
+				"publicly_queryable": {
+					"type": "boolean",
+					"description": "Whether queries can be performed on the front end for the post type as part of parse_request()."
+				},
+				"show_ui": {
+					"type": "boolean",
+					"description": "Whether to generate and allow a UI for managing this post type in the admin."
+				},
+				"show_in_menu": {
+					"anyOf": [
+						{
+							"type": "boolean"
+						},
+						{
+							"type": "string"
+						}
+					],
+					"description": "Where to show the post type in the admin menu. To work, $show_ui must be true."
+				},
+				"show_in_admin_bar": {
+					"type": "boolean",
+					"description": "Makes this post type available via the admin bar."
+				},
+				"show_in_nav_menus": {
+					"type": "boolean",
+					"description": "Makes this post type available for selection in navigation menus."
+				},
+				"show_in_rest": {
+					"type": "boolean",
+					"description": "Whether to include the post type in the REST API."
+				},
+				"rest_base": {
+					"type": "string",
+					"description": "To change the base URL of REST API route."
+				},
+				"rest_namespace": {
+					"type": "string",
+					"description": "To change the namespace URL of REST API route."
+				},
+				"rest_controller_class": {
+					"type": "string",
+					"description": "REST API controller class name."
+				},
+				"menu_icon": {
+					"type": "string",
+					"description": "The URL to the icon to be used for this menu."
+				},
+				"menu_position": {
+					"anyOf": [
+						{
+							"type": "string"
+						},
+						{
+							"type": "number"
+						}
+					],
+					"description": "The position in the menu order the post type should appear."
+				},
+				"rename_capabilities": {
+					"type": "boolean",
+					"description": "Whether to rename the capabilities for this post type."
+				},
+				"singular_capability_name": {
+					"type": "string",
+					"description": "The singular capability name for this post type."
+				},
+				"plural_capability_name": {
+					"type": "string",
+					"description": "The plural capability name for this post type."
+				},
+				"taxonomies": {
+					"type": "array",
+					"items": {
+						"type": "string"
+					},
+					"description": "An array of taxonomy identifiers that will be registered for the post type."
+				},
+				"query_var_name": {
+					"type": "string",
+					"description": "The query var name for this post type."
+				},
+				"register_meta_box_cb": {
+					"type": "string",
+					"description": "Provide a callback function that sets up the meta boxes for the edit form."
+				},
+				"enter_title_here": {
+					"type": "string",
+					"description": "Custom text for the \"Enter title here\" placeholder in the title field."
+				},
+				"capability_type": {
+					"anyOf": [
+						{
+							"type": "string"
+						},
+						{
+							"type": "array",
+							"items": {
+								"type": "string"
+							},
+							"minItems": 2,
+							"maxItems": 2
+						}
+					],
+					"description": "The string to use to build the read, edit, and delete capabilities."
+				},
+				"capabilities": {
+					"type": "object",
+					"additionalProperties": {
+						"type": "string"
+					},
+					"description": "Array of capabilities for this post type."
+				},
+				"map_meta_cap": {
+					"type": "boolean",
+					"default": false,
+					"description": "Whether to use the internal default meta capability handling."
+				},
+				"supports": {
+					"type": "array",
+					"items": {
+						"type": "string"
+					},
+					"description": "Core feature(s) the post type supports."
+				},
+				"has_archive": {
+					"anyOf": [
+						{
+							"type": "boolean"
+						},
+						{
+							"type": "string"
+						}
+					],
+					"default": false,
+					"description": "Whether there should be post type archives, or if a string, the archive slug to use."
+				},
+				"rewrite": {
+					"anyOf": [
+						{
+							"type": "boolean"
+						},
+						{
+							"type": "object",
+							"properties": {
+								"slug": {
+									"type": "string"
+								},
+								"with_front": {
+									"type": "boolean"
+								},
+								"pages": {
+									"type": "boolean"
+								},
+								"feeds": {
+									"type": "boolean"
+								},
+								"ep_mask": {
+									"type": "number"
+								}
+							}
+						}
+					],
+					"description": "Triggers the handling of rewrites for this post type."
+				},
+				"query_var": {
+					"anyOf": [
+						{
+							"type": "boolean"
+						},
+						{
+							"type": "string"
+						}
+					],
+					"description": "Sets the query_var key for this post type."
+				},
+				"can_export": {
+					"type": "boolean",
+					"default": true,
+					"description": "Whether to allow this post type to be exported."
+				},
+				"delete_with_user": {
+					"type": "boolean",
+					"description": "Whether to delete posts of this type when deleting a user."
+				},
+				"template": {
+					"type": "array",
+					"items": {
+						"type": "array",
+						"minItems": 1,
+						"maxItems": 2,
+						"items": [
+							{
+								"type": "string"
+							},
+							{
+								"type": "object",
+								"additionalProperties": {
+									"$ref": "#/definitions/JsonValue"
+								}
+							}
+						]
+					},
+					"description": "Array of blocks to use as the default initial state for an editor session."
+				},
+				"template_lock": {
+					"anyOf": [
+						{
+							"type": "string",
+							"enum": [
+								"all",
+								"insert"
+							]
+						},
+						{
+							"type": "boolean",
+							"enum": [
+								false
+							]
+						}
+					],
+					"default": false,
+					"description": "Whether the block template should be locked if $template is set."
+				}
+			}
+		},
+		"FontFace": {
+			"type": "object",
+			"required": [
+				"fontFamily",
+				"src"
+			],
+			"properties": {
+				"preview": {
+					"type": "string",
+					"description": "URL to a preview image of the font."
+				},
+				"fontFamily": {
+					"type": "string",
+					"description": "CSS font-family value."
+				},
+				"fontStyle": {
+					"type": "string",
+					"description": "CSS font-style value."
+				},
+				"fontWeight": {
+					"anyOf": [
+						{
+							"type": "string"
+						},
+						{
+							"type": "number"
+						}
+					],
+					"description": "List of available font weights, separated by a space."
+				},
+				"fontDisplay": {
+					"type": "string",
+					"enum": [
+						"auto",
+						"block",
+						"fallback",
+						"swap",
+						"optional"
+					],
+					"description": "CSS font-display value."
+				},
+				"src": {
+					"anyOf": [
+						{
+							"$ref": "#/definitions/DataReference"
+						},
+						{
+							"type": "array",
+							"items": {
+								"$ref": "#/definitions/DataReference"
+							}
+						}
+					],
+					"description": "Paths or URLs to the font files."
+				},
+				"fontStretch": {
+					"type": "string",
+					"description": "CSS font-stretch value."
+				},
+				"ascentOverride": {
+					"type": "string",
+					"description": "CSS ascent-override value."
+				},
+				"descentOverride": {
+					"type": "string",
+					"description": "CSS descent-override value."
+				},
+				"fontVariant": {
+					"type": "string",
+					"description": "CSS font-variant value."
+				},
+				"fontFeatureSettings": {
+					"type": "string",
+					"description": "CSS font-feature-settings value."
+				},
+				"fontVariationSettings": {
+					"type": "string",
+					"description": "CSS font-variation-settings value."
+				},
+				"lineGapOverride": {
+					"type": "string",
+					"description": "CSS line-gap-override value."
+				},
+				"sizeAdjust": {
+					"type": "string",
+					"description": "CSS size-adjust value."
+				},
+				"unicodeRange": {
+					"type": "string",
+					"description": "CSS unicode-range value."
+				}
+			}
+		},
+		"FontCollection": {
+			"type": "object",
+			"required": [
+				"font_families"
+			],
+			"properties": {
+				"$schema": {
+					"type": "string",
+					"description": "JSON schema URI for font-collection.json."
+				},
+				"font_families": {
+					"type": "array",
+					"items": {
+						"type": "object",
+						"required": [
+							"font_family_settings"
+						],
+						"properties": {
+							"font_family_settings": {
+								"type": "object",
+								"required": [
+									"name",
+									"slug",
+									"fontFamily"
+								],
+								"properties": {
+									"name": {
+										"type": "string",
+										"description": "Name of the font family preset, translatable."
+									},
+									"slug": {
+										"type": "string",
+										"description": "Kebab-case unique identifier for the font family preset."
+									},
+									"fontFamily": {
+										"type": "string",
+										"description": "CSS font-family value."
+									},
+									"preview": {
+										"type": "string",
+										"description": "URL to a preview image of the font family."
+									},
+									"fontFace": {
+										"type": "array",
+										"items": {
+											"$ref": "#/definitions/FontFace"
+										},
+										"description": "Array of font-face definitions."
+									}
+								}
+							},
+							"categories": {
+								"type": "array",
+								"items": {
+									"type": "string"
+								},
+								"description": "Array of category slugs."
+							}
+						}
+					}
+				}
+			},
+			"description": "Font collection schema for WordPress Font Library."
+		},
+		"WordPressPost": {
+			"type": "object",
+			"required": [
+				"post_title"
+			],
+			"properties": {
+				"post_author": {
+					"type": "number",
+					"description": "Username of the post author."
+				},
+				"post_date": {
+					"type": "string",
+					"description": "The date of the post in UTC. Accepts format 'YYYY-MM-DD HH:MM:SS'."
+				},
+				"post_content": {
+					"type": "string",
+					"default": "",
+					"description": "The main post content. Can contain HTML, shortcodes, etc."
+				},
+				"post_title": {
+					"type": "string",
+					"description": "The post title."
+				},
+				"post_excerpt": {
+					"type": "string",
+					"description": "The post excerpt. Default empty."
+				},
+				"post_status": {
+					"type": "string",
+					"enum": [
+						"publish",
+						"pending",
+						"draft",
+						"auto-draft",
+						"future",
+						"private",
+						"inherit",
+						"trash"
+					],
+					"description": "The post status."
+				},
+				"post_type": {
+					"type": "string",
+					"description": "The post type (e.g., 'post', 'page'). Default 'post'."
+				},
+				"comment_status": {
+					"type": "string",
+					"enum": [
+						"open",
+						"closed"
+					],
+					"default": "open",
+					"description": "Whether comments are allowed."
+				},
+				"post_password": {
+					"type": "string",
+					"description": "A password to protect access. Default empty."
+				},
+				"post_name": {
+					"type": "string",
+					"description": "The URL slug. Default sanitized post_title for new posts."
+				},
+				"post_parent_name": {
+					"type": "string",
+					"description": "Post parent name for hierarchical post types (e.g., pages). Default empty."
+				},
+				"menu_order": {
+					"type": "number",
+					"default": 0,
+					"description": "Menu order within a post type. Default 0."
+				},
+				"post_mime_type": {
+					"type": "string",
+					"description": "MIME type for attachments. Default empty."
+				},
+				"guid": {
+					"type": "string",
+					"description": "Global Unique ID. Default empty."
+				},
+				"post_category": {
+					"type": "array",
+					"items": {
+						"type": "string"
+					},
+					"description": "Array of category slugs. Defaults to the site's default category."
+				},
+				"post_tags": {
+					"type": "array",
+					"items": {
+						"type": "string"
+					},
+					"description": "Array of tag names. Default empty."
+				},
+				"tax_input": {
+					"type": "object",
+					"additionalProperties": {
+						"type": "array",
+						"items": {
+							"type": "string"
+						}
+					},
+					"description": "Taxonomy terms keyed by taxonomy name."
+				},
+				"meta_input": {
+					"type": "object",
+					"additionalProperties": {
+						"$ref": "#/definitions/JsonValue"
+					},
+					"description": "Post meta keyed by meta key to value. Default empty."
+				},
+				"page_template": {
+					"type": "string",
+					"default": "",
+					"description": "Specifies the page template file to use."
+				}
+			}
+		},
+		"Step": {
+			"oneOf": [
+				{
+					"type": "object",
+					"required": [
+						"step",
+						"pluginPath"
+					],
+					"properties": {
+						"step": {
+							"type": "string",
+							"enum": [
+								"activatePlugin"
+							]
+						},
+						"pluginPath": {
+							"type": "string",
+							"description": "Path to the plugin directory as absolute path or the plugin entry file relative to the plugins directory."
+						}
+					}
+				},
+				{
+					"type": "object",
+					"required": [
+						"step",
+						"themeFolderName"
+					],
+					"properties": {
+						"step": {
+							"type": "string",
+							"enum": [
+								"activateTheme"
+							]
+						},
+						"themeFolderName": {
+							"type": "string",
+							"description": "The name of the theme folder inside wp-content/themes/"
+						}
+					}
+				},
+				{
+					"type": "object",
+					"required": [
+						"step",
+						"fromPath",
+						"toPath"
+					],
+					"properties": {
+						"step": {
+							"type": "string",
+							"enum": [
+								"cp"
+							]
+						},
+						"fromPath": {
+							"type": "string"
+						},
+						"toPath": {
+							"type": "string"
+						}
+					}
+				},
+				{
+					"type": "object",
+					"required": [
+						"step",
+						"constants"
+					],
+					"properties": {
+						"step": {
+							"type": "string",
+							"enum": [
+								"defineConstants"
+							]
+						},
+						"constants": {
+							"type": "object",
+							"additionalProperties": {
+								"type": "string"
+							}
+						}
+					}
+				},
+				{
+					"type": "object",
+					"required": [
+						"step"
+					],
+					"properties": {
+						"step": {
+							"type": "string",
+							"enum": [
+								"importThemeStarterContent"
+							]
+						},
+						"themeSlug": {
+							"type": "string",
+							"description": "The name of the theme to import content from."
+						}
+					}
+				},
+				{
+					"type": "object",
+					"required": [
+						"step",
+						"plugin"
+					],
+					"properties": {
+						"step": {
+							"type": "string",
+							"enum": [
+								"installPlugin"
+							]
+						},
+						"plugin": {
+							"$ref": "#/definitions/PluginDefinition"
+						}
+					}
+				},
+				{
+					"type": "object",
+					"required": [
+						"step",
+						"source"
+					],
+					"properties": {
+						"step": {
+							"type": "string",
+							"enum": [
+								"installTheme"
+							]
+						},
+						"source": {
+							"$ref": "#/definitions/ThemeReference"
+						},
+						"activate": {
+							"type": "boolean",
+							"description": "Whether to activate the theme after installing it."
+						},
+						"importStarterContent": {
+							"type": "boolean",
+							"description": "Whether to import the theme's starter content after installing it."
+						},
+						"targetFolderName": {
+							"type": "string",
+							"description": "The name of the folder to install the theme to. Defaults to guessing from themeData."
+						}
+					}
+				},
+				{
+					"type": "object",
+					"required": [
+						"step",
+						"path"
+					],
+					"properties": {
+						"step": {
+							"type": "string",
+							"enum": [
+								"mkdir"
+							]
+						},
+						"path": {
+							"type": "string"
+						}
+					}
+				},
+				{
+					"type": "object",
+					"required": [
+						"step",
+						"fromPath",
+						"toPath"
+					],
+					"properties": {
+						"step": {
+							"type": "string",
+							"enum": [
+								"mv"
+							]
+						},
+						"fromPath": {
+							"type": "string"
+						},
+						"toPath": {
+							"type": "string"
+						}
+					}
+				},
+				{
+					"type": "object",
+					"required": [
+						"step",
+						"path"
+					],
+					"properties": {
+						"step": {
+							"type": "string",
+							"enum": [
+								"rm"
+							]
+						},
+						"path": {
+							"type": "string"
+						}
+					}
+				},
+				{
+					"type": "object",
+					"required": [
+						"step",
+						"path"
+					],
+					"properties": {
+						"step": {
+							"type": "string",
+							"enum": [
+								"rmdir"
+							]
+						},
+						"path": {
+							"type": "string"
+						}
+					}
+				},
+				{
+					"type": "object",
+					"required": [
+						"step"
+					],
+					"properties": {
+						"step": {
+							"type": "string",
+							"enum": [
+								"runPHP"
+							]
+						},
+						"code": {
+							"type": "string",
+							"description": "The code snippet to eval instead of a php file."
+						},
+						"relativeUri": {
+							"type": "string",
+							"description": "Request path following the domain:port part."
+						},
+						"scriptPath": {
+							"type": "string",
+							"description": "Path of the .php file to execute."
+						},
+						"protocol": {
+							"type": "string",
+							"description": "Request protocol."
+						},
+						"method": {
+							"type": "string",
+							"enum": [
+								"GET",
+								"POST",
+								"HEAD",
+								"OPTIONS",
+								"PATCH",
+								"PUT",
+								"DELETE"
+							],
+							"default": "GET",
+							"description": "Request method."
+						},
+						"headers": {
+							"type": "object",
+							"additionalProperties": {
+								"type": "string"
+							},
+							"description": "Request headers."
+						},
+						"body": {
+							"type": "string",
+							"description": "Request body."
+						},
+						"env": {
+							"type": "object",
+							"additionalProperties": {
+								"type": "string"
+							},
+							"description": "Environment variables to set for this run."
+						},
+						"$_SERVER": {
+							"type": "object",
+							"additionalProperties": {
+								"type": "string"
+							},
+							"description": "$_SERVER entries to set for this run."
+						}
+					}
+				},
+				{
+					"type": "object",
+					"required": [
+						"step",
+						"source"
+					],
+					"properties": {
+						"step": {
+							"type": "string",
+							"enum": [
+								"runSql"
+							]
+						},
+						"source": {
+							"$ref": "#/definitions/DataReference"
+						}
+					}
+				},
+				{
+					"type": "object",
+					"required": [
+						"step",
+						"language"
+					],
+					"properties": {
+						"step": {
+							"type": "string",
+							"enum": [
+								"setSiteLanguage"
+							]
+						},
+						"language": {
+							"type": "string",
+							"description": "The language to set, e.g. 'en_US'"
+						}
+					}
+				},
+				{
+					"type": "object",
+					"required": [
+						"step",
+						"options"
+					],
+					"properties": {
+						"step": {
+							"type": "string",
+							"enum": [
+								"setSiteOptions"
+							]
+						},
+						"options": {
+							"type": "object",
+							"additionalProperties": {
+								"$ref": "#/definitions/JsonValue"
+							}
+						}
+					}
+				},
+				{
+					"type": "object",
+					"required": [
+						"step",
+						"zipFile",
+						"extractToPath"
+					],
+					"properties": {
+						"step": {
+							"type": "string",
+							"enum": [
+								"unzip"
+							]
+						},
+						"zipFile": {
+							"anyOf": [
+								{
+									"$ref": "#/definitions/URLReference"
+								},
+								{
+									"$ref": "#/definitions/ExecutionContextPath"
+								}
+							],
+							"description": "The zip file resource to extract."
+						},
+						"extractToPath": {
+							"type": "string",
+							"description": "The path to extract the zip file to inside the virtual filesystem."
+						}
+					}
+				},
+				{
+					"type": "object",
+					"required": [
+						"step",
+						"command"
+					],
+					"properties": {
+						"step": {
+							"type": "string",
+							"enum": [
+								"wp-cli"
+							]
+						},
+						"command": {
+							"type": "string"
+						},
+						"wpCliPath": {
+							"type": "string"
+						}
+					}
+				},
+				{
+					"type": "object",
+					"required": [
+						"step",
+						"path",
+						"content"
+					],
+					"properties": {
+						"step": {
+							"type": "string",
+							"enum": [
+								"writeFile"
+							]
+						},
+						"path": {
+							"type": "string"
+						},
+						"content": {
+							"$ref": "#/definitions/DataReference"
+						}
+					}
+				},
+				{
+					"type": "object",
+					"required": [
+						"step",
+						"files"
+					],
+					"properties": {
+						"step": {
+							"type": "string",
+							"enum": [
+								"writeFiles"
+							]
+						},
+						"files": {
+							"type": "object",
+							"additionalProperties": {
+								"$ref": "#/definitions/DataReference"
+							}
+						}
+					}
+				}
+			]
+		}
+	}
+}

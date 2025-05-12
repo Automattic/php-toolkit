@@ -1,4 +1,5 @@
 <?php
+
 define( 'WP_ADMIN', true );
 require_once getenv( 'DOCROOT' ) . '/wp-load.php';
 

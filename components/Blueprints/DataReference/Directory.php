@@ -22,8 +22,8 @@ class Directory extends DataReference {
 	/**
 	 * Constructor.
 	 *
-	 * @param Filesystem $filesystem The filesystem representing the directory content.
-	 * @param string     $dirname   The name of the directory.
+	 * @param  Filesystem  $filesystem  The filesystem representing the directory content.
+	 * @param  string  $dirname  The name of the directory.
 	 */
 	public function __construct( Filesystem $filesystem, string $dirname ) {
 		$this->filesystem = $filesystem;

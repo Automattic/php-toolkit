@@ -39,6 +39,7 @@ class ProgressTrackedReadStream implements ByteReadStream {
 		if ( $isEndOfData ) {
 			$this->updateProgress(); // Ensure progress is 100% if end is reached
 		}
+
 		return $isEndOfData;
 	}
 
@@ -48,6 +49,7 @@ class ProgressTrackedReadStream implements ByteReadStream {
 	public function pull( $n, $mode = self::PULL_NO_MORE_THAN ): int {
 		$bytesPulled = $this->stream->pull( $n, $mode );
 		$this->updateProgress();
+
 		return $bytesPulled;
 	}
 
@@ -64,6 +66,7 @@ class ProgressTrackedReadStream implements ByteReadStream {
 	public function consume( $n ): string {
 		$data = $this->stream->consume( $n );
 		$this->updateProgress();
+
 		return $data;
 	}
 
@@ -73,6 +76,7 @@ class ProgressTrackedReadStream implements ByteReadStream {
 	public function consume_all(): string {
 		$data = $this->stream->consume_all();
 		$this->updateProgress(); // Should be 100% after this
+
 		return $data;
 	}
 
@@ -88,7 +92,7 @@ class ProgressTrackedReadStream implements ByteReadStream {
 		if ( $this->stream->tell() === 0 ) {
 			return;
 		}
-		
+
 		if ( null === $this->streamLength || $this->streamLength === 0 ) {
 			// If length is unknown or zero, we cannot meaningfully report percentage progress.
 			// However, if we are at the end or length is 0, we can consider it 100%
@@ -99,13 +103,14 @@ class ProgressTrackedReadStream implements ByteReadStream {
 					$this->tracker->set( 100 );
 				}
 			}
+
 			return;
 		}
 
 		$progress = ( $this->stream->tell() / $this->streamLength ) * 100;
 		// It's possible to seek() backwards. Let's make sure we never decrease
 		// the reported progress.
-		if( $progress > $this->tracker->getProgress() ) {
+		if ( $progress > $this->tracker->getProgress() ) {
 			$this->tracker->set( $progress );
 		}
 	}

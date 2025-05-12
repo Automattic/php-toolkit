@@ -1,4 +1,5 @@
 <?php
+
 require_once getenv( 'DOCROOT' ) . '/wp-load.php';
 
 define( 'WP_ADMIN', true );
@@ -6,6 +7,7 @@ define( 'WP_ADMIN', true );
 // Define a dummy skin for the upgrader.
 if ( ! class_exists( '\WP_Upgrader_Skin', false ) ) {
 	require_once getenv( 'DOCROOT' ) . '/wp-admin/includes/class-wp-upgrader.php';
+
 	class Blueprint_WP_Upgrader_Skin extends \WP_Upgrader_Skin {
 		public $destination;
 		public $options = array(
@@ -18,22 +20,29 @@ if ( ! class_exists( '\WP_Upgrader_Skin', false ) ) {
 			'extra'  => array(),
 		);
 		public $result = null;
-		public function add_strings() {}
+
+		public function add_strings() {
+		}
+
 		public function set_upgrader( &$upgrader ) {
 			if ( is_object( $upgrader ) ) {
 				$this->upgrader = &$upgrader;
 			}
 			$this->add_strings();
 		}
+
 		public function set_result( $result ) {
 			$this->result = $result;
 		}
+
 		public function request_filesystem_credentials( $error = false, $context = '', $allow_relaxed_file_ownership = false ) {
 			return true;
 		}
+
 		public function error( $errors ) {
 			if ( is_string( $errors ) ) {
 				$this->feedback( $errors );
+
 				return;
 			}
 			if ( is_wp_error( $errors ) && $errors->has_errors() ) {
@@ -46,16 +55,29 @@ if ( ! class_exists( '\WP_Upgrader_Skin', false ) ) {
 				}
 			}
 		}
+
 		public function feedback( $string, ...$args ) {
 			// For debugging
 			error_log( sprintf( $string, ...$args ) );
 		}
-		public function header() {}
-		public function footer() {}
-		public function bulk_header() {}
-		public function bulk_footer() {}
-		public function before( $title = '' ) {}
-		public function after( $title = '' ) {}
+
+		public function header() {
+		}
+
+		public function footer() {
+		}
+
+		public function bulk_header() {
+		}
+
+		public function bulk_footer() {
+		}
+
+		public function before( $title = '' ) {
+		}
+
+		public function after( $title = '' ) {
+		}
 	}
 }
 
@@ -83,7 +105,7 @@ if ( ! $plugin_zip_path ) {
 	exit( 1 );
 }
 
-$plugin_zip_path = getenv( 'DOCROOT' ) . '/' . ltrim($plugin_zip_path, '/');
+$plugin_zip_path = getenv( 'DOCROOT' ) . '/' . ltrim( $plugin_zip_path, '/' );
 
 if ( ! file_exists( $plugin_zip_path ) ) {
 	error_log( "Plugin zip file not found at " . $plugin_zip_path );
@@ -92,35 +114,35 @@ if ( ! file_exists( $plugin_zip_path ) ) {
 
 // List files from the plugin zip
 $zip = new ZipArchive();
-if ($zip->open($plugin_zip_path) !== true) {
-    error_log("Failed to open plugin zip file: " . $plugin_zip_path);
-    exit(1);
+if ( $zip->open( $plugin_zip_path ) !== true ) {
+	error_log( "Failed to open plugin zip file: " . $plugin_zip_path );
+	exit( 1 );
 }
 
-error_log("Plugin zip contents:");
-for ($i = 0; $i < $zip->numFiles; $i++) {
-    $filename = $zip->getNameIndex($i);
-    $stats = $zip->statIndex($i);
-    $size = $stats['size'];
-    $is_dir = substr($filename, -1) === '/';
-    
-    error_log(sprintf(
-        "%s%s (%s bytes)",
-        $filename,
-        $is_dir ? " [directory]" : "",
-        $size
-    ));
+error_log( "Plugin zip contents:" );
+for ( $i = 0; $i < $zip->numFiles; $i ++ ) {
+	$filename = $zip->getNameIndex( $i );
+	$stats    = $zip->statIndex( $i );
+	$size     = $stats['size'];
+	$is_dir   = substr( $filename, - 1 ) === '/';
+
+	error_log( sprintf(
+		"%s%s (%s bytes)",
+		$filename,
+		$is_dir ? " [directory]" : "",
+		$size
+	) );
 }
 
 // Extract plugin slug from the zip file
 $plugin_slug = '';
 // Check the first directory in the zip file
-if ($zip->numFiles > 0) {
-    $first_entry = $zip->getNameIndex(0);
-    // Most plugin zips have a top-level directory that is the plugin slug
-    if (strpos($first_entry, '/') !== false) {
-        $plugin_slug = explode('/', $first_entry)[0];
-    }
+if ( $zip->numFiles > 0 ) {
+	$first_entry = $zip->getNameIndex( 0 );
+	// Most plugin zips have a top-level directory that is the plugin slug
+	if ( strpos( $first_entry, '/' ) !== false ) {
+		$plugin_slug = explode( '/', $first_entry )[0];
+	}
 }
 
 $zip->close();
@@ -142,24 +164,24 @@ $upgrader = new \Plugin_Upgrader( $skin );
 
 // If we have a plugin slug from the zip, create the target directory first
 $target_directory = null;
-if (!empty($plugin_slug)) {
-    $target_directory = WP_PLUGIN_DIR . '/' . $plugin_slug;
-    
-    // Remove existing directory if it exists
-    if (is_dir($target_directory)) {
-        $GLOBALS['wp_filesystem']->delete($target_directory, true);
-    }
-    
-    // Create the directory
-    $GLOBALS['wp_filesystem']->mkdir($target_directory);
-    
-    error_log("Created target directory: " . $target_directory);
+if ( ! empty( $plugin_slug ) ) {
+	$target_directory = WP_PLUGIN_DIR . '/' . $plugin_slug;
+
+	// Remove existing directory if it exists
+	if ( is_dir( $target_directory ) ) {
+		$GLOBALS['wp_filesystem']->delete( $target_directory, true );
+	}
+
+	// Create the directory
+	$GLOBALS['wp_filesystem']->mkdir( $target_directory );
+
+	error_log( "Created target directory: " . $target_directory );
 }
 
 // Install the plugin
-$result = $upgrader->install( $plugin_zip_path, array( 
-    'overwrite_package' => true,
-    'destination' => $target_directory
+$result = $upgrader->install( $plugin_zip_path, array(
+	'overwrite_package' => true,
+	'destination'       => $target_directory,
 ) );
 
 // Check for filesystem errors
@@ -186,7 +208,7 @@ if ( $result === false || $result === null ) {
 }
 
 // Installation successful, find the main plugin file.
-$plugin_folder_name = !empty($plugin_slug) ? $plugin_slug : ($upgrader->result['destination_name'] ?? null);
+$plugin_folder_name = ! empty( $plugin_slug ) ? $plugin_slug : ( $upgrader->result['destination_name'] ?? null );
 if ( ! $plugin_folder_name ) {
 	error_log( "Could not determine plugin folder name after installation." );
 	exit( 1 );
@@ -204,8 +226,8 @@ $plugin_file_relative_path = array_key_first( $plugins_in_folder );
 
 // Output the relative path of the main plugin file.
 $output = $plugin_folder_name . '/' . $plugin_file_relative_path;
-if(getenv('OUTPUT_FILE')) {
-	file_put_contents(getenv('OUTPUT_FILE'), $output);
+if ( getenv( 'OUTPUT_FILE' ) ) {
+	file_put_contents( getenv( 'OUTPUT_FILE' ), $output );
 } else {
 	echo $output;
 }

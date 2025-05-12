@@ -39,21 +39,21 @@ use Symfony\Component\EventDispatcher\EventDispatcher;
  * stage2.finish();
  */
 class Tracker {
-	private $selfWeight   = 1;
-	private $selfDone     = false;
+	private $selfWeight = 1;
+	private $selfDone = false;
 	private $selfProgress = 0;
-	private $selfCaption  = '';
+	private $selfCaption = '';
 	private $weight;
 	private $subTrackers = array();
 
 	/**
 	 * Most recently updated tracker or sub-tracker, used to expose
 	 * the latest caption.
-	 * 
+	 *
 	 * One of:
-	 * 
+	 *
 	 * * Tracker instance – the last sub-tracker that was updated
-	 * * null – when this tracker was updated more recently than 
+	 * * null – when this tracker was updated more recently than
 	 *          any of its sub-trackers
 	 */
 	private $lastUpdatedTracker = null;
@@ -84,8 +84,8 @@ class Tracker {
 	 *
 	 * Returns the newly-created sub-tracker.
 	 *
-	 * @param weight The weight of the new stage, as a decimal value between 0 and 1.
-	 * @param caption The caption for the new stage, which will be used as the progress caption for the sub-tracker.
+	 * @param  weight The weight of the new stage, as a decimal value between 0 and 1.
+	 * @param  caption The caption for the new stage, which will be used as the progress caption for the sub-tracker.
 	 *
 	 * @throws {Error} If the weight of the new stage would cause the total weight of all stages to exceed 1.
 	 *
@@ -121,7 +121,7 @@ class Tracker {
 		$this->subTrackers[] = $subTracker;
 		$subTracker->events->addListener(
 			ProgressEvent::class,
-			function () use ($subTracker) {
+			function () use ( $subTracker ) {
 				$this->lastUpdatedTracker = $subTracker;
 				$this->notifyProgress();
 			}
@@ -143,8 +143,8 @@ class Tracker {
 	}
 
 	/**
-	 * @param float       $value
-	 * @param string|null $caption
+	 * @param  float  $value
+	 * @param  string|null  $caption
 	 */
 	public function set( $value, $caption = null ) {
 		if ( $value < $this->selfProgress ) {
@@ -158,9 +158,9 @@ class Tracker {
 		if ( $caption !== null ) {
 			$this->selfCaption = $caption;
 		}
-		
+
 		$this->lastUpdatedTracker = null;
-		
+
 		$this->notifyProgress();
 		if ( $this->selfProgress + 0.00001 >= 100 ) {
 			$this->finish();
@@ -168,14 +168,14 @@ class Tracker {
 	}
 
 	public function setCaption( $caption ) {
-		$this->selfCaption = $caption;
+		$this->selfCaption        = $caption;
 		$this->lastUpdatedTracker = null;
 		$this->notifyProgress();
 	}
 
 	public function finish() {
-		$this->selfDone     = true;
-		$this->selfProgress = 100;
+		$this->selfDone           = true;
+		$this->selfProgress       = 100;
 		$this->lastUpdatedTracker = null;
 		$this->notifyProgress();
 		$this->notifyDone();
@@ -183,10 +183,10 @@ class Tracker {
 
 	public function getCaption() {
 		// If this tracker was most recently updated, return its caption
-		if ($this->lastUpdatedTracker === null) {
+		if ( $this->lastUpdatedTracker === null ) {
 			return $this->selfCaption;
 		}
-		
+
 		// Otherwise return the caption of the most recently updated sub-tracker
 		return $this->lastUpdatedTracker->getCaption();
 	}

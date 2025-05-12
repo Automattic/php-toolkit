@@ -6,7 +6,8 @@ schema, data structures, and the Execution Algorithm.
 TypeScript is used for its expressive, self-validating type system. The
 actual implementation will be built in PHP.
 
-The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "SHOULD NOT", "RECOMMENDED", "MAY", and "OPTIONAL" in this document are to be interpreted as described in [RFC 2119](https://www.rfc-editor.org/rfc/rfc2119).
+The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "SHOULD NOT", "RECOMMENDED", "MAY", and "
+OPTIONAL" in this document are to be interpreted as described in [RFC 2119](https://www.rfc-editor.org/rfc/rfc2119).
 
 ## Introduction
 
@@ -17,28 +18,28 @@ understand and create that site.
 
 This proposal connects:
 
--   Business cases such as starter sites, AI site builders, smooth
--   Real-world Blueprints usage and feedback received between 2023
+- Business cases such as starter sites, AI site builders, smooth
+- Real-world Blueprints usage and feedback received between 2023
 
 Blueprints v2 should:
 
--   Be AI-friendly.
--   Be simple, easy to understand, modify, remix, and validate.
--   Support collaborative workflows, e.g. by producing meaningful, human-readable diffs in version control.
--   Be expressible in other formats such as TOML.
--   Be possible to compose with other Blueprints.
--   Offer an easy and recommended way of doing things.
--   Express a single, unambiguous intent with well-known execution order.
--   Enable loading data from multiple sources (files, URLs, git repos, etc).
--   Be portable across production, development, and Playground environments.
--   Retain feature-level BC with Blueprints v1. The schema differs, but the
--   Support 90% of the use cases via declarative syntax.
+- Be AI-friendly.
+- Be simple, easy to understand, modify, remix, and validate.
+- Support collaborative workflows, e.g. by producing meaningful, human-readable diffs in version control.
+- Be expressible in other formats such as TOML.
+- Be possible to compose with other Blueprints.
+- Offer an easy and recommended way of doing things.
+- Express a single, unambiguous intent with well-known execution order.
+- Enable loading data from multiple sources (files, URLs, git repos, etc).
+- Be portable across production, development, and Playground environments.
+- Retain feature-level BC with Blueprints v1. The schema differs, but the
+- Support 90% of the use cases via declarative syntax.
 
 Blueprints v2 should not:
 
--   Be a programming language. They won't support variables, conditionals,
--   Turn the JSON document into a content export format. Use SQL, WXR, HTML, and
--   Support all possible use-cases via the declarative syntax. Use procedural steps
+- Be a programming language. They won't support variables, conditionals,
+- Turn the JSON document into a content export format. Use SQL, WXR, HTML, and
+- Support all possible use-cases via the declarative syntax. Use procedural steps
 
 ## JSON data format
 
@@ -76,8 +77,8 @@ It **MUST** NOT expose any schema extension points.
 
 The purpose of this limitation is to:
 
--   Keep the runner implementations simple
--   Keep all Blueprints portable across all runners
+- Keep the runner implementations simple
+- Keep all Blueprints portable across all runners
 
 Implementers in need of additional Blueprint properties are encouraged to
 follow the approach used by the [Blueprint Execution Algorithm](#blueprint-execution-algorithm). Namely,
@@ -234,52 +235,57 @@ the `wp-content` directory.
 
 A Blueprint runner enforces this directory structure during Blueprint validation:
 
--   Plugins **MUST** only be accepted from the `wp-content/plugins` directory.
-    The accepted formats are:
+- Plugins **MUST** only be accepted from the `wp-content/plugins` directory.
+  The accepted formats are:
 
-    -   A directory containing at least one file with a `Plugin Name:` header comment
-    -   A single-file plugin `*.php`
-    -   A ZIP archive whose root contains a plugin directory or file
+    - A directory containing at least one file with a `Plugin Name:` header comment
+    - A single-file plugin `*.php`
+    - A ZIP archive whose root contains a plugin directory or file
 
-    For more details on WordPress plugin structure and requirements, see [the WordPress plugin basics documentation](https://developer.wordpress.org/plugins/plugin-basics/).
+  For more details on WordPress plugin structure and requirements,
+  see [the WordPress plugin basics documentation](https://developer.wordpress.org/plugins/plugin-basics/).
 
--   Themes **MUST** only be accepted from the `wp-content/themes` directory.
-    The accepted formats are:
+- Themes **MUST** only be accepted from the `wp-content/themes` directory.
+  The accepted formats are:
 
-    -   A directory whose root contains `style.css` and (optionally) `index.php`
-    -   A ZIP archive wrapping such a directory
+    - A directory whose root contains `style.css` and (optionally) `index.php`
+    - A ZIP archive wrapping such a directory
 
-    For more details on WordPress theme structure and requirements, see [the WordPress theme basics documentation](https://developer.wordpress.org/themes/basics/).
+  For more details on WordPress theme structure and requirements,
+  see [the WordPress theme basics documentation](https://developer.wordpress.org/themes/basics/).
 
--   Translations **MUST** only be accepted from the `wp-content/languages` directory.
-    The accepted formats are:
+- Translations **MUST** only be accepted from the `wp-content/languages` directory.
+  The accepted formats are:
 
-    -   `.po` and `.mo` files for core WordPress translations (e.g., `en_US.po`, `de_DE.mo`)
-    -   Plugin-specific translations in subdirectories (e.g., `plugins/akismet-en_US.po`)
-    -   Theme-specific translations in subdirectories (e.g., `themes/twentytwentythree-de_DE.mo`)
-    -   A ZIP archive containing translation files in the appropriate structure
+    - `.po` and `.mo` files for core WordPress translations (e.g., `en_US.po`, `de_DE.mo`)
+    - Plugin-specific translations in subdirectories (e.g., `plugins/akismet-en_US.po`)
+    - Theme-specific translations in subdirectories (e.g., `themes/twentytwentythree-de_DE.mo`)
+    - A ZIP archive containing translation files in the appropriate structure
 
-    For more details on WordPress localization, see [the WordPress localization documentation](https://developer.wordpress.org/plugins/internationalization/localization/).
+  For more details on WordPress localization,
+  see [the WordPress localization documentation](https://developer.wordpress.org/plugins/internationalization/localization/).
 
--   Fonts **MUST** only be accepted from the `wp-content/uploads/fonts` directory.
-    The accepted formats are:
-    -   `*.woff2`: A Web Open Font Format 2.0 font file
-    -   `*.woff`: A Web Open Font Format font file
-    -   `*.ttf`: A TrueType font file
-    -   `*.otf`: An OpenType font file
--   General content files **MUST** only be accepted from the `wp-content/content` directory. They **MUST** be encoded as UTF-8.
-    The accepted formats are:
-    -   `*.sql`: A MySQL dump with any set of valid SQL statements
-    -   `*.xml`: A WordPress Extended RSS `*.xml` (WXR)
--   Post content files **MUST** only be accepted from the `wp-content/content/posts/<POST TYPE>` directories.
-    The accepted formats are:
-    -   `post-type.json`: A JSON document describing the post type. See [Appendix A](appendix-A-blueprint-v2-schema.ts)
-        for the schema details.
-    -   Static document formats supported by the Data Liberation importer – to be defined in a separate proposal. They **MUST** be encoded as UTF-8.
--   Media files **MUST** only be accepted from the `wp-content/uploads` directory. The
-    accepted formats are all formats allowed by the WordPress Media Library at the
-    time of importing. For more details on WordPress media, see
-    [the WordPress Uploading Files documentation](https://codex.wordpress.org/Uploading_Files).
+- Fonts **MUST** only be accepted from the `wp-content/uploads/fonts` directory.
+  The accepted formats are:
+    - `*.woff2`: A Web Open Font Format 2.0 font file
+    - `*.woff`: A Web Open Font Format font file
+    - `*.ttf`: A TrueType font file
+    - `*.otf`: An OpenType font file
+- General content files **MUST** only be accepted from the `wp-content/content` directory. They **MUST** be encoded as
+  UTF-8.
+  The accepted formats are:
+    - `*.sql`: A MySQL dump with any set of valid SQL statements
+    - `*.xml`: A WordPress Extended RSS `*.xml` (WXR)
+- Post content files **MUST** only be accepted from the `wp-content/content/posts/<POST TYPE>` directories.
+  The accepted formats are:
+    - `post-type.json`: A JSON document describing the post type. See [Appendix A](appendix-A-blueprint-v2-schema.ts)
+      for the schema details.
+    - Static document formats supported by the Data Liberation importer – to be defined in a separate proposal. They *
+      *MUST** be encoded as UTF-8.
+- Media files **MUST** only be accepted from the `wp-content/uploads` directory. The
+  accepted formats are all formats allowed by the WordPress Media Library at the
+  time of importing. For more details on WordPress media, see
+  [the WordPress Uploading Files documentation](https://codex.wordpress.org/Uploading_Files).
 
 While this measure may seem restrictive, it ensures all Blueprints follow the same
 standard structure which ultimately makes them easier to create, debug, statically
@@ -292,7 +298,7 @@ A Blueprint Execution Context is the direct parent of the blueprint.json file.
 The meaning of a "direct parent" depends on how the Blueprint is loaded.
 
 | Blueprint Source | Example                                                 | Execution Context                            |
-| ---------------- | ------------------------------------------------------- | -------------------------------------------- |
+|------------------|---------------------------------------------------------|----------------------------------------------|
 | Local Path       | `/Users/user/blueprints/my-blueprint.json`              | `/Users/user/blueprints`                     |
 | URL              | `https://example.com/blueprints/my-blueprint.json`      | The directory containing the downloaded file |
 | ZIP Bundle       | `blueprint.zip` containing `blueprint.json` at the root | The root directory of the extracted ZIP      |
@@ -342,11 +348,11 @@ explicitly referencing every bundled file required to build the site.
 
 The purpose of this approach is to:
 
--   Reduce errors – explicit references make it impossible to ship a Blueprint
--   Have a single source of truth – the Blueprint file says everything there is
--   Support explicit configuration options and the `additionalStepsAfterExecution` syntax.
--   Enable shipping a `blueprint.json` file in a git repository without automatically
-    treating every file in that repository as a WordPress site artifact.
+- Reduce errors – explicit references make it impossible to ship a Blueprint
+- Have a single source of truth – the Blueprint file says everything there is
+- Support explicit configuration options and the `additionalStepsAfterExecution` syntax.
+- Enable shipping a `blueprint.json` file in a git repository without automatically
+  treating every file in that repository as a WordPress site artifact.
 
 The downside of this approach is exposing the Blueprint author to the tedium
 of maintaining a synchronization between the Blueprint and the bundle. To
@@ -432,7 +438,8 @@ To import content inline, use the following JSON syntax:
 In this scenario, the content **MUST** BE in the block markup format – exactly like
 the content found in the `post_content` column of the `wp_posts` table.
 
-For more information on the JSON schema of the `content` property, consult [Appendix A](./appendix-A-blueprint-v2-schema.ts).
+For more information on the JSON schema of the `content` property,
+consult [Appendix A](./appendix-A-blueprint-v2-schema.ts).
 
 ### Content URL rewriting
 
@@ -441,10 +448,10 @@ to keep them working after the site is created.
 
 The importer **MUST** search for URLs in the following locations:
 
--   Post metadata
--   HTML attributes
--   Block attributes
--   Inline URLs detected within stretches of text
+- Post metadata
+- HTML attributes
+- Block attributes
+- Inline URLs detected within stretches of text
 
 Any content not bundled in the Block Markup format **MUST** be first transformed
 into Block Markup and then inspected for URLs.
@@ -472,8 +479,8 @@ Welcome to the bike shop! Learn more about our [bikes](/2025/05/02/about-bikes.h
 
 Static content files MAY use:
 
--   Relative paths – e.g. `./about-bikes.html` or `../pages/about-bikes.html`.
--   Absolute paths – e.g. `/wp-content/content/posts/about-bikes.html`. Absolute paths
+- Relative paths – e.g. `./about-bikes.html` or `../pages/about-bikes.html`.
+- Absolute paths – e.g. `/wp-content/content/posts/about-bikes.html`. Absolute paths
 
 Any relative path leading to a non-existent file will stop the Blueprint execution
 with a clear error message.
@@ -502,37 +509,43 @@ Execution Configuration is a set of operational choices that the Blueprint Runne
 
 Execution Configuration contains information such as:
 
--   Execution Target – Are we creating a new site? Or are we updating an existing site?
--   Database Connection – Are we using MySQL or SQLite? How do we connect to the database?
--   Content Import Behavior – Are we appending new posts to the site? Or updating the existing ones?
-    Or maybe we're replacing the existing data with the new content?
+- Execution Target – Are we creating a new site? Or are we updating an existing site?
+- Database Connection – Are we using MySQL or SQLite? How do we connect to the database?
+- Content Import Behavior – Are we appending new posts to the site? Or updating the existing ones?
+  Or maybe we're replacing the existing data with the new content?
 
-For details about the full set of Execution Configuration Options, see [Appendix C](./appendix-C-runner-configuration.ts).
+For details about the full set of Execution Configuration Options,
+see [Appendix C](./appendix-C-runner-configuration.ts).
 
 ### Validate the Blueprint
 
-Before execution, the Blueprint Runner **MUST** validate the provided Blueprint document by performing the following checks in order:
+Before execution, the Blueprint Runner **MUST** validate the provided Blueprint document by performing the following
+checks in order:
 
-1.  **UTF-8 Encoding:** Assert the Blueprint input is UTF-8 encoded.
-2.  **JSON Validity:** Assert the input is a valid JSON document.
-3.  **Schema Conformance:** Assert the JSON document conforms to the schema defined in [Appendix A](./appendix-A-blueprint-v2-schema.ts).
-    This validates the structure, data types, and allowed values for all properties.
-4.  **Plugin/Theme Reference Check (WordPress.org):**
-    -   The validator **MAY** assert that plugin and theme slugs and version references pointing to the WordPress.org
-        directory correspond to existing releases.
-    -   Alternatively, this check **MAY** be deferred until the specific execution step that installs the relevant plugin or theme.
-5.  **Bundle Path Validation (If validating a Bundle):**
-    -   If the Blueprint is part of a Bundle, the validator **MAY** assert that all relative and absolute file paths referenced
-        within the `blueprint.json` (e.g., in `plugins`, `themes`, `content` sources) point to files actually included within the bundle.
-    -   A Bundle validator **MAY** also assert that all files shipped within the bundle _are_ referenced somewhere in the
-        `blueprint.json` file (to detect unused files).
+1. **UTF-8 Encoding:** Assert the Blueprint input is UTF-8 encoded.
+2. **JSON Validity:** Assert the input is a valid JSON document.
+3. **Schema Conformance:** Assert the JSON document conforms to the schema defined
+   in [Appendix A](./appendix-A-blueprint-v2-schema.ts).
+   This validates the structure, data types, and allowed values for all properties.
+4. **Plugin/Theme Reference Check (WordPress.org):**
+    - The validator **MAY** assert that plugin and theme slugs and version references pointing to the WordPress.org
+      directory correspond to existing releases.
+    - Alternatively, this check **MAY** be deferred until the specific execution step that installs the relevant plugin
+      or theme.
+5. **Bundle Path Validation (If validating a Bundle):**
+    - If the Blueprint is part of a Bundle, the validator **MAY** assert that all relative and absolute file paths
+      referenced
+      within the `blueprint.json` (e.g., in `plugins`, `themes`, `content` sources) point to files actually included
+      within the bundle.
+    - A Bundle validator **MAY** also assert that all files shipped within the bundle _are_ referenced somewhere in the
+      `blueprint.json` file (to detect unused files).
 
 **Failure Handling:**
 
 If any validation assertion fails, the validator **MUST**:
 
--   Stop the Blueprint execution immediately.
--   Provide a clear, human-readable error message pinpointing the issue and offering guidance on how to resolve it.
+- Stop the Blueprint execution immediately.
+- Provide a clear, human-readable error message pinpointing the issue and offering guidance on how to resolve it.
 
 Bad error message example:
 
@@ -555,28 +568,44 @@ An Execution Target is the WordPress site that the Blueprint will be applied to.
 determining this target depends heavily on the `executionMode` specified in the
 [Runner Configuration](./appendix-C-runner-configuration.ts):
 
--   **If `executionMode` is `'apply-to-existing-site'`: (Applying to an Existing Site)**
+- **If `executionMode` is `'apply-to-existing-site'`: (Applying to an Existing Site)**
 
-    -   The runner **MUST** verify that the provided `targetSiteRef` points to a directory containing a valid WordPress installation (e.g., by checking for the presence of `wp-load.php`), as required by the Runner Configuration. If not, the process stops with an error.
-    -   This existing site becomes the Execution Target.
-    -   The runner **MUST** verify that the WordPress version of this existing site is compatible with the `wordpressVersion` specified in the Blueprint. If not, the process stops with an error.
-    -   The runner **MUST** verify that the PHP version specified in the Blueprint (`phpVersion`, if present) is compatible with the execution environment's PHP version.
-    -   The runner **MUST** verify that the existing site's database engine matches the `databaseEngine` specified in the Runner Configuration. If not, the process stops with an error.
+    - The runner **MUST** verify that the provided `targetSiteRef` points to a directory containing a valid WordPress
+      installation (e.g., by checking for the presence of `wp-load.php`), as required by the Runner Configuration. If
+      not, the process stops with an error.
+    - This existing site becomes the Execution Target.
+    - The runner **MUST** verify that the WordPress version of this existing site is compatible with the
+      `wordpressVersion` specified in the Blueprint. If not, the process stops with an error.
+    - The runner **MUST** verify that the PHP version specified in the Blueprint (`phpVersion`, if present) is
+      compatible with the execution environment's PHP version.
+    - The runner **MUST** verify that the existing site's database engine matches the `databaseEngine` specified in the
+      Runner Configuration. If not, the process stops with an error.
 
--   **If `executionMode` is `'create-new-site'`: (Creating a New Site)**
-    -   The runner **MUST** verify that the provided `targetSiteRef` points to an **empty directory**, as required by the Runner Configuration. If not, the process stops with an error.
-    -   The runner **MUST** verify that valid `databaseCredentials` have been provided according to the selected `databaseEngine` in the Runner Configuration (e.g., MySQL credentials are required if `databaseEngine` is 'mysql'). If not, the process stops with an error.
-    -   **Create WordPress Files:** The runner creates the standard WordPress directory structure within the `targetSiteRef` directory, downloading and placing the WordPress core files corresponding to the `wordpressVersion` from the Blueprint.
-    -   **Run WordPress Installer:** The runner executes the WordPress installation process:
-        -   Using the provided `databaseCredentials` and respecting the chosen `databaseEngine`.
-        -   _(Note: If `databaseEngine` is 'sqlite', the runner **MUST** ensure the `sqlite-database-integration` plugin is installed and activated before database operations, as detailed in [Appendix C](./appendix-C-runner-configuration.ts)._
-        -   Setting the administrator username to `admin` and password to `password`. The Blueprint may both specify a different password and the Blueprint runner may override this default with a randomly-generated secure password.
-        -   Applying initial site settings like `siteLanguage` and `siteOptions.timezone` as defined in the Blueprint.
-    -   The runner **MUST** verify that the PHP version specified in the Blueprint (`phpVersion`, if present) is compatible with the execution environment's PHP version.
-    -   The runner **MUST** verify that the installation completed successfully. If not, the process stops with an error.
-    -   This newly created site becomes the Execution Target.
+- **If `executionMode` is `'create-new-site'`: (Creating a New Site)**
+    - The runner **MUST** verify that the provided `targetSiteRef` points to an **empty directory**, as required by the
+      Runner Configuration. If not, the process stops with an error.
+    - The runner **MUST** verify that valid `databaseCredentials` have been provided according to the selected
+      `databaseEngine` in the Runner Configuration (e.g., MySQL credentials are required if `databaseEngine` is '
+      mysql'). If not, the process stops with an error.
+    - **Create WordPress Files:** The runner creates the standard WordPress directory structure within the
+      `targetSiteRef` directory, downloading and placing the WordPress core files corresponding to the
+      `wordpressVersion` from the Blueprint.
+    - **Run WordPress Installer:** The runner executes the WordPress installation process:
+        - Using the provided `databaseCredentials` and respecting the chosen `databaseEngine`.
+        - _(Note: If `databaseEngine` is 'sqlite', the runner **MUST** ensure the `sqlite-database-integration` plugin
+          is installed and activated before database operations, as detailed
+          in [Appendix C](./appendix-C-runner-configuration.ts)._
+        - Setting the administrator username to `admin` and password to `password`. The Blueprint may both specify a
+          different password and the Blueprint runner may override this default with a randomly-generated secure
+          password.
+        - Applying initial site settings like `siteLanguage` and `siteOptions.timezone` as defined in the Blueprint.
+    - The runner **MUST** verify that the PHP version specified in the Blueprint (`phpVersion`, if present) is
+      compatible with the execution environment's PHP version.
+    - The runner **MUST** verify that the installation completed successfully. If not, the process stops with an error.
+    - This newly created site becomes the Execution Target.
 
-Once these steps are completed successfully based on the `executionMode`, the identified or newly created site is the confirmed **Execution Target**.
+Once these steps are completed successfully based on the `executionMode`, the identified or newly created site is the
+confirmed **Execution Target**.
 
 ### Create the Execution Plan
 
@@ -613,43 +642,46 @@ Into the following execution plan:
 ```
 
 Note how the `phpVersion` and `wordpressVersion` properties were omitted from the execution plan. They were handled
-by the runner at the [Validation stage](#validate-the-blueprint) and the [Resolve the Execution Target](#resolve-the-execution-target)
+by the runner at the [Validation stage](#validate-the-blueprint) and
+the [Resolve the Execution Target](#resolve-the-execution-target)
 stage respectively and have no relevance to the execution plan.
 
 ##### Order of operations
 
 Declarative properties are translated into imperative steps in the following order:
 
--   `constants` – defines constants in wp-config.php
--   `siteOptions`
--   `muPlugins` – installs mu-plugins in the declared order.
--   `themes` – installs themes in the declared order. Similarly to plugins, the parent theme declaration does not.
--   `activeTheme` – installs and activates the theme.
--   `plugins` – installs plugins in the declared order. The `Requires` plugin property is not considered for.
--   `fonts` – installs fonts in the declared order.
--   `media` – uploads media files to the WordPress Media Library.
--   `siteLanguage`
--   `roles` – creates a desired set of roles in the declared order.
--   `users` – creates a desired set of users in the declared order.
--   `postTypes` – creates a desired set of post types in the listed order. Requires the `secure-custom-fields` plugin to be included in the Blueprint.
--   `content` – imports content from the declared sources in the listed order. Uses the Data Liberation importers.
--   `additionalStepsAfterExecution` – imperative execution plan to execute after the declarative steps are completed.
+- `constants` – defines constants in wp-config.php
+- `siteOptions`
+- `muPlugins` – installs mu-plugins in the declared order.
+- `themes` – installs themes in the declared order. Similarly to plugins, the parent theme declaration does not.
+- `activeTheme` – installs and activates the theme.
+- `plugins` – installs plugins in the declared order. The `Requires` plugin property is not considered for.
+- `fonts` – installs fonts in the declared order.
+- `media` – uploads media files to the WordPress Media Library.
+- `siteLanguage`
+- `roles` – creates a desired set of roles in the declared order.
+- `users` – creates a desired set of users in the declared order.
+- `postTypes` – creates a desired set of post types in the listed order. Requires the `secure-custom-fields` plugin to
+  be included in the Blueprint.
+- `content` – imports content from the declared sources in the listed order. Uses the Data Liberation importers.
+- `additionalStepsAfterExecution` – imperative execution plan to execute after the declarative steps are completed.
 
 ##### Rationale for using a transpilation approach
 
 This approach is inspired by:
 
--   Alex Kirk'x library of custom Blueprint steps: https://github.com/WordPress/blueprints-library/issues/118
--   Git. The low-level binary protocol is small and powerful. The CLI tool harnesses that power with an abundance of human-readable commands.
+- Alex Kirk'x library of custom Blueprint steps: https://github.com/WordPress/blueprints-library/issues/118
+- Git. The low-level binary protocol is small and powerful. The CLI tool harnesses that power with an abundance of
+  human-readable commands.
 
 While the transpilation approach may initially seem weird, it has strong advantages:
 
--   Blueprint extenders can easily follow core and add their own declarative
--   Future extensions of the core Blueprint schema will require an adjusted
--   Supporting Blueprints outside of PHP only requires implementing the steps,
--   It is a forcing function – every future schema adjustment **MUST** cover the
--   It ensures that everything expressed declaratively can also be expressed
--   It makes developer tools easier to implement, e.g. a Blueprint editor that
+- Blueprint extenders can easily follow core and add their own declarative
+- Future extensions of the core Blueprint schema will require an adjusted
+- Supporting Blueprints outside of PHP only requires implementing the steps,
+- It is a forcing function – every future schema adjustment **MUST** cover the
+- It ensures that everything expressed declaratively can also be expressed
+- It makes developer tools easier to implement, e.g. a Blueprint editor that
 
 ### Run the Execution Plan
 
@@ -740,10 +772,11 @@ Use the inline JSON syntax when you want to ship small amounts of content direct
 
 ## Composing Blueprints
 
-A process of applying multiple Blueprints to the same site is called **Composition**. This document recognizes two ways of composing Blueprints.
+A process of applying multiple Blueprints to the same site is called **Composition**. This document recognizes two ways
+of composing Blueprints.
 
--   [Sequential execution](#sequential-execution)
--   [Merging Blueprints](#merging-blueprints)
+- [Sequential execution](#sequential-execution)
+- [Merging Blueprints](#merging-blueprints)
 
 A compliant Blueprint runner **MUST** support both.
 
@@ -755,67 +788,79 @@ the first one, and then execute the second one on the same Execution Target.
 
 ### Merging Blueprints
 
-When the runner is instructed to merge multiple Blueprints before the execution, it **MUST** run the merging algorithm described below. On a successful merge, the runner **MUST** execute the merged Blueprint instead of the original ones.
+When the runner is instructed to merge multiple Blueprints before the execution, it **MUST** run the merging algorithm
+described below. On a successful merge, the runner **MUST** execute the merged Blueprint instead of the original ones.
 
-1.  **Initialization** – Create a `merge target` that is a new, empty Blueprint Bundle.
-2.  **Validation** – Validate every input Blueprint (`input Blueprint`) using the [Validation Algorithm](#validate-the-blueprint). If validation fails, abort the merge and report the validation error.
-3.  **Merge loop** – For every `input Blueprint` (and its associated Bundle), run the following steps:
+1. **Initialization** – Create a `merge target` that is a new, empty Blueprint Bundle.
+2. **Validation** – Validate every input Blueprint (`input Blueprint`) using
+   the [Validation Algorithm](#validate-the-blueprint). If validation fails, abort the merge and report the validation
+   error.
+3. **Merge loop** – For every `input Blueprint` (and its associated Bundle), run the following steps:
 
-    1.  **Property-by-Property merge**: Merge every property from `input Blueprint` into the `merge target` according to the rules below. If the `input Blueprint` is a Bundle, apply the rules to the bundled `/blueprint.json` file.
+    1. **Property-by-Property merge**: Merge every property from `input Blueprint` into the `merge target` according to
+       the rules below. If the `input Blueprint` is a Bundle, apply the rules to the bundled `/blueprint.json` file.
 
-        -   **`version`** – assert the version of the `input Blueprint` is the same as the version of the `merge target`.
-        -   **`blueprintMeta`, `$schema`** – ignore these properties.
-        -   **`siteLanguage`, `activeTheme`** – assert that either:
+        - **`version`** – assert the version of the `input Blueprint` is the same as the version of the `merge target`.
+        - **`blueprintMeta`, `$schema`** – ignore these properties.
+        - **`siteLanguage`, `activeTheme`** – assert that either:
 
-            -   The value defined in neither the `input Blueprint` or `merge target` – in this case, ignore this property.
-            -   The value defined in either the `input Blueprint` or `merge target` – in this case, use the available value.
-            -   The value defined in both `input Blueprint` and `merge target` and they are the same – in this case, use that value.
-            -   In any other case, abort the merge and report a conflict.
+            - The value defined in neither the `input Blueprint` or `merge target` – in this case, ignore this property.
+            - The value defined in either the `input Blueprint` or `merge target` – in this case, use the available
+              value.
+            - The value defined in both `input Blueprint` and `merge target` and they are the same – in this case, use
+              that value.
+            - In any other case, abort the merge and report a conflict.
 
-        -   **`constants`, `siteOptions`, `postTypes`, `fonts`**:
+        - **`constants`, `siteOptions`, `postTypes`, `fonts`**:
 
-            -   **Rule**: Merge key-value pairs; fail on conflicting values for the same key.
-            -   Append the `input Blueprint` key-value pairs into `merge target`, failing on conflicting values for the same key.
+            - **Rule**: Merge key-value pairs; fail on conflicting values for the same key.
+            - Append the `input Blueprint` key-value pairs into `merge target`, failing on conflicting values for the
+              same key.
 
-        -   **`phpVersion`, `wordpressVersion`**:
+        - **`phpVersion`, `wordpressVersion`**:
 
-            -   Normalize the version specifier in `input Blueprint` and `merge target` (if present) into number-based ranges.
-            -   If `merge target` has no version set, adopt the normalized range from `input Blueprint`.
-            -   If both have versions, calculate the intersection of the two ranges.
-            -   If the intersection is empty, abort the merge and report a version conflict (e.g., "PHP version conflict: Blueprint A requires `"maxVersion": "8.0"`, but Blueprint B requires `"minVersion": "8.1"`").
-            -   Update `merge target`'s version to the intersected range.
+            - Normalize the version specifier in `input Blueprint` and `merge target` (if present) into number-based
+              ranges.
+            - If `merge target` has no version set, adopt the normalized range from `input Blueprint`.
+            - If both have versions, calculate the intersection of the two ranges.
+            - If the intersection is empty, abort the merge and report a version conflict (e.g., "PHP version conflict:
+              Blueprint A requires `"maxVersion": "8.0"`, but Blueprint B requires `"minVersion": "8.1"`").
+            - Update `merge target`'s version to the intersected range.
 
-        -   **`plugins`, `themes`, `muPlugins`**:
+        - **`plugins`, `themes`, `muPlugins`**:
 
-            -   **Rule**: Merge lists by resource identifier (slug); intersect versions; fail on version conflicts or file collisions.
-            -   Append resources from `input Blueprint` to `merge target`.
-            -   If a resource with the same identifier (slug) exists in both `input Blueprint` and `merge target`:
-                -   Assert their JSON definitions are identical.
-                -   If definitions differ, abort the merge and report a resource definition conflict.
+            - **Rule**: Merge lists by resource identifier (slug); intersect versions; fail on version conflicts or file
+              collisions.
+            - Append resources from `input Blueprint` to `merge target`.
+            - If a resource with the same identifier (slug) exists in both `input Blueprint` and `merge target`:
+                - Assert their JSON definitions are identical.
+                - If definitions differ, abort the merge and report a resource definition conflict.
 
-        -   **`steps`, `content`, `media`** – Append all items from the `input Blueprint` to the `merge target`.
+        - **`steps`, `content`, `media`** – Append all items from the `input Blueprint` to the `merge target`.
 
-        -   **`users`**:
+        - **`users`**:
 
-            -   Append users from `input Blueprint` to `merge target`.
-            -   When a user with the same `username` or `email` exists in both `input Blueprint` and `merge target`:
-                -   Fail if `username`, `email`, or `role` are different.
-                -   Merge `meta` key-value pairs, failing on conflicting values for the same key.
+            - Append users from `input Blueprint` to `merge target`.
+            - When a user with the same `username` or `email` exists in both `input Blueprint` and `merge target`:
+                - Fail if `username`, `email`, or `role` are different.
+                - Merge `meta` key-value pairs, failing on conflicting values for the same key.
 
-        -   **`roles`**:
-            -   Append roles from `input Blueprint` to `merge target`.
-            -   When a role with the same `name` exists in both `input Blueprint` and `merge target`:
-                -   Merge `capabilities` key-value pairs, failing on conflicting values for the same key.
+        - **`roles`**:
+            - Append roles from `input Blueprint` to `merge target`.
+            - When a role with the same `name` exists in both `input Blueprint` and `merge target`:
+                - Merge `capabilities` key-value pairs, failing on conflicting values for the same key.
 
-    2.  **File merge**:
-        -   For `input Blueprint` that is a Bundle, copy all bundled files except `blueprint.json` to the `merge target`.
-        -   If the file with the same path and a different content already exists in `merge target`, abort and report a file content conflict.
+    2. **File merge**:
+        - For `input Blueprint` that is a Bundle, copy all bundled files except `blueprint.json` to the `merge target`.
+        - If the file with the same path and a different content already exists in `merge target`, abort and report a
+          file content conflict.
 
-4.  **Output**:
-    -   **On Success**: Return the final `merge target` bundle.
-    -   **On Failure**: Return a detailed report listing all conflicts encountered during the merge process.
+4. **Output**:
+    - **On Success**: Return the final `merge target` bundle.
+    - **On Failure**: Return a detailed report listing all conflicts encountered during the merge process.
 
 ## Areas intentionally not covered by this proposal
 
--   Multisite configuration – it may require a separate schema and is left for a future iteration of the Blueprint standard.
--   Content import format – it is a separate, nuanced topic that warrants a dedicated proposal.
+- Multisite configuration – it may require a separate schema and is left for a future iteration of the Blueprint
+  standard.
+- Content import format – it is a separate, nuanced topic that warrants a dedicated proposal.

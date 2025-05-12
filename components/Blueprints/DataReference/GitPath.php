@@ -24,18 +24,18 @@ class GitPath extends DataReference {
 	/**
 	 * Constructor.
 	 *
-	 * @param string      $git_repository      The git repository URL.
-	 * @param string|null $ref                 The git reference.
-	 * @param string|null $path                The path within the repository.
+	 * @param  string  $git_repository  The git repository URL.
+	 * @param  string|null  $ref  The git reference.
+	 * @param  string|null  $path  The path within the repository.
 	 */
 	public function __construct(
 		string $git_repository,
 		?string $ref = null,
 		?string $path = null,
 	) {
-		$this->git_repository      = $git_repository;
-		$this->ref                 = $ref;
-		$this->path                = $path;
+		$this->git_repository = $git_repository;
+		$this->ref            = $ref;
+		$this->path           = $path;
 		parent::__construct();
 	}
 
@@ -67,13 +67,14 @@ class GitPath extends DataReference {
 	}
 
 	public function get_filename(): string {
-		return basename($this->path);
+		return basename( $this->path );
 	}
 
 	/**
 	 * Create an instance from an array.
 	 *
-	 * @param array $data The array data.
+	 * @param  array  $data  The array data.
+	 *
 	 * @return self The created instance.
 	 */
 	public static function from_blueprint_data( array $data ): self {
@@ -91,7 +92,8 @@ class GitPath extends DataReference {
 	/**
 	 * Check if an array represents a valid git path.
 	 *
-	 * @param array $data The array to check.
+	 * @param  array  $data  The array to check.
+	 *
 	 * @return bool Whether the array is valid.
 	 */
 	public static function is_valid( $data ): bool {
@@ -105,8 +107,9 @@ class GitPath extends DataReference {
 	 * @return string The human-readable name.
 	 */
 	public function get_human_readable_name(): string {
-		$ref = $this->ref ? "#{$this->ref}" : "";
+		$ref  = $this->ref ? "#{$this->ref}" : "";
 		$path = $this->path ? "/{$this->path}" : "";
+
 		return "Git: {$this->git_repository}{$ref}{$path}";
 	}
 }

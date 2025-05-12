@@ -10,7 +10,7 @@ class DataReference {
 	private static int $instanceCounter = 0;
 
 	public function __construct() {
-		$this->id = self::$instanceCounter++;
+		$this->id = self::$instanceCounter ++;
 	}
 
 	static public function create( $reference, array $additional_reference_classes = [] ) {
@@ -22,12 +22,12 @@ class DataReference {
 			ExecutionContextPath::class,
 			...$additional_reference_classes,
 		);
-		foreach( $classes as $class ) {
-			if( $class::is_valid( $reference ) ) {
-				if (method_exists($class, 'from_blueprint_data')) {
-					return $class::from_blueprint_data($reference);
+		foreach ( $classes as $class ) {
+			if ( $class::is_valid( $reference ) ) {
+				if ( method_exists( $class, 'from_blueprint_data' ) ) {
+					return $class::from_blueprint_data( $reference );
 				} else {
-					return new $class($reference);
+					return new $class( $reference );
 				}
 			}
 		}
@@ -40,11 +40,11 @@ class DataReference {
 	}
 
 	public function get_filename(): string {
-		throw new NotImplementedException('get_filename is not implemented for this data reference');
+		throw new NotImplementedException( 'get_filename is not implemented for this data reference' );
 	}
 
 	public function get_human_readable_name(): string {
-		throw new NotImplementedException('get_human_readable_name is not implemented for this data reference');
+		throw new NotImplementedException( 'get_human_readable_name is not implemented for this data reference' );
 	}
 
 }

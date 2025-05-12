@@ -19,8 +19,8 @@ class InlineDirectory extends DataReference {
 	/**
 	 * Constructor.
 	 *
-	 * @param string $name     The directory name.
-	 * @param array  $children The directory children.
+	 * @param  string  $name  The directory name.
+	 * @param  array  $children  The directory children.
 	 */
 	public function __construct( string $name, array $children ) {
 		$this->name     = $name;
@@ -53,7 +53,8 @@ class InlineDirectory extends DataReference {
 	/**
 	 * Create an instance from an array.
 	 *
-	 * @param array $data The array data.
+	 * @param  array  $data  The array data.
+	 *
 	 * @return self The created instance.
 	 */
 	public static function from_array( array $data ): self {
@@ -78,7 +79,8 @@ class InlineDirectory extends DataReference {
 	/**
 	 * Check if an array represents a valid inline directory.
 	 *
-	 * @param array $data The array to check.
+	 * @param  array  $data  The array to check.
+	 *
 	 * @return bool Whether the array is valid.
 	 */
 	public static function is_valid( $data ): bool {

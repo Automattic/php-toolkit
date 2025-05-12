@@ -16,7 +16,7 @@ class ExecutionContextPath extends DataReference {
 	/**
 	 * Constructor.
 	 *
-	 * @param string $path The path.
+	 * @param  string  $path  The path.
 	 */
 	public function __construct( string $path ) {
 		$this->path = $path;
@@ -33,7 +33,7 @@ class ExecutionContextPath extends DataReference {
 	}
 
 	public function get_filename(): string {
-		return basename($this->path);
+		return basename( $this->path );
 	}
 
 	/**
@@ -52,6 +52,7 @@ class ExecutionContextPath extends DataReference {
 		// Remove leading / if present
 		return ltrim( $path, '/' );
 	}
+
 	/**
 	 * Checks if a string is a valid context-relative path.
 	 * A valid path must start with either '/' or './'.
@@ -60,10 +61,11 @@ class ExecutionContextPath extends DataReference {
 	 * according to the Blueprint specification.
 	 *
 	 * @param $path The path to check.
+	 *
 	 * @return bool Whether the path is valid.
 	 */
 	public static function is_valid( $path ): bool {
-		return is_string($path) && (strpos( $path, './' ) === 0 || strpos( $path, '/' ) === 0);
+		return is_string( $path ) && ( strpos( $path, './' ) === 0 || strpos( $path, '/' ) === 0 );
 	}
 
 	/**

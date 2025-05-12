@@ -3,11 +3,11 @@
 namespace unit\steps;
 
 use PHPUnitTestCase;
-use WordPress\Blueprints\Steps\DataClass\MkdirStep;
 use WordPress\Blueprints\Runner\Step\MkdirStepRunner;
 use WordPress\Blueprints\Runtime\Runtime;
-use WordPress\Filesystem\FilesystemException;
+use WordPress\Blueprints\Steps\DataClass\MkdirStep;
 use WordPress\Filesystem\Filesystem;
+use WordPress\Filesystem\FilesystemException;
 use WordPress\Filesystem\LocalFilesystem;
 
 use function WordPress\Filesystem\wp_join_paths;
@@ -37,10 +37,10 @@ class MkdirStepRunnerTest extends PHPUnitTestCase {
 	 * @before
 	 */
 	public function setUp(): void {
-		$this->document_root = wp_join_paths(sys_get_temp_dir(), 'test');
+		$this->document_root = wp_join_paths( sys_get_temp_dir(), 'test' );
 		$this->runtime       = new Runtime( $this->document_root );
 
-		$this->filesystem = LocalFilesystem::create($this->document_root);
+		$this->filesystem = LocalFilesystem::create( $this->document_root );
 
 		$this->step_runner = new MkdirStepRunner();
 		$this->step_runner->setRuntime( $this->runtime );
@@ -49,9 +49,9 @@ class MkdirStepRunnerTest extends PHPUnitTestCase {
 	/**
 	 * @after
 	 */
-	public function tearDown():void {
+	public function tearDown(): void {
 		$this->filesystem->rmdir( '/', [
-			'recursive' => true
+			'recursive' => true,
 		] );
 	}
 
@@ -75,7 +75,7 @@ class MkdirStepRunnerTest extends PHPUnitTestCase {
 		$this->step_runner->run( $step );
 
 		self::assertTrue(
-			$this->filesystem->exists($absolute_path),
+			$this->filesystem->exists( $absolute_path ),
 			sprintf( 'Failed to assert that the directory exists: %s', $absolute_path )
 		);
 	}
@@ -105,7 +105,7 @@ class MkdirStepRunnerTest extends PHPUnitTestCase {
 	}
 
 	public function testThrowExceptionWhenCreatingDirectoryAndItAlreadyExists() {
-		$path          = 'dir';
+		$path = 'dir';
 		$this->filesystem->mkdir( $path );
 
 		$step = new MkdirStep();

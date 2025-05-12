@@ -1,0 +1,114 @@
+<?php
+
+namespace WordPress\Blueprints\Steps;
+
+use WordPress\Blueprints\DataReference\DataReference;
+use WordPress\Blueprints\DataReference\Directory;
+use WordPress\Blueprints\DataReference\File;
+use WordPress\Blueprints\Progress\Tracker;
+use WordPress\Blueprints\Runtime;
+use WordPress\Zip\ZipEncoder;
+
+use function WordPress\Filesystem\pipe_stream;
+use function WordPress\Zip\is_zip_file_stream;
+
+/**
+ * Represents the 'installTheme' step.
+ */
+class InstallThemeStep implements StepInterface {
+	/**
+	 * Theme source identifier (slug, slug@version, URL, ./path, /path).
+	 */
+	public DataReference $source;
+
+	/**
+	 * Whether to activate the theme after installing it. Defaults to false.
+	 */
+	public bool $activate;
+
+	/**
+	 * Whether to import the theme's starter content after installing it. Defaults to false.
+	 */
+	public bool $importStarterContent;
+
+	/**
+	 * Optional target folder name. Defaults based on source.
+	 */
+	public ?string $targetFolderName;
+
+	/**
+	 * @param  DataReference  $source  Theme source identifier.
+	 * @param  bool  $activate  Activate after install?
+	 * @param  bool  $importStarterContent  Import starter content?
+	 * @param  string|null  $targetFolderName  Optional target folder name.
+	 */
+	public function __construct(
+		DataReference $source,
+		bool $activate = false,
+		bool $importStarterContent = false,
+		?string $targetFolderName = null
+	) {
+		$this->source               = $source;
+		$this->activate             = $activate;
+		$this->importStarterContent = $importStarterContent;
+		$this->targetFolderName     = $targetFolderName;
+	}
+
+	public function run( Runtime $runtime, Tracker $tracker ) {
+		$fs = $runtime->getTargetFilesystem();
+		$runtime->withTemporaryDirectory( function ( $temp_dir ) use ( $fs, $runtime, $tracker ) {
+			$theme_data = $runtime->resolve( $this->source );
+			$tracker->setCaption( 'Installing theme ' . $theme_data->get_human_readable_name() );
+
+			if ( $theme_data instanceof Directory ) {
+				$zip_path    = $temp_dir . '/' . $theme_data->dirname . '.zip';
+				$zip_stream  = $fs->open_write_stream( $zip_path );
+				$zip_encoder = new ZipEncoder( $zip_stream );
+				$zip_encoder->append_from_filesystem( $theme_data->filesystem );
+				$zip_encoder->close();
+			} elseif ( $theme_data instanceof File ) {
+				$zip_filename = preg_replace( '/\.(zip|php)$/', '', $theme_data->filename ) . '.zip';
+				$zip_path     = $temp_dir . '/' . $zip_filename;
+				$zip_stream   = $fs->open_write_stream( $zip_path );
+
+				if ( is_zip_file_stream( $theme_data->stream ) ) {
+					pipe_stream( $theme_data->stream, $zip_stream );
+				} else {
+					throw new \RuntimeException( "Theme is not a valid zip file." );
+				}
+				$zip_stream->close_writing();
+			}
+
+			$tracker->set( 50 );
+
+			$output_file           = $temp_dir . '/theme_stylesheet.txt';
+			$install_script_result = $runtime->evalPhpInSubProcess(
+				file_get_contents( __DIR__ . '/scripts/InstallTheme/wp_install_theme.php' ),
+				[ 'THEME_ZIP_PATH' => $zip_path, 'OUTPUT_FILE' => $output_file ]
+			);
+
+			if ( ! $fs->exists( $output_file ) ) {
+				throw new \RuntimeException(
+					"Theme installation script did not create output file. Error output: {$install_script_result}"
+				);
+			}
+
+			$theme_folder_name = trim( $fs->get_contents( $output_file ) );
+			if ( empty( $theme_folder_name ) ) {
+				throw new \RuntimeException(
+					"Theme installation script did not return the theme stylesheet name."
+				);
+			}
+
+			if ( $this->activate ) {
+				$tracker->set( 75, 'Activating theme ' . $theme_folder_name );
+				$runtime->evalPhpInSubProcess(
+					file_get_contents( __DIR__ . '/scripts/ActivateTheme/wp_activate_theme.php' ),
+					[ 'THEME_FOLDER_NAME' => $theme_folder_name ]
+				);
+			}
+
+			$tracker->set( 100 );
+		}, '' );
+	}
+}

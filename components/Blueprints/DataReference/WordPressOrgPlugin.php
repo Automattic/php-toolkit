@@ -17,8 +17,8 @@ class WordPressOrgPlugin extends DataReference {
 	/**
 	 * Constructor.
 	 *
-	 * @param string      $slug    The plugin slug.
-	 * @param string|null $version The plugin version.
+	 * @param  string  $slug  The plugin slug.
+	 * @param  string|null  $version  The plugin version.
 	 */
 	public function __construct( string $slug, ?string $version = null ) {
 		$this->slug    = $slug;
@@ -48,7 +48,8 @@ class WordPressOrgPlugin extends DataReference {
 	 * Check if a string is a valid WordPress.org plugin reference.
 	 * Valid formats are: "plugin-slug" or "plugin-slug@version"
 	 *
-	 * @param string $reference The reference to check.
+	 * @param  string  $reference  The reference to check.
+	 *
 	 * @return bool Whether the reference is valid.
 	 */
 	public static function is_valid( string $reference ): bool {
@@ -68,12 +69,13 @@ class WordPressOrgPlugin extends DataReference {
 	/**
 	 * Parse a WordPress.org plugin reference into slug and version.
 	 *
-	 * @param string $reference The reference to parse.
+	 * @param  string  $reference  The reference to parse.
+	 *
 	 * @return array{0: string, 1: string|null} An array with slug and version.
 	 */
 	public static function parse( string $reference ): array {
-		$parts = explode( '@', $reference );
-		$slug = $parts[0];
+		$parts   = explode( '@', $reference );
+		$slug    = $parts[0];
 		$version = isset( $parts[1] ) ? $parts[1] : null;
 
 		return [ $slug, $version ];
@@ -86,9 +88,10 @@ class WordPressOrgPlugin extends DataReference {
 	 * @return string The human-readable name.
 	 */
 	public function get_human_readable_name(): string {
-		if ($this->version) {
+		if ( $this->version ) {
 			return "Plugin: {$this->slug} (version {$this->version})";
 		}
+
 		return "Plugin: {$this->slug}";
 	}
 

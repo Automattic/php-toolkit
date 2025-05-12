@@ -64,7 +64,7 @@
  * }
  * ```
  *
- * @param mixed $content
+ * @param  mixed  $content
  *
  * @return string
  */
@@ -110,7 +110,7 @@ function rewrite_wp_config_to_define_constants( $content, $constants = array() )
 			while ( $token = array_pop( $tokens ) ) {
 				$output[] = $token;
 				if ( $token === '(' ) {
-					++$open_parenthesis;
+					++ $open_parenthesis;
 					break;
 				}
 			}
@@ -121,7 +121,7 @@ function rewrite_wp_config_to_define_constants( $content, $constants = array() )
 			while ( $token = array_pop( $tokens ) ) {
 				$output[] = $token;
 				if ( $token === ')' ) {
-					--$open_parenthesis;
+					-- $open_parenthesis;
 				}
 				if ( $open_parenthesis === 0 ) {
 					break;
@@ -155,9 +155,9 @@ function rewrite_wp_config_to_define_constants( $content, $constants = array() )
 		while ( $token = array_pop( $tokens ) ) {
 			$buffer[] = $token;
 			if ( $token === '(' || $token === '[' || $token === '{' ) {
-				++$open_parenthesis;
+				++ $open_parenthesis;
 			} elseif ( $token === ')' || $token === ']' || $token === '}' ) {
-				--$open_parenthesis;
+				-- $open_parenthesis;
 			} elseif ( $token === ',' && $open_parenthesis === 0 ) {
 				break;
 			}
@@ -177,9 +177,9 @@ function rewrite_wp_config_to_define_constants( $content, $constants = array() )
 				// Final parenthesis of the define call.
 				break;
 			} elseif ( $token === '(' || $token === '[' || $token === '{' ) {
-				++$open_parenthesis;
+				++ $open_parenthesis;
 			} elseif ( $token === ')' || $token === ']' || $token === '}' ) {
-				--$open_parenthesis;
+				-- $open_parenthesis;
 			} elseif ( $token === ',' && $open_parenthesis === 0 ) {
 				// This define call has more than 2 arguments! The third one is the
 				// boolean value indicating $is_case_insensitive. Let's continue capturing

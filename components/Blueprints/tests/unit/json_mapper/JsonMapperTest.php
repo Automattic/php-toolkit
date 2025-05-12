@@ -29,7 +29,7 @@ class JsonMapperTest extends PHPUnitTestCase {
 		$mapper = new JsonMapper(
 			array(
 				Item::class => function ( $json ) {
-					$item = new Item();
+					$item       = new Item();
 					$item->name = $json->name;
 
 					return $item;

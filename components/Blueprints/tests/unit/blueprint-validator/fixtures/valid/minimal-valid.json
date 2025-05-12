@@ -1,14 +1,14 @@
 {
-  "version": 2,
-  "content": [
-    {
-      "type": "posts",
-      "source": [
-        {
-          "post_title": "Hello World",
-          "post_content": "This is a sample post."
-        }
-      ]
-    }
-  ]
-} 
+	"version": 2,
+	"content": [
+		{
+			"type": "posts",
+			"source": [
+				{
+					"post_title": "Hello World",
+					"post_content": "This is a sample post."
+				}
+			]
+		}
+	]
+}
