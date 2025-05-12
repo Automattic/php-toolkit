@@ -225,25 +225,27 @@ class BlueprintMetadata {
     }
 }
 
-// StepRunnerInterface
-interface StepRunnerInterface {
-	/**
-	 * Runs the step with the given parameters.
-	 *
-	 * @param object $step The step object with configuration
-	 * @param Runtime $runtime The runtime providing environment access
-	 * @param Tracker $tracker The tracker for reporting progress
-	 * @return mixed The result of running the step
-	 */
-	public function run(object $step, Runtime $runtime, Tracker $tracker);
+// --- Step Classes ---
+
+/**
+ * New Step Interface
+ */
+interface StepInterface {
+    /**
+     * Executes the step logic.
+     *
+     * @param Runtime $runtime The runtime providing environment access
+     * @param Tracker $tracker The tracker for reporting progress
+     * @return mixed The result of running the step
+     */
+    public function run(Runtime $runtime, Tracker $tracker);
 }
 
-// --- Step Classes ---
 
 /**
  * Represents the 'activatePlugin' step.
  */
-class ActivatePluginStep {
+class ActivatePluginStep implements StepInterface {
     /**
      * Path to the plugin directory or entry file.
      * Examples: '/wordpress/wp-content/plugins/plugin-name', 'plugin-name/plugin-name.php'
@@ -257,6 +259,19 @@ class ActivatePluginStep {
         $this->pluginPath = $pluginPath;
     }
 
+    /**
+     * Executes the activatePlugin step.
+     */
+    public function run(Runtime $runtime, Tracker $tracker): mixed {
+		$tracker->setCaption('Activating plugin ' . ($this->pluginPath ?? ''));
+ 		return $runtime->evalPhpInSubProcess(
+ 			file_get_contents(__DIR__ . '/ActivatePlugin/wp_activate_plugin.php'),
+ 			[
+ 				'PLUGIN_PATH' => $this->pluginPath,
+ 			]
+ 		);
+ 	}
+
     public function getPluginPath(): string {
         return $this->pluginPath;
     }
@@ -266,32 +281,10 @@ class ActivatePluginStep {
     }
 }
 
-// ActivatePluginStepRunner
-class ActivatePluginStepRunner {
-	/**
-	 * Runs the activatePlugin step.
-	 *
-	 * @param ActivatePluginStep $step The activatePlugin step configuration
-	 * @param Runtime $runtime The runtime providing environment access
-	 * @param Tracker $tracker The tracker for reporting progress
-	 * @return mixed The result of running the step
-	 */
-	public function run(ActivatePluginStep $step, Runtime $runtime, Tracker $tracker): mixed {
-		$tracker->setCaption('Activating plugin ' . ($step->getPluginPath() ?? ''));
-		return $runtime->evalPhpInSubProcess(
-			file_get_contents(__DIR__ . '/ActivatePlugin/wp_activate_plugin.php'),
-			[
-				'PLUGIN_PATH' => $step->getPluginPath(),
-			]
-		);
-	}
-}
-
-
 /**
  * Represents the 'activateTheme' step.
  */
-class ActivateThemeStep {
+class ActivateThemeStep implements StepInterface {
     /**
      * The name of the theme folder inside wp-content/themes/.
      */
@@ -304,6 +297,19 @@ class ActivateThemeStep {
         $this->themeFolderName = $themeFolderName;
     }
 
+    /**
+     * Executes the activateTheme step.
+     */
+    public function run(Runtime $runtime, Tracker $tracker): mixed {
+		$tracker->setCaption('Activating theme ' . $this->themeFolderName);
+ 		return $runtime->evalPhpInSubProcess(
+ 			file_get_contents(__DIR__ . '/ActivateTheme/wp_activate_theme.php'),
+ 			[
+ 				'THEME_FOLDER_NAME' => $this->themeFolderName,
+ 			]
+ 		);
+ 	}
+
     public function getThemeFolderName(): string {
         return $this->themeFolderName;
     }
@@ -313,23 +319,10 @@ class ActivateThemeStep {
     }
 }
 
-// ActivateThemeStepRunner
-class ActivateThemeStepRunner {
-	public function run(object $step, Runtime $runtime, Tracker $tracker): mixed {
-		$tracker->setCaption('Activating theme ' . $step->getThemeFolderName());
-		return $runtime->evalPhpInSubProcess(
-			file_get_contents(__DIR__ . '/ActivateTheme/wp_activate_theme.php'),
-			[
-				'THEME_FOLDER_NAME' => $step->getThemeFolderName(),
-			]
-		);
-	}
-}
-
 /**
  * Represents the 'cp' (copy) step.
  */
-class CpStep {
+class CpStep implements StepInterface {
     private string $fromPath;
     private string $toPath;
 
@@ -341,6 +334,18 @@ class CpStep {
         $this->fromPath = $fromPath;
         $this->toPath = $toPath;
     }
+
+    /**
+     * Executes the cp step.
+     */
+    public function run(Runtime $runtime, Tracker $tracker): mixed {
+		$tracker->setCaption('Copying from ' . $this->fromPath . ' to ' . $this->toPath);
+ 		return $runtime->getTargetFilesystem()->copy(
+ 			$this->fromPath,
+ 			$this->toPath,
+ 			[ 'recursive' => true ]
+ 		);
+ 	}
 
     public function getFromPath(): string {
         return $this->fromPath;
@@ -359,30 +364,10 @@ class CpStep {
     }
 }
 
-// CpStepRunner
-class CpStepRunner {
-	/**
-	 * Runs the cp step.
-	 *
-	 * @param CpStep $step The cp step configuration
-	 * @param Runtime $runtime The runtime providing environment access
-	 * @param Tracker $tracker The tracker for reporting progress
-	 * @return mixed The result of running the step
-	 */
-	public function run(CpStep $step, Runtime $runtime, Tracker $tracker): mixed {
-		$tracker->setCaption('Copying from ' . $step->getFromPath() . ' to ' . $step->getToPath());
-		return $runtime->getTargetFilesystem()->copy(
-			$step->getFromPath(),
-			$step->getToPath(),
-			[ 'recursive' => true ]
-		);
-	}
-}
-
 /**
  * Represents the 'defineConstants' step.
  */
-class DefineConstantsStep {
+class DefineConstantsStep implements StepInterface {
     /**
      * An associative array of constant names to their values (string, bool, int, float).
      * @var array<string, scalar>
@@ -395,6 +380,26 @@ class DefineConstantsStep {
     public function __construct(array $constants) {
         $this->constants = $constants;
     }
+
+    /**
+     * Executes the defineConstants step.
+     */
+    public function run(Runtime $runtime, Tracker $tracker): mixed {
+		$tracker->setCaption('Defining wp-config constants');
+ 		$functions = file_get_contents(__DIR__ . '/DefineWpConfigConsts/functions.php');
+ 		return $runtime->evalPhpInSubProcess(
+ 			"$functions ?>" . '<?php
+    $wp_config_path = getenv("DOCROOT") . "/wp-config.php";
+    if (!file_exists($wp_config_path)) { error_log("Blueprint Error: wp-config.php file not found at " . $wp_config_path); exit(1); }
+    if (!is_readable($wp_config_path) || !is_writable($wp_config_path)) { error_log("Blueprint Error: wp-config.php is not readable or writable at " . $wp_config_path); exit(1); }
+	$consts = json_decode(getenv("CONSTS"), true);
+	$wp_config = file_get_contents($wp_config_path);
+	$new_wp_config = rewrite_wp_config_to_define_constants($wp_config, $consts);
+	file_put_contents($wp_config_path, $new_wp_config);
+',
+ 			array('CONSTS' => json_encode($this->constants))
+ 		);
+ 	}
 
     /**
      * @return array<string, scalar>
@@ -411,38 +416,10 @@ class DefineConstantsStep {
     }
 }
 
-// DefineConstantsStepRunner
-class DefineConstantsStepRunner {
-	/**
-	 * Runs the defineConstants step.
-	 *
-	 * @param DefineConstantsStep $step The defineConstants step configuration
-	 * @param Runtime $runtime The runtime providing environment access
-	 * @param Tracker $tracker The tracker for reporting progress
-	 * @return mixed The result of running the step
-	 */
-	public function run(DefineConstantsStep $step, Runtime $runtime, Tracker $tracker): mixed {
-		$tracker->setCaption('Defining wp-config constants');
-		$functions = file_get_contents(__DIR__ . '/DefineWpConfigConsts/functions.php');
-		return $runtime->evalPhpInSubProcess(
-			"$functions ?>" . '<?php
-    $wp_config_path = getenv("DOCROOT") . "/wp-config.php";
-    if (!file_exists($wp_config_path)) { error_log("Blueprint Error: wp-config.php file not found at " . $wp_config_path); exit(1); }
-    if (!is_readable($wp_config_path) || !is_writable($wp_config_path)) { error_log("Blueprint Error: wp-config.php is not readable or writable at " . $wp_config_path); exit(1); }
-	$consts = json_decode(getenv("CONSTS"), true);
-	$wp_config = file_get_contents($wp_config_path);
-	$new_wp_config = rewrite_wp_config_to_define_constants($wp_config, $consts);
-	file_put_contents($wp_config_path, $new_wp_config);
-',
-			array('CONSTS' => json_encode($step->getConstants()))
-		);
-	}
-}
-
 /**
  * Represents the 'importThemeStarterContent' step.
  */
-class ImportThemeStarterContentStep {
+class ImportThemeStarterContentStep implements StepInterface {
     /**
      * Optional slug of the theme to import content from.
      * If null, might imply the currently active theme.
@@ -455,6 +432,18 @@ class ImportThemeStarterContentStep {
     public function __construct(?string $themeSlug = null) {
         $this->themeSlug = $themeSlug;
     }
+
+    /**
+     * Executes the importThemeStarterContent step.
+     * @TODO Implement this logic
+     */
+    public function run(Runtime $runtime, Tracker $tracker): mixed {
+		$tracker->setCaption('Importing theme starter content' . ($this->themeSlug ? ' for ' . $this->themeSlug : ''));
+		// Placeholder: Actual implementation needed
+		error_log("Warning: importThemeStarterContent step is not fully implemented yet.");
+		$tracker->finish();
+		return true;
+	}
 
     public function getThemeSlug(): ?string {
         return $this->themeSlug;
@@ -469,7 +458,7 @@ class ImportThemeStarterContentStep {
  * Represents the 'installPlugin' step.
  * Simplified by embedding PluginDefinition properties.
  */
-class InstallPluginStep {
+class InstallPluginStep implements StepInterface {
     /**
      * Plugin source reference.
      */
@@ -509,51 +498,14 @@ class InstallPluginStep {
         $this->onError = $onError;
     }
 
-    public function getSource(): DataReference {
-        return $this->source;
-    }
-
-    public function setSource(DataReference $source): void {
-        $this->source = $source;
-    }
-
-    public function isActive(): bool {
-        return $this->active;
-    }
-
-    public function setActive(bool $active): void {
-        $this->active = $active;
-    }
-
     /**
-     * @return array<string, mixed>|null
+     * Executes the installPlugin step.
      */
-    public function getActivationOptions(): ?array {
-        return $this->activationOptions;
-    }
+    public function run(Runtime $runtime, Tracker $tracker): mixed {
+        $plugin_data = $runtime->resolve($this->source);
 
-    /**
-     * @param array<string, mixed>|null $activationOptions
-     */
-    public function setActivationOptions(?array $activationOptions): void {
-        $this->activationOptions = $activationOptions;
-    }
-
-    public function getOnError(): PluginErrorBehavior {
-        return $this->onError;
-    }
-
-    public function setOnError(PluginErrorBehavior $onError): void {
-        $this->onError = $onError;
-    }
-}
-
-class InstallPluginStepRunner {
-	public function run(object $step, Runtime $runtime, Tracker $tracker): mixed {
-		$plugin_data = $runtime->resolve($step->getSource());
-
-		$fs = $runtime->getTargetFilesystem();
-		FilesystemHelpers::withTemporaryDirectory($fs, function($temp_dir) use ($fs, $runtime, $step, $tracker, $plugin_data) {
+        $fs = $runtime->getTargetFilesystem();
+		FilesystemHelpers::withTemporaryDirectory($fs, function($temp_dir) use ($fs, $runtime, $tracker, $plugin_data) {
 			$tracker->setCaption('Installing plugin ' . $plugin_data->get_human_readable_name());
 			if ($plugin_data instanceof Directory) {
 				$zip_path = $temp_dir . '/' . $plugin_data->dirname . '.zip';
@@ -589,7 +541,7 @@ class InstallPluginStepRunner {
 
 			$relative_path = $fs->get_contents($temp_dir . '/plugin_path.txt');
 
-			if ($step->isActive()) {
+			if ($this->active) {
 				$tracker->set(75, 'Activating plugin ' . $plugin_data->get_human_readable_name());
 				$runtime->evalPhpInSubProcess(
 					file_get_contents(__DIR__ . '/ActivatePlugin/wp_activate_plugin.php'),
@@ -607,7 +559,7 @@ class InstallPluginStepRunner {
 /**
  * Represents the 'installTheme' step.
  */
-class InstallThemeStep {
+class InstallThemeStep implements StepInterface {
     /**
      * Theme source identifier (slug, slug@version, URL, ./path, /path).
      */
@@ -677,22 +629,15 @@ class InstallThemeStep {
     public function setTargetFolderName(?string $targetFolderName): void {
         $this->targetFolderName = $targetFolderName;
     }
-}
 
-class InstallThemeStepRunner {
 	/**
-	 * Runs the installTheme step.
-	 *
-	 * @param InstallThemeStep $step The installTheme step configuration
-	 * @param Runtime $runtime The runtime providing environment access
-	 * @param Tracker $tracker The tracker for reporting progress
-	 * @return mixed The result of running the step
+	 * Executes the installTheme step.
 	 */
-	public function run(InstallThemeStep $step, Runtime $runtime, Tracker $tracker): mixed {
+	public function run(Runtime $runtime, Tracker $tracker): mixed {
 		$fs = $runtime->getTargetFilesystem();
-		FilesystemHelpers::withTemporaryDirectory($fs, function($temp_dir) use ($fs, $runtime, $step, $tracker) {
+		FilesystemHelpers::withTemporaryDirectory($fs, function($temp_dir) use ($fs, $runtime, $tracker) {
 			// Create data reference for the theme source
-			$dataRef = $step->getSource();
+			$dataRef = $this->getSource();
 			$theme_data = $runtime->resolve($dataRef);
 			$tracker->setCaption('Installing theme ' . $theme_data->get_human_readable_name());
 
@@ -736,7 +681,7 @@ class InstallThemeStepRunner {
 				);
 			}
 
-			if ($step->isActivate()) {
+			if ($this->isActivate()) {
 				$tracker->set(75, 'Activating theme ' . $theme_folder_name);
 				$runtime->evalPhpInSubProcess(
 					file_get_contents(__DIR__ . '/ActivateTheme/wp_activate_theme.php'),
@@ -754,7 +699,7 @@ class InstallThemeStepRunner {
 /**
  * Represents the 'mkdir' (make directory) step.
  */
-class MkdirStep {
+class MkdirStep implements StepInterface {
     private string $path;
 
     /**
@@ -763,6 +708,14 @@ class MkdirStep {
     public function __construct(string $path) {
         $this->path = $path;
     }
+
+    /**
+     * Executes the mkdir step.
+     */
+    public function run(Runtime $runtime, Tracker $tracker): mixed {
+		$tracker->setCaption('Creating directory ' . $this->path);
+ 		return $runtime->getTargetFilesystem()->mkdir($this->path, ['recursive' => true]);
+ 	}
 
     public function getPath(): string {
         return $this->path;
@@ -773,32 +726,10 @@ class MkdirStep {
     }
 }
 
-class MkdirStepRunner {
-	/**
-	 * Runs the mkdir step.
-	 *
-	 * @param MkdirStep $step The mkdir step configuration
-	 * @param Runtime $runtime The runtime providing environment access
-	 * @param Tracker $tracker The tracker for reporting progress
-	 * @return mixed The result of running the step
-	 */
-	public function run(MkdirStep $step, Runtime $runtime, Tracker $tracker): mixed {
-		$tracker->setCaption('Creating directory ' . $step->getPath());
-
-		$filesystem = $runtime->getTargetFilesystem();
-		if ($filesystem->exists($step->getPath())) {
-			throw new FilesystemException(
-				sprintf('Path already exists: %s', $step->getPath())
-			);
-		}
-		return $runtime->getTargetFilesystem()->mkdir($step->getPath(), ['recursive' => true]);
-	}
-}
-
 /**
  * Represents the 'mv' (move) step.
  */
-class MvStep {
+class MvStep implements StepInterface {
     private string $fromPath;
     private string $toPath;
 
@@ -810,6 +741,11 @@ class MvStep {
         $this->fromPath = $fromPath;
         $this->toPath = $toPath;
     }
+
+    public function run(Runtime $runtime, Tracker $tracker): mixed {
+		$tracker->setCaption('Moving from ' . $this->fromPath . ' to ' . $this->toPath);
+		return $runtime->getTargetFilesystem()->rename($this->fromPath, $this->toPath);
+	}
 
     public function getFromPath(): string {
         return $this->fromPath;
@@ -828,25 +764,10 @@ class MvStep {
     }
 }
 
-class MvStepRunner {
-	/**
-	 * Runs the mv step.
-	 *
-	 * @param MvStep $step The mv step configuration
-	 * @param Runtime $runtime The runtime providing environment access
-	 * @param Tracker $tracker The tracker for reporting progress
-	 * @return mixed The result of running the step
-	 */
-	public function run(MvStep $step, Runtime $runtime, Tracker $tracker): mixed {
-		$tracker->setCaption('Moving from ' . $step->getFromPath() . ' to ' . $step->getToPath());
-		return $runtime->getTargetFilesystem()->rename($step->getFromPath(), $step->getToPath());
-	}
-}
-
 /**
  * Represents the 'rm' (remove file) step.
  */
-class RmStep {
+class RmStep implements StepInterface {
     private string $path;
 
     /**
@@ -863,14 +784,11 @@ class RmStep {
     public function setPath(string $path): void {
         $this->path = $path;
     }
-}
-
-class RmStepRunner {
-	public function run(object $step, Runtime $runtime, Tracker $tracker): mixed {
-		$tracker->setCaption('Removing ' . $step->getPath());
+	public function run(Runtime $runtime, Tracker $tracker): mixed {
+		$tracker->setCaption('Removing ' . $this->getPath());
 
 		$filesystem = $runtime->getTargetFilesystem();
-		$path = $step->getPath();
+		$path = $this->getPath();
 
 		if (!$filesystem->exists($path)) {
 			throw new FilesystemException(sprintf('Path does not exist: %s', $path));
@@ -887,7 +805,7 @@ class RmStepRunner {
 /**
  * Represents the 'rmdir' (remove directory) step.
  */
-class RmDirStep {
+class RmDirStep implements StepInterface {
     private string $path;
 
     /**
@@ -904,9 +822,6 @@ class RmDirStep {
     public function setPath(string $path): void {
         $this->path = $path;
     }
-}
-
-class RmDirStepRunner {
 	/**
 	 * Runs the rmdir step.
 	 *
@@ -915,16 +830,16 @@ class RmDirStepRunner {
 	 * @param Tracker $tracker The tracker for reporting progress
 	 * @return mixed The result of running the step
 	 */
-	public function run(RmDirStep $step, Runtime $runtime, Tracker $tracker): mixed {
-		$tracker->setCaption('Removing directory ' . $step->getPath());
-		return $runtime->getTargetFilesystem()->rmdir($step->getPath(), ['recursive' => true]);
+	public function run(Runtime $runtime, Tracker $tracker) {
+		$tracker->setCaption('Removing directory ' . $this->getPath());
+		return $runtime->getTargetFilesystem()->rmdir($this->getPath(), ['recursive' => true]);
 	}
 }
 
 /**
  * Represents the 'runPHP' step.
  */
-class RunPHPStep {
+class RunPHPStep implements StepInterface {
     private ?string $code;
     private ?string $relativeUri;
     private ?string $scriptPath;
@@ -1054,12 +969,9 @@ class RunPHPStep {
     public function set__SERVER(?array $__SERVER): void {
         $this->__SERVER = $__SERVER;
     }
-}
-
-class RunPHPStepRunner implements StepRunnerInterface {
-	public function run(object $step, Runtime $runtime, Tracker $tracker): mixed {
+	public function run(Runtime $runtime, Tracker $tracker): mixed {
 		$tracker->setCaption('Running custom PHP code');
-		return $runtime->evalPhpInSubProcess($step->getCode(), [
+		return $runtime->evalPhpInSubProcess($this->getCode(), [
 			'DOCROOT' => $runtime->getConfiguration()->getTargetSiteRoot(),
 		]);
 	}
@@ -1068,7 +980,7 @@ class RunPHPStepRunner implements StepRunnerInterface {
 /**
  * Represents the 'runSql' step.
  */
-class RunSqlStep {
+class RunSqlStep implements StepInterface {
     /**
      * SQL source identifier (URL, ./path, /path).
      */
@@ -1088,14 +1000,11 @@ class RunSqlStep {
     public function setSource(DataReference $source): void {
         $this->source = $source;
     }
-}
-
-class RunSQLStepRunner implements StepRunnerInterface {
-	public function run(object $step, Runtime $runtime, Tracker $tracker): mixed {
+	public function run(Runtime $runtime, Tracker $tracker): mixed {
 		$tracker->setCaption('Running SQL queries');
 
 		// Get the data reference for the SQL file
-		$source = $step->getSource();
+		$source = $this->getSource();
 		$sql = $runtime->resolve($source);
 
 		if (!$sql instanceof File) {
@@ -1129,7 +1038,7 @@ CODE
 /**
  * Represents the 'setSiteLanguage' step.
  */
-class SetSiteLanguageStep {
+class SetSiteLanguageStep implements StepInterface {
     /**
      * The language code (e.g., 'en_US', 'de_DE').
      */
@@ -1149,16 +1058,13 @@ class SetSiteLanguageStep {
     public function setLanguage(string $language): void {
         $this->language = $language;
     }
-}
-
-class SetSiteLanguageStepRunner implements StepRunnerInterface {
-    public function run(object $step, Runtime $runtime, Tracker $tracker): mixed {
+    public function run(Runtime $runtime, Tracker $tracker): mixed {
         $tracker->setCaption('Translating');
-        $language = $step->getLanguage();
+        $language = $this->getLanguage();
         
         // Define WPLANG constant
-		$runner = new DefineConstantsStepRunner();
-        $runner->run(new DefineConstantsStep(['WPLANG' => $language]), $runtime, new Tracker());
+		$step = new DefineConstantsStep(['WPLANG' => $language]);
+        $this->run($runtime, new Tracker());
     
         
         // Create language directories if they don't exist
@@ -1356,7 +1262,7 @@ class SetSiteLanguageStepRunner implements StepRunnerInterface {
 /**
  * Represents the 'setSiteOptions' step.
  */
-class SetSiteOptionsStep {
+class SetSiteOptionsStep implements StepInterface {
     /**
      * An associative array of option names to their JSON-compatible values.
      * @var array<string, mixed>
@@ -1383,10 +1289,8 @@ class SetSiteOptionsStep {
     public function setOptions(array $options): void {
         $this->options = $options;
     }
-}
 
-class SetSiteOptionsStepRunner implements StepRunnerInterface {
-	public function run(object $step, Runtime $runtime, Tracker $tracker): mixed {
+	public function run(Runtime $runtime, Tracker $tracker): mixed {
 		$tracker->setCaption('Setting site options');
 		return $runtime->evalPhpInSubProcess(
 			'
@@ -1397,7 +1301,7 @@ class SetSiteOptionsStepRunner implements StepRunnerInterface {
 			update_option($name, $value);
 		}
 ',
-			array('OPTIONS' => json_encode($step->getOptions()))
+			array('OPTIONS' => json_encode($this->getOptions()))
 		);
 	}
 }
@@ -1405,7 +1309,7 @@ class SetSiteOptionsStepRunner implements StepRunnerInterface {
 /**
  * Represents the 'unzip' step.
  */
-class UnzipStep {
+class UnzipStep implements StepInterface {
     /**
      * Zip file source identifier (URL, ./path, /path).
      */
@@ -1440,16 +1344,14 @@ class UnzipStep {
     public function setExtractToPath(string $extractToPath): void {
         $this->extractToPath = $extractToPath;
     }
-}
 
-class UnzipStepRunner implements StepRunnerInterface {
-	public function run(object $step, Runtime $runtime, Tracker $tracker): mixed {
+	public function run(Runtime $runtime, Tracker $tracker): mixed {
 		$tracker->set(10, 'Unzipping...');
 
 		$target_fs = $runtime->getTargetFilesystem();
 
 		// Get the data reference for the zip file
-		$zipFile = $step->getZipFile();
+		$zipFile = $this->getZipFile();
 		$zip_stream = $runtime->resolve($zipFile);
 
 		if (!$zip_stream instanceof File) {
@@ -1464,7 +1366,7 @@ class UnzipStepRunner implements StepRunnerInterface {
 			'source_filesystem' => $zip_fs,
 			'source_path'       => '/',
 			'target_filesystem' => $target_fs,
-			'target_path'       => $step->getExtractToPath(),
+			'target_path'       => $this->getExtractToPath(),
 			'recursive'         => true,
 		]);
 
@@ -1477,7 +1379,7 @@ class UnzipStepRunner implements StepRunnerInterface {
 /**
  * Represents the 'wp-cli' step.
  */
-class WPCLIStep {
+class WPCLIStep implements StepInterface {
     /**
      * The WP-CLI command arguments string (e.g., "plugin install woocommerce --activate").
      */
@@ -1512,19 +1414,17 @@ class WPCLIStep {
     public function setWpCliPath(?string $wpCliPath): void {
         $this->wpCliPath = $wpCliPath;
     }
-}
 
-class WPCLIStepRunner implements StepRunnerInterface {
-	public function run(object $step, Runtime $runtime, Tracker $tracker): mixed {
-		$tracker->setCaption('Running WP-CLI command: ' . $step->getCommand());
-		return $runtime->runShellCommand($step->getCommand());
+	public function run(Runtime $runtime, Tracker $tracker): mixed {
+		$tracker->setCaption('Running WP-CLI command: ' . $this->getCommand());
+		return $runtime->runShellCommand($this->getCommand());
 	}
 }
 
 /**
  * Represents the 'writeFiles' step.
  */
-class WriteFilesStep {
+class WriteFilesStep implements StepInterface {
     /**
      * An associative array where keys are file paths and values are their contents.
      * @var array<string, string|DataReference>
@@ -1551,11 +1451,9 @@ class WriteFilesStep {
     public function setFiles(array $files): void {
         $this->files = $files;
     }
-}
 
-class WriteFilesStepRunner {
-	public function run(object $step, Runtime $runtime, Tracker $tracker): mixed {
-		$files = $step->getFiles();
+	public function run(Runtime $runtime, Tracker $tracker): mixed {
+		$files = $this->getFiles();
 		$total_files = count($files);
 
 		$tracker->set(10, 'Writing files...');
@@ -3042,10 +2940,9 @@ class BlueprintRunner
         for ($i = 0; $i < $stepCount; $i++) {
             $step = $steps[$i];
             $stepNumber = $i + 1;
-            $stepCaption = $this->getStepCaption($step);
             $stepTrackers[$i] = $parentTracker->stage(
                 $stepWeight,
-                sprintf("Step %d/%d: %s", $stepNumber, $stepCount, $stepCaption)
+                sprintf("Step %d/%d", $stepNumber, $stepCount)
             );
         }
 
@@ -3055,8 +2952,7 @@ class BlueprintRunner
             $stepTracker = $stepTrackers[$i];
 
             try {
-                $runner = $this->createStepRunner($step);
-                $results[$i] = $runner->run($step, $runtime, $stepTracker);
+                $results[$i] = $step->run($runtime, $stepTracker);
 
                 // If step didn't call finish(), do it for them
                 if (!$stepTracker->isDone()) {
@@ -3074,7 +2970,7 @@ class BlueprintRunner
                 $stepTracker->finish();
 
                 // Determine if we should continue or stop execution
-                $continueOnError = $step->continueOnError ?? false;
+                $continueOnError = $this->continueOnError ?? false;
                 if (!$continueOnError) {
                     throw new RuntimeException(
                         sprintf("Error when executing step %s (number %d in the plan)",
@@ -3090,77 +2986,13 @@ class BlueprintRunner
 
         return $results;
     }
-
-    private function getStepCaption($step): string {
-        $stepClass = get_class($step);
-        return substr($stepClass, strrpos($stepClass, '\\') + 1);
-    }
-
-    private function createStepRunner($step) {
-        if ($step instanceof ActivatePluginStep) {
-            return new ActivatePluginStepRunner();
-        }
-        if ($step instanceof ActivateThemeStep) {
-            return new ActivateThemeStepRunner();
-        }
-        if ($step instanceof CpStep) {
-            return new CpStepRunner();
-        }
-        if ($step instanceof DefineConstantsStep) {
-            return new DefineConstantsStepRunner();
-        }
-        if ($step instanceof InstallPluginStep) {
-            return new InstallPluginStepRunner();
-        }
-        if ($step instanceof InstallThemeStep) {
-            return new InstallThemeStepRunner();
-        }
-        if ($step instanceof MkdirStep) {
-            return new MkdirStepRunner();
-        }
-        if ($step instanceof MvStep) {
-            return new MvStepRunner();
-        }
-        if ($step instanceof RmStep) {
-            return new RmStepRunner();
-        }
-        if ($step instanceof RmDirStep) {
-            return new RmDirStepRunner();
-        }
-        if ($step instanceof RunPHPStep) {
-            return new RunPHPStepRunner();
-        }
-        if ($step instanceof RunSqlStep) {
-            return new RunSQLStepRunner();
-        }
-        if ($step instanceof SetSiteLanguageStep) {
-            return new SetSiteLanguageStepRunner();
-        }
-        if ($step instanceof SetSiteOptionsStep) {
-            return new SetSiteOptionsStepRunner();
-        }
-        if ($step instanceof UnzipStep) {
-            return new UnzipStepRunner();
-        }
-        if ($step instanceof WPCLIStep) {
-            return new WPCLIStepRunner();
-        }
-        if ($step instanceof WriteFilesStep) {
-            return new WriteFilesStepRunner();
-        }
-        if ($step instanceof ImportMediaStep) {
-            return new ImportMediaStepRunner();
-        }
-
-        throw new \InvalidArgumentException('Unknown step type: ' . get_class($step));
-    }
 }
 
 
 /**
  * Represents the 'importMedia' step.
  */
-class ImportMediaStep {
+class ImportMediaStep implements StepInterface {
     /**
      * An associative array of media files to import.
      * @var array<string, DataReference|string>
@@ -3187,12 +3019,10 @@ class ImportMediaStep {
     public function setMedia(array $media): void {
         $this->media = $media;
     }
-}
 
-class ImportMediaStepRunner implements StepRunnerInterface {
-    public function run(object $step, Runtime $runtime, Tracker $tracker) {
+    public function run(Runtime $runtime, Tracker $tracker) {
         $tracker->setCaption('Importing media files');
-		$medias = $step->getMedia();
+		$medias = $this->getMedia();
         $total_files = count($medias);
         
         if ($total_files === 0) {
