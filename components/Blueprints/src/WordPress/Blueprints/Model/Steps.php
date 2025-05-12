@@ -1652,322 +1652,6 @@ class ProgressLogger {
     }
 }
 
-// class BlueprintRunner {
-//     private ?Blueprint $blueprint;
-//     private Runtime $runtime;
-//     private Tracker $mainTracker;
-//     private RunnerConfiguration $runnerConfiguration;
-//     private ProgressLogger $progressLogger;
-
-//     /**
-//      * Create a new BlueprintRunner with the given configuration
-//      *
-//      * @param RunnerConfiguration $runnerConfiguration Configuration for the runner
-//      * @param callable|null $progressCallback Optional callback for progress updates
-//      */
-//     public function __construct(RunnerConfiguration $runnerConfiguration, ?callable $progressCallback = null) {
-//         $this->runnerConfiguration = $runnerConfiguration;
-//         $this->mainTracker = new Tracker();
-
-// 		// Default progress handler logs to stderr
-//         $this->progressLogger = new ProgressLogger(
-//             $progressCallback ?? function($progress, $caption) {
-//                 fprintf(STDERR, "[%3d%%] %s\n", $progress, $caption);
-//             }
-//         );
-//         $this->progressLogger->attachTo($this->mainTracker);
-//     }
-
-//     public function run() {
-//         // Create all top-level progress stages upfront so the tracker knows what %
-// 		// of the total work is being done with every progress update.
-// 		//
-// 		// The stage weights are arbitrary and can be tweaked as needed.
-// 		// They have to add up to 1.
-//         $dataResolutionStage = $this->mainTracker->stage(0.25, 'Resolving data references');
-//         $blueprintStage = $this->mainTracker->stage(0.05, 'Resolving Blueprint');
-//         $siteStage = $this->mainTracker->stage(0.2, 'Setting up WordPress site');
-//         $executionStage = $this->mainTracker->stage(0.5, 'Executing Blueprint steps');
-
-//         $blueprintStage->setCaption('Loading Blueprint data');
-// 		// Resolve the blueprint.
-// 		// @TODO: Support more data sources.
-// 		// @TODO: Rename Blueprint class to ExecutionPlan. Separate it from
-// 		//        the execution target resolution.
-//         $rawBlueprint = $this->runnerConfiguration->getRawBlueprint();
-//         if(is_string($rawBlueprint)) {
-//             $this->blueprint = Blueprint::fromJsonString($rawBlueprint);
-//         } else if(is_array($rawBlueprint)) {
-//             $this->blueprint = Blueprint::fromArray($rawBlueprint);
-//         } else {
-//             throw new RuntimeException('Invalid blueprint source');
-//         }
-//         $blueprintStage->finish();
-
-// 		// @TODO: Resolve just like any other resource (but only if we're creating a new site)
-// 		if (!isset($options['wordPressZip'])) {
-// 			$wordPressZip = DataReference::create('https://wordpress.org/latest.zip');
-// 		} else if(is_string($options['wordPressZip'])) {
-// 			$wordPressZip = DataReference::create($options['wordPressZip']);
-// 		} else {
-// 			throw new \InvalidArgumentException('The wordPressZip option must be a DataReference but was ' . gettype($options['wordPressZip']));
-// 		}
-
-// 		// @TODO: Resolve just like any other resource (but only if we're creating a new site)
-// 		if(!isset($options['sqliteIntegrationPluginZip'])) {
-// 			$sqliteIntegrationPluginZip = DataReference::create('https://downloads.wordpress.org/plugin/sqlite-database-integration.zip');
-// 		} else if(is_string($options['sqliteIntegrationPluginZip'])) {
-// 			$sqliteIntegrationPluginZip = DataReference::create($options['sqliteIntegrationPluginZip']);
-// 		} else {
-// 			throw new \InvalidArgumentException('The sqliteIntegrationPluginZip option must be a DataReference but was ' . gettype($options['sqliteIntegrationPluginZip']));
-// 		}
-
-// 		$data_references = [
-// 			...$this->blueprint->getDataReferences(),
-// 			$wordPressZip,
-// 			$sqliteIntegrationPluginZip,
-// 		];
-
-//         $this->runtime = new Runtime(
-//             documentRoot: $this->runnerConfiguration->getTargetSiteRoot(),
-// 			executionContext: LocalFilesystem::create(
-// 				$this->runnerConfiguration->getExecutionContextRoot()
-// 			),
-// 			dataReferences: $data_references,
-// 			dataResolutionTracker: $dataResolutionStage,
-//         );
-// 		$this->runtime->startResolvingAllDataReferences();
-
-//         $siteStage->setCaption('Booting WordPress environment');
-// 		// Resolve the execution target.
-// 		// @TODO: Support existing sites.
-//         WordPressBootManager::boot( [
-// 			'runtime' => $this->runtime,
-// 			'siteUrl' => $this->runnerConfiguration->getTargetSiteUrl(),
-// 			'wordPressZip' => $wordPressZip,
-// 			'sqliteIntegrationPluginZip' => $sqliteIntegrationPluginZip,
-// 		] );
-//         $siteStage->finish();
-
-//         $this->runSteps($executionStage);
-//     }
-
-// 	/**
-// 	 * Resolves a specific WordPress release URL and version string based on
-// 	 * a version query string such as "latest", "beta", or "6.6".
-// 	 *
-// 	 * Examples:
-// 	 * ```php
-// 	 * $result = resolveWordPressRelease('latest');
-// 	 * // becomes ['releaseUrl' => 'https://wordpress.org/wordpress-6.6.2.zip', 'version' => '6.6.2']
-// 	 *
-// 	 * $result = resolveWordPressRelease('beta');
-// 	 * // becomes ['releaseUrl' => 'https://wordpress.org/wordpress-6.6.2-RC1.zip', 'version' => '6.6.2-RC1']
-// 	 *
-// 	 * $result = resolveWordPressRelease('6.6');
-// 	 * // becomes ['releaseUrl' => 'https://wordpress.org/wordpress-6.6.2.zip', 'version' => '6.6.2']
-// 	 * ```
-// 	 *
-// 	 * @param string $versionQuery The WordPress version query string to resolve.
-// 	 * @return array The resolved WordPress release URL and version string.
-// 	 */
-// 	static public function resolveWordPressRelease($versionQuery = 'latest')
-// 	{
-// 		if (
-// 			str_starts_with($versionQuery, 'https://') ||
-// 			str_starts_with($versionQuery, 'http://')
-// 		) {
-// 			$sha1 = substr(sha1($versionQuery), 0, 8);
-// 			return [
-// 				'releaseUrl' => $versionQuery,
-// 				'version' => 'custom-' . $sha1,
-// 				'source' => 'inferred',
-// 			];
-// 		} else if ($versionQuery === 'trunk' || $versionQuery === 'nightly') {
-// 			return [
-// 				'releaseUrl' => 'https://wordpress.org/nightly-builds/wordpress-latest.zip',
-// 				'version' => 'nightly-' . date('Y-m-d'),
-// 				'source' => 'inferred',
-// 			];
-// 		}
-
-// 		$response = file_get_contents('https://api.wordpress.org/core/version-check/1.7/?channel=beta');
-// 		$latestVersions = json_decode($response, true);
-
-// 		$latestVersions = array_filter($latestVersions['offers'], function($v) {
-// 			return $v['response'] === 'autoupdate';
-// 		});
-
-// 		foreach ($latestVersions as $apiVersion) {
-// 			if ($versionQuery === 'beta' && strpos($apiVersion['version'], 'beta') !== false) {
-// 				return [
-// 					'releaseUrl' => $apiVersion['download'],
-// 					'version' => $apiVersion['version'],
-// 					'source' => 'api',
-// 				];
-// 			} else if (
-// 				$versionQuery === 'latest' &&
-// 				strpos($apiVersion['version'], 'beta') === false
-// 			) {
-// 				// The first non-beta item in the list is the latest version.
-// 				return [
-// 					'releaseUrl' => $apiVersion['download'],
-// 					'version' => $apiVersion['version'],
-// 					'source' => 'api',
-// 				];
-// 			} else if (
-// 				substr($apiVersion['version'], 0, strlen($versionQuery)) ===
-// 				$versionQuery
-// 			) {
-// 				return [
-// 					'releaseUrl' => $apiVersion['download'],
-// 					'version' => $apiVersion['version'],
-// 					'source' => 'api',
-// 				];
-// 			}
-// 		}
-
-// 		return [
-// 			'releaseUrl' => "https://wordpress.org/wordpress-{$versionQuery}.zip",
-// 			'version' => $versionQuery,
-// 			'source' => 'inferred',
-// 		];
-// 	}
-	
-//     /**
-//      * Run the steps in the execution plan with progress tracking
-//      *
-//      * @param Tracker $parentTracker The parent tracker for step execution
-//      * @return array Results from each step execution
-//      */
-//     private function runSteps(Tracker $parentTracker) {
-//         $results = [];
-//         $steps = $this->blueprint->getExecutionPlan();
-//         $stepCount = count($steps);
-
-//         if ($stepCount === 0) {
-//             $parentTracker->finish();
-//             return $results;
-//         }
-
-//         // Create sub-trackers for each step with equal weight
-//         $stepWeight = 1.0 / $stepCount;
-//         $stepTrackers = [];
-
-//         // Create all step trackers upfront for accurate progress calculation
-//         for ($i = 0; $i < $stepCount; $i++) {
-//             $step = $steps[$i];
-//             $stepNumber = $i + 1;
-//             $stepCaption = $this->getStepCaption($step);
-//             $stepTrackers[$i] = $parentTracker->stage(
-//                 $stepWeight,
-//                 sprintf("Step %d/%d: %s", $stepNumber, $stepCount, $stepCaption)
-//             );
-//         }
-
-//         // Execute each step
-//         for ($i = 0; $i < $stepCount; $i++) {
-//             $step = $steps[$i];
-//             $stepTracker = $stepTrackers[$i];
-
-//             try {
-//                 $runner = $this->createStepRunner($step);
-//                 $results[$i] = $runner->run($step, $this->runtime, $stepTracker);
-
-//                 // If step didn't call finish(), do it for them
-//                 if (!$stepTracker->isDone()) {
-//                     $stepTracker->finish();
-//                 }
-//             } catch (Exception $e) {
-//                 $results[$i] = $e;
-//                 $stepTracker->setCaption(sprintf("%s (FAILED: %s)",
-//                     $stepTracker->getCaption(),
-//                     $e->getMessage()
-//                 ));
-
-//                 // Mark as done but not 100% to indicate error
-//                 $stepTracker->set(99.9);
-//                 $stepTracker->finish();
-
-//                 // Determine if we should continue or stop execution
-//                 $continueOnError = $step->continueOnError ?? false;
-//                 if (!$continueOnError) {
-//                     throw new RuntimeException(
-//                         sprintf("Error when executing step %s (number %d in the plan)",
-//                             get_class($step),
-//                             $i + 1
-//                         ),
-//                         0,
-//                         $e
-//                     );
-//                 }
-//             }
-//         }
-
-//         return $results;
-//     }
-
-//     private function getStepCaption($step): string {
-//         $stepClass = get_class($step);
-//         return substr($stepClass, strrpos($stepClass, '\\') + 1);
-//     }
-
-//     private function createStepRunner($step) {
-//         if ($step instanceof ActivatePluginStep) {
-//             return new ActivatePluginStepRunner();
-//         }
-//         if ($step instanceof ActivateThemeStep) {
-//             return new ActivateThemeStepRunner();
-//         }
-//         if ($step instanceof CpStep) {
-//             return new CpStepRunner();
-//         }
-//         if ($step instanceof DefineConstantsStep) {
-//             return new DefineConstantsStepRunner();
-//         }
-//         if ($step instanceof InstallPluginStep) {
-//             return new InstallPluginStepRunner();
-//         }
-//         if ($step instanceof InstallThemeStep) {
-//             return new InstallThemeStepRunner();
-//         }
-//         if ($step instanceof MkdirStep) {
-//             return new MkdirStepRunner();
-//         }
-//         if ($step instanceof MvStep) {
-//             return new MvStepRunner();
-//         }
-//         if ($step instanceof RmStep) {
-//             return new RmStepRunner();
-//         }
-//         if ($step instanceof RmDirStep) {
-//             return new RmDirStepRunner();
-//         }
-//         if ($step instanceof RunPHPStep) {
-//             return new RunPHPStepRunner();
-//         }
-//         if ($step instanceof RunSqlStep) {
-//             return new RunSQLStepRunner();
-//         }
-//         if ($step instanceof SetSiteLanguageStep) {
-//             return new SetSiteLanguageStepRunner();
-//         }
-//         if ($step instanceof SetSiteOptionsStep) {
-//             return new SetSiteOptionsStepRunner();
-//         }
-//         if ($step instanceof UnzipStep) {
-//             return new UnzipStepRunner();
-//         }
-//         if ($step instanceof WPCLIStep) {
-//             return new WPCLIStepRunner();
-//         }
-//         if ($step instanceof WriteFilesStep) {
-//             return new WriteFilesStepRunner();
-//         }
-
-//         throw new \InvalidArgumentException('Unknown step type: ' . get_class($step));
-//     }
-// }
 
 /*──────────────────────── Value objects ───────────────────────────*/
 class VersionConstraint
@@ -2081,6 +1765,7 @@ class RunnerConfiguration
 
 	public function getDatabaseCredentials(): array { return $this->databaseCredentials; }
 }
+
 /*──────────────────────── Data-reference resolver ─────────────────*/
 class DataReferenceResolver
 {
@@ -2236,7 +1921,7 @@ class NewSiteResolver
 			? VersionConstraint::fromMixed($blueprint['wordpressVersion'])
 			: null;
 
-		$wpZip = self::resolveWordPressZipUrl($wpVersionConstraint);
+		$wpZip = self::resolveWordPressZipUrl($runtime->getHttpClient(), $wpVersionConstraint);
 
 		$assets = [
 			'wordpress' => DataReference::create($wpZip),
@@ -2361,7 +2046,7 @@ class NewSiteResolver
 		$targetResolutionStage->finish();
     }
 
-	static private function resolveWordPressZipUrl(?VersionConstraint $constraint): string {
+	static private function resolveWordPressZipUrl(Client $client, ?VersionConstraint $constraint): string {
 		if($constraint === null) {
 			return 'https://wordpress.org/latest.zip';
 		}
@@ -2370,20 +2055,43 @@ class NewSiteResolver
 		$max = $constraint->getMax();
 		$recommended = $constraint->getRecommended();
 
-		if($min === null && $max === null && $recommended === null) {
+		$version_string = $recommended ?? $max ?? $min;
+
+		if ($version_string === 'latest') {
 			return 'https://wordpress.org/latest.zip';
 		}
 
-		if($recommended !== null) {
-			return 'https://wordpress.org/wordpress-'.$recommended.'.zip';
+		if (
+			str_starts_with($version_string, 'https://') ||
+			str_starts_with($version_string, 'http://')
+		) {
+			return $version_string;
+		}
+		
+		if ($version_string === 'nightly') {
+			return 'https://wordpress.org/nightly-builds/wordpress-latest.zip';
 		}
 
-		if($max !== null) {
-			return 'https://wordpress.org/wordpress-'.$max.'.zip';
-		}
+		$latestVersions = $client->fetch('https://api.wordpress.org/core/version-check/1.7/?channel=beta')->json();
+		$latestVersions = array_filter($latestVersions['offers'], function($v) {
+			return $v['response'] === 'autoupdate';
+		});
 
-		if($min !== null) {
-			return 'https://wordpress.org/wordpress-'.$min.'.zip';
+		foreach ($latestVersions as $apiVersion) {
+			if ($version_string === 'beta' && strpos($apiVersion['version'], 'beta') !== false) {
+				return $apiVersion['download'];
+			} else if (
+				$version_string === 'latest' &&
+				strpos($apiVersion['version'], 'beta') === false
+			) {
+				// The first non-beta item in the list is the latest version.
+				return $apiVersion['download'];
+			} else if (
+				substr($apiVersion['version'], 0, strlen($version_string)) ===
+				$version_string
+			) {
+				return $apiVersion['download'];
+			}
 		}
 
 		throw new \Exception('Invalid WordPress version constraint');
