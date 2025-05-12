@@ -7,7 +7,7 @@ namespace WordPress\Blueprints;
  * 
  * Validates Blueprint JSON files against the schema without using a schema validation library.
  */
-class BlueprintV2Validator {
+class Validator {
     /**
      * Store validation errors.
      *

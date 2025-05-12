@@ -32,6 +32,7 @@ use WordPress\Blueprints\Progress\DoneEvent;
 use WordPress\Blueprints\Progress\ProgressEvent;
 use WordPress\Blueprints\Progress\ProgressTrackedReadStream;
 use WordPress\Blueprints\Progress\Tracker;
+use WordPress\Blueprints\Validator;
 use WordPress\ByteStream\MemoryPipe;
 use WordPress\Filesystem\Filesystem;
 use WordPress\Filesystem\FilesystemException;
@@ -58,8 +59,7 @@ use function WordPress\Zip\is_zip_file_stream;
 error_reporting(E_ALL & ~E_DEPRECATED & ~E_USER_DEPRECATED);
 
 // Initialize runtime for the given document root
-require_once __DIR__ . '/../../../../vendor/autoload.php';
-require_once __DIR__ . '/../../../../../../vendor/autoload.php';
+require_once __DIR__ . '/../../../vendor/autoload.php';
 
 
 /**
@@ -1994,7 +1994,7 @@ class BlueprintRunner
 
     private function validateBlueprint(): void {
 		// Schema conformance
-		$v = new BlueprintV2Validator();
+		$v = new Validator();
 		$is_valid = $v->validate($this->blueprintArray);
 		if(!$is_valid) {
 			throw new \Exception('Blueprint is invalid');
