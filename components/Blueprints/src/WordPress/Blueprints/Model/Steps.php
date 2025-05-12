@@ -2467,9 +2467,7 @@ class BlueprintRunner
 
         // 7. fonts – not directly supported; use RunPHP placeholders.
         if ( !empty($validated_array['fonts']) && is_array($validated_array['fonts'])) {
-			throw new InvalidArgumentException('Fonts are not supported yet.');
-            $code = '// TODO: Install fonts declared in Blueprint. Fonts JSON: ' . var_export($validated_array['fonts'], true) . ';';
-            $plan[] = $this->createStepObject('runPHP', ['code' => $code]);
+			throw new InvalidArgumentException('Your Blueprint contains a "fonts" property that is not supported yet.');
         }
 
         // 8. media – Import media files
