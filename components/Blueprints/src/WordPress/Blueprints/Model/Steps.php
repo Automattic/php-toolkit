@@ -44,6 +44,7 @@ use WordPress\Git\GitFilesystem;
 use WordPress\Git\GitRepository;
 use WordPress\HttpClient\ByteStream\RequestReadStream;
 use WordPress\HttpClient\Client;
+use WordPress\HttpClient\FilesystemCache;
 use WordPress\HttpClient\Request;
 use WordPress\Zip\FileEntry;
 use WordPress\Zip\ZipDecoder;
@@ -1909,7 +1910,6 @@ class NewSiteResolver
 {
     static public function resolve(Runtime $runtime, Tracker $targetResolutionStage)
     {
-		return;
 		$stages = [
 			'resolve_assets' => $targetResolutionStage->stage(0.66),
 			'install_wordpress' => $targetResolutionStage->stage(0.33, 'Installing WordPress'),
@@ -2213,7 +2213,8 @@ class BlueprintRunner
 
     public function __construct(private RunnerConfiguration $configuration)
     {
-        $this->client     = new Client();
+        $cache = new FilesystemCache(LocalFilesystem::create(__DIR__ . '/cache'));
+        $this->client     = new Client(['cache' => $cache]);
         $this->mainTracker = new Tracker();
 
         // Set up progress logging
@@ -2759,7 +2760,7 @@ class BlueprintRunner
 						add_action(
 							'init',
 							static function () {
-								register_post_type('%1$s', %2$s);
+								register_post_type(%1$s, %2$s);
 							},
 							0
 						);
@@ -3291,13 +3292,13 @@ $config = (new RunnerConfiguration())
     ->setBlueprint([
 		"version" => 2,
 		'$schema' => "https://raw.githubusercontent.com/WordPress/blueprints/trunk/blueprints/schema.json",
-		// "plugins" => [
-		// 	"friends"
-		// ],
+		"plugins" => [
+			"friends"
+		],
 		// @TODO: Should the default WordPress theme stay? Do we need an option for this!
-		// "themes" => [
-		// 	"adventurer"
-		// ],
+		"themes" => [
+			"adventurer"
+		],
 		"blueprintMeta" => [
 			"name" => "Full Featured Blueprint",
 			"description" => "A blueprint demonstrating most of the available features",

@@ -5,6 +5,7 @@ namespace WordPress\HttpClient;
 use WordPress\ByteStream\ReadStream\FileReadStream;
 use WordPress\ByteStream\ReadStream\TransformedReadStream;
 use WordPress\ByteStream\ByteTransformer\InflateTransformer;
+use WordPress\ByteStream\WriteStream\ByteWriteStream;
 use WordPress\HttpClient\ByteStream\ChunkedDecoderReadStream;
 use WordPress\HttpClient\ByteStream\ChunkedEncoderByteTransformer;
 use WordPress\HttpClient\ByteStream\RequestReadStream;
@@ -109,12 +110,17 @@ class Client {
 	protected $response_body_chunk;
 	protected $timeout;
 	protected $requests_started_at = array();
+	protected ?CacheStorage $cache;
+	protected array $stale_cache_entries = array();
+	/** @var array<int, ByteWriteStream> */
+	protected array $cache_write_streams = array();
 
 	public function __construct( $options = array() ) {
 		$this->concurrency   = $options['concurrency'] ?? 10;
 		$this->max_redirects = $options['max_redirects'] ?? 3;
 		$this->timeout       = $options['timeout'] ?? 30;
 		$this->requests      = array();
+		$this->cache         = $options['cache'] ?? null;
 	}
 
 	/**
@@ -161,11 +167,52 @@ class Client {
 		}
 
 		foreach ( $requests as $request ) {
+			if ( $this->cache && $request->method === 'GET' ) {
+				$cached = $this->cache->lookup( $request->url );
+				if ( $cached && CachePolicy::is_fresh( $cached ) ) {
+					$this->hydrate_from_cache( $request, $cached );
+					// Still track the request internally so that await_next_event() can emit the cached events.
+					$this->requests[] = apply_filters( 'wp_http_client_request', $request );
+					$this->requests_started_at[ $request->id ] = microtime( true );
+					continue;
+				}
+				if ( $cached ) {
+					if ( $cached->etag ) {
+						$request->headers['if-none-match'] = $cached->etag;
+					}
+					if ( $cached->last_modified ) {
+						$request->headers['if-modified-since'] = $cached->last_modified;
+					}
+					// Store the stale cache entry internally instead of on the Request object.
+					$this->stale_cache_entries[ $request->id ] = $cached;
+				}
+			}
+
 			$this->requests[]                          = apply_filters( 'wp_http_client_request', $request );
 			$this->events[ $request->id ]              = array();
 			$this->connections[ $request->id ]         = new Connection( $request );
 			$this->requests_started_at[ $request->id ] = microtime( true );
 		}
+	}
+
+	private function hydrate_from_cache( Request $r, CacheEntry $e ) : void {
+		$r->response              = new Response( $r );
+		$r->response->status_code = $e->status;
+		$r->response->headers     = $e->headers;
+		$r->state                 = Request::STATE_FINISHED;
+		$this->events[ $r->id ]   = array(
+			self::EVENT_GOT_HEADERS          => true,
+			self::EVENT_BODY_CHUNK_AVAILABLE => true,
+			self::EVENT_FINISHED    => true,
+		);
+	
+		// lazy-load body through RequestReadStream
+		if ( ! isset( $this->connections[ $r->id ] ) ) {
+			$this->connections[ $r->id ] = new Connection( $r );
+		}
+		// @TODO: Tolerate a failure, e.g. a truncated body stream. In such a case,
+		//        purge the cached entry and run the request as usual.
+		$this->connections[ $r->id ]->response_buffer = $this->cache->get_body( $e );
 	}
 
 	/**
@@ -695,10 +742,37 @@ class Client {
 					break;
 				}
 
+				// If the response is a 304 Not Modified, we can use the cached response.
+				$stale_cache_entry = $this->stale_cache_entries[ $request->id ] ?? null;
+				if ( $response->status_code === 304 && $stale_cache_entry ) {
+					$entry = $stale_cache_entry;
+					// @TODO: Should we merge these headers? Or replace them?
+					$entry->headers      = array_merge( $entry->headers, $response->headers );
+					$entry->stored_at    = time();
+					$this->cache->store( $entry );
+					$this->hydrate_from_cache( $request, $entry );
+					unset( $this->stale_cache_entries[ $request->id ] );
+				}
+
 				// If we're being redirected, we don't need to wait for the body.
 				if ( $response->status_code >= 300 && $response->status_code < 400 ) {
 					$request->state = Request::STATE_RECEIVED;
 					break;
+				}
+
+				// Cache the response metadata
+				if ( $this->cache ) {
+					$meta = new CacheEntry();
+					$meta->url          = $request->url;
+					$meta->status       = $request->response->status_code;
+					$meta->headers      = $request->response->headers;
+					$meta->stored_at    = time();
+					$cc                 = $request->response->get_header( 'cache-control' );
+					$meta->max_age      = $cc ? CachePolicy::parse_max_age( $cc ) : null;
+					$meta->etag         = $request->response->get_header( 'etag' );
+					$meta->last_modified= $request->response->get_header( 'last-modified' );
+		
+					$this->cache->store( $meta );
 				}
 
 				$request->state = Request::STATE_RECEIVING_BODY;
@@ -733,11 +807,23 @@ class Client {
 					$this->connections[ $request->id ]->response_buffer .= $body_chunk;
 
 					$this->events[ $request->id ][ self::EVENT_BODY_CHUNK_AVAILABLE ] = true;
-					break;
+
+					if (
+						$this->cache &&
+						$request->method === 'GET' &&
+						CachePolicy::response_is_cacheable( $request->response )
+					) {
+						// @TODO: Close the write stream on exceptions
+						// @TODO: Close the write stream after exhausting the stream
+						// @TODO: If we're running two concurrent requests to the same URL,
+						//        don't open two write streams.
+						if ( ! isset( $this->cache_write_streams[ $request->id ] ) ) {
+							$this->cache_write_streams[ $request->id ] = $this->cache->open_body_write_stream( $request->url );
+						}
+						$this->cache_write_streams[ $request->id ]->append_bytes( $body_chunk );
+					}
+					break; // Process one chunk per loop iteration
 				} elseif ( $stream->reached_end_of_data() ) {
-					// No data came in during this poll, we need to break out of the loop
-					// and get a chance to call stream_select() one more time to receive
-					// the next chunk.
 					$request->state = Request::STATE_RECEIVED;
 					break;
 				}

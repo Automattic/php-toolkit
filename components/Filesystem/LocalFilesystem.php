@@ -122,7 +122,7 @@ class LocalFilesystem implements Filesystem {
 	}
 
 	public function rm( $path ) {
-		if ( false === unlink( $path ) ) {
+		if ( false === @unlink( $path ) ) {
 			throw new FilesystemException(
 				sprintf( 'Failed to remove file: %s', $path )
 			);
