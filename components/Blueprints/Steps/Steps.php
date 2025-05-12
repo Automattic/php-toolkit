@@ -1333,7 +1333,7 @@ class DataReferenceResolver
 			$progress_tracker->finish();
 
 			/**
-			 * @TODO: Use a local path as in the Blueprints v2 spec Appendix B.
+			 * @TODO: Use a temporary local filesystem for cloning the repo as in the Blueprints v2 spec Appendix B.
 			 *        Even medium-sized repos can use all the memory.
 			 */
 			$repo = new GitRepository( InMemoryFilesystem::create() );
