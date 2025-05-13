@@ -1,4 +1,14 @@
 <?php
+/**
+ * @TODO: Support different ref formats:
+ * – nice branch names like "trunk"
+ * – full branch names like "refs/heads/trunk"
+ * – tags
+ * – commit hashes
+ * - ... what else? ...
+ * 
+ * Currently, we only support full branch names.
+ */
 
 namespace WordPress\Git;
 

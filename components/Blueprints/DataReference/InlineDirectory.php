@@ -2,6 +2,11 @@
 
 namespace WordPress\Blueprints\DataReference;
 
+use WordPress\Filesystem\Filesystem;
+use WordPress\Filesystem\InMemoryFilesystem;
+
+use function WordPress\Filesystem\wp_join_paths;
+
 /**
  * Represents a directory that is inlined within the Blueprint JSON document.
  */
@@ -50,6 +55,31 @@ class InlineDirectory extends DataReference {
 		return $this->children;
 	}
 
+	public function as_filesystem(): Filesystem {
+		$fs = InMemoryFilesystem::create();
+
+		$add_to_fs = function ( $children, $base_path = '' ) use ( &$add_to_fs, $fs ) {
+			foreach ( $children as $child ) {
+				if ( $child instanceof \WordPress\Blueprints\DataReference\InlineFile ) {
+					$path = wp_join_paths( $base_path, $child->get_filename() );
+					$fs->put_contents( $path, $child->get_content() );
+				} elseif ( $child instanceof \WordPress\Blueprints\DataReference\InlineDirectory ) {
+					$dir_path = wp_join_paths( $base_path, $child->get_name() );
+					$fs->mkdir( $dir_path, [ 'recursive' => true ] );
+					$add_to_fs( $child->get_children(), $dir_path );
+				}
+			}
+		};
+
+		$add_to_fs( $this->children );
+
+		return $fs;
+	}
+
+	public function as_directory(): Directory {
+		return new Directory( $this->as_filesystem(), $this->get_name() );
+	}
+
 	/**
 	 * Create an instance from an array.
 	 *
@@ -65,7 +95,7 @@ class InlineDirectory extends DataReference {
 		$children = [];
 		foreach ( $data['children'] as $child ) {
 			if ( InlineFile::is_valid( $child ) ) {
-				$children[] = InlineFile::from_array( $child );
+				$children[] = InlineFile::from_blueprint_data( $child );
 			} elseif ( self::is_valid( $child ) ) {
 				$children[] = self::from_array( $child );
 			} else {

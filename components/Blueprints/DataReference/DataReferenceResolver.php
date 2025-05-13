@@ -108,15 +108,7 @@ class DataReferenceResolver {
 			return new File( new MemoryPipe( $reference->get_content() ), $reference->get_filename() );
 		} elseif ( $reference instanceof InlineDirectory ) {
 			$progress_tracker->finish();
-			$fs = InMemoryFilesystem::create();
-			/**
-			 * @TODO: This can be recursive, we need to support nested directories.
-			 */
-			foreach ( $reference->get_children() as $child ) {
-				$fs->put_contents( $child->get_path(), $child->get_content() );
-			}
-
-			return new Directory( $fs, $reference->get_name() );
+			return $reference->as_directory();
 		} elseif ( $reference instanceof GitPath ) {
 			// @TODO (low priority): Actually track the download progress for git repositories.
 			$progress_tracker->finish();
