@@ -8,7 +8,6 @@ use WordPress\Blueprints\DataReference\DataReferenceResolver;
 use WordPress\Blueprints\DataReference\Directory;
 use WordPress\Blueprints\DataReference\ExecutionContextPath;
 use WordPress\Blueprints\DataReference\File;
-use WordPress\Blueprints\DataReference\InlineDirectory;
 use WordPress\Blueprints\DataReference\InlineFile;
 use WordPress\Blueprints\DataReference\URLReference;
 use WordPress\Blueprints\DataReference\WordPressOrgPlugin;
@@ -21,7 +20,6 @@ use WordPress\Blueprints\Steps\ActivateThemeStep;
 use WordPress\Blueprints\Steps\CpStep;
 use WordPress\Blueprints\Steps\DefineConstantsStep;
 use WordPress\Blueprints\Steps\Exception;
-use WordPress\Blueprints\Steps\HttpMethod;
 use WordPress\Blueprints\Steps\ImportMediaStep;
 use WordPress\Blueprints\Steps\ImportThemeStarterContentStep;
 use WordPress\Blueprints\Steps\InstallPluginStep;
@@ -60,8 +58,17 @@ class Runner {
 	private ProgressObserver $progressObserver;
 
 	public function __construct( private RunnerConfiguration $configuration ) {
-		$cache             = new FilesystemCache( LocalFilesystem::create( __DIR__ . '/cache' ) );
-		$this->client      = new Client( [ 'cache' => $cache ] );
+		$this->client      = new Client( [
+			/**
+			 * Store cached HTTP responses in a temporary directory with a stable path
+			 * to reuse across multiple runs.
+			 */
+			'cache' => new FilesystemCache(
+				LocalFilesystem::create( 
+					sys_get_temp_dir() . '/wp-blueprints'
+				)
+			)
+		] );
 		$this->mainTracker = new Tracker();
 
 		// Set up progress logging
@@ -74,37 +81,40 @@ class Runner {
 	}
 
 	public function run(): void {
-		// Create all top-level progress stages upfront so the tracker knows what %
-		// of the total work is being done with every progress update.
-		//
-		// The stage weights are arbitrary and can be tweaked as needed.
-		// They have to add up to 1.
-		$blueprintStage        = $this->mainTracker->stage( 0.05, 'Resolving Blueprint' );
-		$targetResolutionStage = $this->mainTracker->stage( 0.2, 'Setting up WordPress site' );
-		$dataResolutionStage   = $this->mainTracker->stage( 0.25, 'Resolving data references' );
-		$executionStage        = $this->mainTracker->stage( 0.5, 'Executing Blueprint steps' );
-
-		$this->assets = new DataReferenceResolver( $this->client );
-
-		$blueprintStage->setCaption( 'Loading Blueprint data' );
-		$this->loadBlueprint();
-		$this->validateBlueprint();
-		$this->assets->setExecutionContext( $this->blueprintExecutionContext );
-		$blueprintStage->finish();
-
-		$targetResolutionStage->setCaption( 'Resolving target site' );
-
-		$targetSiteFs = LocalFilesystem::create( $this->configuration->getTargetSiteRoot() );
-		$runtime      = new Runtime(
-			$targetSiteFs,
-			$this->configuration,
-			$this->assets,
-			$this->client,
-			$this->blueprintArray
-		);
-		$runtime->initialize();
+		$tempRoot = sys_get_temp_dir() . '/wp-blueprints-runtime-' . uniqid();
+		mkdir( $tempRoot, 0777, true );
 
 		try {
+			// Create all top-level progress stages upfront so the tracker knows what %
+			// of the total work is being done with every progress update.
+			//
+			// The stage weights are arbitrary and can be tweaked as needed.
+			// They have to add up to 1.
+			$blueprintStage        = $this->mainTracker->stage( 0.05, 'Resolving Blueprint' );
+			$targetResolutionStage = $this->mainTracker->stage( 0.2, 'Setting up WordPress site' );
+			$dataResolutionStage   = $this->mainTracker->stage( 0.25, 'Resolving data references' );
+			$executionStage        = $this->mainTracker->stage( 0.5, 'Executing Blueprint steps' );
+
+			$this->assets = new DataReferenceResolver( $this->client );
+
+			$blueprintStage->setCaption( 'Loading Blueprint data' );
+			$this->loadBlueprint();
+			$this->validateBlueprint();
+			$this->assets->setExecutionContext( $this->blueprintExecutionContext );
+			$blueprintStage->finish();
+
+			$targetResolutionStage->setCaption( 'Resolving target site' );
+
+			$targetSiteFs = LocalFilesystem::create( $this->configuration->getTargetSiteRoot() );
+			$runtime      = new Runtime(
+				$targetSiteFs,
+				$this->configuration,
+				$this->assets,
+				$this->client,
+				$this->blueprintArray,
+				$tempRoot
+			);
+
 			if ( $this->configuration->getExecutionMode() === 'apply-to-existing-site' ) {
 				ExistingSiteResolver::resolve( $runtime, $targetResolutionStage );
 			} else {
@@ -116,7 +126,9 @@ class Runner {
 			$this->assets->startEagerResolution( $this->dataReferences, $dataResolutionStage );
 			$this->executePlan( $executionStage, $plan, $runtime );
 		} finally {
-			$runtime->teardown();
+			LocalFilesystem::create( $tempRoot )->rmdir( '/', [
+				'recursive' => true,
+			]);
 		}
 	}
 
@@ -715,6 +727,8 @@ class Runner {
 	private function createDataReference( mixed $data, array $additional_reference_classes = [] ): DataReference {
 		$reference                              = $data instanceof DataReference ? $data
 			: DataReference::create( $data, $additional_reference_classes );
+		// @TODO: If referencing a ExecutionContextPath, ensure we have the user consent
+		//        to load data from the local filesystem.
 		$this->dataReferences[ $reference->id ] = $reference;
 
 		return $reference;

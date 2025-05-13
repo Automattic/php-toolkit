@@ -23,47 +23,14 @@ class EvalResult {
 }
 
 class Runtime {
-	private string $tempRoot;
-	private bool $initialized = false;
-
 	public function __construct(
 		private Filesystem $targetFs,
 		private RunnerConfiguration $configuration,
 		private DataReferenceResolver $assets,
 		private Client $client,
-		private array $blueprint
+		private array $blueprint,
+		private string $tempRoot
 	) {
-	}
-
-	/**
-	 * Initializes the runtime by creating a temporary directory for the entire runtime lifecycle.
-	 * 
-	 * @throws FilesystemException If the temporary directory cannot be created.
-	 */
-	public function initialize(): void {
-		if ($this->initialized) {
-			return;
-		}
-
-		$this->tempRoot = sys_get_temp_dir() . '/wp-blueprints-runtime-' . uniqid();
-		mkdir( $this->tempRoot, 0777, true );
-
-		$this->initialized = true;
-	}
-
-	/**
-	 * Tears down the runtime by deleting the temporary filesystem.
-	 */
-	public function teardown(): void {
-		if (!$this->initialized) {
-			return;
-		}
-		
-		LocalFilesystem::create( $this->tempRoot )->rmdir( '/', [
-			'recursive' => true,
-		]);
-		
-		$this->initialized = false;
 	}
 
 	public function getHttpClient(): Client {

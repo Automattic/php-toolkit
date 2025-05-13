@@ -68,6 +68,8 @@ class DataReferenceResolver {
 					 *
 					 * * Uses range headers when possible.
 					 * * Buffers data on disk for seeking(), not in memory.
+					 * 
+					 * @TODO: Support ZIPs >= 100MB.
 					 */
 					'buffer_size'      => 100 * 1024 * 1024,
 					'progress_tracker' => $progress_tracker,
