@@ -104,4 +104,11 @@ class ChrootLayer extends Layer {
 		$path = $this->normalize_path( $path );
 		return $this->fs->put_contents( $path, $contents, $options );
 	}
+
+	public function get_meta(): array {
+		return [
+			'chroot' => $this->chroot,
+			...$this->fs->get_meta(),
+		];
+	}
 }

@@ -102,17 +102,22 @@ class Runner {
 			$this->client,
 			$this->blueprintArray
 		);
+		$runtime->initialize();
 
-		if ( $this->configuration->getExecutionMode() === 'apply-to-existing-site' ) {
-			ExistingSiteResolver::resolve( $runtime, $targetResolutionStage );
-		} else {
-			NewSiteResolver::resolve( $runtime, $targetResolutionStage );
+		try {
+			if ( $this->configuration->getExecutionMode() === 'apply-to-existing-site' ) {
+				ExistingSiteResolver::resolve( $runtime, $targetResolutionStage );
+			} else {
+				NewSiteResolver::resolve( $runtime, $targetResolutionStage );
+			}
+			$targetResolutionStage->finish();
+
+			$plan = $this->createExecutionPlan();
+			$this->assets->startEagerResolution( $this->dataReferences, $dataResolutionStage );
+			$this->executePlan( $executionStage, $plan, $runtime );
+		} finally {
+			$runtime->teardown();
 		}
-		$targetResolutionStage->finish();
-
-		$plan = $this->createExecutionPlan();
-		$this->assets->startEagerResolution( $this->dataReferences, $dataResolutionStage );
-		$this->executePlan( $executionStage, $plan, $runtime );
 	}
 
 	/*──────────────── Blueprint load / validation / createExecutionPlan ─────────────*/

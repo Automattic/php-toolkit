@@ -9,8 +9,10 @@ use WordPress\Blueprints\DataReference\Directory;
 use WordPress\Blueprints\DataReference\File;
 use WordPress\Blueprints\Progress\Tracker;
 use WordPress\Filesystem\Filesystem;
-use WordPress\Filesystem\FilesystemHelpers;
+use WordPress\Filesystem\LocalFilesystem;
 use WordPress\HttpClient\Client;
+
+use function WordPress\Filesystem\wp_join_paths;
 
 class EvalResult {
 	public function __construct(
@@ -21,6 +23,9 @@ class EvalResult {
 }
 
 class Runtime {
+	private string $tempRoot;
+	private bool $initialized = false;
+
 	public function __construct(
 		private Filesystem $targetFs,
 		private RunnerConfiguration $configuration,
@@ -28,6 +33,37 @@ class Runtime {
 		private Client $client,
 		private array $blueprint
 	) {
+	}
+
+	/**
+	 * Initializes the runtime by creating a temporary directory for the entire runtime lifecycle.
+	 * 
+	 * @throws FilesystemException If the temporary directory cannot be created.
+	 */
+	public function initialize(): void {
+		if ($this->initialized) {
+			return;
+		}
+
+		$this->tempRoot = sys_get_temp_dir() . '/wp-blueprints-runtime-' . uniqid();
+		mkdir( $this->tempRoot, 0777, true );
+
+		$this->initialized = true;
+	}
+
+	/**
+	 * Tears down the runtime by deleting the temporary filesystem.
+	 */
+	public function teardown(): void {
+		if (!$this->initialized) {
+			return;
+		}
+		
+		LocalFilesystem::create( $this->tempRoot )->rmdir( '/', [
+			'recursive' => true,
+		]);
+		
+		$this->initialized = false;
 	}
 
 	public function getHttpClient(): Client {
@@ -55,11 +91,39 @@ class Runtime {
 	}
 
 	public function withTemporaryDirectory( callable $callback ) {
-		return FilesystemHelpers::withTemporaryDirectory( $this->targetFs, $callback );
+		$tmp = $this->createTemporaryDirectory();
+		try {
+			return $callback( $tmp );
+		} finally {
+			LocalFilesystem::create( $tmp )->rmdir( '/', [ 'recursive' => true ] );
+		}
+	}
+
+	public function createTemporaryDirectory(): string {
+		do {
+			$dirname = wp_join_paths( $this->tempRoot, uniqid( 'tmp_' ) );
+		} while ( file_exists( $dirname ) );
+
+		mkdir( $dirname, 0777, true );
+		return $dirname;
 	}
 
 	public function withTemporaryFile( callable $callback, ?string $suffix = null ) {
-		return FilesystemHelpers::withTemporaryFile( $this->targetFs, $callback, $suffix );
+		$tempFile = $this->createTemporaryFile( $suffix );
+		try {
+			return $callback( $tempFile );
+		} finally {
+			@unlink( $tempFile );
+		}
+	}
+
+	public function createTemporaryFile( ?string $suffix = null ): string {
+		do {
+			$filename = wp_join_paths( $this->tempRoot, uniqid( $suffix ?? 'tmp_' ) );
+		} while ( file_exists( $filename ) );
+
+		touch( $filename );
+		return $filename;
 	}
 
 	/**
@@ -81,12 +145,15 @@ class Runtime {
 	) {
 		return $this->withTemporaryFile( function ( $tempFile ) use ( $code, $env, $input, $timeout ) {
 			return $this->withTemporaryFile( function ( $outputFile ) use ( $tempFile, $code, $env, $input, $timeout ) {
-				$this->targetFs->put_contents( $tempFile, '<?php 
+				file_put_contents(
+					$tempFile,
+					'<?php 
 					function append_output( $output ) {
 						file_put_contents( getenv("OUTPUT_FILE"), $output, FILE_APPEND );
 					}
 					$_SERVER["HTTP_HOST"] = "localhost";
-					?>' . $code );
+					?>' . $code
+				);
 
 				$process = $this->runShellCommand(
 					array(
@@ -105,7 +172,7 @@ class Runtime {
 					$timeout
 				);
 				return new EvalResult(
-					$this->targetFs->get_contents( $outputFile ),
+					file_get_contents( $outputFile ),
 					$process
 				);
 			} );

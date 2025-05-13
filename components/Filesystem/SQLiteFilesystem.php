@@ -392,4 +392,8 @@ class SQLiteFilesystem implements Filesystem {
 			--$this->transaction_level;
 		}
 	}
+
+	public function get_meta(): array {
+		return [];
+	}
 }

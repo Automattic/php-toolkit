@@ -105,8 +105,6 @@ if ( ! $plugin_zip_path ) {
 	exit( 1 );
 }
 
-$plugin_zip_path = getenv( 'DOCROOT' ) . '/' . ltrim( $plugin_zip_path, '/' );
-
 if ( ! file_exists( $plugin_zip_path ) ) {
 	error_log( "Plugin zip file not found at " . $plugin_zip_path );
 	exit( 1 );

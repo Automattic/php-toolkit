@@ -7,9 +7,11 @@ use WordPress\Blueprints\DataReference\Directory;
 use WordPress\Blueprints\DataReference\File;
 use WordPress\Blueprints\Progress\Tracker;
 use WordPress\Blueprints\Runtime;
+use WordPress\ByteStream\WriteStream\FileWriteStream;
 use WordPress\Zip\ZipEncoder;
 
 use function WordPress\Filesystem\pipe_stream;
+use function WordPress\Filesystem\wp_join_paths;
 use function WordPress\Zip\is_zip_file_stream;
 
 /**
@@ -55,21 +57,21 @@ class InstallThemeStep implements StepInterface {
 	}
 
 	public function run( Runtime $runtime, Tracker $tracker ) {
-		$fs = $runtime->getTargetFilesystem();
-		$runtime->withTemporaryDirectory( function ( $temp_dir ) use ( $fs, $runtime, $tracker ) {
+		$runtime->withTemporaryDirectory( function ( $temp_dir ) use ( $runtime, $tracker ) {
 			$theme_data = $runtime->resolve( $this->source );
 			$tracker->setCaption( 'Installing theme ' . $theme_data->get_human_readable_name() );
 
 			if ( $theme_data instanceof Directory ) {
-				$zip_path    = $temp_dir . '/' . $theme_data->dirname . '.zip';
-				$zip_stream  = $fs->open_write_stream( $zip_path );
-				$zip_encoder = new ZipEncoder( $zip_stream );
+				$zip_filename = $theme_data->dirname . '.zip';
+				$zip_absolute_path = wp_join_paths( $temp_dir, $zip_filename );
+				$zip_stream   = FileWriteStream::from_path( $zip_absolute_path, 'truncate' );
+				$zip_encoder  = new ZipEncoder( $zip_stream );
 				$zip_encoder->append_from_filesystem( $theme_data->filesystem );
 				$zip_encoder->close();
 			} elseif ( $theme_data instanceof File ) {
 				$zip_filename = preg_replace( '/\.(zip|php)$/', '', $theme_data->filename ) . '.zip';
-				$zip_path     = $temp_dir . '/' . $zip_filename;
-				$zip_stream   = $fs->open_write_stream( $zip_path );
+				$zip_absolute_path = wp_join_paths( $temp_dir, $zip_filename );
+				$zip_stream   = FileWriteStream::from_path( $zip_absolute_path, 'truncate' );
 
 				if ( is_zip_file_stream( $theme_data->stream ) ) {
 					pipe_stream( $theme_data->stream, $zip_stream );
@@ -83,7 +85,7 @@ class InstallThemeStep implements StepInterface {
 
 			$output = $runtime->evalPhpInSubProcess(
 				file_get_contents( __DIR__ . '/scripts/InstallTheme/wp_install_theme.php' ),
-				[ 'THEME_ZIP_PATH' => $zip_path ]
+				[ 'THEME_ZIP_PATH' => $zip_absolute_path ]
 			);
 
 			$theme_folder_name = trim( $output->outputFileContent );

@@ -143,4 +143,12 @@ interface Filesystem {
 	 * @throws FilesystemException If the file cannot be read.
 	 */
 	public function get_contents( $path );
+
+	/**
+	 * Get the metadata of the filesystem instance. Different
+	 * for every filesystem implementation.
+	 *
+	 * @return array<string, mixed> The metadata of the filesystem.
+	 */
+	public function get_meta(): array;
 }

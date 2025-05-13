@@ -214,4 +214,8 @@ class ZipFilesystem implements Filesystem {
 
 		$this->central_directory_end_header = $this->zip->get_object();
 	}
+
+	public function get_meta(): array {
+		return [];
+	}
 }

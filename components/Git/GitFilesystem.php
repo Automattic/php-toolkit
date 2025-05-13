@@ -253,4 +253,8 @@ class GitFilesystem implements Filesystem {
 		// amended commits (and remove it before pushing?)
 		return $remote_branch_hash !== $head_commit_hash;
 	}
+
+	public function get_meta(): array {
+		return [];
+	}
 }

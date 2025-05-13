@@ -190,4 +190,8 @@ class InMemoryFilesystem implements Filesystem, InternalizedWriteStream {
 		}
 		unset( $this->write_streams[ $stream_id ] );
 	}
+
+	public function get_meta(): array {
+		return [];
+	}
 }

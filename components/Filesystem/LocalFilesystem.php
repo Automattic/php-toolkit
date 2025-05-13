@@ -47,6 +47,12 @@ class LocalFilesystem implements Filesystem {
 		return $this->root;
 	}
 
+	public function get_meta(): array {
+		return [
+			'root' => $this->root,
+		];
+	}
+
 	public function ls( $path = '/' ) {
 		$dh = opendir( $path );
 		if ( false === $dh ) {
