@@ -8,6 +8,8 @@ use WordPress\Blueprints\DataReference\DataReferenceResolver;
 use WordPress\Blueprints\DataReference\Directory;
 use WordPress\Blueprints\DataReference\ExecutionContextPath;
 use WordPress\Blueprints\DataReference\File;
+use WordPress\Blueprints\DataReference\InlineDirectory;
+use WordPress\Blueprints\DataReference\InlineFile;
 use WordPress\Blueprints\DataReference\URLReference;
 use WordPress\Blueprints\DataReference\WordPressOrgPlugin;
 use WordPress\Blueprints\DataReference\WordPressOrgTheme;
@@ -44,6 +46,7 @@ use WordPress\HttpClient\Client;
 use WordPress\HttpClient\FilesystemCache;
 use WordPress\Zip\ZipFilesystem;
 
+use function WordPress\Encoding\utf8_is_valid_byte_stream;
 use function WordPress\Zip\is_zip_file_stream;
 
 class Runner {
@@ -152,9 +155,10 @@ class Runner {
 					// filesystem path at this point.
 					// The execution context is the directory containing the blueprint.json file.
 					$this->blueprintExecutionContext = LocalFilesystem::create( dirname( $reference->get_path() ) );
+				} elseif ( $reference instanceof InlineFile ) {
+					$this->blueprintExecutionContext = InMemoryFilesystem::create();
 				} else {
-					// @TODO: Support other reference types
-					throw new \Exception( 'Unsupported blueprint reference type' );
+					throw new \Exception( 'Unsupported blueprint reference type: ' . get_class( $reference ) );
 				}
 			}
 		} elseif ( $resolved instanceof Directory ) {
@@ -169,12 +173,14 @@ class Runner {
 		// Preliminary validation of the provided Blueprint string:
 
 		// 1. **UTF-8 Encoding:** Assert the Blueprint input is UTF-8 encoded.
-		if ( ! function_exists( 'mb_check_encoding' ) ) {
-			// @TODO: Use Dennis Snells' utf-8 decoder as a fallback.
-			throw new \Exception( 'mb_check_encoding() is not available, cannot validate UTF-8 encoding of the blueprint' );
+		$is_valid_utf8 = false;
+		if ( function_exists( 'mb_check_encoding' ) ) {
+			$is_valid_utf8 = mb_check_encoding( $blueprintString, 'UTF-8' );
+		} else {
+			$is_valid_utf8 = utf8_is_valid_byte_stream( $blueprintString );
 		}
-
-		if ( ! mb_check_encoding( $blueprintString, 'UTF-8' ) ) {
+		
+		if ( ! $is_valid_utf8 ) {
 			throw new \Exception( 'Blueprint must be encoded as UTF-8' );
 		}
 
