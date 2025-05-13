@@ -7,7 +7,7 @@ use WordPress\Blueprints\Runtime;
 
 /**
  * Represents the 'runPHP' step.
- * @TODO: Remove most step options from the specification. They don't apply to running PHP code,
+ * @TODO [_spec_]: Remove most step options from the specification. They don't apply to running PHP code,
  *        just to running HTTP requests. HTTP requests are not supported in this step.
  */
 class RunPHPStep implements StepInterface {

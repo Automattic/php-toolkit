@@ -1,6 +1,6 @@
 <?php
 /**
- * @TODO add a configurable sqlite-database-integration data ref to the
+ * @TODO [_spec_]: add a configurable sqlite-database-integration data ref to the
  *       runner configuration in the markdown spec */
 
 namespace WordPress\Blueprints;
