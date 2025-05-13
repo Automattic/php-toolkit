@@ -1,4 +1,7 @@
 <?php
+/**
+ * @TODO add a configurable sqlite-database-integration data ref to the
+ *       runner configuration in the markdown spec */
 
 namespace WordPress\Blueprints;
 
@@ -14,6 +17,16 @@ class RunnerConfiguration {
 	private string $databaseEngine = 'mysql';
 	private array $databaseCredentials = [];
 	private $progressObserver = null;
+
+	/**
+	 * @var DataReference|null
+	 * Reference to the sqlite-database-integration plugin zip, if configured.
+	 */
+	private ?DataReference $sqliteIntegrationPlugin = null;
+
+	public function __construct() {
+		$this->sqliteIntegrationPlugin = DataReference::create( 'https://downloads.wordpress.org/plugin/sqlite-database-integration.zip' );
+	}
 
 	public function setBlueprint( DataReference|array $r ): self {
 		$this->blueprintRef = $r;
@@ -124,5 +137,25 @@ class RunnerConfiguration {
 	 */
 	public function getProgressObserver() {
 		return $this->progressObserver;
+	}
+
+	/**
+	 * Set a custom DataReference for the sqlite-database-integration plugin.
+	 *
+	 * @param DataReference $ref
+	 * @return self
+	 */
+	public function setSqliteIntegrationPlugin( DataReference $ref ): self {
+		$this->sqliteIntegrationPlugin = $ref;
+		return $this;
+	}
+
+	/**
+	 * Get the DataReference for the sqlite-database-integration plugin, or null if not set.
+	 *
+	 * @return DataReference|null
+	 */
+	public function getSqliteIntegrationPlugin(): ?DataReference {
+		return $this->sqliteIntegrationPlugin;
 	}
 }

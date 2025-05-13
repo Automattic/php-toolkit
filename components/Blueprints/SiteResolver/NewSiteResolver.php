@@ -40,8 +40,7 @@ class NewSiteResolver {
 			'wordpress' => DataReference::create( $wpZip ),
 		];
 		if ( $runtime->getConfiguration()->getDatabaseEngine() === 'sqlite' ) {
-			// @TODO: configurable sqlite integration plugin zip URL
-			$assets['sqlite-integration'] = DataReference::create( 'https://downloads.wordpress.org/plugin/sqlite-database-integration.zip' );
+			$assets['sqlite-integration'] = $runtime->getConfiguration()->getSqliteIntegrationPlugin();
 		}
 		$assets['wp-cli'] = DataReference::create( 'https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar' );
 
