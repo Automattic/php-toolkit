@@ -84,9 +84,11 @@ class WordPressBootManagerTest extends PHPUnitTestCase {
 			}
 			require $wp_load;
 			
-			echo function_exists('is_blog_installed') && is_blog_installed() ? '1' : '0';
+			append_output(
+				function_exists('is_blog_installed') && is_blog_installed() ? '1' : '0'
+			);
 			PHP
-		);
+		)->outputFileContent;
 		$this->assertEquals( '1', $installCheck, 'WordPress is not correctly installed' );
 	}
 }

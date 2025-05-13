@@ -53,56 +53,60 @@ class SetSiteLanguageStep implements StepInterface {
 
 		// Get core translation package URL
 		$wp_version = trim( $runtime->evalPhpInSubProcess(
-			"<?php
-            require getenv('DOCROOT') . '/wp-includes/version.php';
-            echo \$wp_version;
-            "
-		) );
+			'<?php
+            require getenv("DOCROOT") . "/wp-includes/version.php";
+            append_output( $wp_version );
+            '
+		)->outputFileContent );
 
 		// Get plugin translations
 		$plugins_data = json_decode( $runtime->evalPhpInSubProcess(
 			"<?php
             require_once(getenv('DOCROOT') . '/wp-load.php');
             require_once(getenv('DOCROOT') . '/wp-admin/includes/plugin.php');
-            echo json_encode(
-                array_values(
-                    array_map(
-                        function(\$plugin) {
-                            return [
-                                'slug'    => \$plugin['TextDomain'],
-                                'version' => \$plugin['Version']
-                            ];
-                        },
-                        array_filter(
-                            get_plugins(),
-                            function(\$plugin) {
-                                return !empty(\$plugin['TextDomain']);
-                            }
-                        )
-                    )
-                )
-            );"
-		), true );
+            append_output(
+				json_encode(
+					array_values(
+						array_map(
+							function(\$plugin) {
+								return [
+									'slug'    => \$plugin['TextDomain'],
+									'version' => \$plugin['Version']
+								];
+							},
+							array_filter(
+								get_plugins(),
+								function(\$plugin) {
+									return !empty(\$plugin['TextDomain']);
+								}
+							)
+						)
+					)
+				)
+			);"
+		)->outputFileContent, true );
 
 		// Get theme translations
 		$themes_data = json_decode( $runtime->evalPhpInSubProcess(
 			"<?php
             require_once(getenv('DOCROOT') . '/wp-load.php');
             require_once(getenv('DOCROOT') . '/wp-admin/includes/theme.php');
-            echo json_encode(
-                array_values(
-                    array_map(
-                        function(\$theme) {
-                            return [
-                                'slug'    => \$theme->get('TextDomain'),
-                                'version' => \$theme->get('Version')
-                            ];
-                        },
-                        wp_get_themes()
-                    )
-                )
-            );"
-		), true );
+            append_output(
+				json_encode(
+					array_values(
+						array_map(
+							function(\$theme) {
+								return [
+									'slug'    => \$theme->get('TextDomain'),
+									'version' => \$theme->get('Version')
+								];
+							},
+							wp_get_themes()
+						)
+					)
+				)
+			);"
+		)->outputFileContent, true );
 
 		$client = $runtime->getHttpClient();
 

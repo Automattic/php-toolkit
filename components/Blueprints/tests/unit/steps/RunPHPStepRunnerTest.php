@@ -143,9 +143,9 @@ PHP;
 			<<<'PHP'
             <?php
             require_once getenv('DOCROOT') . '/wp-load.php';
-            echo get_option('test_option');
+            append_output( get_option('test_option') );
             PHP
-		);
+		)->outputFileContent;
 
 		$this->assertEquals( 'test_value', $option_value );
 	}

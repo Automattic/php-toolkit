@@ -226,8 +226,8 @@ $plugin_file_relative_path = array_key_first( $plugins_in_folder );
 
 // Output the relative path of the main plugin file.
 $output = $plugin_folder_name . '/' . $plugin_file_relative_path;
-if ( getenv( 'OUTPUT_FILE' ) ) {
-	file_put_contents( getenv( 'OUTPUT_FILE' ), $output );
+if ( function_exists( 'append_output' ) ) {
+	append_output( $output );
 } else {
 	echo $output;
 }

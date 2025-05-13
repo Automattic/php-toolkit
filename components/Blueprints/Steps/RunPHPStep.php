@@ -13,7 +13,7 @@ class RunPHPStep implements StepInterface {
 	public ?string $relativeUri;
 	public ?string $scriptPath;
 	public ?string $protocol;
-	public HttpMethod $method;
+	public string $method;
 	/** @var array<string, string>|null */
 	public ?array $headers;
 	public ?string $body; // Simplified from string | Uint8Array
@@ -26,7 +26,7 @@ class RunPHPStep implements StepInterface {
 	 * @param  string|null  $code  PHP code snippet to run (either code or scriptPath is required).
 	 * @param  string|null  $scriptPath  Path to PHP script to run (either code or scriptPath is required).
 	 * @param  string|null  $relativeUri  Request path relative to domain.
-	 * @param  HttpMethod  $method  HTTP method.
+	 * @param  string  $method  HTTP method.
 	 * @param  string|null  $protocol  Request protocol (e.g., 'http', 'https').
 	 * @param  array<string, string>|null  $headers  Request headers.
 	 * @param  string|null  $body  Request body.
@@ -51,8 +51,6 @@ class RunPHPStep implements StepInterface {
 	public function run( Runtime $runtime, Tracker $tracker ) {
 		// @TODO: Use the provided step options
 		$tracker->setCaption( 'Running custom PHP code' );
-		$runtime->evalPhpInSubProcess( $this->code, [
-			'DOCROOT' => $runtime->getConfiguration()->getTargetSiteRoot(),
-		] );
+		$runtime->evalPhpInSubProcess( $this->code );
 	}
 }

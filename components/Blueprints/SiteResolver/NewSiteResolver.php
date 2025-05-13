@@ -108,14 +108,14 @@ class NewSiteResolver {
 			<<<'PHP'
 			$wp_load = getenv('DOCROOT') . '/wp-load.php';
 			if (!file_exists($wp_load)) {
-				echo '0';
+				append_output('0');
 				exit;
 			}
 			require $wp_load;
 
-			echo function_exists('is_blog_installed') && is_blog_installed() ? '1' : '0';
+			append_output( function_exists('is_blog_installed') && is_blog_installed() ? '1' : '0' );
 			PHP
-		);
+		)->outputFileContent;
 
 		if ( trim( $installCheck ) !== '1' ) {
 			$wp_cli_filename = 'wp-cli.phar';

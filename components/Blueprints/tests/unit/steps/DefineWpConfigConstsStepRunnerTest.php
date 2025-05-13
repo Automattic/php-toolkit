@@ -272,12 +272,12 @@ PHP;
                 $results[$name] = defined($name) ? constant($name) : null;
             }
             
-            echo json_encode($results);
+            append_output( json_encode($results) );
             PHP,
 			[
 				'CONSTANTS' => json_encode( $expected_constants ),
 			]
-		);
+		)->outputFileContent;
 
 		$actual_constants = json_decode( $result, true );
 		$this->assertEquals( $expected_constants, $actual_constants );

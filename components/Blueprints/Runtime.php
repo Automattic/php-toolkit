@@ -12,6 +12,14 @@ use WordPress\Filesystem\Filesystem;
 use WordPress\Filesystem\FilesystemHelpers;
 use WordPress\HttpClient\Client;
 
+class EvalResult {
+	public function __construct(
+		public string $outputFileContent,
+		public Process $process
+	) {
+	}
+}
+
 class Runtime {
 	public function __construct(
 		private Filesystem $targetFs,
@@ -55,6 +63,13 @@ class Runtime {
 	}
 
 	/**
+	 * Runs the given PHP code in a sub-process. The code has access to:
+	 * 
+	 * * append_output( $output ): A function that appends a given string to the output file. Useful for
+	 *                             separating the returned structured data from PHP warnings and echos.
+	 * * DOCROOT environment variable: The path to the WordPress root directory.
+	 * * OUTPUT_FILE environment variable: The path to a file where the output of the code will be appended.
+	 * 
 	 * @param  mixed[]|null  $env
 	 * @param  float  $timeout
 	 */
@@ -65,31 +80,40 @@ class Runtime {
 		$timeout = 60
 	) {
 		return $this->withTemporaryFile( function ( $tempFile ) use ( $code, $env, $input, $timeout ) {
-			$this->targetFs->put_contents( $tempFile, '<?php $_SERVER["HTTP_HOST"] = "localhost"; ?>' . $code );
+			return $this->withTemporaryFile( function ( $outputFile ) use ( $tempFile, $code, $env, $input, $timeout ) {
+				$this->targetFs->put_contents( $tempFile, '<?php 
+					function append_output( $output ) {
+						file_put_contents( getenv("OUTPUT_FILE"), $output, FILE_APPEND );
+					}
+					$_SERVER["HTTP_HOST"] = "localhost";
+					?>' . $code );
 
-			return $this->runShellCommand(
-				array(
-					'php',
-					$tempFile,
-				),
-				$this->configuration->getTargetSiteRoot(),
-				array_merge(
+				$process = $this->runShellCommand(
 					array(
-						'DOCROOT' => $this->configuration->getTargetSiteRoot(),
+						'php',
+						$tempFile,
 					),
-					$env ?? array()
-				),
-				$input,
-				$timeout
-			);
+					$this->configuration->getTargetSiteRoot(),
+					array_merge(
+						array(
+							'DOCROOT' => $this->configuration->getTargetSiteRoot(),
+							'OUTPUT_FILE' => $outputFile,
+						),
+						$env ?? array()
+					),
+					$input,
+					$timeout
+				);
+				return new EvalResult(
+					$this->targetFs->get_contents( $outputFile ),
+					$process
+				);
+			} );
 		} );
 	}
 
 	/**
-	 * @TODO: Migrate from Symfony Process to a more lightweight implementation.
-	 * @TODO: Expose stdout and stderr as byte streams.
-	 * @TODO: Don't wait until the process terminates. Just return the streams and
-	 *        some kind of wait() method for the caller to decide.
+	 * @TODO: Upgrade to the latest Symfony Process version.
 	 *
 	 * @param  mixed[]  $command
 	 * @param  string|null  $cwd
@@ -112,14 +136,7 @@ class Runtime {
 			$input,
 			$timeout
 		);
-		$process->start();
-		$process->wait();
-		if ( $process->getExitCode() !== 0 ) {
-			// @TODO: Don't just echo this here
-			echo $process->getErrorOutput();
-			throw new ProcessFailedException( $process );
-		}
-
-		return $process->getOutput();
+		$process->mustRun();
+		return $process;
 	}
 }

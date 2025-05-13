@@ -81,19 +81,12 @@ class InstallThemeStep implements StepInterface {
 
 			$tracker->set( 50 );
 
-			$output_file           = $temp_dir . '/theme_stylesheet.txt';
-			$install_script_result = $runtime->evalPhpInSubProcess(
+			$output = $runtime->evalPhpInSubProcess(
 				file_get_contents( __DIR__ . '/scripts/InstallTheme/wp_install_theme.php' ),
-				[ 'THEME_ZIP_PATH' => $zip_path, 'OUTPUT_FILE' => $output_file ]
+				[ 'THEME_ZIP_PATH' => $zip_path ]
 			);
 
-			if ( ! $fs->exists( $output_file ) ) {
-				throw new \RuntimeException(
-					"Theme installation script did not create output file. Error output: {$install_script_result}"
-				);
-			}
-
-			$theme_folder_name = trim( $fs->get_contents( $output_file ) );
+			$theme_folder_name = trim( $output->outputFileContent );
 			if ( empty( $theme_folder_name ) ) {
 				throw new \RuntimeException(
 					"Theme installation script did not return the theme stylesheet name."

@@ -102,9 +102,9 @@ class RunSQLStepRunnerTest extends PHPUnitTestCase {
             global $wpdb;
             $table_name = 'test_table';
             $result = $wpdb->get_var("SHOW TABLES LIKE '$table_name'");
-            echo ($result === $table_name) ? 'true' : 'false';
+            append_output( ($result === $table_name) ? 'true' : 'false' );
             PHP
-		);
+		)->outputFileContent;
 
 		$this->assertEquals( 'true', $table_exists );
 	}
@@ -139,12 +139,12 @@ SQL;
             global $wpdb;
             $count = $wpdb->get_var("SELECT COUNT(*) FROM test_table");
             $rows = $wpdb->get_results("SELECT * FROM test_table ORDER BY id", ARRAY_A);
-            echo json_encode([
+            append_output( json_encode([
                 'count' => (int)$count,
                 'rows' => $rows
-            ]);
+            ]) );
             PHP
-		);
+		)->outputFileContent;
 
 		$data = json_decode( $result, true );
 		$this->assertEquals( 3, $data['count'] );
@@ -178,9 +178,9 @@ SQL;
 			<<<'PHP'
             <?php
             require_once getenv('DOCROOT') . '/wp-load.php';
-            echo get_option('sql_test_option');
+            append_output( get_option('sql_test_option') );
             PHP
-		);
+		)->outputFileContent;
 
 		$this->assertEquals( 'updated_via_sql', $option_value );
 	}
@@ -217,12 +217,12 @@ SQL;
             $table1_data = $wpdb->get_var("SELECT value FROM test_table_1 LIMIT 1");
             $table2_data = $wpdb->get_var("SELECT value FROM test_table_2 LIMIT 1");
             
-            echo json_encode([
+            append_output( json_encode([
                 'table1' => $table1_data,
                 'table2' => $table2_data
-            ]);
+            ]) );
             PHP
-		);
+		)->outputFileContent;
 
 		$data = json_decode( $result, true );
 		$this->assertEquals( 'table_1_data', $data['table1'] );
@@ -257,9 +257,9 @@ SQL;
             global $wpdb;
             $table_name = 'test_table';
             $result = $wpdb->get_var("SHOW TABLES LIKE '$table_name'");
-            echo ($result === $table_name) ? 'true' : 'false';
+            append_output( ($result === $table_name) ? 'true' : 'false' );
             PHP
-		);
+		)->outputFileContent;
 
 		$this->assertEquals( 'true', $table_exists );
 	}

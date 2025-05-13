@@ -136,9 +136,9 @@ class InstallThemeStepRunnerTest extends PHPUnitTestCase {
 			<<<'PHP'
             <?php
             require_once getenv('DOCROOT') . '/wp-load.php';
-            echo get_option('stylesheet');
+            append_output( get_option('stylesheet') );
             PHP
-		);
+		)->outputFileContent;
 
 		$this->assertEquals( 'test-theme', trim( $active_theme ) );
 	}
@@ -177,9 +177,9 @@ class InstallThemeStepRunnerTest extends PHPUnitTestCase {
 			<<<'PHP'
             <?php
             require_once getenv('DOCROOT') . '/wp-load.php';
-            echo get_option('stylesheet');
+            append_output( get_option('stylesheet') );
             PHP
-		);
+		)->outputFileContent;
 
 		$this->assertNotEquals( 'test-theme', trim( $active_theme ) );
 	}
@@ -214,9 +214,9 @@ class InstallThemeStepRunnerTest extends PHPUnitTestCase {
 			<<<'PHP'
             <?php
             require_once getenv('DOCROOT') . '/wp-load.php';
-            echo get_option('stylesheet');
+            append_output( get_option('stylesheet') );
             PHP
-		);
+		)->outputFileContent;
 
 		$this->assertEquals( 'test-theme', trim( $active_theme ) );
 	}

@@ -89,12 +89,12 @@ class SetSiteOptionsStepRunnerTest extends PHPUnitTestCase {
                 $result[$name] = $actual_value;
             }
             
-            echo json_encode($result);
+            append_output( json_encode($result) );
             PHP,
 			[
 				'OPTIONS' => json_encode( $expected_options ),
 			]
-		);
+		)->outputFileContent;
 
 		$actual_options = json_decode( $result, true );
 
@@ -184,7 +184,7 @@ class SetSiteOptionsStepRunnerTest extends PHPUnitTestCase {
             update_option('users_can_register', 0);
             update_option('default_role', 'subscriber');
             PHP
-		);
+		)->outputFileContent;
 
 		// Now update them
 		$step_runner = new SetSiteOptionsStepRunner();

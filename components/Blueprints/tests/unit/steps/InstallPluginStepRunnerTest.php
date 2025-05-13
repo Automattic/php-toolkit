@@ -117,9 +117,9 @@ class InstallPluginStepRunnerTest extends PHPUnitTestCase {
 			<<<'PHP'
             <?php
             require_once getenv('DOCROOT') . '/wp-load.php';
-            echo json_encode(get_option('active_plugins'));
+            append_output( json_encode(get_option('active_plugins')) );
             PHP
-		);
+		)->outputFileContent;
 
 		$active_plugins = json_decode( $active_plugins, true );
 		$this->assertContains( 'test-plugin/test-plugin.php', $active_plugins );
@@ -159,9 +159,9 @@ class InstallPluginStepRunnerTest extends PHPUnitTestCase {
 			$active_plugins = get_option('active_plugins');
 			// Filter to get only inactive plugins
 			$inactive_plugins = array_diff(array_keys($all_plugins), $active_plugins);
-			echo json_encode($inactive_plugins);
+			append_output( json_encode($inactive_plugins) );
 			PHP
-		);
+		)->outputFileContent;
 		$inactive_plugins = json_decode( $inactive_plugins, true );
 		$this->assertContains( 'test-plugin/test-plugin.php', $inactive_plugins );
 
@@ -170,9 +170,9 @@ class InstallPluginStepRunnerTest extends PHPUnitTestCase {
 			<<<'PHP'
             <?php
             require_once getenv('DOCROOT') . '/wp-load.php';
-            echo json_encode(get_option('active_plugins'));
+            append_output( json_encode(get_option('active_plugins')) );
             PHP
-		);
+		)->outputFileContent;
 
 		$active_plugins = json_decode( $active_plugins, true );
 		$this->assertNotContains( 'test-plugin/test-plugin.php', $active_plugins );
@@ -206,9 +206,9 @@ class InstallPluginStepRunnerTest extends PHPUnitTestCase {
 			<<<'PHP'
             <?php
             require_once getenv('DOCROOT') . '/wp-load.php';
-            echo json_encode(get_option('active_plugins'));
+            append_output( json_encode(get_option('active_plugins')) );
             PHP
-		);
+		)->outputFileContent;
 
 		$active_plugins = json_decode( $active_plugins, true );
 		$this->assertContains( 'zipped-test-plugin/test-plugin.php', $active_plugins );
@@ -242,9 +242,9 @@ class InstallPluginStepRunnerTest extends PHPUnitTestCase {
 			<<<'PHP'
             <?php
             require_once getenv('DOCROOT') . '/wp-load.php';
-            echo json_encode(get_option('active_plugins'));
+            append_output( json_encode(get_option('active_plugins')) );
             PHP
-		);
+		)->outputFileContent;
 
 		$active_plugins = json_decode( $active_plugins, true );
 		$this->assertContains( 'subfolder-name/test-plugin.php', $active_plugins );
@@ -278,9 +278,9 @@ class InstallPluginStepRunnerTest extends PHPUnitTestCase {
 			<<<'PHP'
             <?php
             require_once getenv('DOCROOT') . '/wp-load.php';
-            echo json_encode(get_option('active_plugins'));
+            append_output( json_encode(get_option('active_plugins')) );
             PHP
-		);
+		)->outputFileContent;
 
 		$active_plugins = json_decode( $active_plugins, true );
 		$this->assertContains( 'test-plugin/test-plugin.php', $active_plugins );

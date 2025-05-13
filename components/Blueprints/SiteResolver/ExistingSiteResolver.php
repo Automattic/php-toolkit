@@ -28,19 +28,13 @@ class ExistingSiteResolver {
 
 		// Additional check to ensure we can actually load WordPress
 		try {
-			$result = $runtime->withTemporaryDirectory( function ( $temp_dir ) use ( $targetFs, $runtime ) {
-				$output_file = $temp_dir . '/wp_installed.txt';
-				$runtime->evalPhpInSubProcess(
-					'<?php
-                    require_once(getenv("DOCROOT") . "/wp-load.php");
-                    $is_installed = function_exists("is_blog_installed") && is_blog_installed() ? "true" : "false";
-                    file_put_contents(getenv("OUTPUT_FILE"), "WordPress is installed: " . $is_installed);
-                    ',
-					[ 'OUTPUT_FILE' => $output_file ]
-				);
-
-				return $targetFs->get_contents( $output_file );
-			}, '' );
+			$result = $runtime->evalPhpInSubProcess(
+				'<?php
+				require_once(getenv("DOCROOT") . "/wp-load.php");
+				$is_installed = function_exists("is_blog_installed") && is_blog_installed() ? "true" : "false";
+				append_output("WordPress is installed: " . $is_installed);
+				'
+			)->outputFileContent;
 
 			if ( $result !== 'WordPress is installed: true' ) {
 				throw new \RuntimeException(
@@ -61,18 +55,12 @@ class ExistingSiteResolver {
 			$wpVersionConstraint = VersionConstraint::fromMixed( $blueprint['wordpressVersion'] );
 
 			// Get current WordPress version
-			$currentWordPressVersion = $runtime->withTemporaryDirectory( function ( $temp_dir ) use ( $targetFs, $runtime ) {
-				$output_file = $temp_dir . '/wp_version.txt';
-				$runtime->evalPhpInSubProcess(
-					'<?php
-                    require_once(getenv("DOCROOT") . "/wp-includes/version.php");
-                    file_put_contents(getenv("OUTPUT_FILE"), $wp_version);
-                    ',
-					[ 'OUTPUT_FILE' => $output_file ]
-				);
-
-				return $targetFs->get_contents( $output_file );
-			}, '' );
+			$currentWordPressVersion = $runtime->evalPhpInSubProcess(
+				'<?php
+				require_once(getenv("DOCROOT") . "/wp-includes/version.php");
+				append_output( $wp_version );
+				'
+			)->outputFileContent;
 
 			if ( ! $wpVersionConstraint->satisfiedBy( trim( $currentWordPressVersion ) ) ) {
 				throw new \RuntimeException(
@@ -96,25 +84,19 @@ class ExistingSiteResolver {
 
 		// Check if SQLite integration plugin is active when using SQLite
 		if ( $requiredEngine === 'sqlite' ) {
-			$sqliteActive = $runtime->withTemporaryDirectory( function ( $temp_dir ) use ( $targetFs, $runtime ) {
-				$output_file = $temp_dir . '/sqlite_active.txt';
-				$runtime->evalPhpInSubProcess(
-					'<?php
-                    require_once(getenv("DOCROOT") . "/wp-load.php");
-                    
-                    // Check if SQLite integration is active
-                    $sqlite_plugin = WP_CONTENT_DIR . "/plugins/sqlite-database-integration/load.php";
-                    $plugin_exists = file_exists($sqlite_plugin);
-                    
-                    // Also check for the db.php drop-in
-                    $is_db_file = file_exists(WP_CONTENT_DIR . "/db.php");                    
-                    file_put_contents(getenv("OUTPUT_FILE"), ($plugin_exists && $is_db_file) ? "true" : "false");
-                    ',
-					[ 'OUTPUT_FILE' => $output_file ]
-				);
-
-				return $targetFs->get_contents( $output_file );
-			}, '' );
+			$sqliteActive = $runtime->evalPhpInSubProcess(
+				'<?php
+				require_once(getenv("DOCROOT") . "/wp-load.php");
+				
+				// Check if SQLite integration is active
+				$sqlite_plugin = WP_CONTENT_DIR . "/plugins/sqlite-database-integration/load.php";
+				$plugin_exists = file_exists($sqlite_plugin);
+				
+				// Also check for the db.php drop-in
+				$is_db_file = file_exists(WP_CONTENT_DIR . "/db.php");                    
+				append_output( ($plugin_exists && $is_db_file) ? "true" : "false" );
+				'
+			)->outputFileContent;
 
 			if ( trim( $sqliteActive ) !== 'true' ) {
 				throw new \RuntimeException(
@@ -123,29 +105,23 @@ class ExistingSiteResolver {
 			}
 		} elseif ( $requiredEngine === 'mysql' ) {
 			// For MySQL, verify it's not using SQLite
-			$usingMysql = $runtime->withTemporaryDirectory( function ( $temp_dir ) use ( $targetFs, $runtime ) {
-				$output_file = $temp_dir . '/mysql_active.txt';
-				$runtime->evalPhpInSubProcess(
-					'<?php
-                    require_once(getenv("DOCROOT") . "/wp-load.php");
-                    
-                    // Check if SQLite integration is NOT active
-                    $active_plugins = get_option("active_plugins");
-                    $sqlite_plugin = "sqlite-database-integration/load.php";
-                    $is_sqlite_active = in_array($sqlite_plugin, $active_plugins);
-                    
-                    // Also check for the db.php drop-in
-                    $is_sqlite_db_file = file_exists(WP_CONTENT_DIR . "/db.php") && 
-                                        strpos(file_get_contents(WP_CONTENT_DIR . "/db.php"), "sqlite") !== false;
-                    
-                    // Using MySQL if NOT using SQLite
-                    file_put_contents(getenv("OUTPUT_FILE"), (!$is_sqlite_active && !$is_sqlite_db_file) ? "true" : "false");
-                    ',
-					[ 'OUTPUT_FILE' => $output_file ]
-				);
-
-				return $targetFs->get_contents( $output_file );
-			}, '' );
+			$usingMysql = $runtime->evalPhpInSubProcess(
+				'<?php
+				require_once(getenv("DOCROOT") . "/wp-load.php");
+				
+				// Check if SQLite integration is NOT active
+				$active_plugins = get_option("active_plugins");
+				$sqlite_plugin = "sqlite-database-integration/load.php";
+				$is_sqlite_active = in_array($sqlite_plugin, $active_plugins);
+				
+				// Also check for the db.php drop-in
+				$is_sqlite_db_file = file_exists(WP_CONTENT_DIR . "/db.php") && 
+									strpos(file_get_contents(WP_CONTENT_DIR . "/db.php"), "sqlite") !== false;
+				
+				// Using MySQL if NOT using SQLite
+				append_output( (!$is_sqlite_active && !$is_sqlite_db_file) ? "true" : "false" );
+				'
+			)->outputFileContent;
 
 			if ( trim( $usingMysql ) !== 'true' ) {
 				throw new \RuntimeException(

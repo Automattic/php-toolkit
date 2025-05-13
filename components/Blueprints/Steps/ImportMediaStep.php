@@ -57,20 +57,14 @@ class ImportMediaStep implements StepInterface {
 
 		$files_imported = 0;
 		$fs             = $runtime->getTargetFilesystem();
-		$wp_upload_dir  = $runtime->withTemporaryDirectory( function ( $temp_dir ) use ( $fs, $runtime ) {
-			$output_file = $temp_dir . '/upload_dir.json';
-			$runtime->evalPhpInSubProcess(
-				'<?php
-                require_once(getenv("DOCROOT") . "/wp-load.php");
-                $upload_dir = wp_upload_dir();
-                file_put_contents(getenv("OUTPUT_FILE"), json_encode($upload_dir));
-                ',
-				[ 'OUTPUT_FILE' => $output_file ]
-			);
-
-			return $fs->get_contents( $output_file );
-		}, '' );
-
+		$wp_upload_dir  = $runtime->evalPhpInSubProcess(
+			'<?php
+			require_once(getenv("DOCROOT") . "/wp-load.php");
+			$upload_dir = wp_upload_dir();
+			append_output( json_encode($upload_dir) );
+			'
+		)->outputFileContent;
+		
 		$upload_dir = json_decode( $wp_upload_dir, true );
 		if ( ! $upload_dir || ! isset( $upload_dir['path'] ) ) {
 			throw new RuntimeException( 'Failed to get WordPress upload directory' );

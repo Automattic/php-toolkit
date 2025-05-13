@@ -125,8 +125,8 @@ if ( ! $theme_folder_name ) {
 }
 
 // Output the theme folder name (stylesheet) either to a file or stdout
-if ( getenv( 'OUTPUT_FILE' ) ) {
-	file_put_contents( getenv( 'OUTPUT_FILE' ), $theme_folder_name );
+if ( function_exists( 'append_output' ) ) {
+	append_output( $theme_folder_name );
 } else {
 	echo $theme_folder_name;
 }
