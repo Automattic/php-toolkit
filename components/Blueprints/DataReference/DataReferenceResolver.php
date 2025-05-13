@@ -8,9 +8,12 @@ use WordPress\ByteStream\MemoryPipe;
 use WordPress\Filesystem\Filesystem;
 use WordPress\Filesystem\InMemoryFilesystem;
 use WordPress\Filesystem\Layer\ChrootLayer;
+use WordPress\Filesystem\LocalFilesystem;
 use WordPress\Git\GitFilesystem;
 use WordPress\Git\GitRepository;
 use WordPress\HttpClient\Client;
+
+use function WordPress\Filesystem\wp_join_paths;
 
 class DataReferenceResolver {
 	private array $subTrackers;
@@ -18,8 +21,10 @@ class DataReferenceResolver {
 	private array $resolvedDataReferences;
 	private Tracker $dataResolutionTracker;
 	private ?Filesystem $executionContext;
+	private string $tmpRoot;
 	
-	public function __construct(private Client $client) {
+	public function __construct(private Client $client, ?string $tmpRoot = null) {
+		$this->tmpRoot = $tmpRoot ?: sys_get_temp_dir();
 	}
 
 	public function setExecutionContext( Filesystem $executionContext ) {
@@ -114,10 +119,17 @@ class DataReferenceResolver {
 			$progress_tracker->finish();
 
 			/**
-			 * @TODO: Use a temporary local filesystem for cloning the repo as in the Blueprints v2 spec Appendix B.
-			 *        Even medium-sized repos can use all the memory.
+			 * Create a temporary directory for the git repository.
+			 * 
+			 * Do not clean it up after the pull()! That would remove the
+			 * data before we're able to consume it in the Step.
+			 * 
+			 * The Blueprint Runner will clean up all temporary directories at
+			 * the end of the execution.
 			 */
-			$repo = new GitRepository( InMemoryFilesystem::create() );
+			$tmp_dir = wp_join_paths( $this->tmpRoot, 'git-repo-' . uniqid() );
+			
+			$repo = new GitRepository( LocalFilesystem::create( $tmp_dir ) );
 			$repo->add_remote( 'origin', $reference->get_git_repository() );
 			$client = $repo->get_remote_client( 'origin' );
 			$client->pull(
