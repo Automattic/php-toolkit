@@ -20,8 +20,10 @@ class ProgressObserver {
 	 *
 	 * @param  callable  $logCallback  Function that receives progress updates
 	 */
-	public function __construct( callable $logCallback ) {
-		$this->logCallback = $logCallback;
+	public function __construct( ?callable $logCallback = null ) {
+		$this->logCallback = $logCallback ?? function() {
+			// noop
+		};
 	}
 
 	/**

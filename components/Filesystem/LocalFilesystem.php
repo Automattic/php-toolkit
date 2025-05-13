@@ -54,7 +54,7 @@ class LocalFilesystem implements Filesystem {
 	}
 
 	public function ls( $path = '/' ) {
-		$dh = opendir( $path );
+		$dh = @opendir( $path );
 		if ( false === $dh ) {
 			throw new FilesystemException(
 				sprintf( 'Failed to open directory: %s', $path )

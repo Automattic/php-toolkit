@@ -42,7 +42,7 @@ class InstallPluginStep implements StepInterface {
 	 * @param  DataReference  $source  Plugin source reference.
 	 * @param  bool  $active  Activate after install?
 	 * @param  array<string, mixed>|null  $activationOptions  Optional activation data.
-	 * @param  PluginErrorBehavior  $onError  Error handling behavior.
+	 * @param  string  $onError  Error handling behavior.
 	 */
 	public function __construct(
 		DataReference $source,
@@ -75,7 +75,6 @@ class InstallPluginStep implements StepInterface {
 
 				if ( is_zip_file_stream( $plugin_data->stream ) ) {
 					pipe_stream( $plugin_data->stream, $zip_stream );
-					$plugin_data->stream->close_reading();
 				} else {
 					$zip_encoder = new ZipEncoder( $zip_stream );
 					$zip_encoder->append_file( new FileEntry( [
@@ -85,6 +84,7 @@ class InstallPluginStep implements StepInterface {
 					] ) );
 					$zip_encoder->close();
 				}
+				$plugin_data->stream->close_reading();
 			}
 			$zip_stream->close_writing();
 

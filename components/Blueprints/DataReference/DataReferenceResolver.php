@@ -93,7 +93,7 @@ class DataReferenceResolver {
 				return new File( $tracked_stream, basename( $path ) );
 			} elseif ( $this->executionContext->is_dir( $path ) ) {
 				// @TODO (low priority): Actually track the download progress for directories.
-				$this->subTrackers[ $reference->id ]->finish();
+				$progress_tracker->finish();
 
 				return new Directory(
 					new ChrootLayer( $this->executionContext, $path ),

@@ -52,10 +52,11 @@ class Runner {
 	private DataReferenceResolver $assets;
 	private Filesystem $blueprintExecutionContext;
 	private array $blueprintArray;
-	private array $dataReferences;
+	private array $dataReferences = [];
 	private ?VersionConstraint $phpVersionConstraint;
 	private Tracker $mainTracker;
 	private ProgressObserver $progressObserver;
+	public ?Runtime $runtime;
 
 	public function __construct( private RunnerConfiguration $configuration ) {
 		$this->client      = new Client( [
@@ -72,11 +73,7 @@ class Runner {
 		$this->mainTracker = new Tracker();
 
 		// Set up progress logging
-		$this->progressObserver = $configuration->getProgressObserver() ?? new ProgressObserver(
-			function ( $progress, $caption ) {
-				fprintf( STDERR, "[%3d%%] %s\n", $progress, $caption );
-			}
-		);
+		$this->progressObserver = $configuration->getProgressObserver() ?? new ProgressObserver();
 		$this->progressObserver->attachTo( $this->mainTracker );
 	}
 
@@ -106,7 +103,7 @@ class Runner {
 			$targetResolutionStage->setCaption( 'Resolving target site' );
 
 			$targetSiteFs = LocalFilesystem::create( $this->configuration->getTargetSiteRoot() );
-			$runtime      = new Runtime(
+			$this->runtime      = new Runtime(
 				$targetSiteFs,
 				$this->configuration,
 				$this->assets,
@@ -116,15 +113,15 @@ class Runner {
 			);
 
 			if ( $this->configuration->getExecutionMode() === 'apply-to-existing-site' ) {
-				ExistingSiteResolver::resolve( $runtime, $targetResolutionStage );
+				ExistingSiteResolver::resolve( $this->runtime, $targetResolutionStage );
 			} else {
-				NewSiteResolver::resolve( $runtime, $targetResolutionStage );
+				NewSiteResolver::resolve( $this->runtime, $targetResolutionStage );
 			}
 			$targetResolutionStage->finish();
 
 			$plan = $this->createExecutionPlan();
 			$this->assets->startEagerResolution( $this->dataReferences, $dataResolutionStage );
-			$this->executePlan( $executionStage, $plan, $runtime );
+			$this->executePlan( $executionStage, $plan, $this->runtime );
 		} finally {
 			LocalFilesystem::create( $tempRoot )->rmdir( '/', [
 				'recursive' => true,
@@ -160,8 +157,8 @@ class Runner {
 			$stream = $resolved->stream;
 
 			if ( is_zip_file_stream( $stream ) ) {
-				$this->blueprintExecutionContext = new ZipFilesystem( $stream );
 				$blueprintString        = $this->blueprintExecutionContext->get_contents( '/blueprint.json' );
+				$this->blueprintExecutionContext = $this->configuration->getExecutionContext() ?? new ZipFilesystem( $stream );
 			} else {
 				// JSON file
 				$blueprintString = $stream->consume_all();
@@ -171,16 +168,16 @@ class Runner {
 					// It was resolved as an ExecutionContextPath, but it's actually a local
 					// filesystem path at this point.
 					// The execution context is the directory containing the blueprint.json file.
-					$this->blueprintExecutionContext = LocalFilesystem::create( dirname( $reference->get_path() ) );
+					$this->blueprintExecutionContext = $this->configuration->getExecutionContext() ?? LocalFilesystem::create( dirname( $reference->get_path() ) );
 				} elseif ( $reference instanceof InlineFile ) {
-					$this->blueprintExecutionContext = InMemoryFilesystem::create();
+					$this->blueprintExecutionContext = $this->configuration->getExecutionContext() ?? InMemoryFilesystem::create();
 				} else {
 					throw new \Exception( 'Unsupported blueprint reference type: ' . get_class( $reference ) );
 				}
 			}
 		} elseif ( $resolved instanceof Directory ) {
-			$this->blueprintExecutionContext = $resolved->filesystem;
-			$blueprintString        = $this->blueprintExecutionContext->get_contents( '/blueprint.json' );
+			$blueprintString = $resolved->filesystem->get_contents( '/blueprint.json' );
+			$this->blueprintExecutionContext = $this->configuration->getExecutionContext() ?? $resolved->filesystem;
 		} else {
 			throw new \Exception( 'Invalid blueprint reference' );
 		}

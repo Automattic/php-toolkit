@@ -49,6 +49,10 @@ class Runtime {
 		return $this->targetFs;
 	}
 
+	public function getTempRoot(): string {
+		return $this->tempRoot;
+	}
+
 	public function getDataReferenceResolver(): DataReferenceResolver {
 		return $this->assets;
 	}

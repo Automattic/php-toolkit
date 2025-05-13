@@ -5,6 +5,7 @@ namespace WordPress\Blueprints\Tests;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use WordPress\Blueprints\BlueprintV2Validator;
+use WordPress\Blueprints\Validator;
 
 /**
  * Tests for the BlueprintV2Validator class.
@@ -22,7 +23,7 @@ class BlueprintV2ValidatorTest extends TestCase {
 	 */
 	public function setUp(): void {
 		parent::setUp();
-		$this->validator = new BlueprintV2Validator();
+		$this->validator = new Validator();
 	}
 
 	/**

@@ -1,29 +1,14 @@
 <?php
 
-namespace unit\steps;
+namespace WordPress\Blueprints\Tests\Unit\Steps;
 
-use PHPUnitTestCase;
 use WordPress\Blueprints\DataReference\DataReference;
 use WordPress\Blueprints\Progress\Tracker;
-use WordPress\Blueprints\Runner\Step\InstallPluginStepRunner;
-use WordPress\Blueprints\Runner\WordPressBoot\BootOptions;
-use WordPress\Blueprints\Runner\WordPressBoot\WordPressBootManager;
-use WordPress\Blueprints\Runtime\Runtime;
-use WordPress\Blueprints\Steps\DataClass\InstallPluginStep;
+use WordPress\Blueprints\Steps\InstallPluginStep;
 
 use function WordPress\Filesystem\wp_join_paths;
 
-class InstallPluginStepRunnerTest extends PHPUnitTestCase {
-	/**
-	 * @var string
-	 */
-	private $document_root;
-
-	/**
-	 * @var Runtime
-	 */
-	private $runtime;
-
+class InstallPluginStepTest extends StepTestCase {
 	const PLUGIN_FILE_CONTENT = <<<'PHP'
 	<?php
 	/**
@@ -40,72 +25,22 @@ class InstallPluginStepRunnerTest extends PHPUnitTestCase {
 	add_action('init', 'test_plugin_init');
 	PHP;
 
-	/**
-	 * @before
-	 */
-	public function setUp(): void {
-		$this->document_root = wp_join_paths( sys_get_temp_dir(), 'test_plugin_install_' . uniqid() );
-		if ( ! is_dir( $this->document_root ) ) {
-			mkdir( $this->document_root, 0777, true );
-		}
-
-		// Boot WordPress using WordPressBootManager
-		$options = BootOptions::parse( [
-			'siteUrl'      => 'https://example.com',
-			'documentRoot' => $this->document_root,
-		] );
-
-		$this->runtime = WordPressBootManager::boot( $options );
-	}
-
-	/**
-	 * @after
-	 */
-	public function tearDown(): void {
-		// Clean up temp directory
-		if ( is_dir( $this->document_root ) ) {
-			$this->removeDirectory( $this->document_root );
-		}
-	}
-
-	private function removeDirectory( $dir ) {
-		if ( ! is_dir( $dir ) ) {
-			return;
-		}
-		$objects = scandir( $dir );
-		foreach ( $objects as $object ) {
-			if ( $object == "." || $object == ".." ) {
-				continue;
-			}
-
-			$path = $dir . DIRECTORY_SEPARATOR . $object;
-			if ( is_dir( $path ) ) {
-				$this->removeDirectory( $path );
-			} else {
-				unlink( $path );
-			}
-		}
-		rmdir( $dir );
-	}
-
 	public function testInstallPluginWithActivation() {
-		$this->runtime->getTargetFilesystem()->mkdir(
+		$this->execution_context->mkdir(
 			'test-plugin', [ 'recursive' => true ]
 		);
-		$this->runtime->getTargetFilesystem()->put_contents(
+		$this->execution_context->put_contents(
 			'test-plugin/test-plugin.php',
 			self::PLUGIN_FILE_CONTENT
 		);
 
-		$step_runner = new InstallPluginStepRunner();
-		$step_runner->setRuntime( $this->runtime );
-
-		$step             = new InstallPluginStep();
-		$step->pluginData = DataReference::create( 'test-plugin/test-plugin.php' );
-		$step->activate   = true;
+		$step = new InstallPluginStep(
+			DataReference::create( './test-plugin/test-plugin.php' ),
+			true
+		);
 
 		$tracker = new Tracker();
-		$step_runner->run( $step, $tracker );
+		$step->run( $this->runtime, $tracker );
 
 		// Check if plugin is installed
 		$fs = $this->runtime->getTargetFilesystem();
@@ -126,23 +61,21 @@ class InstallPluginStepRunnerTest extends PHPUnitTestCase {
 	}
 
 	public function testInstallPluginWithoutActivation() {
-		$this->runtime->getTargetFilesystem()->mkdir(
+		$this->execution_context->mkdir(
 			'test-plugin', [ 'recursive' => true ]
 		);
-		$this->runtime->getTargetFilesystem()->put_contents(
+		$this->execution_context->put_contents(
 			'test-plugin/test-plugin.php',
 			self::PLUGIN_FILE_CONTENT
 		);
 
-		$step_runner = new InstallPluginStepRunner();
-		$step_runner->setRuntime( $this->runtime );
-
-		$step             = new InstallPluginStep();
-		$step->pluginData = DataReference::create( 'test-plugin/test-plugin.php' );
-		$step->activate   = false;
+		$step = new InstallPluginStep(
+			DataReference::create( './test-plugin/test-plugin.php' ),
+			false
+		);
 
 		$tracker = new Tracker();
-		$step_runner->run( $step, $tracker );
+		$step->run( $this->runtime, $tracker );
 
 		// Check if plugin is installed
 		$fs = $this->runtime->getTargetFilesystem();
@@ -179,22 +112,20 @@ class InstallPluginStepRunnerTest extends PHPUnitTestCase {
 	}
 
 	public function testInstallPluginFromZip() {
-		$zip_file = wp_join_paths( $this->document_root, 'zipped-test-plugin.zip' );
+		$zip_file = wp_join_paths( $this->execution_context_path, 'zipped-test-plugin.zip' );
 		$zip      = new \ZipArchive();
 		if ( $zip->open( $zip_file, \ZipArchive::CREATE ) === true ) {
 			$zip->addFromString( 'test-plugin.php', self::PLUGIN_FILE_CONTENT );
 			$zip->close();
 		}
 
-		$step_runner = new InstallPluginStepRunner();
-		$step_runner->setRuntime( $this->runtime );
-
-		$step             = new InstallPluginStep();
-		$step->pluginData = DataReference::create( 'zipped-test-plugin.zip' );
-		$step->activate   = true;
+		$step = new InstallPluginStep(
+			DataReference::create( './zipped-test-plugin.zip' ),
+			true
+		);
 
 		$tracker = new Tracker();
-		$step_runner->run( $step, $tracker );
+		$step->run( $this->runtime, $tracker );
 
 		// Check if plugin is installed
 		$fs = $this->runtime->getTargetFilesystem();
@@ -215,22 +146,20 @@ class InstallPluginStepRunnerTest extends PHPUnitTestCase {
 	}
 
 	public function testInstallPluginFromZipWithSubfolder() {
-		$zip_file = wp_join_paths( $this->document_root, 'zipped-test-plugin.zip' );
+		$zip_file = wp_join_paths( $this->execution_context_path, 'zipped-test-plugin.zip' );
 		$zip      = new \ZipArchive();
 		if ( $zip->open( $zip_file, \ZipArchive::CREATE ) === true ) {
 			$zip->addFromString( 'subfolder-name/test-plugin.php', self::PLUGIN_FILE_CONTENT );
 			$zip->close();
 		}
 
-		$step_runner = new InstallPluginStepRunner();
-		$step_runner->setRuntime( $this->runtime );
-
-		$step             = new InstallPluginStep();
-		$step->pluginData = DataReference::create( 'zipped-test-plugin.zip' );
-		$step->activate   = true;
+		$step = new InstallPluginStep(
+			DataReference::create( './zipped-test-plugin.zip' ),
+			true
+		);
 
 		$tracker = new Tracker();
-		$step_runner->run( $step, $tracker );
+		$step->run( $this->runtime, $tracker );
 
 		// Check if plugin is installed
 		$fs = $this->runtime->getTargetFilesystem();
@@ -251,27 +180,25 @@ class InstallPluginStepRunnerTest extends PHPUnitTestCase {
 	}
 
 	public function testInstallPluginFromADirectory() {
-		$this->runtime->getTargetFilesystem()->mkdir(
+		$this->execution_context->mkdir(
 			'plugin-directory', [ 'recursive' => true ]
 		);
-		$this->runtime->getTargetFilesystem()->put_contents(
+		$this->execution_context->put_contents(
 			'plugin-directory/test-plugin.php',
 			self::PLUGIN_FILE_CONTENT
 		);
 
-		$step_runner = new InstallPluginStepRunner();
-		$step_runner->setRuntime( $this->runtime );
-
-		$step             = new InstallPluginStep();
-		$step->pluginData = DataReference::create( 'plugin-directory' );
-		$step->activate   = true;
+		$step = new InstallPluginStep(
+			DataReference::create( './plugin-directory' ),
+			true
+		);
 
 		$tracker = new Tracker();
-		$step_runner->run( $step, $tracker );
+		$step->run( $this->runtime, $tracker );
 
 		// Check if plugin is installed
 		$fs = $this->runtime->getTargetFilesystem();
-		$this->assertTrue( $fs->exists( 'wp-content/plugins/test-plugin/test-plugin.php' ) );
+		$this->assertTrue( $fs->exists( 'wp-content/plugins/plugin-directory/test-plugin.php' ) );
 
 		// Check if plugin is activated
 		$active_plugins = $this->runtime->evalPhpInSubProcess(
@@ -283,7 +210,7 @@ class InstallPluginStepRunnerTest extends PHPUnitTestCase {
 		)->outputFileContent;
 
 		$active_plugins = json_decode( $active_plugins, true );
-		$this->assertContains( 'test-plugin/test-plugin.php', $active_plugins );
+		$this->assertContains( 'plugin-directory/test-plugin.php', $active_plugins );
 	}
 
 

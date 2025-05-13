@@ -4,6 +4,7 @@ namespace WordPress\Blueprints\Steps;
 
 use WordPress\Blueprints\Progress\Tracker;
 use WordPress\Blueprints\Runtime;
+use WordPress\Filesystem\FilesystemException;
 
 /**
  * Represents the 'rm' (remove file) step.

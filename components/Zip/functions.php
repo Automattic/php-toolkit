@@ -16,5 +16,5 @@ function is_zip_file_stream(ByteReadStream $stream) {
 		return false;
 	}
 
-	return true;
+	return $stream->peek(4) === "PK\x03\x04";
 }
