@@ -184,6 +184,8 @@ class NewSiteResolver {
 			return 'https://wordpress.org/nightly-builds/wordpress-latest.zip';
 		}
 
+		// @TODO Support version numbers like 6.5.1 that don't show up in the default API response.
+		//       Use query params for filtering somehow?
 		$latestVersions = $client->fetch( 'https://api.wordpress.org/core/version-check/1.7/?channel=beta' )->json();
 		$latestVersions = array_filter( $latestVersions['offers'], function ( $v ) {
 			return $v['response'] === 'autoupdate';

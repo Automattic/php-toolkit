@@ -1,14 +1,19 @@
 <?php
 
 /**
- * @TODO: Fast unzipping of remote Zip Files by iterating over the entries
- *        instead of skipping over to the end central directory index entry.
- * @TODO: Processing Zip Files without the Content-Length header.
- * @TODO: HTTP Cache support for remote files.
- * @TODO: Restrictions on supported step types, media files types, SQL queries types, etc.
+ * @TODO: A large test suite.
+ * @TODO: Client HTTP queue deadlock when we enqueued a lot of requests and need to fetch a small
+ *        ad-hoc resource such as a JSON list of translations.
+ * @TODO: Exception structure?
+ * @TODO: Blueprint JSON validation.
+ * @TODO: Support Zip Files without the Content-Length header.
  * @TODO: Add importMedia step to the specification.
  * @TODO: How to handle the default WordPress theme? Should it be preserved for new sites?
  *        What if we want to remove it? And what should be the semantics for existing sites?
+ * @TODO: Production-grade HTTP Cache support for remote files. Not the stopgap we have now.
+ * @TODO (low priority): Restrictions on supported step types, media files types, SQL queries types, etc.
+ * @TODO (low priority): Fast unzipping of remote Zip Files by iterating over the entries
+ *        instead of skipping over to the end central directory index entry.
  */
 
 namespace WordPress\Blueprints\Steps;
@@ -33,6 +38,13 @@ $config = (new RunnerConfiguration())
 		"themes" => [
 			"adventurer"
 		],
+		"wordpressVersion" => "6.5",
+		"phpVersion" => [
+			"min" => "8.0",
+			"max" => "8.4",
+			"recommended" => "8.2"
+		],
+		"activeTheme" => "twentytwentyfour",
 		"blueprintMeta" => [
 			"name" => "Full Featured Blueprint",
 			"description" => "A blueprint demonstrating most of the available features",
@@ -52,6 +64,39 @@ $config = (new RunnerConfiguration())
 				"show_in_rest" => true,
 				"supports" => ["title", "editor", "author", "thumbnail", "excerpt", "comments"]
 			]
+		],
+		// "muPlugins" => [
+		// 	"0-test" => [
+		// 		"filename" => "0-test.php",
+		// 		"content" => "<?php
+		// 			echo 'test';
+		// 		? >"
+		// 	]
+		// ],
+		"users" => [
+			[
+				"username" => "admin",
+				"password" => "password",
+				"email" => "adam@example.com",
+				"role" => "adamadamin"
+			]
+		],
+		"roles" => [
+			[
+				"name" => "adamadamin",
+				// @TODO: What's the correct way to set capabilities?
+				"capabilities" => ["manage_options"=>"manage_options"]
+			]
+		],
+		"siteOptions" => [
+			"blogname" => "Blueprint Demo Site",
+			"timezone_string" => "America/New_York",
+			"permalink_structure" => "/%year%/%monthnum%/%postname%/"
+		],
+		"siteLanguage" => "en_US",
+		"constants" => [
+			"WP_DEBUG" => true,
+			"SCRIPT_DEBUG" => true
 		],
 		"media" => [
 			"https://wordpress.org/files/2024/10/design-visual-6-7.png",

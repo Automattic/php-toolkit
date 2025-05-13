@@ -213,6 +213,7 @@ class Runner {
 		$v        = new Validator();
 		$is_valid = $v->validate( $this->blueprintArray );
 		if ( ! $is_valid ) {
+			print_r( $v->get_errors() );
 			throw new \Exception( 'Blueprint is invalid' );
 		}
 

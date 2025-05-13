@@ -39,7 +39,17 @@ class VersionConstraint {
 			}
 		}
 		if ( $this->max !== null ) {
-			if ( version_compare( $version, $this->max, '>' ) ) {
+			// If max is set to 6.4 and the actual version is 6.4.1, we should still return true.
+			// To limit the minor version number, the user must specify it explicitly.
+			// @TODO: Don't append .999999. That's a hack. Consider all possible
+			//        WordPress and PHP version number strings and find a way of
+			//        meaningfully comparing them (or throw a warning if no meaningful
+			//        comparison can be made).
+			$max = $this->max;
+			if ( preg_match( '/^[0-9]+\.[0-9]+$/', $max ) ) {
+				$max = $max . '.999999';
+			}
+			if ( version_compare( $version, $max, '>' ) ) {
 				return false;
 			}
 		}
