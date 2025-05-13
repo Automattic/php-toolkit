@@ -90,7 +90,7 @@ class DataReferenceResolver {
 
 				return new File( $tracked_stream, basename( $path ) );
 			} elseif ( $this->executionContext->is_dir( $path ) ) {
-				// @TODO: Actually track the download progress for directories.
+				// @TODO (low priority): Actually track the download progress for directories.
 				$this->subTrackers[ $reference->id ]->finish();
 
 				return new Directory(
@@ -116,7 +116,7 @@ class DataReferenceResolver {
 
 			return new Directory( $fs, $reference->get_name() );
 		} elseif ( $reference instanceof GitPath ) {
-			// @TODO: Actually track the download progress for git repositories.
+			// @TODO (low priority): Actually track the download progress for git repositories.
 			$progress_tracker->finish();
 
 			/**

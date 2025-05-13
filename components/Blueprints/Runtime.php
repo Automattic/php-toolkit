@@ -90,6 +90,14 @@ class Runtime {
 		return $this->assets->resolve( $r, $progress_tracker );
 	}
 
+	/**
+	 * @TODO: Find a more useful way of communicating warnings. Perhaps an interface that captures output
+	 *        of the runtime, similar to progress reporter?
+	 */
+	public function logWarning( string $message ) {
+		error_log( $message );
+	}
+
 	public function withTemporaryDirectory( callable $callback ) {
 		$tmp = $this->createTemporaryDirectory();
 		try {
@@ -180,8 +188,6 @@ class Runtime {
 	}
 
 	/**
-	 * @TODO: Upgrade to the latest Symfony Process version.
-	 *
 	 * @param  mixed[]  $command
 	 * @param  string|null  $cwd
 	 * @param  mixed[]|null  $env

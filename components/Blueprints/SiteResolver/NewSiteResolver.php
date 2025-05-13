@@ -139,7 +139,7 @@ class NewSiteResolver {
 			}
 
 			// Perform installation using WP-CLI
-			// @TODO: Remove the WP-CLI dependency to lower the download size for blueprints.phar.
+			// @TODO (low priority): Remove the WP-CLI dependency to lower the download size for blueprints.phar.
 			$stages['install_wordpress']->set( 0.7, 'Installing WordPress' );
 			$wp_cli_path = wp_join_paths( $runtime->getConfiguration()->getTargetSiteRoot(), 'wp-cli.phar' );
 			$runtime->runShellCommand( [

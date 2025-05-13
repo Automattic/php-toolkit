@@ -115,7 +115,7 @@ class SetSiteLanguageStep implements StepInterface {
 
 		// Core translation
 		if ( $language === 'en_US' ) {
-			$core_translation_url = $this->getWordPressTranslationUrl( $wp_version, $language, $client );
+			$core_translation_url = $this->getWordPressTranslationUrl( $runtime, $wp_version, $language, $client );
 			if ( $core_translation_url ) {
 				$download_targets[] = [
 					'request'    => new Request( $core_translation_url ),
@@ -184,14 +184,32 @@ class SetSiteLanguageStep implements StepInterface {
 					'recursive'         => true,
 				] );
 			} catch ( \Exception $e ) {
-				// Only log warnings for plugin and theme translations
-				// @TODO: Find a more useful way of communicating warnings
+				/**
+				 * Log warnings for missing plugin and theme translations. This is an expected
+				 * scenario. Not all plugins and themes are translated to all languages.
+				 */
 				if ( isset( $target['is_plugin'] ) ) {
-					echo "Warning: Failed to download translations for plugin {$target['slug']}: " . $e->getMessage() . "\n";
+					$runtime->logWarning( 
+						sprintf(
+							"Warning: Failed to download translations for plugin %s: %s",
+							$target['slug'],
+							$e->getMessage()
+						)
+					);
 				} elseif ( isset( $target['is_theme'] ) ) {
-					echo "Warning: Failed to download translations for theme {$target['slug']}: " . $e->getMessage() . "\n";
+					$runtime->logWarning(
+						sprintf(
+							"Warning: Failed to download translations for theme %s: %s",
+							$target['slug'],
+							$e->getMessage()
+						)
+					);
 				} else {
-					// For core translations, we should re-throw the exception
+					/**
+					 * Stop the execution of the blueprint if we fail to download core translations.
+					 * WordPress core is expected to be translated to all languages. If a translation
+					 * is missing, why use it in the Blueprint?
+					 */
 					throw new \Exception( "Failed to download core translations: " . $e->getMessage(), 0, $e );
 				}
 			}
@@ -203,10 +221,8 @@ class SetSiteLanguageStep implements StepInterface {
 	 *
 	 * @param  string  $wpVersion  WordPress version
 	 * @param  string  $language  Language code
-	 *
-	 * @throws \Exception If translation package is not found
 	 */
-	private function getWordPressTranslationUrl( string $wpVersion, string $language, Client $client ): string|false {
+	private function getWordPressTranslationUrl( Runtime $runtime, string $wpVersion, string $language, Client $client ): string|false {
 		try {
 			$api_url           = "https://api.wordpress.org/translations/core/1.0/?version={$wpVersion}";
 			$translations_data = $client->fetch( $api_url )->json();
@@ -221,8 +237,7 @@ class SetSiteLanguageStep implements StepInterface {
 				}
 			}
 		} catch ( \Exception $e ) {
-			// Log warning about translation API failure
-			error_log( "Warning: Failed to fetch translations from WordPress.org API: " . $e->getMessage() );
+			$runtime->logWarning( "Warning: Failed to fetch translations details from WordPress.org API: " . $e->getMessage() );
 		}
 
 		return false;
