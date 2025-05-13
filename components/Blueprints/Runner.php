@@ -36,6 +36,7 @@ use WordPress\Blueprints\Steps\SetSiteOptionsStep;
 use WordPress\Blueprints\Steps\UnzipStep;
 use WordPress\Blueprints\Steps\WPCLIStep;
 use WordPress\Blueprints\Steps\WriteFilesStep;
+use WordPress\ByteStream\ReadStream\FileReadStream;
 use WordPress\Filesystem\Filesystem;
 use WordPress\Filesystem\InMemoryFilesystem;
 use WordPress\Filesystem\LocalFilesystem;
@@ -48,7 +49,7 @@ use function WordPress\Zip\is_zip_file_stream;
 class Runner {
 	private Client $client;
 	private DataReferenceResolver $assets;
-	private Filesystem $executionContext;
+	private Filesystem $blueprintExecutionContext;
 	private array $blueprintArray;
 	private array $dataReferences;
 	private ?VersionConstraint $phpVersionConstraint;
@@ -80,16 +81,15 @@ class Runner {
 		$dataResolutionStage   = $this->mainTracker->stage( 0.25, 'Resolving data references' );
 		$executionStage        = $this->mainTracker->stage( 0.5, 'Executing Blueprint steps' );
 
+		$this->assets = new DataReferenceResolver( $this->client );
+
 		$blueprintStage->setCaption( 'Loading Blueprint data' );
 		$this->loadBlueprint();
 		$this->validateBlueprint();
+		$this->assets->setExecutionContext( $this->blueprintExecutionContext );
 		$blueprintStage->finish();
 
 		$targetResolutionStage->setCaption( 'Resolving target site' );
-		$this->assets = new DataReferenceResolver(
-			$this->client,
-			$this->executionContext
-		);
 
 		$targetSiteFs = LocalFilesystem::create( $this->configuration->getTargetSiteRoot() );
 		$runtime      = new Runtime(
@@ -115,20 +115,33 @@ class Runner {
 	/*──────────────── Blueprint load / validation / createExecutionPlan ─────────────*/
 	private function loadBlueprint() {
 		$reference = $this->configuration->getBlueprint();
+
 		if ( is_array( $reference ) ) {
 			$this->blueprintArray   = $reference;
-			$this->executionContext = $this->configuration->getExecutionContext() ?? InMemoryFilesystem::create();
+			$this->blueprintExecutionContext = $this->configuration->getExecutionContext() ?? InMemoryFilesystem::create();
 
 			return;
 		}
 
-		$resolved = $this->assets->resolve( $reference );
+		if ( $reference instanceof ExecutionContextPath ) {
+			$absolute_path = $reference->get_normalized_path();
+			if ( substr( $absolute_path, 0, 1 ) !== '/' ) {
+				throw new \Exception( 'Blueprint path must be absolute' );
+			}
+			$resolved = new File(
+				FileReadStream::from_path( $absolute_path ),
+				$reference->get_filename()
+			);
+		} else {
+			$resolved = $this->assets->resolve( $reference );
+		}
+		
 		if ( $resolved instanceof File ) {
 			$stream = $resolved->stream;
 
 			if ( is_zip_file_stream( $stream ) ) {
-				$this->executionContext = new ZipFilesystem( $stream );
-				$blueprintString        = $this->executionContext->get_contents( '/blueprint.json' );
+				$this->blueprintExecutionContext = new ZipFilesystem( $stream );
+				$blueprintString        = $this->blueprintExecutionContext->get_contents( '/blueprint.json' );
 			} else {
 				// JSON file
 				$blueprintString = $stream->consume_all();
@@ -138,15 +151,15 @@ class Runner {
 					// It was resolved as an ExecutionContextPath, but it's actually a local
 					// filesystem path at this point.
 					// The execution context is the directory containing the blueprint.json file.
-					$this->executionContext = LocalFilesystem::create( dirname( $reference->get_path() ) );
+					$this->blueprintExecutionContext = LocalFilesystem::create( dirname( $reference->get_path() ) );
 				} else {
 					// @TODO: Support other reference types
 					throw new \Exception( 'Unsupported blueprint reference type' );
 				}
 			}
 		} elseif ( $resolved instanceof Directory ) {
-			$this->executionContext = $resolved->filesystem;
-			$blueprintString        = $this->executionContext->get_contents( '/blueprint.json' );
+			$this->blueprintExecutionContext = $resolved->filesystem;
+			$blueprintString        = $this->blueprintExecutionContext->get_contents( '/blueprint.json' );
 		} else {
 			throw new \Exception( 'Invalid blueprint reference' );
 		}

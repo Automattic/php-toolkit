@@ -17,11 +17,13 @@ class DataReferenceResolver {
 	private array $dataReferences;
 	private array $resolvedDataReferences;
 	private Tracker $dataResolutionTracker;
+	private ?Filesystem $executionContext;
+	
+	public function __construct(private Client $client) {
+	}
 
-	public function __construct(
-		private Client $client,
-		private Filesystem $executionContext
-	) {
+	public function setExecutionContext( Filesystem $executionContext ) {
+		$this->executionContext = $executionContext;
 	}
 
 	public function startEagerResolution( array $dataReferences, Tracker $dataResolutionTracker ) {
