@@ -100,7 +100,7 @@ class ImportMediaStep implements StepInterface {
 					// would we have to check anyway?
 					// Would there be any value in the runtime having specific methods like resolveFile()
 					// and resolveDirectory() that throw if they cannot resolve the requested type?
-					throw new RuntimeException( "Failed to resolve media file: $human_readable_name" );
+					throw new \RuntimeException( "Failed to resolve media file: $human_readable_name" );
 				}
 
 				// Create a new file in the uploads directory
@@ -162,11 +162,11 @@ class ImportMediaStep implements StepInterface {
 				);
 
 				if ( ! $attachment_id ) {
-					throw new RuntimeException( "Failed to import media file: $human_readable_name" );
+					throw new \RuntimeException( "Failed to import media file: $human_readable_name" );
 				}
 
 				$progress_import->increment( $progress_import_step );
-			} catch ( Exception $e ) {
+			} catch ( \Exception $e ) {
 				// Log error but continue with other media files
 				error_log( "Failed to import media file {$target_path}: " . $e->getMessage() );
 			}
@@ -186,7 +186,7 @@ class ImportMediaStep implements StepInterface {
 
 		$filename = $source->get_filename();
 		if ( ! $filename ) {
-			throw new RuntimeException( sprintf(
+			throw new \RuntimeException( sprintf(
 				'Failed to get filename for media file: %s. We can\'t infer the extension.',
 				$source->get_human_readable_name()
 			) );
