@@ -94,8 +94,7 @@ class Runner {
 			$dataResolutionStage   = $this->mainTracker->stage( 0.25, 'Resolving data references' );
 			$executionStage        = $this->mainTracker->stage( 0.5, 'Executing Blueprint steps' );
 
-			// TODO: What's the client?
-			
+			// TODO: What's the client? 
 			$this->assets = new DataReferenceResolver( $this->client );
 
 			$blueprintStage->setCaption( 'Loading Blueprint data' );
