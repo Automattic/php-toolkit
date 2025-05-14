@@ -48,14 +48,11 @@ $server->set_handler( function( IncomingRequest $request, TcpResponseWriteStream
 	$parsed_url = $request->get_parsed_url();
 	if($parsed_url->searchParams->get('chunked') === 'yes') {
 		$response->use_chunked_encoding();
-
-		$file_stream = FileReadStream::from_path($file_path);
-		pipe_stream($file_stream, $response);
 	} else {
 		$response->send_header( 'Content-Length', filesize($file_path) );
-		$file_stream = FileReadStream::from_path($file_path);
-		pipe_stream($file_stream, $response);
 	}
+	$file_stream = FileReadStream::from_path($file_path);
+	pipe_stream($file_stream, $response);
 } );
 
 $server->serve(function($host, $port) {
