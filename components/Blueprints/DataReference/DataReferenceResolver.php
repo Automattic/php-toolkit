@@ -46,6 +46,7 @@ class DataReferenceResolver {
 
 	/** Core service method shared by runner, target resolvers and steps */
 	public function resolve( DataReference $reference, ?Tracker $progress_tracker = null ): File|Directory {
+		// TODO: Comment this. Make semantics clearer.
 		if ( isset( $this->resolvedDataReferences[ $reference->id ] ) ) {
 			return $this->resolvedDataReferences[ $reference->id ];
 		}
@@ -86,6 +87,8 @@ class DataReferenceResolver {
 				$tracked_stream,
 				$filename
 			);
+		// TODO: Consider a clearer name. Some not-so-great ballpark ideas:
+		// BlueprintParentPath, BlueprintRootPath, BlueprintContextPath, BlueprintRelativePath
 		} elseif ( $reference instanceof ExecutionContextPath ) {
 			$path = $reference->get_path();
 			if ( ! $this->executionContext->exists( $path ) ) {
@@ -107,10 +110,12 @@ class DataReferenceResolver {
 			} else {
 				throw new \RuntimeException( 'Path is not a file or directory: ' . $path );
 			}
+		// TODO: Lovely name.
 		} elseif ( $reference instanceof InlineFile ) {
 			$progress_tracker->finish();
 
 			return new File( new MemoryPipe( $reference->get_content() ), $reference->get_filename() );
+		// TODO: What is an InlineDirectory?! Can we actually specify directories with file content inline?
 		} elseif ( $reference instanceof InlineDirectory ) {
 			$progress_tracker->finish();
 			return $reference->as_directory();

@@ -128,7 +128,9 @@ $config = (new RunnerConfiguration())
 			]
 		]
 	])
+	// TODO: What is the default database engine?
 	->setDatabaseEngine('sqlite')
+	// TODO: Neat!
     ->setExecutionMode('create-new-site') // or 'apply-to-existing-site'
     ->setTargetSiteRoot(__DIR__ . '/my-new-site')
     ->setTargetSiteUrl('http://127.0.0.1:2456') // Arbitrary URL for the new site

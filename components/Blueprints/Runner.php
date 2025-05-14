@@ -48,6 +48,7 @@ use function WordPress\Encoding\utf8_is_valid_byte_stream;
 use function WordPress\Zip\is_zip_file_stream;
 
 class Runner {
+	// TODO: Rename httpClient
 	private Client $client;
 	private DataReferenceResolver $assets;
 	private Filesystem $blueprintExecutionContext;
@@ -79,6 +80,7 @@ class Runner {
 
 	public function run(): void {
 		$tempRoot = sys_get_temp_dir() . '/wp-blueprints-runtime-' . uniqid();
+		// TODO: Are there cases where we should not have these permissions?
 		mkdir( $tempRoot, 0777, true );
 
 		try {
@@ -92,6 +94,7 @@ class Runner {
 			$dataResolutionStage   = $this->mainTracker->stage( 0.25, 'Resolving data references' );
 			$executionStage        = $this->mainTracker->stage( 0.5, 'Executing Blueprint steps' );
 
+			// TODO: What's the client?
 			$this->assets = new DataReferenceResolver( $this->client );
 
 			$blueprintStage->setCaption( 'Loading Blueprint data' );
@@ -123,6 +126,7 @@ class Runner {
 			$this->assets->startEagerResolution( $this->dataReferences, $dataResolutionStage );
 			$this->executePlan( $executionStage, $plan, $this->runtime );
 		} finally {
+			// TODO: Optionally preserve workspace in case of error? Support resuming after error?
 			LocalFilesystem::create( $tempRoot )->rmdir( '/', [
 				'recursive' => true,
 			]);
