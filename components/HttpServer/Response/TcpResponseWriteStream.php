@@ -62,7 +62,7 @@ class TcpResponseWriteStream implements ResponseWriteStream
         $this->headers[$lname] = [$name, $value];
     }
 
-    public function send_headers_if_needed()
+    private function send_headers_if_needed()
     {
         if ($this->headers_sent) {
             return;
