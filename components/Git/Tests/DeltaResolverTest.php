@@ -13,9 +13,9 @@ class DeltaResolverTest extends \PHPUnit\Framework\TestCase {
 	public function test_resolve_next_chunk() {
 		$base_bytes = 'Hello, world!';
 
-		$object      = new MemoryPipe(
-			'blob ' . strlen( $base_bytes ) . "\000" .
-			gzcompress( $base_bytes, 9, ZLIB_ENCODING_DEFLATE )
+		$header = 'blob ' . strlen( $base_bytes ) . "\000";
+		$object = new MemoryPipe(
+			gzcompress( $header . $base_bytes, 9, ZLIB_ENCODING_DEFLATE )
 		);
 		$base_reader = new GitObjectDecoder( $object );
 		$base_reader->read_header();

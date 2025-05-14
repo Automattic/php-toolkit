@@ -30,16 +30,14 @@ class GitObjectEncoder implements ByteWriteStream {
 		}
 
 		$this->repository = $repository;
-
-		$header           = "$object_type_name $object_length\x00";
 		$this->downstream = new TransformedWriteStream(
 			$repository->get_object_storage_filesystem()->open_write_stream( 'objects/.tmp' ),
 			array(
 				'checksum' => new ChecksumTransformer( 'sha1' ),
 			)
 		);
-		$this->downstream->append_bytes( $header );
 		$this->downstream['deflate'] = new DeflateTransformer( ZLIB_ENCODING_DEFLATE );
+		$this->downstream->append_bytes( "$object_type_name $object_length\x00" );
 	}
 
 	public function append_bytes( $data ): void {

@@ -16,8 +16,6 @@ use WordPress\Git\Protocol\Parser\ProtocolDemultiplexer;
 class ProtocolDemultiplexerTest extends \PHPUnit\Framework\TestCase {
 
 	public function test_parse_simple_response() {
-		$request_buffer = new MemoryPipe();
-
 		$repo = new GitRepository( InMemoryFilesystem::create() );
 		$oid  = $repo->add_object(
 			'tree',
@@ -71,8 +69,8 @@ class ProtocolDemultiplexerTest extends \PHPUnit\Framework\TestCase {
 			array_slice( $chunks, 0, 6 )
 		);
 		$this->assertStringStartsWith( 'PACK', $chunks[6] );
-		$this->assertEquals( 59, strlen( $chunks[6] ) );
-		$this->assertEquals( 20, strlen( $chunks[7] ) );
+		$this->assertEquals( 60, strlen( $chunks[6] ) );
+		$this->assertEquals( 26, strlen( $chunks[7] ) );
 	}
 
 	public function test_parse_response_no_blobs() {
