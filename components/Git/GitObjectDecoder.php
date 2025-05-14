@@ -9,10 +9,6 @@ use WordPress\ByteStream\NotEnoughDataException;
 use WordPress\Git\Protocol\Parser\CommitParser;
 use WordPress\Git\Protocol\Parser\TreeParser;
 
-/**
- * GitObjectDecoder now treats the header as part of the deflated stream.
- * Offset 0 always points to the first byte **after** the header.
- */
 class GitObjectDecoder extends BaseByteReadStream {
 
     private ?string $object_header         = null;

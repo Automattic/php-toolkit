@@ -67,11 +67,11 @@ abstract class BaseByteReadStream implements ByteReadStream {
 
 			if ( $consumable_after === $consumable_before ) {
 				++$empty_pulls;
+				if ( $this->reached_end_of_data() ) {
+					throw new NotEnoughDataException( 'End of data reached while pulling' );
+				}
 			}
 
-			if ( $this->reached_end_of_data() ) {
-				throw new NotEnoughDataException( 'End of data reached while pulling' );
-			}
 			if ( $empty_pulls > 4 ) {
 				throw new NotEnoughDataException( '4 empty pulls in a row, we are probably at the end of the data' );
 			}
