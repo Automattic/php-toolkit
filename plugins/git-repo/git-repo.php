@@ -10,7 +10,7 @@ use WordPress\DataLiberation\DataFormatConsumer\AnnotatedBlockMarkupConsumer;
 use WordPress\DataLiberation\DataFormatConsumer\BlocksWithMetadata;
 use WordPress\DataLiberation\DataFormatProducer\AnnotatedBlockMarkupProducer;
 use WordPress\Filesystem\Layer\ChrootLayer;
-use WordPress\HttpServer\ResponseWriter\BufferingResponseWriter;
+use WordPress\HttpServer\Response\BufferingResponseWriter;
 use WordPress\Filesystem\LocalFilesystem;
 use WordPress\Filesystem\Visitor\FilesystemVisitor;
 use WordPress\Git\GitEndpoint;
@@ -73,7 +73,7 @@ switch($request_path) {
                 foreach(['post_date_gmt', 'post_title', 'menu_order'] as $key) {
                     $metadata[$key] = get_post_field($key, $page->ID);
                 }
-                
+
                 $converter = new AnnotatedBlockMarkupProducer(
                     new BlocksWithMetadata($page->post_content, $metadata)
                 );
@@ -116,7 +116,7 @@ if($request_path === '/git-receive-pack') {
         $updated_ids = [];
         foreach($git_fs->ls($post_type) as $file_name) {
             $file_path = $post_type . '/' . $file_name;
-            $converter = new AnnotatedBlockMarkupConsumer( 
+            $converter = new AnnotatedBlockMarkupConsumer(
                 $git_fs->get_contents($file_path)
             );
             $result = $converter->consume();

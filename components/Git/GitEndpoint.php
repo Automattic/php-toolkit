@@ -7,7 +7,7 @@ use WordPress\Git\Model\Commit;
 use WordPress\Git\Protocol\GitProtocolEncoderPipe;
 use WordPress\Git\Protocol\Parser\GitProtocolDecoder;
 use WordPress\Git\Protocol\Parser\PacketParser;
-use WordPress\HttpServer\ResponseWriter\ResponseWriteStream;
+use WordPress\HttpServer\Response\ResponseWriteStream;
 
 /**
  * Implement Git server protocol v2

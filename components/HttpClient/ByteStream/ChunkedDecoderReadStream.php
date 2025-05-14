@@ -3,7 +3,6 @@
 namespace WordPress\HttpClient\ByteStream;
 
 use WordPress\ByteStream\ReadStream\BaseByteReadStream;
-use WordPress\ByteStream\ReadStream\ByteReadStream;
 
 class ChunkedDecoderReadStream extends BaseByteReadStream {
 

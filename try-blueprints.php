@@ -5,7 +5,6 @@
  * @TODO: Client HTTP queue deadlock when we enqueued a lot of requests and need to fetch a small
  *        ad-hoc resource such as a JSON list of translations.
  * @TODO: Blueprint JSON validation.
- * @TODO: Support Zip Files without the Content-Length header.
  * @TODO [_spec_]: Add importMedia step to the specification.
  * @TODO [_spec_]: How to handle the default WordPress theme? Should it be preserved for new sites?
  *        What if we want to remove it? And what should be the semantics for existing sites?
@@ -13,11 +12,14 @@
  *                       We can ship Blueprints without http cache support, but do not ship the stopgap solution 
  *                       in production.
  * @TODO (low priority): Exception structure?
+ * @TODO (low priority): Range header-based HTTP stream for fast partial parsing of large remote zip files.
+ *                       Needs to support servers lying about their Range support.
  * @TODO (low priority): Restrictions on supported step types, media files types, SQL queries types, etc.
  * @TODO (low priority): Fast unzipping of remote Zip Files by iterating over the entries
  *        instead of skipping over to the end central directory index entry.
+ * ✅ @TODO: Support chunked encoding Zip Files without the Content-Length header.
  */
-
+  
 namespace WordPress\Blueprints\Steps;
 
 use WordPress\Blueprints\ProgressObserver;

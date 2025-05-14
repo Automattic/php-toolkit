@@ -1,6 +1,6 @@
 <?php
 
-namespace WordPress\HttpServer\ResponseWriter;
+namespace WordPress\HttpServer\Response;
 
 class BufferingResponseWriter implements ResponseWriteStream {
 

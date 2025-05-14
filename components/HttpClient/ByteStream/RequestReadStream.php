@@ -143,6 +143,14 @@ class RequestReadStream extends BaseByteReadStream {
 					}
 					break;
 				case Client::EVENT_FINISHED:
+					/**
+					 * If the server did not provide a Content-Length header,
+					 * backfill the file length with the number of downloaded
+					 * bytes.
+					 */
+					if(null === $this->remote_file_length) {
+						$this->remote_file_length = $this->bytes_already_forgotten + strlen($this->buffer);
+					}
 					return '';
 				case Client::EVENT_FAILED:
 					// TODO: Think through error handling. Errors are expected when working with

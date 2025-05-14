@@ -11,7 +11,7 @@ use WordPress\Git\Model\Tree;
 use WordPress\Git\Model\TreeEntry;
 use WordPress\Git\Protocol\GitProtocolEncoderPipe;
 use WordPress\Git\Protocol\Parser\GitProtocolDecoder;
-use WordPress\HttpServer\ResponseWriter\BufferingResponseWriter;
+use WordPress\HttpServer\Response\BufferingResponseWriter;
 
 class GitServerTest extends TestCase {
 
