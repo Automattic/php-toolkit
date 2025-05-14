@@ -111,6 +111,11 @@ class Request {
 		}
 	}
 
+	public function __clone()
+	{
+		$this->id = ++ self::$last_id;
+	}
+
 	public function get_header( $name ) {
 		return $this->headers[ $name ] ?? null;
 	}

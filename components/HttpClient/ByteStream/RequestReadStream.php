@@ -114,6 +114,17 @@ class RequestReadStream extends BaseByteReadStream {
 			switch ( $this->client->get_event() ) {
 				case Client::EVENT_GOT_HEADERS:
 					$this->response = $response;
+					$content_length = $response->get_header( 'Content-Length' );
+					if ( null !== $content_length ) {
+						/**
+						 * Set the content-length based on the header, but make sure it stays null
+						 * when the Content-Length header is not set.
+						 * 
+						 * Important: Don't set the content-length to 0 if the header is missing! This
+						 * would tell the streaming machinery there's no body to consume.
+						 */
+						$this->remote_file_length = (int) $content_length;
+					}
 					if ( $stop_at_event === Client::EVENT_GOT_HEADERS ) {
 						return true;
 					}
@@ -145,28 +156,6 @@ class RequestReadStream extends BaseByteReadStream {
 	}
 
 	public function length(): ?int {
-		if ( null !== $this->remote_file_length ) {
-			return $this->remote_file_length;
-		}
-
-		if ( ! $this->response ) {
-			$this->pull_until_event(
-				array(
-					'event' => Client::EVENT_GOT_HEADERS,
-				)
-			);
-		}
-		$content_length = $this->response->get_header( 'Content-Length' );
-		if ( null !== $content_length ) {
-			/**
-			 * Set the content-length based on the header, but make sure it stays null
-			 * when the Content-Length header is not set.
-			 * 
-			 * Important: Don't set the content-length to 0 if the header is missing! This
-			 * would tell the streaming machinery there's no body to consume.
-			 */
-			$this->remote_file_length = (int) $content_length;
-		}
 		return $this->remote_file_length;
 	}
 

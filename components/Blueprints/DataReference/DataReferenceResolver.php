@@ -11,6 +11,7 @@ use WordPress\Filesystem\Layer\ChrootLayer;
 use WordPress\Filesystem\LocalFilesystem;
 use WordPress\Git\GitFilesystem;
 use WordPress\Git\GitRepository;
+use WordPress\HttpClient\ByteStream\SeekableRequestReadStream;
 use WordPress\HttpClient\Client;
 
 use function WordPress\Filesystem\wp_join_paths;
@@ -65,9 +66,11 @@ class DataReferenceResolver {
 			$url      = $reference->get_url();
 			$filename = basename( parse_url( $url, PHP_URL_PATH ) );
 
-			$tracked_stream = $this->client->fetch(
+			$tracked_stream = new SeekableRequestReadStream(
 				$url,
 				array(
+					'client' => $this->client,
+					'cache_path' => wp_join_paths( $this->tmpRoot, uniqid( 'blueprints_seekable_cache_' ) ),
 					/**
 					 * Use a 100MB buffer to support seek()-ing in the streamed ZIP files.
 					 * To support ZIPs larger than 100MB, we'll need a custom SeekableRequestReadStream that:
