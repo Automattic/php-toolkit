@@ -5,6 +5,8 @@ namespace WordPress\HttpClient\ByteStream;
 use WordPress\ByteStream\ByteStreamException;
 use WordPress\ByteStream\ReadStream\BaseByteReadStream;
 use WordPress\HttpClient\Client;
+use WordPress\HttpClient\HttpClientException;
+use WordPress\HttpClient\HttpError;
 use WordPress\HttpClient\Request;
 use WordPress\HttpClient\Response;
 
@@ -102,7 +104,7 @@ class RequestReadStream extends BaseByteReadStream {
 		) ) {
 			$request = $this->client->get_request();
 			if ( $request->error ) {
-				throw new ByteStreamException( 'HTTP request failed: ' . $request->error->message );
+				throw new HttpClientException( 'HTTP request failed: ' . $request->error->message );
 			}
 			$response = $request->response;
 			if ( ! $response ) {

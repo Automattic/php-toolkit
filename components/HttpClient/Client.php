@@ -479,7 +479,6 @@ class Client {
 		$request->error                                     = $error;
 		$request->state                                     = Request::STATE_FAILED;
 		$this->events[ $request->id ][ self::EVENT_FAILED ] = true;
-
 		$this->close_connection( $request );
 	}
 
@@ -721,7 +720,11 @@ class Client {
 					continue;
 				}
 
-				$parsed                      = static::parse_http_headers( $connection->response_buffer );
+				$parsed = static::parse_http_headers( $connection->response_buffer );
+				if(false === $parsed) {
+					$this->set_error($request, new HttpError('Malformed HTTP headers received from the server.'));
+					break;
+				}
 				$connection->response_buffer = '';
 
 				$response->headers        = $parsed['headers'];
@@ -906,6 +909,9 @@ class Client {
 		$lines   = explode( "\r\n", $headers );
 		$status  = array_shift( $lines );
 		$status  = explode( ' ', $status );
+		if(count($status) < 3) {
+			return false;
+		}
 		$status  = array(
 			'protocol' => $status[0],
 			'code'     => (int) $status[1],
@@ -1082,6 +1088,9 @@ class Client {
 			}
 		}
 		$except = null;
+		if(count($read) === 0 && count($write) === 0) {
+			return array();
+		}
 
 		// phpcs:disable WordPress.PHP.NoSilencedErrors.Discouraged
 		$ready = @stream_select( $read, $write, $except, 0, static::NONBLOCKING_TIMEOUT_MICROSECONDS );

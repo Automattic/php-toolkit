@@ -31,13 +31,13 @@ class RequestReadStreamTest extends TestCase {
         
         // Cannot directly test that the custom client is used as it's a private property
         // But we can verify the request works
-        $response = $stream->get_response();
+        $response = $stream->await_response();
         $this->assertInstanceOf(Response::class, $response);
     }
     
     public function testGetResponse() {
         $stream = new RequestReadStream($this->test_url);
-        $response = $stream->get_response();
+        $response = $stream->await_response();
         
         $this->assertInstanceOf(Response::class, $response);
         $this->assertEquals(200, $response->status_code);

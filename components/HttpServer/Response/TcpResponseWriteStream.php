@@ -62,6 +62,14 @@ class TcpResponseWriteStream implements ResponseWriteStream
         $this->headers[$lname] = [$name, $value];
     }
 
+	/**
+	 * Enables streaming bytes to the client without sending the HTTP headers first.
+	 */
+	public function dangerously_mark_headers_as_sent()
+	{
+		$this->headers_sent = true;
+	}
+
     private function send_headers_if_needed()
     {
         if ($this->headers_sent) {
