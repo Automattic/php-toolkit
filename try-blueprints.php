@@ -124,6 +124,7 @@ $config = (new RunnerConfiguration())
 						"gitRepository" => "https://github.com/adamziel/mysql-sqlite-network-proxy.git",
 						"path" => "php-implementation",
 						// @TODO: Accept branch names without the refs/heads/ prefix
+						// @TODO: Accept commit hashes and tag names
 						"ref" => "refs/heads/trunk"
 					]
 				]
