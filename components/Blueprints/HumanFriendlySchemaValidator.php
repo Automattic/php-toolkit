@@ -332,7 +332,16 @@ final class HumanFriendlySchemaValidator
         }
 
         if ($valid === 1) { return ValidationResult::ok(); }
-        if ($valid > 1)  { return ValidationResult::err($path, 'Data matches more than one allowed shape—make it unambiguous.'); }
+        if ($valid > 1) {
+            $matchedShapes = array_map(function($b) {
+                if (isset($b['$ref'])) {
+                    $resolved = $this->resolveReference($b['$ref']);
+                    return $resolved['title'] ?? $b['$ref'];
+                }
+                return $this->branchLabel($b);
+            }, array_filter($cands, fn($b) => $this->validateNode($path, $data, isset($b['$ref']) ? $this->resolveReference($b['$ref']) : $b)->valid));
+            return ValidationResult::err($path, 'Data matches more than one allowed shape - you need to make it unambiguous. Matched shapes: ' . implode(', ', $matchedShapes) . '.');
+        }
         if ($narrowed && $fails) { return ValidationResult::combine(...$fails); }
 
         return $this->explainAggregateMismatch($path, $data, $branches, $schema, 'oneOf', $fails);
@@ -471,14 +480,15 @@ final class HumanFriendlySchemaValidator
         if(!empty($schema['required'])){
             $missing=array_diff($schema['required'],array_keys($arr));
             if($missing){
-                $results[]=ValidationResult::err(
-                    $path,
-                    'Missing required field(s): '.implode(', ',$missing).'.',
-                    meta:[
-                        'expected'=>['required'=>$schema['required']],
-                        'actual'=>['present'=>array_keys($arr)],
-                    ]
-                );
+				foreach($missing as $m){
+					$results[] = ValidationResult::err(
+						$path,
+						'Missing required field: '.$m.'.',
+						meta: [
+							'schema'=>$schema,
+						]
+					);
+				}
             }
         }
 
@@ -577,3 +587,4 @@ final class HumanFriendlySchemaValidator
         return null;
     }
 }
+
