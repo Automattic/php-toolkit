@@ -2,14 +2,6 @@
 
 namespace WordPress\Blueprints;
 
-final class Issue
-{
-    public function __construct(
-        public array  $path,
-        public string $message
-    ) {}
-}
-
 class ValidationResult
 {
     public function __construct(
@@ -36,12 +28,33 @@ class ValidationResult
         return new self(false, [...$this->errors, ...$other->errors]);
     }
 
+	public function addExplanation(ValidationResult $explanation)
+	{
+		foreach ($explanation->errors as $error) {
+			$this->errors[] = new Issue($error->path, $error->message, Issue::TYPE_EXPLANATION);
+			// don't add more than one explanation
+			break;
+		}
+	}
+
     public static function combine(self ...$results): self
     {
         return array_reduce($results, fn ($c, $r) => $c->merge($r), self::ok());
     }
 }
 
+final class Issue
+{
+	const TYPE_ISSUE = 'issue';
+	const TYPE_EXPLANATION = 'explanation';
+
+	public string $type = self::TYPE_ISSUE;
+
+    public function __construct(
+        public array  $path,
+        public string $message
+    ) {}
+}
 
 final class SchemaValidator
 {
@@ -179,7 +192,7 @@ final class SchemaValidator
 		}
 
 		$disc = $this->inferDiscriminator($schema['discriminator'] ?? null, $branches);
-		return $this->explainAggregateMismatch($path, $data, $branches, $disc, 'anyOf');
+		return $this->explainAggregateMismatch($path, $data, $branches, $disc, 'anyOf', $failures);
 	}
 
 	/* -------------------------------------------------
@@ -204,19 +217,23 @@ final class SchemaValidator
 			if (!$r->valid) { $fails[] = $r; }
 		}
 
-		return match (true) {
-			$valid === 1 => ValidationResult::ok(),
-			$valid > 1   => ValidationResult::err($path, 'oneOf matched multiple clauses'),
-			$narrowed && $fails
-				=> ValidationResult::combine(...$fails),             // specific branch errors
-			default => $this->explainAggregateMismatch(
-				$path,
-				$data,
-				$branches,
-				$this->inferDiscriminator($schema['discriminator'] ?? null, $branches),
-				'oneOf'
-			),
-		};
+		if ($valid === 1) {
+			return ValidationResult::ok();
+		}
+		if ($valid > 1) {
+			return ValidationResult::err($path, 'oneOf matched multiple clauses');
+		}
+		if ($narrowed && $fails) {
+			return ValidationResult::combine(...$fails);
+		}
+		return $this->explainAggregateMismatch(
+			$path,
+			$data,
+			$branches,
+			$this->inferDiscriminator($schema['discriminator'] ?? null, $branches),
+			'oneOf',
+			$fails
+		);
 	}
 
 	/** Produce richer error message for anyOf/oneOf aggregate failure */
@@ -231,7 +248,8 @@ final class SchemaValidator
 		mixed  $data,
 		array  $branches,
 		?array $discriminator,            // [$prop, $allowed]|null
-		string $ctx                       // 'anyOf' | 'oneOf'
+		string $ctx,                      // 'anyOf' | 'oneOf'
+		array $failures = []
 	): ValidationResult {
 		// a) type information
 		$allowedTypes = [];
@@ -273,14 +291,39 @@ final class SchemaValidator
 
 		// c) generic – list unique labels once
 		$labels = array_unique(array_map([$this, 'branchLabel'], $branches));
-		return ValidationResult::err(
+		$error = ValidationResult::err(
 			$path,
 			"$ctx: value must match " .
 			($ctx === 'oneOf' ? 'exactly one of ' : 'one of ') .
 			implode(', ', $labels)
 		);
+		// Only add an additional explanation if there's no clear-cut mismatch
+		// of the type of discriminator.
+		$error->addExplanation($this->bestFailure($failures));
+		return $error;
 	}
 
+	/* -------------------------------------------------
+	*  Smallest-damage heuristic
+	* ------------------------------------------------- */
+	private function bestFailure(array $results): ValidationResult
+	{
+		usort(
+			$results,
+			function (ValidationResult $a, ValidationResult $b) {
+				$errorCountA = count($a->errors);
+				$errorCountB = count($b->errors);
+				if ($errorCountA !== $errorCountB) {
+					return $errorCountA <=> $errorCountB;
+				}
+				// If error counts are equal, compare path specificity (longer paths first)
+				$maxPathA = max(array_map(fn($e) => count($e->path), $a->errors));
+				$maxPathB = max(array_map(fn($e) => count($e->path), $b->errors));
+				return $maxPathB <=> $maxPathA; // more specific first
+			}
+		);
+		return $results[0]; // first = fewest violations, most specific
+	}
 
 	/** Try to find a single enum-based discriminator shared by all object branches */
 	private function inferDiscriminator(?array $explicit_discriminator, array $branches): ?array
@@ -394,13 +437,18 @@ final class SchemaValidator
         $results = [];
 
         // required
-        if (!empty($schema['required'])) {
-            foreach ($schema['required'] as $field) {
-                if (!array_key_exists($field, $dataArr)) {
-                    $results[] = ValidationResult::err([...$path], 'Missing required field "' . $field . '"');
+            // Start of Selection
+            if (!empty($schema['required'])) {
+                $missing = [];
+                foreach ($schema['required'] as $field) {
+                    if (!array_key_exists($field, $dataArr)) {
+                        $missing[] = $field;
+                    }
+                }
+                if (!empty($missing)) {
+                    $results[] = ValidationResult::err([...$path], 'Missing required fields: ' . implode(', ', $missing));
                 }
             }
-        }
 
         // properties
         if (!empty($schema['properties'])) {
@@ -547,7 +595,7 @@ $result = $validator->validate([
 	"media" => [
 		"https://wordpress.org/files/2024/10/design-visual-6-7.png",
 		[
-			"source" => 2,//"2",
+			"source" => "2",
 			"title" => "Introduction Video",
 			"description" => "A brief introduction to our company",
 			"alt" => "Company introduction video"
