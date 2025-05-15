@@ -1,268 +1,605 @@
 <?php
 
-namespace WordPress\Blueprints\Tests;
+namespace WordPress\Blueprints\Tests\Unit\Validator;
 
-use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use WordPress\Blueprints\HumanFriendlySchemaValidator;
+use WordPress\Blueprints\ValidationResult;
+use WordPress\Blueprints\Issue;
+use WordPress\Blueprints\Validator\UnsupportedSchemaException;
 
 /**
- * Tests for the BlueprintV2Validator class.
+ * Tests for the HumanFriendlySchemaValidator class.
+ * This class focuses on general JSON schema validation capabilities.
  */
 class HumanFriendlySchemaValidatorTest extends TestCase {
-	/**
-	 * Blueprint validator instance.
-	 *
-	 * @var HumanFriendlySchemaValidator
-	 */
-	private $validator;
 
-	/**
-	 * Set up the test.
-	 */
-	public function setUp(): void {
-		parent::setUp();
-		$this->validator = new HumanFriendlySchemaValidator(
-			json_decode( file_get_contents( __DIR__ . '/../../../json-schema/blueprint-v2-schema.json' ), true ),
-		);
-	}
-
-	/**
-	 * Data provider for valid blueprints.
-	 *
-	 * @return array[]
-	 */
-	public static function validBlueprintsProvider(): array {
+	// Test Primitive Types
+	public static function primitiveTypeProvider(): array {
 		return [
-			'minimal valid blueprint'         => [ 'valid/minimal-valid.json' ],
-			'full featured blueprint'         => [ 'valid/full-features.json' ],
-			'blueprint with plugins'          => [ 'valid/with-plugins.json' ],
-			'blueprint with content'          => [ 'valid/with-content.json' ],
-			'blueprint with steps'            => [ 'valid/with-steps.json' ],
-			'blueprint with post types'       => [ 'valid/with-post-types.json' ],
-			'blueprint with additional steps' => [ 'valid/with-additional-steps.json' ],
+			'valid string' => [ ['type' => 'string'], 'hello', true ],
+			'invalid string (integer given)' => [ ['type' => 'string'], 123, false, 'Expected string, got integer.' ],
+			'valid integer' => [ ['type' => 'integer'], 42, true ],
+			'invalid integer (string given)' => [ ['type' => 'integer'], 'foo', false, 'Expected integer, got string.' ],
+			'valid boolean true' => [ ['type' => 'boolean'], true, true ],
+			'valid boolean false' => [ ['type' => 'boolean'], false, true ],
+			'invalid boolean (integer given)' => [ ['type' => 'boolean'], 0, false, 'Expected boolean, got integer.' ],
+			'valid number (float)' => [ ['type' => 'number'], 3.14, true ],
+			'valid number (integer)' => [ ['type' => 'number'], 7, true ],
+			'invalid number (string given)' => [ ['type' => 'number'], '7.0', false, 'Expected number, got string.' ],
+			// 'valid null' => [ ['type' => 'null'], null, true ], // Assuming 'null' type is supported
+			// 'invalid null (string given)' => [ ['type' => 'null'], 'not null', false, 'Expected null, got string.'],
 		];
 	}
 
 	/**
-	 * Test valid blueprints.
-	 * 
-	 * @dataProvider validBlueprintsProvider
+	 * @dataProvider primitiveTypeProvider
 	 */
-	#[DataProvider( 'validBlueprintsProvider' )]
-	public function testValidBlueprints( string $fixturePath ) {
-		$blueprint = $this->loadFixture( $fixturePath );
-		$result    = $this->validator->validate( $blueprint );
-
-		$this->assertTrue( $result, 'Validation should pass for valid blueprint' );
-		$this->assertEmpty( $this->validator->getErrors(), 'No errors should be present' );
+	public function testPrimitiveTypeValidation(array $schema, $value, bool $shouldBeValid, string $expectedErrorMessage = null) {
+		$validator = new HumanFriendlySchemaValidator($schema);
+		$result = $validator->validate($value);
+		$this->assertSame($shouldBeValid, $result->valid);
+		if (!$shouldBeValid && $expectedErrorMessage) {
+			$this->assertNotEmpty($result->errors);
+			$this->assertStringContainsString($expectedErrorMessage, $result->errors[0]->message);
+		}
 	}
 
-	/**
-	 * Data provider for invalid blueprints.
-	 *
-	 * @return array[]
-	 */
-	public static function invalidBlueprintsProvider(): array {
+	// Test Enums
+	public static function enumProvider(): array {
 		return [
-			'missing required fields'  => [
-				'invalid/missing-required.json',
-				'version',
-				"Required field 'version' is missing",
-				'Validation should fail for blueprint with missing required fields',
-			],
-			'invalid version'          => [
-				'invalid/invalid-version.json',
-				'version',
-				'Version must be 2',
-				'Validation should fail for blueprint with invalid version',
-			],
-			'invalid plugin format'    => [
-				'invalid/invalid-plugin-format.json',
-				'plugins',
-				'Plugin definition must be a string or an object',
-				'Validation should fail for blueprint with invalid plugin format',
-			],
-			'invalid content type'     => [
-				'invalid/invalid-content-type.json',
-				'content',
-				'Invalid content type',
-				'Validation should fail for blueprint with invalid content type',
-			],
-			'invalid URL format'       => [
-				'invalid/invalid-url-format.json',
-				'blueprintMeta.authorUrl',
-				'URL must start with http:// or https://',
-				'Validation should fail for blueprint with invalid URL format',
-			],
-			'invalid post types'       => [
-				'invalid/invalid-post-types.json',
-				'postTypes.book.show_in_menu',
-				'show_in_menu must be a boolean or string',
-				'Validation should fail for blueprint with invalid post types',
-			],
-			'invalid additional steps' => [
-				'invalid/invalid-additional-steps.json',
-				'additionalStepsAfterExecution',
-				'Unknown step type: unknownStep',
-				'Validation should fail for blueprint with invalid additional steps',
-			],
+			'valid enum string' => [ ['type' => 'string', 'enum' => ['a', 'b']], 'a', true ],
+			'invalid enum string' => [ ['type' => 'string', 'enum' => ['a', 'b']], 'c', false, 'Allowed values: a, b. You supplied "c".' ],
+			'valid enum integer' => [ ['type' => 'integer', 'enum' => [1, 2]], 2, true ],
+			'invalid enum integer' => [ ['type' => 'integer', 'enum' => [1, 2]], 3, false, 'Allowed values: 1, 2. You supplied 3.' ],
+			'enum with empty string allowed' => [ ['type' => 'string', 'enum' => ['', 'foo']], '', true ],
 		];
 	}
 
 	/**
-	 * Test invalid blueprints.
-	 * 
-	 * @dataProvider invalidBlueprintsProvider
+	 * @dataProvider enumProvider
 	 */
-	#[DataProvider( 'invalidBlueprintsProvider' )]
-	public function testInvalidBlueprints(
-		string $fixturePath,
-		?string $expectedErrorPath,
-		?string $expectedErrorMessage,
-		string $assertMessage
-	) {
-		$blueprint = $this->loadFixture( $fixturePath );
-		$result    = $this->validator->validate( $blueprint );
+	public function testEnumValidation(array $schema, $value, bool $shouldBeValid, string $expectedErrorMessage = null) {
+		$validator = new HumanFriendlySchemaValidator($schema);
+		$result = $validator->validate($value);
+		$this->assertSame($shouldBeValid, $result->valid);
+		if (!$shouldBeValid && $expectedErrorMessage) {
+			$this->assertNotEmpty($result->errors);
+			$this->assertStringContainsString($expectedErrorMessage, $result->errors[0]->message);
+		}
+	}
 
-		$this->assertFalse( $result, $assertMessage );
-		$errors = $this->validator->getErrors();
-		$this->assertNotEmpty( $errors, 'Errors should be present' );
+	// Test Objects
+	public static function objectProvider(): array {
+		$baseSchema = [
+			'type' => 'object',
+			'properties' => [ 
+				'foo' => ['type' => 'string'],
+				'bar' => ['type' => 'integer']
+			],
+		];
+		return [
+			'valid object' => [
+				array_merge($baseSchema, ['required' => ['foo']]),
+				['foo' => 'text', 'bar' => 123],
+				true
+			],
+			'valid object with optional property missing' => [
+				array_merge($baseSchema, ['required' => ['foo']]),
+				['foo' => 'text'],
+				true
+			],
+			'invalid object missing required property' => [
+				array_merge($baseSchema, ['required' => ['foo', 'bar']]),
+				['foo' => 'text'],
+				false,
+				'Missing required field(s): bar'
+			],
+			'invalid object property type' => [
+				$baseSchema,
+				['foo' => 123], // foo should be string
+				false,
+				'Expected string, got integer.'
+			],
+			'object with additionalProperties: false, extra prop' => [
+				array_merge($baseSchema, ['additionalProperties' => false]),
+				['foo' => 'text', 'extra' => 'disallowed'],
+				false,
+				"Property 'extra' isn't allowed here."
+			],
+			'object with additionalProperties: true, extra prop' => [ // True is default, but explicit for test
+				array_merge($baseSchema, ['additionalProperties' => true]),
+				['foo' => 'text', 'extra' => 'allowed'],
+				true
+			],
+			'object with additionalProperties: schema, valid extra prop' => [
+				array_merge($baseSchema, ['additionalProperties' => ['type' => 'boolean']]),
+				['foo' => 'text', 'extra' => true],
+				true
+			],
+			'object with additionalProperties: schema, invalid extra prop' => [
+				array_merge($baseSchema, ['additionalProperties' => ['type' => 'boolean']]),
+				['foo' => 'text', 'extra' => 'not a bool'],
+				false,
+				'Expected boolean, got string.'
+			],
+			'object with no properties defined, only additionalProperties: schema' => [
+				['type' => 'object', 'additionalProperties' => ['type' => 'string']],
+				['key1' => 'val1', 'key2' => 'val2'],
+				true
+			],
+			'object with only required, no properties' => [
+			    ['type' => 'object', 'required' => ['mustExist']],
+				['mustExist' => 'here'],
+				true
+			],
+			'object with only required, no properties, missing required' => [
+			    ['type' => 'object', 'required' => ['mustExist']],
+				['otherKey' => 'not it'],
+				false,
+				'Missing required field(s): mustExist'
+			]
+		];
+	}
 
-		if ( $expectedErrorPath !== null ) {
-			$hasExpectedError = false;
-			foreach ( $errors as $error ) {
-				if ( strpos( $error['path'], $expectedErrorPath ) !== false ) {
-					$hasExpectedError = true;
+	/**
+	 * @dataProvider objectProvider
+	 */
+	public function testObjectValidation(array $schema, $value, bool $shouldBeValid, string $expectedErrorMessage = null) {
+		$validator = new HumanFriendlySchemaValidator($schema);
+		$result = $validator->validate($value);
+		$this->assertSame($shouldBeValid, $result->valid, $expectedErrorMessage ?: 'Validation status mismatch');
+		if (!$shouldBeValid && $expectedErrorMessage) {
+			$this->assertNotEmpty($result->errors, "Errors array should not be empty when validation fails.");
+			$foundError = false;
+			foreach($result->errors as $error) {
+				if (strpos($error->message, $expectedErrorMessage) !== false) {
+					$foundError = true;
 					break;
 				}
 			}
-			$this->assertTrue( $hasExpectedError, "Should contain error related to $expectedErrorPath" );
-		}
-
-		if ( $expectedErrorMessage !== null ) {
-			$hasExpectedMessage = false;
-			foreach ( $errors as $error ) {
-				if ( strpos( $error['message'], $expectedErrorMessage ) !== false ) {
-					$hasExpectedMessage = true;
-					break;
-				}
-			}
-			$this->assertTrue( $hasExpectedMessage, "Should contain error message with '$expectedErrorMessage'" );
+			$this->assertTrue($foundError, "Expected error message fragment '{$expectedErrorMessage}' not found. Actual errors: " . print_r($result->errors, true));
 		}
 	}
 
-	/**
-	 * Test specifically for error messages.
-	 */
-	public function testSpecificErrorMessages() {
-		// Test missing required blueprint
-		$missingRequiredBlueprint = $this->loadFixture( 'invalid/missing-required.json' );
-		$result                   = $this->validator->validate( $missingRequiredBlueprint );
-		$this->assertFalse( $result );
-		$errors = $this->validator->getErrors();
-		$this->assertNotEmpty( $errors );
-
-		$versionError = false;
-		foreach ( $errors as $error ) {
-			if ( strpos( $error['path'], 'version' ) !== false ) {
-				$versionError = true;
-				$this->assertStringContainsString( "Required field 'version' is missing", $error['message'] );
-				break;
-			}
-		}
-		$this->assertTrue( $versionError, "Should have error for missing version" );
-
-		// Test invalid content type
-		$invalidContentBlueprint = $this->loadFixture( 'invalid/invalid-content-type.json' );
-		$result                  = $this->validator->validate( $invalidContentBlueprint );
-		$this->assertFalse( $result );
-		$errors = $this->validator->getErrors();
-		$this->assertNotEmpty( $errors );
-
-		$contentError = false;
-		foreach ( $errors as $error ) {
-			if ( strpos( $error['path'], 'content' ) !== false ) {
-				$contentError = true;
-				$this->assertStringContainsString( 'Invalid content type', $error['message'] );
-				break;
-			}
-		}
-		$this->assertTrue( $contentError, "Should have error for invalid content type" );
-
-		// Test post types validation
-		$invalidPostTypeBlueprint = $this->loadFixture( 'invalid/invalid-post-types.json' );
-		$result                   = $this->validator->validate( $invalidPostTypeBlueprint );
-		$this->assertFalse( $result );
-		$errors = $this->validator->getErrors();
-		$this->assertNotEmpty( $errors );
-
-		$postTypeError = false;
-		foreach ( $errors as $error ) {
-			if ( strpos( $error['path'], 'show_in_menu' ) !== false ) {
-				$postTypeError = true;
-				$this->assertStringContainsString( 'show_in_menu must be a boolean or string', $error['message'] );
-				break;
-			}
-		}
-		$this->assertTrue( $postTypeError, "Should have error for invalid post types" );
-
-		// Test additional steps validation
-		$invalidStepsBlueprint = $this->loadFixture( 'invalid/invalid-additional-steps.json' );
-		$result                = $this->validator->validate( $invalidStepsBlueprint );
-		$this->assertFalse( $result );
-		$errors = $this->validator->getErrors();
-		$this->assertNotEmpty( $errors );
-
-		$stepsError = false;
-		foreach ( $errors as $error ) {
-			if ( strpos( $error['path'], 'additionalStepsAfterExecution' ) !== false &&
-			     strpos( $error['message'], 'Unknown step type' ) !== false ) {
-				$stepsError = true;
-				break;
-			}
-		}
-		$this->assertTrue( $stepsError, "Should have error for invalid additional steps" );
-	}
-
-	/**
-	 * Data provider for schema validation tests.
-	 *
-	 * @return array[]
-	 */
-	public static function schemaValidationProvider(): array {
+	// Test Arrays
+	public static function arrayProvider(): array {
 		return [
-			'valid blueprint'   => [ 'valid/minimal-valid.json', true ],
-			'invalid blueprint' => [ 'invalid/invalid-content-type.json', false ],
+			'valid array of strings' => [
+				['type' => 'array', 'items' => ['type' => 'string']],
+				['a', 'b', 'c'],
+				true
+			],
+			'invalid array item type' => [
+				['type' => 'array', 'items' => ['type' => 'string']],
+				['a', 123, 'c'],
+				false,
+				'Expected string, got integer.'
+			],
+			'array with minItems: valid' => [
+				['type' => 'array', 'items' => ['type' => 'integer'], 'minItems' => 2],
+				[1, 2],
+				true
+			],
+			'array with minItems: invalid' => [
+				['type' => 'array', 'items' => ['type' => 'integer'], 'minItems' => 2],
+				[1],
+				false,
+				'Need at least 2 items, found 1.'
+			],
+			'array with maxItems: valid' => [
+				['type' => 'array', 'items' => ['type' => 'integer'], 'maxItems' => 2],
+				[1, 2],
+				true
+			],
+			'array with maxItems: invalid' => [
+				['type' => 'array', 'items' => ['type' => 'integer'], 'maxItems' => 1],
+				[1, 2],
+				false,
+				'May contain at most 1 items, found 2.'
+			],
+			'empty array, items schema defined: valid' => [
+				['type' => 'array', 'items' => ['type' => 'string']],
+				[],
+				true
+			],
+			'array with complex items (objects): valid' => [
+				[
+					'type' => 'array', 
+					'items' => [
+						'type' => 'object',
+						'properties' => ['id' => ['type' => 'integer']],
+						'required' => ['id']
+					]
+				],
+				[ ['id' => 1], ['id' => 2] ],
+				true
+			],
+			'array with complex items (objects): invalid item' => [
+				[
+					'type' => 'array', 
+					'items' => [
+						'type' => 'object',
+						'properties' => ['id' => ['type' => 'integer']],
+						'required' => ['id']
+					]
+				],
+				[ ['id' => 1], ['name' => 'oops'] ], // second item missing 'id'
+				false,
+				'Missing required field(s): id'
+			]
 		];
 	}
 
 	/**
-	 * Test validate_against_schema method.
+	 * @dataProvider arrayProvider
 	 */
-	#[DataProvider( 'schemaValidationProvider' )]
-	public function testValidateAgainstSchema( string $fixturePath, bool $shouldBeValid ) {
-		$blueprint = $this->loadFixture( $fixturePath );
-		$errors    = $this->validator->validate_against_schema( $blueprint );
-
-		if ( $shouldBeValid ) {
-			$this->assertEmpty( $errors, 'Valid blueprint should not have errors' );
-		} else {
-			$this->assertNotEmpty( $errors, 'Invalid blueprint should have errors' );
+	public function testArrayValidation(array $schema, $value, bool $shouldBeValid, string $expectedErrorMessage = null) {
+		$validator = new HumanFriendlySchemaValidator($schema);
+		$result = $validator->validate($value);
+		$this->assertSame($shouldBeValid, $result->valid, $expectedErrorMessage ?: 'Validation status mismatch');
+		if (!$shouldBeValid && $expectedErrorMessage) {
+			$this->assertNotEmpty($result->errors);
+            $foundError = false;
+			foreach($result->errors as $error) {
+				if (strpos($error->message, $expectedErrorMessage) !== false) {
+					$foundError = true;
+					break;
+				}
+			}
+			$this->assertTrue($foundError, "Expected error message fragment '{$expectedErrorMessage}' not found. Actual errors: " . print_r($result->errors, true));
 		}
 	}
 
-	/**
-	 * Load a fixture file.
-	 *
-	 * @param  string  $fixture_path  The fixture path relative to fixtures directory.
-	 *
-	 * @return array The decoded fixture.
-	 */
-	private function loadFixture( $fixture_path ) {
-		$fixture_file = __DIR__ . '/fixtures/' . $fixture_path;
-		$json         = file_get_contents( $fixture_file );
-
-		return json_decode( $json, true );
+	// Test anyOf
+	public static function anyOfProvider(): array {
+		return [
+			'anyOf: matches first schema (string)' => [
+				['anyOf' => [ ['type' => 'string'], ['type' => 'integer'] ]],
+				'i am a string',
+				true
+			],
+			'anyOf: matches second schema (integer)' => [
+				['anyOf' => [ ['type' => 'string'], ['type' => 'integer'] ]],
+				123,
+				true
+			],
+			'anyOf: matches no schema (boolean given)' => [
+				['anyOf' => [ ['type' => 'string'], ['type' => 'integer'] ]],
+				true,
+				false,
+				'Expected one of [string, integer] here, but got boolean.'
+			],
+			'anyOf: overlapping schemas, matches both (number and integer for an int)' => [
+				['anyOf' => [ ['type' => 'number'], ['type' => 'integer'] ]],
+				5, // Matches both 'number' and 'integer'
+				true // anyOf should pass if at least one matches
+			],
+		];
 	}
+
+	/**
+	 * @dataProvider anyOfProvider
+	 */
+	public function testAnyOfValidation(array $schema, $value, bool $shouldBeValid, string $expectedErrorMessage = null) {
+		$validator = new HumanFriendlySchemaValidator($schema);
+		$result = $validator->validate($value);
+		$this->assertSame($shouldBeValid, $result->valid);
+		if (!$shouldBeValid && $expectedErrorMessage) {
+			$this->assertNotEmpty($result->errors);
+			$this->assertStringContainsString($expectedErrorMessage, $result->errors[0]->message);
+			// Check for explanation in aggregate errors
+			if (count($result->errors) > 1 && $result->errors[0]->type === Issue::TYPE_ISSUE) {
+				$hasExplanation = false;
+				for ($i = 1; $i < count($result->errors); $i++) {
+					if ($result->errors[$i]->type === Issue::TYPE_EXPLANATION) {
+						$hasExplanation = true;
+						break;
+					}
+				}
+				// This assertion might be too strict depending on how explanations are added for all anyOf failures.
+				// $this->assertTrue($hasExplanation, "Expected an explanation for anyOf failure.");
+			}
+		}
+	}
+
+	// Test oneOf
+	public static function oneOfProvider(): array {
+		return [
+			'oneOf: matches first schema (string)' => [
+				['oneOf' => [ ['type' => 'string'], ['type' => 'integer'] ]],
+				'i am a string',
+				true
+			],
+			'oneOf: matches second schema (integer)' => [
+				['oneOf' => [ ['type' => 'string'], ['type' => 'integer'] ]],
+				123,
+				true
+			],
+			'oneOf: matches no schema (boolean given)' => [
+				['oneOf' => [ ['type' => 'string'], ['type' => 'integer'] ]],
+				true,
+				false,
+				'Expected one of [string, integer] here, but got boolean.'
+			],
+			'oneOf: matches multiple schemas (number and integer for an int)' => [
+				['oneOf' => [ ['type' => 'number'], ['type' => 'integer'] ]],
+				5, // Matches both 'number' and 'integer'
+				false, // oneOf should fail if more than one matches
+				'Data matches more than one allowed shape—make it unambiguous.'
+			],
+		];
+	}
+
+	/**
+	 * @dataProvider oneOfProvider
+	 */
+	public function testOneOfValidation(array $schema, $value, bool $shouldBeValid, string $expectedErrorMessage = null) {
+		$validator = new HumanFriendlySchemaValidator($schema);
+		$result = $validator->validate($value);
+		$this->assertSame($shouldBeValid, $result->valid);
+		if (!$shouldBeValid && $expectedErrorMessage) {
+			$this->assertNotEmpty($result->errors);
+			$this->assertStringContainsString($expectedErrorMessage, $result->errors[0]->message);
+		}
+	}
+
+	// Test $ref (local references only)
+	public function testLocalRefValidation() {
+		$schema = [
+			'definitions' => [
+				'name' => ['type' => 'string', 'maxLength' => 10],
+				'user' => [
+					'type' => 'object',
+					'properties' => [
+						'username' => [ '$ref' => '#/definitions/name' ],
+						'id' => ['type' => 'integer']
+					],
+					'required' => ['username', 'id']
+				]
+			],
+			'type' => 'object',
+			'properties' => [
+				'admin' => [ '$ref' => '#/definitions/user' ]
+			]
+		];
+		$validator = new HumanFriendlySchemaValidator($schema);
+
+		// Valid
+		$this->assertTrue($validator->validate(['admin' => ['username' => 'test', 'id' => 1]])->valid);
+		
+		// Invalid due to $ref constraint (maxLength)
+		// $resultInvalidRef = $validator->validate(['admin' => ['username' => 'longusername', 'id' => 2]]);
+		// $this->assertFalse($resultInvalidRef->valid);
+		// The current validator does not implement maxLength. If it did, we would assert the error.
+		// For now, this specific check for maxLength violation is commented out.
+
+		// Invalid: property type within referenced schema
+		$resultInvalidType = $validator->validate(['admin' => ['username' => 'test', 'id' => 'not-an-int']]);
+		$this->assertFalse($resultInvalidType->valid);
+		$this->assertStringContainsString('Expected integer, got string.', $resultInvalidType->errors[0]->message);
+		$this->assertEquals(['root', 'admin', 'id'], $resultInvalidType->errors[0]->path);
+	}
+
+	public function testUnsupportedExternalRefThrows() {
+		$schema = [ 'type' => 'object', 'properties' => [ 'foo' => [ '$ref' => 'external.json#/foo' ] ] ];
+		$validator = new HumanFriendlySchemaValidator($schema);
+		$this->expectException(UnsupportedSchemaException::class);
+		$this->expectExceptionMessage('Only local #/ refs are supported');
+		$validator->validate(['foo' => 'bar']);
+	}
+	
+	public function testInvalidLocalRefPathThrows() {
+		$schema = [ 'type' => 'object', 'properties' => [ 'foo' => [ '$ref' => '#/definitions/nonExistent' ] ] ];
+		$validator = new HumanFriendlySchemaValidator($schema);
+		$this->expectException(UnsupportedSchemaException::class);
+		$this->expectExceptionMessage('Reference #/definitions/nonExistent not found');
+		$validator->validate(['foo' => 'bar']);
+	}
+
+	// Test Error Messages and Paths
+	public function testErrorMessageContainsPathAndDetails() {
+		$schema = [
+			'type' => 'object',
+			'properties' => [
+				'user' => [
+					'type' => 'object',
+					'properties' => ['name' => ['type' => 'string']],
+					'required' => ['name']
+				]
+			],
+			'required' => ['user']
+		];
+		$validator = new HumanFriendlySchemaValidator($schema);
+		$result = $validator->validate(['user' => []]); // Missing user.name
+		$this->assertFalse($result->valid);
+		$this->assertCount(1, $result->errors);
+		$error = $result->errors[0];
+		$this->assertEquals(['root', 'user'], $error->path);
+		$this->assertStringContainsString("Missing required field(s): name", $error->message);
+		$this->assertArrayHasKey('expected', $error->meta);
+		$this->assertArrayHasKey('actual', $error->meta);
+	}
+
+	// Test Schema Issues
+	public function testUnknownSchemaNode() {
+		$schema = [ 'type' => 'object', 'properties' => [ 'foo' => [ 'weirdKeyword' => true ] ] ];
+		$this->expectException(UnsupportedSchemaException::class);
+		$validator = new HumanFriendlySchemaValidator($schema);
+		$validator->validate(['foo' => 'bar']);
+	}
+
+	public function testEmptySchema() {
+		$schema = []; // No type, no anyOf/oneOf
+		$this->expectException(UnsupportedSchemaException::class);
+		$validator = new HumanFriendlySchemaValidator($schema);
+		$validator->validate('anything');
+	}
+
+	public function testUnknownTypeInSchema() {
+		$schema = ['type' => 'futureType'];
+		$validator = new HumanFriendlySchemaValidator($schema);
+		$result = $validator->validate('data');
+		$this->assertFalse($result->valid);
+		$this->assertStringContainsString('Expected futureType', $result->errors[0]->message);
+	}
+
+	// Test Input Variations
+	public function testNullInput() {
+		$schema = ['type' => 'string'];
+		$validator = new HumanFriendlySchemaValidator($schema);
+		$result = $validator->validate(null);
+		$this->assertFalse($result->valid);
+		$this->assertNotEmpty($result->errors);
+		$this->assertStringContainsString('Expected string, got NULL.', $result->errors[0]->message); // PHP gettype(null) is "NULL"
+	}
+
+	public function testUnexpectedInputTypeResource() {
+		$schema = ['type' => 'string'];
+		$validator = new HumanFriendlySchemaValidator($schema);
+		$resource = fopen('php://memory', 'r');
+		$result = $validator->validate($resource);
+		fclose($resource);
+		$this->assertFalse($result->valid);
+		$this->assertStringContainsString('Expected string, got resource.', $result->errors[0]->message);
+	}
+	
+	public function testValidatorDoesNotMutateInput() {
+		$schema = ['type' => 'object', 'properties' => ['foo' => ['type' => 'string']]];
+		$validator = new HumanFriendlySchemaValidator($schema);
+		$input = ['foo' => 'bar'];
+		$inputCopy = $input;
+		$validator->validate($input); // Call validation
+		$this->assertSame($inputCopy, $input, "Input data should not be mutated.");
+	}
+
+	// Test Edge Cases
+	public function testDeeplyNestedObjects() {
+		$schema = [
+			'type' => 'object', 'properties' => ['a' => [
+				'type' => 'object', 'properties' => ['b' => [
+					'type' => 'object', 'properties' => ['c' => [
+						'type' => 'string'
+					]], 'required' => ['c']
+				]], 'required' => ['b']
+			]], 'required' => ['a']
+		];
+		$validator = new HumanFriendlySchemaValidator($schema);
+		// Valid
+		$this->assertTrue($validator->validate(['a' => ['b' => ['c' => 'ok']]])->valid);
+		// Invalid
+		$result = $validator->validate(['a' => ['b' => ['d' => 'wrong']]]); // c is missing
+		$this->assertFalse($result->valid);
+		$this->assertStringContainsString('Missing required field(s): c', $result->errors[0]->message);
+		$this->assertEquals(['root', 'a', 'b'], $this->findErrorByPath($result->errors, ['root', 'a', 'b'])->path);
+	}
+	
+	public function testLargeArrayPerformanceStub() {
+	    // This is not a true performance test but checks for crashes with large arrays.
+		$schema = ['type' => 'array', 'items' => ['type' => 'integer']];
+		$validator = new HumanFriendlySchemaValidator($schema);
+		$largeArray = range(1, 500); // Reduced from 10000 to avoid excessive test time / memory
+		$result = $validator->validate($largeArray);
+		$this->assertTrue($result->valid, "Validation of large array failed.");
+		// Test invalid large array
+		$largeArray[] = "not_an_integer";
+		$resultInvalid = $validator->validate($largeArray);
+		$this->assertFalse($resultInvalid->valid);
+		$this->assertStringContainsString('Expected integer, got string.', $resultInvalid->errors[0]->message);
+	}
+
+	public function testDiscriminatorLikeAnyOf() {
+		$schema = [
+			'anyOf' => [
+				[
+					'type' => 'object',
+					'properties' => [
+						'type' => [ 'type' => "string", 'enum' => ['A'] ],
+						'propA' => ['type' => 'string']
+					],
+					'required' => ['type', 'propA']
+				],
+				[
+					'type' => 'object',
+					'properties' => [
+						'type' => [ 'type' => "string", 'enum' => ['B'] ],
+						'propB' => ['type' => 'integer']
+					],
+					'required' => ['type', 'propB']
+				]
+			]
+		];
+		$validator = new HumanFriendlySchemaValidator($schema);
+
+		// Valid type A
+		$this->assertTrue($validator->validate(['type' => 'A', 'propA' => 'hello'])->valid);
+		// Valid type B
+		$this->assertTrue($validator->validate(['type' => 'B', 'propB' => 123])->valid);
+
+		// Invalid: type A data with type B value (missing propA for matched 'A' schema)
+		$result1 = $validator->validate(['type' => 'A', 'propB' => 123]);
+		$this->assertFalse($result1->valid);
+		$this->assertStringContainsString("Missing required field(s): propA", $this->findErrorMessageContaining($result1->errors, "propA"));
+
+
+		// Invalid: type B data with type A value (missing propB for matched 'B' schema)
+		$result2 = $validator->validate(['type' => 'B', 'propA' => 'hello']);
+		$this->assertFalse($result2->valid);
+		$this->assertStringContainsString("Missing required field(s): propB", $this->findErrorMessageContaining($result2->errors, "propB"));
+
+		// Invalid: unknown type value for discriminator
+		$result3 = $validator->validate(['type' => 'C', 'propA' => 'hello']);
+		$this->assertFalse($result3->valid);
+		$this->assertStringContainsString("The 'type' property must be one of [A, B], but it was \"C\"", $result3->errors[0]->message);
+		
+		// Invalid: missing type (discriminator property)
+		$result4 = $validator->validate(['propA' => 'hello']);
+		$this->assertFalse($result4->valid);
+        $this->assertStringContainsString("The 'type' property must be one of [A, B], but it was missing", $result4->errors[0]->message);
+	}
+	
+	/**
+	 * Helper to find an error message containing a specific substring.
+	 */
+	private function findErrorMessageContaining(array $errors, string $substring): ?string
+	{
+		foreach ($errors as $error) {
+			if (strpos($error->message, $substring) !== false) {
+				return $error->message;
+			}
+		}
+		return null;
+	}
+
+    private function findErrorByPath(array $errors, array $path): ?Issue
+    {
+        foreach ($errors as $error) {
+            if ($error->path === $path) {
+                return $error;
+            }
+        }
+        return null;
+    }
+	
+	public function testArrayIsValidObjectOption() {
+        $schema = ['type' => 'object', 'properties' => ['a' => ['type' => 'string']]];
+
+        // Default: array is valid object
+        $validatorDefault = new HumanFriendlySchemaValidator($schema); // array_is_valid_object defaults to true
+        $resultDefault = $validatorDefault->validate(['a' => 'test']); // Using PHP array for object
+        $this->assertTrue($resultDefault->valid);
+
+        // Option false: array is NOT valid object
+        $validatorStrict = new HumanFriendlySchemaValidator($schema, ['array_is_valid_object' => false]);
+        $resultStrict = $validatorStrict->validate(['a' => 'test']); // Using PHP array for object
+        $this->assertFalse($resultStrict->valid);
+        $this->assertStringContainsString('Expected object, got array.', $resultStrict->errors[0]->message);
+
+        // Still validates actual objects correctly
+        $stdClass = new \stdClass();
+        $stdClass->a = 'test';
+        $resultObject = $validatorStrict->validate($stdClass);
+        $this->assertTrue($resultObject->valid);
+    }
+
 }

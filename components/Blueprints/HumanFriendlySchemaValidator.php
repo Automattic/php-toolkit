@@ -2,6 +2,8 @@
 
 namespace WordPress\Blueprints;
 
+use WordPress\Blueprints\Validator\UnsupportedSchemaException;
+
 /**
  * Single validation issue enriched with context.
  */
@@ -235,12 +237,20 @@ final class HumanFriendlySchemaValidator
             $schema = $this->resolveReference($schema['$ref']);
         }
 
-        return match (true) {
+        $result = match (true) {
             isset($schema['anyOf']) => $this->validateAnyOf($path, $data, $schema),
             isset($schema['oneOf']) => $this->validateOneOf($path, $data, $schema),
             isset($schema['type'])  => $this->validateType($path, $data, $schema),
-            default                 => ValidationResult::err($path, 'Validator doesn\'t understand this schema node.'),
+            default                 => null,
         };
+
+		if ($result === null) {
+			throw new UnsupportedSchemaException(
+				'Every object in the schema must have one of "anyOf", "oneOf", "type" or "$ref". However, rule matched for: ' . json_encode($path) . ' did not have either these. First 100 bytes of the schema: ' . substr(json_encode($schema), 0, 100)
+			);
+		}
+
+		return $result;
     }
 
     // ───────────────────────────────────────────── anyOf / oneOf ─┐
@@ -432,14 +442,16 @@ final class HumanFriendlySchemaValidator
             }
         }
 
-        if(array_key_exists('additionalProperties',$schema)){
+        if(array_key_exists('additionalProperties',$schema) && $schema['additionalProperties'] !== true){
             foreach($arr as $name=>$v){
                 if(isset($schema['properties'][$name])){continue;}
                 if($schema['additionalProperties']===false){
                     $results[]=ValidationResult::err([...$path,$name],"Property '$name' isn't allowed here.");
-                }else{
+				} else if(is_array($schema['additionalProperties'])) {
                     $results[]=$this->validateNode([...$path,$name],$v,$schema['additionalProperties']);
-                }
+                } else {
+					throw new UnsupportedSchemaException('Invalid additionalProperties schema. Expected boolean or object.');
+				}
             }
         }
         return ValidationResult::combine(...$results);
@@ -469,12 +481,12 @@ final class HumanFriendlySchemaValidator
     private function resolveReference(string $ref): array
     {
         if(!str_starts_with($ref,'#/')){
-            throw new \RuntimeException('Only local #/ refs are supported');
+            throw new UnsupportedSchemaException('Only local #/ refs are supported');
         }
         $node=$this->schema;
         foreach(explode('/',substr($ref,2)) as $p){
             if(!array_key_exists($p,$node)){
-                throw new \RuntimeException("Reference $ref not found");
+                throw new UnsupportedSchemaException("Reference $ref not found");
             }
             $node=$node[$p];
         }
