@@ -88,9 +88,81 @@ class Symbol {
 const MISSING = new Symbol('missing');
 
 /**
- * JSON-schema-lite validator with human‑centred errors and original narrowing logic.
+ * A lite JSON schema validator with human-centric error messages.
+ * 
+ * ## Why a custom validator?
+ * 
+ * Existing JSON validation libraries don't produce user-friendly error messages.
+ * 
+ * Here's a few examples of what most libraries would report for
+ * popular invalid Blueprint scenarios.
+ * 
+ * In this Blueprint, the "resource" property should have a "url" key:
+ * 
+ *     {"steps":[{"step":"writeFile","path":"/tmp/media/WordPress-logotype-wmark.png","data":{"resource":"url","path":"https://s.w.org/style/images/about/WordPress-logotype-wmark.png"}}]}'
+ * 
+ * However, a typical error is more like:
+ * 
+ *     must be equal to constant at /steps/0/data/resource
+ * 
+ * An invalid "step" value:
+ * 
+ *     {"steps":[ {"step":"noSuchStep"} ]}
+ * 
+ * Is typically rejected with:
+ * 
+ *     value of tag "step" must be in oneOf at /steps/0
+ * 
+ * It's not terrible, but it isn't great either. It doesn't tell us what the allowed values are.
+ * 
+ * It gets worse for schemas without a clear discriminator (such as Blueprint v2).
+ * Imagine the following schema:
+ * 
+ *     {
+ *       "type": "object",
+ *       "properties": {
+ *         "media": {
+ *           "anyOf": [
+ *             {"type": "string"},
+ *             {
+ *               "type":"object",
+ *               "required":["filename", "content"]
+ *             }
+ *           ]
+ *         }
+ *       }
+ *     }
+ * 
+ * The following Blueprint is invalid – it's missing the "content" property:
+ * 
+ *     {"media": { "filename": "post.html" } }
+ * 
+ * However, a typical error message is:
+ * 
+ *     #/properties/media/anyOf: JSON does not match any schemas from 'anyOf'.
+ *     #/properties/media/anyOf/1/required Required properties are missing from object: dirname, files.
+ *     #/properties/media/anyOf/0/required Required properties are missing from object: content.
+ * 
+ * It's awful! Technically, everything is true in it. But it's related to
+ * JSON schema concepts. You need to open the schema to understand the error.
+ * 
+ * How much better would it be to have a message similar to this instead?
+ * 
+ *     The required "media.content" property is missing.
+ * 
+ * It points you to the exact location and tell you what the problem is. Most
+ * libraries just return all the failures on the way and don't bother with
+ * making the output useful.
+ * 
+ * Here's a few other reasons for having a custom validator:
+ * 
+ * * Compatibility – it supports PHP 7.2 and no dependencies.
+ * * Small footprint – it only implements what we need to validate Blueprints.
+ * * Leniency – it can accept PHP arrays as objects. Steps accept data as arrays,
+ *   and this little feature saves us from recursively converting
+ *   between objects and arrays.
  */
-final class SchemaValidator
+final class HumanFriendlySchemaValidator
 {
     private bool $arrayIsValidObject;
 
@@ -441,116 +513,4 @@ final class SchemaValidator
         }
         return null;
     }
-}
-
-echo 'before validation' . PHP_EOL;
-
-$schema = json_decode(file_get_contents(__DIR__ . '/json-schema/blueprint-v2-schema.json'), true);
-$validator = new SchemaValidator($schema);
-$result = $validator->validate([
-	"version" => 2,
-	'$schema' => "https://raw.githubusercontent.com/WordPress/blueprints/trunk/blueprints/schema.json",
-	"plugins" => [
-		"friends"
-	],
-	"themes" => [
-		"adventurer"
-	],
-	"wordpressVersion" => "6.5",
-	"phpVersion" => [
-		"min" => "8.0",
-		"max" => "8.4",
-		"recommended" => "8.2"
-	],
-	"activeTheme" => "twentytwentyfour",
-	"blueprintMeta" => [
-		"name" => "Full Featured Blueprint",
-		"description" => "A blueprint demonstrating most of the available features",
-		"version" => "1.0.0",
-		"authors" => ["Test Author", "Another Author"],
-		"authorUrl" => "https://example.com",
-		"donateLink" => "https://example.com/donate",
-		"tags" => ["test", "full-features", "demo"],
-		"license" => "GPL-2.0"
-	],
-	"postTypes" => [
-		"book" => [
-			"label" => "Books",
-			"description" => "Books post type",
-			"public" => true,
-			"has_archive" => true,
-			"show_in_rest" => true,
-			"supports" => ["title", "editor", "author", "thumbnail", "excerpt", "comments"]
-		]
-	],
-	// "muPlugins" => [
-	// 	"0-test" => [
-	// 		"filename" => "0-test.php",
-	// 		"content" => "<?php
-	// 			echo 'test';
-	// 		? >"
-	// 	]
-	// ],
-	"users" => [
-		[
-			"username" => "admin",
-			"password" => "password",
-			"email" => "adam@example.com",
-			"role" => "adamadamin"
-		]
-	],
-	"roles" => [
-		[
-			"name" => "adamadamin",
-			// @TODO: What's the correct way to set capabilities?
-			"capabilities" => ["manage_options"=>"manage_options"]
-		]
-	],
-	"siteOptions" => [
-		"blogname" => "Blueprint Demo Site",
-		"timezone_string" => "America/New_York",
-		"permalink_structure" => "/%year%/%monthnum%/%postname%/"
-	],
-	"siteLanguage" => "en_US",
-	"constants" => [
-		"WP_DEBUG" => true,
-		"SCRIPT_DEBUG" => true
-	],
-	"media" => [
-		"https://wordpress.org/files/2024/10/design-visual-6-7.png",
-		[
-			"source" => "2",
-			"title" => "Introduction Video",
-			"description" => "A brief introduction to our company",
-			"alt" => "Company introduction video"
-		],
-	],
-	"additionalStepsAfterExecution" => [
-		[
-			"step3" => "writeFiles",
-			"files" => [
-				"wp-content/uploads/custom-file.txt" => [
-					"filename" => "custom-file.txt",
-					"content" => "This is a custom file created by the Blueprint."
-				],
-				"0_readme.md" => "https://gist.githubusercontent.com/adamziel/a93297e21f37612751a2904c193d44fa/raw/5f25cdc900c0a44aefa0e1c06352c09c67312f1e/0_README.md",
-				"playground" => [
-					"gitRepository" => "https://github.com/adamziel/mysql-sqlite-network-proxy.git",
-					"path" => "php-implementation",
-					// @TODO: Accept branch names without the refs/heads/ prefix
-					// @TODO: Accept commit hashes and tag names
-					"ref" => "refs/heads/trunk"
-				]
-			]
-		]
-	]
-]);
-
-if($result->valid) {
-	echo "The data is valid according to the schema.\n";
-} else {
-	echo "The data is invalid according to the schema.\n";
-	foreach($result->errors as $error) {
-		print_r($error);
-	}
 }

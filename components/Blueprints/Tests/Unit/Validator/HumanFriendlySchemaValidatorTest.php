@@ -4,16 +4,16 @@ namespace WordPress\Blueprints\Tests;
 
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
-use WordPress\Blueprints\Validator;
+use WordPress\Blueprints\HumanFriendlySchemaValidator;
 
 /**
  * Tests for the BlueprintV2Validator class.
  */
-class BlueprintV2ValidatorTest extends TestCase {
+class HumanFriendlySchemaValidatorTest extends TestCase {
 	/**
 	 * Blueprint validator instance.
 	 *
-	 * @var BlueprintV2Validator
+	 * @var HumanFriendlySchemaValidator
 	 */
 	private $validator;
 
@@ -22,7 +22,9 @@ class BlueprintV2ValidatorTest extends TestCase {
 	 */
 	public function setUp(): void {
 		parent::setUp();
-		$this->validator = new Validator();
+		$this->validator = new HumanFriendlySchemaValidator(
+			json_decode( file_get_contents( __DIR__ . '/../../../json-schema/blueprint-v2-schema.json' ), true ),
+		);
 	}
 
 	/**
