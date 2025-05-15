@@ -3,9 +3,9 @@
 namespace WordPress\Blueprints\Tests\Unit\Validator;
 
 use PHPUnit\Framework\TestCase;
-use WordPress\Blueprints\HumanFriendlySchemaValidator;
+use WordPress\Blueprints\Validator\HumanFriendlySchemaValidator;
 use WordPress\Blueprints\Validator\UnsupportedSchemaException;
-use WordPress\Blueprints\ValidationError; // Added import
+use WordPress\Blueprints\Validator\ValidationError;
 
 /**
  * Tests for the HumanFriendlySchemaValidator class.
@@ -43,24 +43,20 @@ class HumanFriendlySchemaValidatorTest extends TestCase {
 		}
 	}
 
-	private function assertNotValidationError(?ValidationError $error, string $message = 'Expected no validation error.'): void
-	{
-		$this->assertNull($error, $message);
-	}
 
 	// Test Primitive Types
 	public static function primitiveTypeProvider(): array {
 		return [
 			'valid string' => [ ['type' => 'string'], 'hello', true ],
-			'invalid string (integer given)' => [ ['type' => 'string'], 123, false, 'Expected string, got integer.', 'type-mismatch', '#/' ],
+			'invalid string (integer given)' => [ ['type' => 'string'], 123, false, 'Expected type "string" but got type "integer".', 'type-mismatch', '#/' ],
 			'valid integer' => [ ['type' => 'integer'], 42, true ],
-			'invalid integer (string given)' => [ ['type' => 'integer'], 'foo', false, 'Expected integer, got string.', 'type-mismatch', '#/' ],
+			'invalid integer (string given)' => [ ['type' => 'integer'], 'foo', false, 'Expected type "integer" but got type "string".', 'type-mismatch', '#/' ],
 			'valid boolean true' => [ ['type' => 'boolean'], true, true ],
 			'valid boolean false' => [ ['type' => 'boolean'], false, true ],
-			'invalid boolean (integer given)' => [ ['type' => 'boolean'], 0, false, 'Expected boolean, got integer.', 'type-mismatch', '#/' ],
+			'invalid boolean (integer given)' => [ ['type' => 'boolean'], 0, false, 'Expected type "boolean" but got type "integer".', 'type-mismatch', '#/' ],
 			'valid number (float)' => [ ['type' => 'number'], 3.14, true ],
 			'valid number (integer)' => [ ['type' => 'number'], 7, true ],
-			'invalid number (string given)' => [ ['type' => 'number'], '7.0', false, 'Expected number, got string.', 'type-mismatch', '#/' ],
+			'invalid number (string given)' => [ ['type' => 'number'], '7.0', false, 'Expected type "number" but got type "string".', 'type-mismatch', '#/' ],
 		];
 	}
 
@@ -71,7 +67,7 @@ class HumanFriendlySchemaValidatorTest extends TestCase {
 		$validator = new HumanFriendlySchemaValidator($schema);
 		$error = $validator->validate($value);
 		if ($shouldBeNull) {
-			$this->assertNotValidationError($error);
+			$this->assertTrue($error, 'Expected no validation error.');
 		} else {
 			$this->assertValidationError($error, $expectedErrorMessage, $expectedCode, $expectedPointer);
 		}
@@ -81,9 +77,9 @@ class HumanFriendlySchemaValidatorTest extends TestCase {
 	public static function enumProvider(): array {
 		return [
 			'valid enum string' => [ ['type' => 'string', 'enum' => ['a', 'b']], 'a', true ],
-			'invalid enum string' => [ ['type' => 'string', 'enum' => ['a', 'b']], 'c', false, 'Allowed values: a, b. You supplied "c".', 'enum-mismatch', '#/' ],
+			'invalid enum string' => [ ['type' => 'string', 'enum' => ['a', 'b']], 'c', false, 'The provided value ("c") is not allowed here. Please use one of the following: a, b.', 'enum-mismatch', '#/' ],
 			'valid enum integer' => [ ['type' => 'integer', 'enum' => [1, 2]], 2, true ],
-			'invalid enum integer' => [ ['type' => 'integer', 'enum' => [1, 2]], 3, false, 'Allowed values: 1, 2. You supplied 3.', 'enum-mismatch', '#/' ],
+			'invalid enum integer' => [ ['type' => 'integer', 'enum' => [1, 2]], 3, false, 'The provided value (3) is not allowed here. Please use one of the following: 1, 2.', 'enum-mismatch', '#/' ],
 			'enum with empty string allowed' => [ ['type' => 'string', 'enum' => ['', 'foo']], '', true ],
 		];
 	}
@@ -95,7 +91,7 @@ class HumanFriendlySchemaValidatorTest extends TestCase {
 		$validator = new HumanFriendlySchemaValidator($schema);
 		$error = $validator->validate($value);
 		if ($shouldBeNull) {
-			$this->assertNotValidationError($error);
+			$this->assertTrue($error, 'Expected no validation error.');
 		} else {
 			$this->assertValidationError($error, $expectedErrorMessage, $expectedCode, $expectedPointer);
 		}
@@ -125,25 +121,26 @@ class HumanFriendlySchemaValidatorTest extends TestCase {
 				array_merge($baseSchema, ['required' => ['foo', 'bar']]),
 				['foo' => 'text'],
 				false,
-				['Missing required field: bar.']
+				'Missing required field: bar.'
 			],
 			'invalid object missing multiple required properties' => [
 				array_merge($baseSchema, ['required' => ['foo', 'bar']]),
 				[],
 				false,
+				'Object validation failed.',
 				['Missing required field: foo.', 'Missing required field: bar.']
 			],
 			'invalid object property type' => [
 				$baseSchema,
 				['foo' => 123], // foo should be string
 				false,
-				['Expected string, got integer.']
+				'Expected type "string" but got type "integer".'
 			],
 			'object with additionalProperties: false, extra prop' => [
 				array_merge($baseSchema, ['additionalProperties' => false]),
 				['foo' => 'text', 'extra' => 'disallowed'],
 				false,
-				["Property 'extra' isn't allowed here."]
+				'Property "extra" isn\'t allowed here.'
 			],
 			'object with additionalProperties: true, extra prop' => [ // True is default, but explicit for test
 				array_merge($baseSchema, ['additionalProperties' => true]),
@@ -155,11 +152,11 @@ class HumanFriendlySchemaValidatorTest extends TestCase {
 				['foo' => 'text', 'extra' => true],
 				true
 			],
-			'object with additionalProperties: schema, invalid extra prop' => [
+			'object with additionalProperties: schema, invalid extraextra prop' => [
 				array_merge($baseSchema, ['additionalProperties' => ['type' => 'boolean']]),
 				['foo' => 'text', 'extra' => 'not a bool'],
 				false,
-				['Expected boolean, got string.']
+				'Expected type "boolean" but got type "string".'
 			],
 			'object with no properties defined, only additionalProperties: schema' => [
 				['type' => 'object', 'additionalProperties' => ['type' => 'string']],
@@ -175,13 +172,14 @@ class HumanFriendlySchemaValidatorTest extends TestCase {
 			    ['type' => 'object', 'required' => ['mustExist']],
 				['otherKey' => 'not it'],
 				false,
-				['Missing required field: mustExist.']
+				'Missing required field: mustExist.'
 			],
 			'invalid object with multiple violations' => [
 				array_merge($baseSchema, ['required' => ['foo', 'bar'], 'additionalProperties' => false]),
 				['foo' => 123, 'extra' => 'disallowed'],
 				false,
-				['Expected string, got integer.', 'Missing required field: bar.', "Property 'extra' isn't allowed here."]
+				'Object validation failed.',
+				['Expected type "string" but got type "integer".', 'Missing required field: bar.', 'Property "extra" isn\'t allowed here.']
 			]
 		];
 	}
@@ -189,16 +187,20 @@ class HumanFriendlySchemaValidatorTest extends TestCase {
 	/**
 	 * @dataProvider objectProvider
 	 */
-	public function testObjectValidation(array $schema, $value, bool $shouldBeNull, array $expectedChildErrorChecks = [], string $expectedParentCode = null) {
+	public function testObjectValidation(array $schema, $value, bool $shouldBeNull, ?string $expectedErrorMessage = null, array $expectedChildErrorChecks = [], ?string $expectedParentCode = null) {
 		$validator = new HumanFriendlySchemaValidator($schema);
 		$error = $validator->validate($value);
 
 		if ($shouldBeNull) {
-			$this->assertNotValidationError($error, 'Validation status mismatch. Expected null.');
+			$this->assertTrue($error, 'Validation status mismatch. Expected null.');
 		} else {
 			$this->assertInstanceOf(ValidationError::class, $error, "Parent error should be a ValidationError instance.");
 			if ($expectedParentCode !== null) {
 				$this->assertEquals($expectedParentCode, $error->code, "Parent error code mismatch.");
+			}
+
+			if(null !== $expectedErrorMessage) {
+				$this->assertEquals($expectedErrorMessage, $error->message);
 			}
 			
 			if (!empty($expectedChildErrorChecks)) {
@@ -212,8 +214,6 @@ class HumanFriendlySchemaValidatorTest extends TestCase {
 						$check->pointer ?? null
 					);
 				}
-			} else if ($expectedParentCode === null) { // If no parent code and no children checks, it implies a single direct error
-				 $this->assertValidationError($error, $expectedChildErrorChecks[0]->messageContains ?? null, $expectedChildErrorChecks[0]->code ?? null, $expectedChildErrorChecks[0]->pointer ?? null);
 			}
 		}
 	}
@@ -230,7 +230,7 @@ class HumanFriendlySchemaValidatorTest extends TestCase {
 				['type' => 'array', 'items' => ['type' => 'string']],
 				['a', 123, 'c'],
 				false,
-				'Expected string, got integer.'
+				'Expected type "string" but got type "integer".'
 			],
 			'array with minItems: valid' => [
 				['type' => 'array', 'items' => ['type' => 'integer'], 'minItems' => 2],
@@ -282,7 +282,7 @@ class HumanFriendlySchemaValidatorTest extends TestCase {
 				],
 				[ ['id' => 1], ['name' => 'oops'] ], // second item missing 'id'
 				false,
-				'Missing required field: id'
+				'Missing required field: id.'
 			]
 		];
 	}
@@ -293,17 +293,9 @@ class HumanFriendlySchemaValidatorTest extends TestCase {
 	public function testArrayValidation(array $schema, $value, bool $shouldBeValid, string $expectedErrorMessage = null) {
 		$validator = new HumanFriendlySchemaValidator($schema);
 		$result = $validator->validate($value);
-		$this->assertSame($shouldBeValid, $result->valid, $expectedErrorMessage ?: 'Validation status mismatch');
+		$this->assertIsValid($result, $shouldBeValid, $expectedErrorMessage);
 		if (!$shouldBeValid && $expectedErrorMessage) {
-			$this->assertNotEmpty($result->errors);
-            $foundError = false;
-			foreach($result->errors as $error) {
-				if (strpos($error->message, $expectedErrorMessage) !== false) {
-					$foundError = true;
-					break;
-				}
-			}
-			$this->assertTrue($foundError, "Expected error message fragment '{$expectedErrorMessage}' not found. Actual errors: " . print_r($result->errors, true));
+			$this->assertEquals($expectedErrorMessage, $result->message);
 		}
 	}
 
@@ -324,7 +316,7 @@ class HumanFriendlySchemaValidatorTest extends TestCase {
 				['anyOf' => [ ['type' => 'string'], ['type' => 'integer'] ]],
 				true,
 				false,
-				'Expected one of [string, integer] here, but got boolean.'
+				'Value must be one of the following types: [string, integer], but it was of type "boolean".'
 			],
 			'anyOf: overlapping schemas, matches both (number and integer for an int)' => [
 				['anyOf' => [ ['type' => 'number'], ['type' => 'integer'] ]],
@@ -367,7 +359,7 @@ class HumanFriendlySchemaValidatorTest extends TestCase {
 				['a' => 123], // a should be string but is integer
 				false,
 				'Value did not match any of the allowed shapes: object.',
-				'Expected string, got integer.'
+				'Expected type "string" but got type "integer".'
 			],
 			// Nested anyOf (one level deeper)
 			'anyOf: one level nested' => [
@@ -389,7 +381,7 @@ class HumanFriendlySchemaValidatorTest extends TestCase {
 				]],
 				['nested' => true], // Invalid nested value (boolean)
 				false,
-				'Expected one of [string, integer] here, but got boolean.',
+				'Value must be one of the following types: [string, integer], but it was of type "boolean".',
 				null
 			],
 			// Two levels deeper nesting
@@ -416,7 +408,7 @@ class HumanFriendlySchemaValidatorTest extends TestCase {
 				]],
 				['level1' => ['level2' => false]], // Invalid nested value (boolean)
 				false,
-				'Expected one of [string, integer] here, but got boolean.',
+				'Value must be one of the following types: [string, integer], but it was of type "boolean".',
 				null
 			],
 			// Mixed types in anyOf
@@ -455,7 +447,7 @@ class HumanFriendlySchemaValidatorTest extends TestCase {
 				]],
 				false, // Boolean doesn't match any schema
 				false,
-				'Expected one of [string, object, array] here, but got boolean.',
+				'Value must be one of the following types: [string, object, array], but it was of type "boolean".',
 				null // No explanation for type mismatch
 			],
 			// Deep ambiguity resolution test
@@ -608,23 +600,11 @@ class HumanFriendlySchemaValidatorTest extends TestCase {
 	public function testAnyOfValidation(array $schema, $value, bool $shouldBeValid, string $expectedErrorMessage = null, string $expectedExplanation = null) {
 		$validator = new HumanFriendlySchemaValidator($schema);
 		$result = $validator->validate($value);
-		$this->assertSame($shouldBeValid, $result);
+		$this->assertIsValid($result, $shouldBeValid);
 		if (!$shouldBeValid && $expectedErrorMessage) {
-			$this->assertNotEmpty($result->errors);
-			$this->assertStringContainsString($expectedErrorMessage, $result->errors[0]->message);
-			
-			// Check for explanation in aggregate errors
-			if ($expectedExplanation && count($result->errors) > 1) {
-				$hasExpectedExplanation = false;
-				for ($i = 1; $i < count($result->errors); $i++) {
-					if ($result->errors[$i]->type === Issue::TYPE_EXPLANATION && 
-						$result->errors[$i]->message === $expectedExplanation) {
-						$hasExpectedExplanation = true;
-						break;
-					}
-				}
-				$this->assertTrue($hasExpectedExplanation, 
-					"Expected exact explanation '$expectedExplanation' not found in validation errors");
+			$this->assertEquals($expectedErrorMessage, $result->message);
+			if($expectedExplanation) {
+				$this->assertEquals($expectedExplanation, $result->getMostProbableCause()->message);
 			}
 		}
 	}
@@ -646,7 +626,7 @@ class HumanFriendlySchemaValidatorTest extends TestCase {
 				['oneOf' => [ ['type' => 'string'], ['type' => 'integer'] ]],
 				true,
 				false,
-				'Expected one of [string, integer] here, but got boolean.'
+				'Value must be one of the following types: [string, integer], but it was of type "boolean".'
 			],
 			'oneOf: matches multiple schemas (number and integer for an int)' => [
 				['oneOf' => [ ['type' => 'number'], ['type' => 'integer'] ]],
@@ -690,10 +670,13 @@ class HumanFriendlySchemaValidatorTest extends TestCase {
 	public function testOneOfValidation(array $schema, $value, bool $shouldBeValid, string $expectedErrorMessage = null) {
 		$validator = new HumanFriendlySchemaValidator($schema);
 		$result = $validator->validate($value);
-		$this->assertSame($shouldBeValid, $result);
+		if($shouldBeValid) {
+			$this->assertTrue($result);
+		} else {
+			$this->assertInstanceOf(ValidationError::class, $result);
+		}
 		if (!$shouldBeValid && $expectedErrorMessage) {
-			$this->assertNotEmpty($result->errors);
-			$this->assertStringContainsString($expectedErrorMessage, $result->errors[0]->message);
+			$this->assertEquals($expectedErrorMessage, $result->message);
 		}
 	}
 
@@ -723,9 +706,9 @@ class HumanFriendlySchemaValidatorTest extends TestCase {
 		
 		// Invalid: property type within referenced schema
 		$resultInvalidType = $validator->validate(['admin' => ['username' => 'test', 'id' => 'not-an-int']]);
-		$this->assertFalse($resultInvalidType);
-		$this->assertStringContainsString('Expected integer, got string.', $resultInvalidType->errors[0]->message);
-		$this->assertEquals(['root', 'admin', 'id'], $resultInvalidType->errors[0]->path);
+		$this->assertInstanceOf(ValidationError::class, $resultInvalidType);
+		$this->assertEquals('Expected type "integer" but got type "string".', $resultInvalidType->message);
+		$this->assertEquals('#/admin/id', $resultInvalidType->pointer);
 	}
 
 	/**
@@ -770,13 +753,13 @@ class HumanFriendlySchemaValidatorTest extends TestCase {
 		
 		// Invalid: doesn't match any reference schema
 		$result1 = $validator->validate(['config' => true]);
-		$this->assertFalse($result1);
-		$this->assertStringContainsString('Expected one of [string, integer, object] here, but got boolean', $result1->errors[0]->message);
+		$this->assertInstanceOf(ValidationError::class, $result1);
+		$this->assertEquals('Value must be one of the following types: [string, integer, object], but it was of type "boolean".', $result1->message);
 		
 		// Invalid: partial match with object reference
 		$result2 = $validator->validate(['config' => ['name' => 'test']]);
-		$this->assertFalse($result2);
-		$this->assertStringContainsString('Missing required field: value', $result2->errors[0]->message);
+		$this->assertInstanceOf(ValidationError::class, $result2);
+		$this->assertStringContainsString('Missing required field: value', $result2->children[0]->message);
 	}
 	
 	/**
@@ -823,13 +806,13 @@ class HumanFriendlySchemaValidatorTest extends TestCase {
 		
 		// Invalid: matches neither
 		$result1 = $validator->validate(['data' => ['type' => 'C', 'value' => 'test']]);
-		$this->assertFalse($result1);
-		$this->assertStringContainsString('Value did not match any of the allowed shapes', $result1->errors[0]->message);
+		$this->assertInstanceOf(ValidationError::class, $result1);
+		$this->assertEquals('Property "type" must be one of [A, B], but it was "C".', $result1->message);
 		
 		// Invalid: missing required property in the matched reference
 		$result2 = $validator->validate(['data' => ['type' => 'A', 'count' => 42]]);
-		$this->assertFalse($result2);
-		$this->assertStringContainsString('Missing required field: value', $this->findErrorMessageContaining($result2->errors, 'value'));
+		$this->assertInstanceOf(ValidationError::class, $result2);
+		$this->assertStringContainsString('Missing required field: value', $this->findErrorMessageContaining($result2->children, 'value'));
 	}
 	
 	/**
@@ -865,8 +848,9 @@ class HumanFriendlySchemaValidatorTest extends TestCase {
 		
 		// Invalid: object with wrong property types
 		$result = $validator->validate(['mixed' => ['name' => 123, 'count' => 'not a number']]);
-		$this->assertFalse($result);
-		$this->assertStringContainsString('Expected string, got integer', $this->findErrorMessageContaining($result->errors, 'string'));
+		$this->assertInstanceOf(ValidationError::class, $result);
+		$this->assertEquals('Value did not match any of the allowed shapes: stringProperty, object.', $result->message);
+		$this->assertEquals('Expected type "string" but got type "integer".', $result->getMostProbableCause()->message);
 	}
 	
 	/**
@@ -964,10 +948,9 @@ class HumanFriendlySchemaValidatorTest extends TestCase {
 		
 		// Invalid: neither reference matches
 		$result = $validator->validate(['nested' => ['inner' => ['description' => 'wrong property']]]);
-		$this->assertFalse($result);
-		$this->assertStringContainsString('Value did not match any of the allowed shapes', $result->errors[0]->message);
-		// Check for nested explanation in error
-		$this->assertStringContainsString('Missing required field', $result->errors[1]->message);
+		$this->assertInstanceOf(ValidationError::class, $result);
+		$this->assertStringContainsString('Value did not match any of the allowed shapes', $result->message);
+		$this->assertStringContainsString('Missing required field: id.', $result->children[0]->message);
 	}
 	
 	/**
@@ -990,12 +973,7 @@ class HumanFriendlySchemaValidatorTest extends TestCase {
 		];
 		
 		$validator = new HumanFriendlySchemaValidator($schema);
-		
-		// Test with one level of nesting (should be fine)
-		$this->assertTrue($validator->validate(['data' => ['child' => []]]));
-		
-		// PHP would hit a recursion limit with many levels, but the validator doesn't have
-		// special handling for this case, so we don't need to test deep recursion
+		$this->assertIsValid($validator->validate(['data' => ['child' => []]]));
 	}
 
 	public function testUnsupportedExternalRefThrows() {
@@ -1031,10 +1009,9 @@ class HumanFriendlySchemaValidatorTest extends TestCase {
 
 	public function testUnknownTypeInSchema() {
 		$schema = ['type' => 'futureType'];
+		$this->expectException(UnsupportedSchemaException::class);
 		$validator = new HumanFriendlySchemaValidator($schema);
 		$result = $validator->validate('data');
-		$this->assertFalse($result);
-		$this->assertStringContainsString('Expected futureType', $result->errors[0]->message);
 	}
 
 	// Test Input Variations
@@ -1042,9 +1019,8 @@ class HumanFriendlySchemaValidatorTest extends TestCase {
 		$schema = ['type' => 'string'];
 		$validator = new HumanFriendlySchemaValidator($schema);
 		$result = $validator->validate(null);
-		$this->assertFalse($result);
-		$this->assertNotEmpty($result->errors);
-		$this->assertStringContainsString('Expected string, got NULL.', $result->errors[0]->message); // PHP gettype(null) is "NULL"
+		$this->assertInstanceOf(ValidationError::class, $result);
+		$this->assertEquals('Expected type "string" but got type "NULL".', $result->message); // PHP gettype(null) is "NULL"
 	}
 
 	public function testUnexpectedInputTypeResource() {
@@ -1053,8 +1029,8 @@ class HumanFriendlySchemaValidatorTest extends TestCase {
 		$resource = fopen('php://memory', 'r');
 		$result = $validator->validate($resource);
 		fclose($resource);
-		$this->assertFalse($result);
-		$this->assertStringContainsString('Expected string, got resource.', $result->errors[0]->message);
+		$this->assertInstanceOf(ValidationError::class, $result);
+		$this->assertStringContainsString('Expected type "string" but got type "resource".', $result->message);
 	}
 	
 	public function testValidatorDoesNotMutateInput() {
@@ -1082,9 +1058,9 @@ class HumanFriendlySchemaValidatorTest extends TestCase {
 		$this->assertTrue($validator->validate(['a' => ['b' => ['c' => 'ok']]]));
 		// Invalid
 		$result = $validator->validate(['a' => ['b' => ['d' => 'wrong']]]); // c is missing
-		$this->assertFalse($result);
-		$this->assertStringContainsString('Missing required field: c', $result->errors[0]->message);
-		$this->assertEquals(['root', 'a', 'b'], $this->findErrorByPath($result->errors, ['root', 'a', 'b'])->path);
+		$this->assertInstanceOf(ValidationError::class, $result);
+		$this->assertEquals('Missing required field: c.', $result->message);
+		$this->assertEquals('#/a/b', $result->pointer);
 	}
 	
 	public function testLargeArrayPerformanceStub() {
@@ -1093,12 +1069,12 @@ class HumanFriendlySchemaValidatorTest extends TestCase {
 		$validator = new HumanFriendlySchemaValidator($schema);
 		$largeArray = range(1, 500); // Reduced from 10000 to avoid excessive test time / memory
 		$result = $validator->validate($largeArray);
-		$this->assertTrue($result->valid, "Validation of large array failed.");
+		$this->assertIsValid($result);
 		// Test invalid large array
 		$largeArray[] = "not_an_integer";
 		$resultInvalid = $validator->validate($largeArray);
-		$this->assertFalse($resultInvalid);
-		$this->assertStringContainsString('Expected integer, got string.', $resultInvalid->errors[0]->message);
+		$this->assertInstanceOf(ValidationError::class, $resultInvalid);
+		$this->assertStringContainsString("Expected type \"integer\" but got type \"string\".", $resultInvalid->message);
 	}
 
 	public function testDiscriminatorLikeAnyOf() {
@@ -1125,30 +1101,30 @@ class HumanFriendlySchemaValidatorTest extends TestCase {
 		$validator = new HumanFriendlySchemaValidator($schema);
 
 		// Valid type A
-		$this->assertTrue($validator->validate(['type' => 'A', 'propA' => 'hello']));
+		$this->assertIsValid($validator->validate(['type' => 'A', 'propA' => 'hello']));
 		// Valid type B
-		$this->assertTrue($validator->validate(['type' => 'B', 'propB' => 123]));
+		$this->assertIsValid($validator->validate(['type' => 'B', 'propB' => 123]));
 
 		// Invalid: type A data with type B value (missing propA for matched 'A' schema)
 		$result1 = $validator->validate(['type' => 'A', 'propB' => 123]);
-		$this->assertFalse($result1);
-		$this->assertStringContainsString("Missing required field: propA", $this->findErrorMessageContaining($result1->errors, "propA"));
+		$this->assertInstanceOf(ValidationError::class, $result1);
+		$this->assertStringContainsString("Missing required field: propA", $this->findErrorMessageContaining($result1->children, "propA"));
 
 
 		// Invalid: type B data with type A value (missing propB for matched 'B' schema)
 		$result2 = $validator->validate(['type' => 'B', 'propA' => 'hello']);
-		$this->assertFalse($result2);
-		$this->assertStringContainsString("Missing required field: propB", $this->findErrorMessageContaining($result2->errors, "propB"));
+		$this->assertInstanceOf(ValidationError::class, $result2);
+		$this->assertStringContainsString("Missing required field: propB", $this->findErrorMessageContaining($result2->children, "propB"));
 
 		// Invalid: unknown type value for discriminator
 		$result3 = $validator->validate(['type' => 'C', 'propA' => 'hello']);
-		$this->assertFalse($result3);
-		$this->assertStringContainsString("The 'type' property must be one of [A, B], but it was \"C\"", $result3->errors[0]->message);
+		$this->assertInstanceOf(ValidationError::class, $result3);
+		$this->assertEquals('Property "type" must be one of [A, B], but it was "C".', $result3->message);
 		
 		// Invalid: missing type (discriminator property)
 		$result4 = $validator->validate(['propA' => 'hello']);
-		$this->assertFalse($result4);
-        $this->assertStringContainsString("The 'type' property must be one of [A, B], but it was missing", $result4->errors[0]->message);
+		$this->assertInstanceOf(ValidationError::class, $result4);
+        $this->assertEquals('Property "type" must be one of [A, B], but it was missing.', $result4->message);
 	}
 	
 	/**
@@ -1163,16 +1139,6 @@ class HumanFriendlySchemaValidatorTest extends TestCase {
 		}
 		return null;
 	}
-
-    private function findErrorByPath(array $errors, array $path): ?Issue
-    {
-        foreach ($errors as $error) {
-            if ($error->path === $path) {
-                return $error;
-            }
-        }
-        return null;
-    }
 	
 	public function testArrayIsValidObjectOption() {
         $schema = ['type' => 'object', 'properties' => ['a' => ['type' => 'string']]];
@@ -1180,19 +1146,19 @@ class HumanFriendlySchemaValidatorTest extends TestCase {
         // Default: array is valid object
         $validatorDefault = new HumanFriendlySchemaValidator($schema); // array_is_valid_object defaults to true
         $resultDefault = $validatorDefault->validate(['a' => 'test']); // Using PHP array for object
-        $this->assertTrue($resultDefault);
+        $this->assertIsValid($resultDefault);
 
         // Option false: array is NOT valid object
         $validatorStrict = new HumanFriendlySchemaValidator($schema, ['array_is_valid_object' => false]);
         $resultStrict = $validatorStrict->validate(['a' => 'test']); // Using PHP array for object
-        $this->assertFalse($resultStrict);
-        $this->assertStringContainsString('Expected object, got array.', $resultStrict->errors[0]->message);
+        $this->assertInstanceOf(ValidationError::class, $resultStrict);
+        $this->assertEquals('Expected type "object" but got type "array".', $resultStrict->message);
 
         // Still validates actual objects correctly
         $stdClass = new \stdClass();
         $stdClass->a = 'test';
         $resultObject = $validatorStrict->validate($stdClass);
-        $this->assertTrue($resultObject);
+        $this->assertIsValid($resultObject);
     }
 
 	// Test for unsupported schema keywords
@@ -1286,23 +1252,21 @@ class HumanFriendlySchemaValidatorTest extends TestCase {
 		$validator = new HumanFriendlySchemaValidator($schema);
 		
 		// Test valid string reference
-		$this->assertTrue($validator->validate('test string'));
+		$this->assertIsValid($validator->validate('test string'));
 		
 		// Test valid number reference
-		$this->assertTrue($validator->validate(42.5));
+		$this->assertIsValid($validator->validate(42.5));
 		
 		// Test valid object reference
-		$this->assertTrue($validator->validate(['id' => 'test-id']));
+		$this->assertIsValid($validator->validate(['id' => 'test-id']));
 		
 		// Test valid array (inline schema)
-		$this->assertTrue($validator->validate(['a', 'b', 'c']));
+		$this->assertIsValid($validator->validate(['a', 'b', 'c']));
 		
 		// Test invalid type (boolean)
 		$result1 = $validator->validate(true);
-		$this->assertFalse($result1);
-		$this->assertStringContainsString('Expected one of [string, number, object, array] here, but got boolean', $result1->errors[0]->message);
-		
-		// Skip tests for more detailed error message checks - they are tested elsewhere
+		$this->assertInstanceOf(ValidationError::class, $result1);
+		$this->assertEquals('Value must be one of the following types: [string, number, object, array], but it was of type "boolean".', $result1->message);
 	}
 	
 	/**
@@ -1336,37 +1300,20 @@ class HumanFriendlySchemaValidatorTest extends TestCase {
 		$validator = new HumanFriendlySchemaValidator($schema);
 		
 		// Valid type A
-		$this->assertTrue($validator->validate(['type' => 'A', 'value' => 'test']));
+		$this->assertIsValid($validator->validate(['type' => 'A', 'value' => 'test']));
 		
 		// Valid type B
-		$this->assertTrue($validator->validate(['type' => 'B', 'count' => 42]));
+		$this->assertIsValid($validator->validate(['type' => 'B', 'count' => 42]));
 		
 		// Invalid discriminator value
 		$result1 = $validator->validate(['type' => 'C', 'value' => 'test']);
-		$this->assertFalse($result1);
+		$this->assertInstanceOf(ValidationError::class, $result1);
 		// Check for direct enum error message
-		$foundEnumError = false;
-		foreach ($result1->errors as $error) {
-			if (strpos($error->message, 'Allowed values') !== false && 
-				strpos($error->message, 'You supplied "C"') !== false) {
-				$foundEnumError = true;
-				break;
-			}
-		}
-		$this->assertTrue($foundEnumError, "Missing message about invalid enum value");
+		$this->assertEquals('Property "type" must be one of [A, B], but it was "C".', $result1->message);
 		
 		// Invalid missing discriminator
 		$result2 = $validator->validate(['value' => 'test']);
-		$this->assertFalse($result2);
-		// Check for any message about missing type field
-		$foundMissingType = false;
-		foreach ($result2->errors as $error) {
-			if (strpos($error->message, 'Missing required field: type') !== false) {
-				$foundMissingType = true;
-				break;
-			}
-		}
-		$this->assertTrue($foundMissingType, "Missing message about required discriminator field");
+		$this->assertEquals('Property "type" must be one of [A, B], but it was missing.', $result2->message);
 	}
 
 	/**
@@ -1411,38 +1358,30 @@ class HumanFriendlySchemaValidatorTest extends TestCase {
 		$validator = new HumanFriendlySchemaValidator($schema);
 		
 		// Valid dog reference
-		$this->assertTrue($validator->validate(['pet' => ['type' => 'dog', 'breed' => 'Labrador', 'age' => 3]]));
+		$this->assertIsValid($validator->validate(['pet' => ['type' => 'dog', 'breed' => 'Labrador', 'age' => 3]]));
 		
 		// Valid cat reference
-		$this->assertTrue($validator->validate(['pet' => ['type' => 'cat', 'color' => 'black', 'indoor' => true]]));
+		$this->assertIsValid($validator->validate(['pet' => ['type' => 'cat', 'color' => 'black', 'indoor' => true]]));
 		
 		// Invalid: wrong discriminator value
 		$result1 = $validator->validate(['pet' => ['type' => 'bird', 'species' => 'parrot']]);
-		$this->assertFalse($result1);
+		$this->assertIsValid($result1, false);
 		
 		// Just check that we have an error, without specifying its exact content
-		$this->assertNotEmpty($result1->errors, "Should have error for invalid type value");
+		$this->assertEquals('Property "type" must be one of [dog, cat], but it was "bird".', $result1->message);
 		
 		// Invalid: missing discriminator property
 		$result2 = $validator->validate(['pet' => ['breed' => 'Labrador', 'age' => 3]]);
-		$this->assertFalse($result2);
+		$this->assertInstanceOf(ValidationError::class, $result2);
 		// Check for message about missing type field
-		$foundMissingType = false;
-		foreach ($result2->errors as $error) {
-			if (strpos($error->message, 'Missing required field: type') !== false ||
-			    strpos($error->message, 'property must be one of') !== false && strpos($error->message, 'missing') !== false) {
-				$foundMissingType = true;
-				break;
-			}
-		}
-		$this->assertTrue($foundMissingType, "Missing message about required discriminator field");
+		$this->assertEquals('Property "type" must be one of [dog, cat], but it was missing.', $result2->message, );
 		
 		// Invalid: correct discriminator but missing required property
 		$result3 = $validator->validate(['pet' => ['type' => 'dog', 'age' => 3]]);
-		$this->assertFalse($result3);
+		$this->assertInstanceOf(ValidationError::class, $result3);
 		// Check for message about missing required field
 		$foundMissingField = false;
-		foreach ($result3->errors as $error) {
+		foreach ($result3->children as $error) {
 			if (strpos($error->message, 'Missing required field: breed') !== false) {
 				$foundMissingField = true;
 				break;
@@ -1493,28 +1432,19 @@ class HumanFriendlySchemaValidatorTest extends TestCase {
 		
 		// Invalid: wrong discriminator value
 		$result1 = $validator->validate(['mode' => 'C', 'value' => 'test']);
-		$this->assertFalse($result1);
+		$this->assertInstanceOf(ValidationError::class, $result1);
 		// Check for error about wrong enum value
-		$this->assertStringContainsString('Allowed values', $result1->errors[0]->message);
-		$this->assertStringContainsString('You supplied "C"', $result1->errors[0]->message);
+		$this->assertStringContainsString('Property "mode" must be one of [A, B], but it was "C".', $result1->message);
 		
 		// Invalid: missing discriminator property but has other object properties
 		$result2 = $validator->validate(['value' => 'test', 'count' => 123]);
-		$this->assertFalse($result2);
-		// Check for message about missing field
-		$foundMissingField = false;
-		foreach ($result2->errors as $error) {
-			if (strpos($error->message, 'Missing required field: mode') !== false) {
-				$foundMissingField = true;
-				break;
-			}
-		}
-		$this->assertTrue($foundMissingField, "Missing message about required discriminator field");
+		$this->assertInstanceOf(ValidationError::class, $result2);
+		$this->assertEquals('Property "mode" must be one of [A, B], but it was missing.', $result2->message);
 		
 		// Invalid: wrong type entirely
 		$result3 = $validator->validate(123);
-		$this->assertFalse($result3);
-		$this->assertStringContainsString('Expected one of [object, string] here, but got integer', $result3->errors[0]->message);
+		$this->assertInstanceOf(ValidationError::class, $result3);
+		$this->assertStringContainsString('Value must be one of the following types: [object, string], but it was of type "integer".', $result3->message);
 	}
 
 	/**
@@ -1553,24 +1483,23 @@ class HumanFriendlySchemaValidatorTest extends TestCase {
 		
 		// Invalid: object missing required property
 		$result1 = $validator->validate(['values' => ['a', 'b', 'c']]);
-		$this->assertFalse($result1);
+		$this->assertInstanceOf(ValidationError::class, $result1);
 		// Check for message about missing field
 		$foundMissingField = false;
-		foreach ($result1->errors as $error) {
+		foreach ($result1->children as $error) {
 			if (strpos($error->message, 'Missing required field: name') !== false) {
 				$foundMissingField = true;
 				break;
 			}
 		}
 		$this->assertTrue($foundMissingField, "Missing message about required field");
-		
 		// Invalid: array with wrong item type
 		$result2 = $validator->validate([1, 2, 3]);
-		$this->assertFalse($result2);
+		$this->assertInstanceOf(ValidationError::class, $result2);
 		// Check for message about wrong type
 		$foundTypeError = false;
-		foreach ($result2->errors as $error) {
-			if (strpos($error->message, 'Expected string, got integer') !== false) {
+		foreach ($result2->children[0]->children as $error) {
+			if (strpos($error->message, 'Expected type "string" but got type "integer"') !== false) {
 				$foundTypeError = true;
 				break;
 			}
@@ -1579,8 +1508,8 @@ class HumanFriendlySchemaValidatorTest extends TestCase {
 		
 		// Invalid: completely wrong type
 		$result3 = $validator->validate(true);
-		$this->assertFalse($result3);
-		$this->assertStringContainsString('Expected one of [string, number, array, object] here, but got boolean', $result3->errors[0]->message);
+		$this->assertInstanceOf(ValidationError::class, $result3);
+		$this->assertStringContainsString('Value must be one of the following types: [string, number, array, object], but it was of type "boolean".', $result3->message);
 	}
 	
 	/**
@@ -1629,10 +1558,10 @@ class HumanFriendlySchemaValidatorTest extends TestCase {
 		
 		// Invalid: object matching no branch
 		$result1 = $validator->validate(['config' => ['description' => 'no match']]);
-		$this->assertFalse($result1);
+		$this->assertInstanceOf(ValidationError::class, $result1);
 		// Check for message about missing required field
 		$foundMissingField = false;
-		foreach ($result1->errors as $error) {
+		foreach ($result1->children as $error) {
 			if (strpos($error->message, 'Missing required field: id') !== false || 
 				strpos($error->message, 'Missing required field: name') !== false ||
 				strpos($error->message, 'Value did not match any of the allowed shapes') !== false) {
@@ -1644,10 +1573,10 @@ class HumanFriendlySchemaValidatorTest extends TestCase {
 		
 		// Invalid: reference object missing required field
 		$result2 = $validator->validate(['config' => ['active' => true]]); 
-		$this->assertFalse($result2);
+		$this->assertInstanceOf(ValidationError::class, $result2);
 		// Check for message about missing id field
 		$foundMissingId = false;
-		foreach ($result2->errors as $error) {
+		foreach ($result2->children as $error) {
 			if (strpos($error->message, 'Missing required field: id') !== false) {
 				$foundMissingId = true;
 				break;
@@ -1655,5 +1584,16 @@ class HumanFriendlySchemaValidatorTest extends TestCase {
 		}
 		$this->assertTrue($foundMissingId, "Missing message about required id field");
 	}
-	
+
+	private function assertIsValid($result, bool $shouldBeValid=true) {
+		if($shouldBeValid) {
+			$this->assertTrue($result);
+		} else {
+			$this->assertIsInvalid($result);
+		}
+	}
+
+	private function assertIsInvalid($result) {
+		$this->assertInstanceOf(ValidationError::class, $result);
+	}
 }

@@ -1,145 +1,14 @@
 <?php
 
-namespace WordPress\Blueprints;
+namespace WordPress\Blueprints\Validator;
 
-use WordPress\Blueprints\Validator\UnsupportedSchemaException;
-
-/**
- * Represents a single validation error.
- */
-class ValidationError {
-    /**
-     * @param string $pointer JSON Pointer like /steps/0/data/url
-     * @param string $code short, stable key: required, type-mismatch …
-     * @param string $message human sentence
-     * @param array $context expected/actual/allowed, always associative
-     * @param ValidationError[] $children nested causes
-     */
-    public function __construct(
-        public string  $pointer,
-        public string  $code,
-        public string  $message,
-        public array   $context = [],
-        public array   $children = []
-    ) {}
-
-    /**
-     * Gets the most probable cause of this validation error.
-     * If this error has no children, it is the most probable cause.
-     * Otherwise, it recursively calls getMostProbableCause on its children
-     * and returns the one with the fewest descendants (naïve: first child if counts are equal).
-     */
-    public function getMostProbableCause(): ValidationError {
-        if (empty($this->children)) {
-            return $this;
-        }
-
-        $minChild = null;
-        $minDescendantsCount = PHP_INT_MAX;
-
-        // Find the child with the minimum number of its own *direct* children.
-        // To implement "fewest descendants" fully, we'd need a recursive count here.
-        // The current prompt says "choose the one with fewest descendants" but then suggests "count($a->children)".
-        // Sticking to the simpler direct children count based on the example.
-        foreach ($this->children as $child) {
-            $currentChildDescendantsCount = count($child->children);
-            if ($currentChildDescendantsCount < $minDescendantsCount) {
-                $minDescendantsCount = $currentChildDescendantsCount;
-                $minChild = $child;
-            }
-        }
-        
-        // If $minChild is still null (e.g. if children array was empty, though caught by initial check),
-        // or if for some reason no child was selected, we might return $this or throw an error.
-        // However, given the initial empty check, $minChild should be set if $this->children is not empty.
-        // If all children have the same number of descendants, the first one encountered will be chosen.
-        return $minChild->getMostProbableCause(); 
-    }
-}
-
-/**
- * Single validation issue enriched with context.
- */
-final class Issue
-{
-    public const TYPE_ISSUE       = 'issue';
-    public const TYPE_EXPLANATION = 'explanation';
-
-    public function __construct(
-        public array   $path,
-        public string  $message,
-        public string  $type   = self::TYPE_ISSUE,
-        public ?string $branch = null,                 // e.g. VideoObject, DataReference …
-        public array   $meta   = [],                   // expected/actual, snippet …
-    ){}
-}
-
-/**
- * (In-)valid result plus aggregated issues.
- */
-final class ValidationResult
-{
-    /** @param Issue[] $errors */
-    public function __construct(
-        public bool  $valid,
-        public array $errors = [],
-    ){}
-
-    public static function ok(): self
-    {
-        return new self(true);
-    }
-
-    public static function err(
-        array   $path,
-        string  $message,
-        ?string $branch = null,
-        array   $meta   = [],
-        string  $type   = Issue::TYPE_ISSUE,
-    ): self {
-        return new self(false, [new Issue($path, $message, $type, $branch, $meta)]);
-    }
-
-    public function merge(self $other): self
-    {
-        if ($this->valid && $other->valid) {
-            return self::ok();
-        }
-        return new self(false, [...$this->errors, ...$other->errors]);
-    }
-
-    public static function combine(self ...$results): self
-    {
-        return array_reduce($results, fn ($c, $r) => $c->merge($r), self::ok());
-    }
-
-    /**
-     * Append the first error of another result as an explanatory note.
-     */
-    public function addExplanation(ValidationResult $why): void
-    {
-        if ($why->valid) { return; }
-        $first = $why->errors[0];
-        $this->errors[] = new Issue(
-            $first->path,
-            $first->message,
-            Issue::TYPE_EXPLANATION,
-            $first->branch,
-            $first->meta,
-        );
-    }
-}
-
+// @TODO: Reconsider the need for the Symbol class. We use it
+//        as a unique reference that can't be possibly brought
+//        in with the validated data.
 class Symbol {
-	public function __construct(
-		public string $value,
-	) {}
-	public function __toString(): string
-	{
-		return $this->value;
-	}
+	public function __construct( public string $value,) {}
+	public function __toString(): string { return $this->value; }
 }
-
 const MISSING = new Symbol('missing');
 
 /**
@@ -235,7 +104,11 @@ final class HumanFriendlySchemaValidator
         } else {
             $path[0] = '#'; // Replace 'root' with '#'
         }
-        return implode('/', $path);
+        $imploded = implode('/', $path);
+		if($imploded === '#') {
+			return '#/';
+		}
+		return $imploded;
     }
 
     // ─────────────────────────────────────────────────────── helpers ─┐
@@ -244,11 +117,6 @@ final class HumanFriendlySchemaValidator
     {
         return substr(json_encode($v, JSON_PARTIAL_OUTPUT_ON_ERROR | JSON_UNESCAPED_SLASHES), 0, 80);
     }
-
-    // private function tagBranch(string $branch, ValidationResult $r): void
-    // {
-    //     foreach ($r->errors as $e) { $e->branch ??= $branch; }
-    // }
 
     private function branchLabel(array $s): string
     {
@@ -261,14 +129,14 @@ final class HumanFriendlySchemaValidator
     private function typeMatches(mixed $data, ?string $type): bool
     {
         return match ($type) {
-            'object'  => is_object($data) || ($this->arrayIsValidObject && is_array($data)),
-            'array'   => is_array($data),
+            'object'  => is_object($data) || ($this->arrayIsValidObject && is_array($data) && (!array_is_list($data) || count($data) === 0)),
+            'array'   => is_array($data) && array_is_list($data),
             'string'  => is_string($data),
             'integer' => is_int($data),
             'number'  => is_int($data) || is_float($data),
             'boolean' => is_bool($data),
             null      => true,
-            default   => false,
+            default   => throw new UnsupportedSchemaException("Type \"{$type}\" is not supported."),
         };
     }
 
@@ -451,7 +319,7 @@ final class HumanFriendlySchemaValidator
                 $pointer,
                 'type-mismatch',
                 sprintf(
-                    "Value must be one of the following types: [%s], but it was of type '%s'.",
+                    'Value must be one of the following types: [%s], but it was of type "%s".',
                     implode(', ', $allowedTypes),
                     gettype($data)
                 ),
@@ -479,7 +347,7 @@ final class HumanFriendlySchemaValidator
                     $pointer,
                     'discriminator-mismatch',
                     sprintf(
-                        "Property '%s' must be one of [%s], but it was %s.",
+                        'Property "%s" must be one of [%s], but it was %s.',
                         $prop,
                         implode(', ', $allowedDiscriminatorValues),
                         $actual_humanized
@@ -517,7 +385,7 @@ final class HumanFriendlySchemaValidator
             return new ValidationError(
                 $this->convertPathToString($path),
                 'type-mismatch',
-                sprintf('Expected type "%s" here, but got %s instead.', $type, gettype($data)),
+                sprintf('Expected type "%s" but got type "%s".', $type, gettype($data)),
                 [
                     'expected'=>['type'=>$type],
                     'actual'  =>['type'=>gettype($data),'snippet'=>$this->valueSnippet($data)],
@@ -618,7 +486,7 @@ final class HumanFriendlySchemaValidator
                     $childrenErrors[]= new ValidationError(
                         $this->convertPathToString($currentPropPath),
                         'additional-property-not-allowed',
-                        "Property '{$name}' isn't allowed here.",
+                        'Property "'.$name.'" isn\'t allowed here.',
                         ['propertyName' => $name]
                     );
 				} else if(is_array($schema['additionalProperties'])) {
