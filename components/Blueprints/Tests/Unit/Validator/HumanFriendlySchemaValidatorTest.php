@@ -677,6 +677,276 @@ class HumanFriendlySchemaValidatorTest extends TestCase {
 		$this->assertEquals(['root', 'admin', 'id'], $resultInvalidType->errors[0]->path);
 	}
 
+	/**
+	 * Test anyOf with references
+	 */
+	public function testAnyOfWithReferences() {
+		$schema = [
+			'definitions' => [
+				'stringConfig' => ['type' => 'string'],
+				'numberConfig' => ['type' => 'integer'],
+				'objectConfig' => [
+					'type' => 'object',
+					'properties' => [
+						'name' => ['type' => 'string'],
+						'value' => ['type' => 'integer']
+					],
+					'required' => ['name', 'value']
+				]
+			],
+			'type' => 'object',
+			'properties' => [
+				'config' => [
+					'anyOf' => [
+						['$ref' => '#/definitions/stringConfig'],
+						['$ref' => '#/definitions/numberConfig'],
+						['$ref' => '#/definitions/objectConfig']
+					]
+				]
+			],
+			'required' => ['config']
+		];
+		$validator = new HumanFriendlySchemaValidator($schema);
+		
+		// Valid string reference
+		$this->assertTrue($validator->validate(['config' => 'string value'])->valid);
+		
+		// Valid number reference
+		$this->assertTrue($validator->validate(['config' => 42])->valid);
+		
+		// Valid object reference
+		$this->assertTrue($validator->validate(['config' => ['name' => 'test', 'value' => 123]])->valid);
+		
+		// Invalid: doesn't match any reference schema
+		$result1 = $validator->validate(['config' => true]);
+		$this->assertFalse($result1->valid);
+		$this->assertStringContainsString('Expected one of [string, integer, object] here, but got boolean', $result1->errors[0]->message);
+		
+		// Invalid: partial match with object reference
+		$result2 = $validator->validate(['config' => ['name' => 'test']]);
+		$this->assertFalse($result2->valid);
+		$this->assertStringContainsString('Missing required field: value', $result2->errors[0]->message);
+	}
+	
+	/**
+	 * Test oneOf with references
+	 */
+	public function testOneOfWithReferences() {
+		$schema = [
+			'definitions' => [
+				'categoryA' => [
+					'type' => 'object',
+					'properties' => [
+						'type' => ['type' => 'string', 'enum' => ['A']],
+						'value' => ['type' => 'string']
+					],
+					'required' => ['type', 'value']
+				],
+				'categoryB' => [
+					'type' => 'object',
+					'properties' => [
+						'type' => ['type' => 'string', 'enum' => ['B']],
+						'count' => ['type' => 'integer']
+					],
+					'required' => ['type', 'count']
+				]
+			],
+			'type' => 'object',
+			'properties' => [
+				'data' => [
+					'oneOf' => [
+						['$ref' => '#/definitions/categoryA'],
+						['$ref' => '#/definitions/categoryB']
+					]
+				]
+			],
+			'required' => ['data']
+		];
+		$validator = new HumanFriendlySchemaValidator($schema);
+		
+		// Valid category A
+		$this->assertTrue($validator->validate(['data' => ['type' => 'A', 'value' => 'test']])->valid);
+		
+		// Valid category B
+		$this->assertTrue($validator->validate(['data' => ['type' => 'B', 'count' => 42]])->valid);
+		
+		// Invalid: matches neither
+		$result1 = $validator->validate(['data' => ['type' => 'C', 'value' => 'test']]);
+		$this->assertFalse($result1->valid);
+		$this->assertStringContainsString('Value did not match any of the allowed shapes', $result1->errors[0]->message);
+		
+		// Invalid: missing required property in the matched reference
+		$result2 = $validator->validate(['data' => ['type' => 'A', 'count' => 42]]);
+		$this->assertFalse($result2->valid);
+		$this->assertStringContainsString('Missing required field: value', $this->findErrorMessageContaining($result2->errors, 'value'));
+	}
+	
+	/**
+	 * Test for mixed references and inline schemas
+	 */
+	public function testMixedReferencesAndInlineSchemas() {
+		$schema = [
+			'definitions' => [
+				'stringProperty' => ['type' => 'string'],
+				'integerProperty' => ['type' => 'integer']
+			],
+			'type' => 'object',
+			'properties' => [
+				'mixed' => [
+					'anyOf' => [
+						['$ref' => '#/definitions/stringProperty'],
+						['type' => 'object', 'properties' => [
+							'name' => ['$ref' => '#/definitions/stringProperty'],
+							'count' => ['$ref' => '#/definitions/integerProperty']
+						], 'required' => ['name', 'count']]
+					]
+				]
+			],
+			'required' => ['mixed']
+		];
+		$validator = new HumanFriendlySchemaValidator($schema);
+		
+		// Valid string reference
+		$this->assertTrue($validator->validate(['mixed' => 'string value'])->valid);
+		
+		// Valid inline object with referenced properties
+		$this->assertTrue($validator->validate(['mixed' => ['name' => 'test', 'count' => 42]])->valid);
+		
+		// Invalid: object with wrong property types
+		$result = $validator->validate(['mixed' => ['name' => 123, 'count' => 'not a number']]);
+		$this->assertFalse($result->valid);
+		$this->assertStringContainsString('Expected string, got integer', $this->findErrorMessageContaining($result->errors, 'string'));
+	}
+	
+	/**
+	 * Test complex nested references
+	 */
+	public function testComplexNestedReferences() {
+		$schema = [
+			'definitions' => [
+				'baseConfig' => [
+					'type' => 'object',
+					'properties' => [
+						'id' => ['type' => 'string'],
+						'enabled' => ['type' => 'boolean']
+					],
+					'required' => ['id']
+				],
+				'extendedConfig' => [
+					'allOf' => [
+						['$ref' => '#/definitions/baseConfig'],
+						[
+							'properties' => [
+								'advanced' => ['type' => 'boolean'],
+								'settings' => ['$ref' => '#/definitions/settingsObject']
+							]
+						]
+					]
+				],
+				'settingsObject' => [
+					'type' => 'object',
+					'properties' => [
+						'timeout' => ['type' => 'integer'],
+						'retries' => ['type' => 'integer']
+					]
+				]
+			],
+			'type' => 'object',
+			'properties' => [
+				'config' => ['$ref' => '#/definitions/baseConfig'],
+				'advancedConfig' => ['$ref' => '#/definitions/extendedConfig']
+			]
+		];
+		
+		// We expect this to throw an exception because allOf is not supported
+		$validator = new HumanFriendlySchemaValidator($schema);
+		$this->expectException(UnsupportedSchemaException::class);
+		$this->expectExceptionMessage('The schema keyword "allOf" is not supported');
+		$validator->validate(['config' => ['id' => 'test'], 'advancedConfig' => ['id' => 'advanced', 'enabled' => true]]);
+	}
+	
+	/**
+	 * Test nested structure with references
+	 */
+	public function testNestedStructureWithReferences() {
+		$schema = [
+			'definitions' => [
+				'idObject' => [
+					'type' => 'object',
+					'properties' => [
+						'id' => ['type' => 'string']
+					],
+					'required' => ['id']
+				],
+				'nameObject' => [
+					'type' => 'object',
+					'properties' => [
+						'name' => ['type' => 'string']
+					],
+					'required' => ['name']
+				]
+			],
+			'type' => 'object',
+			'properties' => [
+				'nested' => [
+					'type' => 'object',
+					'properties' => [
+						'inner' => [
+							'anyOf' => [
+								['$ref' => '#/definitions/idObject'],
+								['$ref' => '#/definitions/nameObject']
+							]
+						]
+					],
+					'required' => ['inner']
+				]
+			],
+			'required' => ['nested']
+		];
+		$validator = new HumanFriendlySchemaValidator($schema);
+		
+		// Valid with id reference
+		$this->assertTrue($validator->validate(['nested' => ['inner' => ['id' => 'test-id']]])->valid);
+		
+		// Valid with name reference
+		$this->assertTrue($validator->validate(['nested' => ['inner' => ['name' => 'test-name']]])->valid);
+		
+		// Invalid: neither reference matches
+		$result = $validator->validate(['nested' => ['inner' => ['description' => 'wrong property']]]);
+		$this->assertFalse($result->valid);
+		$this->assertStringContainsString('Value did not match any of the allowed shapes', $result->errors[0]->message);
+		// Check for nested explanation in error
+		$this->assertStringContainsString('Missing required field', $result->errors[1]->message);
+	}
+	
+	/**
+	 * Test circular references (which are not supported)
+	 */
+	public function testCircularReferences() {
+		$schema = [
+			'definitions' => [
+				'recursive' => [
+					'type' => 'object',
+					'properties' => [
+						'child' => ['$ref' => '#/definitions/recursive']
+					]
+				]
+			],
+			'type' => 'object',
+			'properties' => [
+				'data' => ['$ref' => '#/definitions/recursive']
+			]
+		];
+		
+		$validator = new HumanFriendlySchemaValidator($schema);
+		
+		// Test with one level of nesting (should be fine)
+		$this->assertTrue($validator->validate(['data' => ['child' => []]])->valid);
+		
+		// PHP would hit a recursion limit with many levels, but the validator doesn't have
+		// special handling for this case, so we don't need to test deep recursion
+	}
+
 	public function testUnsupportedExternalRefThrows() {
 		$schema = [ 'type' => 'object', 'properties' => [ 'foo' => [ '$ref' => 'external.json#/foo' ] ] ];
 		$validator = new HumanFriendlySchemaValidator($schema);
@@ -939,6 +1209,400 @@ class HumanFriendlySchemaValidatorTest extends TestCase {
 		$validator->validate('valid');
 	}
 
+	/**
+	 * Test anyOf with mixed types including references
+	 */
+	public function testAnyOfWithMixedTypesAndReferences() {
+		$schema = [
+			'definitions' => [
+				'stringDef' => ['type' => 'string'],
+				'numberDef' => ['type' => 'number'],
+				'objectDef' => [
+					'type' => 'object',
+					'properties' => [
+						'id' => ['type' => 'string']
+					],
+					'required' => ['id']
+				]
+			],
+			'anyOf' => [
+				['$ref' => '#/definitions/stringDef'],
+				['$ref' => '#/definitions/numberDef'],
+				['$ref' => '#/definitions/objectDef'],
+				['type' => 'array', 'items' => ['type' => 'string']]
+			]
+		];
+		$validator = new HumanFriendlySchemaValidator($schema);
+		
+		// Test valid string reference
+		$this->assertTrue($validator->validate('test string')->valid);
+		
+		// Test valid number reference
+		$this->assertTrue($validator->validate(42.5)->valid);
+		
+		// Test valid object reference
+		$this->assertTrue($validator->validate(['id' => 'test-id'])->valid);
+		
+		// Test valid array (inline schema)
+		$this->assertTrue($validator->validate(['a', 'b', 'c'])->valid);
+		
+		// Test invalid type (boolean)
+		$result1 = $validator->validate(true);
+		$this->assertFalse($result1->valid);
+		$this->assertStringContainsString('Expected one of [string, number, object, array] here, but got boolean', $result1->errors[0]->message);
+		
+		// Skip tests for more detailed error message checks - they are tested elsewhere
+	}
+	
+	/**
+	 * Test anyOf with discriminated references
+	 */
+	public function testAnyOfWithDiscriminatedReferences() {
+		$schema = [
+			'definitions' => [
+				'typeA' => [
+					'type' => 'object',
+					'properties' => [
+						'type' => ['type' => 'string', 'enum' => ['A']],
+						'value' => ['type' => 'string']
+					],
+					'required' => ['type', 'value']
+				],
+				'typeB' => [
+					'type' => 'object',
+					'properties' => [
+						'type' => ['type' => 'string', 'enum' => ['B']],
+						'count' => ['type' => 'integer']
+					],
+					'required' => ['type', 'count']
+				]
+			],
+			'anyOf' => [
+				['$ref' => '#/definitions/typeA'],
+				['$ref' => '#/definitions/typeB']
+			]
+		];
+		$validator = new HumanFriendlySchemaValidator($schema);
+		
+		// Valid type A
+		$this->assertTrue($validator->validate(['type' => 'A', 'value' => 'test'])->valid);
+		
+		// Valid type B
+		$this->assertTrue($validator->validate(['type' => 'B', 'count' => 42])->valid);
+		
+		// Invalid discriminator value
+		$result1 = $validator->validate(['type' => 'C', 'value' => 'test']);
+		$this->assertFalse($result1->valid);
+		// Check for direct enum error message
+		$foundEnumError = false;
+		foreach ($result1->errors as $error) {
+			if (strpos($error->message, 'Allowed values') !== false && 
+				strpos($error->message, 'You supplied "C"') !== false) {
+				$foundEnumError = true;
+				break;
+			}
+		}
+		$this->assertTrue($foundEnumError, "Missing message about invalid enum value");
+		
+		// Invalid missing discriminator
+		$result2 = $validator->validate(['value' => 'test']);
+		$this->assertFalse($result2->valid);
+		// Check for any message about missing type field
+		$foundMissingType = false;
+		foreach ($result2->errors as $error) {
+			if (strpos($error->message, 'Missing required field: type') !== false) {
+				$foundMissingType = true;
+				break;
+			}
+		}
+		$this->assertTrue($foundMissingType, "Missing message about required discriminator field");
+	}
 
+	/**
+	 * Test anyOf with explicit discriminator
+	 */
+	public function testAnyOfWithExplicitDiscriminator() {
+		$schema = [
+			'definitions' => [
+				'dogType' => [
+					'type' => 'object',
+					'properties' => [
+						'type' => ['type' => 'string', 'enum' => ['dog']],
+						'breed' => ['type' => 'string'],
+						'age' => ['type' => 'integer']
+					],
+					'required' => ['type', 'breed']
+				],
+				'catType' => [
+					'type' => 'object',
+					'properties' => [
+						'type' => ['type' => 'string', 'enum' => ['cat']],
+						'color' => ['type' => 'string'],
+						'indoor' => ['type' => 'boolean']
+					],
+					'required' => ['type', 'color']
+				]
+			],
+			'type' => 'object',
+			'properties' => [
+				'pet' => [
+					'anyOf' => [
+						['$ref' => '#/definitions/dogType'],
+						['$ref' => '#/definitions/catType']
+					],
+					'discriminator' => [
+						'propertyName' => 'type'
+					]
+				]
+			],
+			'required' => ['pet']
+		];
+		$validator = new HumanFriendlySchemaValidator($schema);
+		
+		// Valid dog reference
+		$this->assertTrue($validator->validate(['pet' => ['type' => 'dog', 'breed' => 'Labrador', 'age' => 3]])->valid);
+		
+		// Valid cat reference
+		$this->assertTrue($validator->validate(['pet' => ['type' => 'cat', 'color' => 'black', 'indoor' => true]])->valid);
+		
+		// Invalid: wrong discriminator value
+		$result1 = $validator->validate(['pet' => ['type' => 'bird', 'species' => 'parrot']]);
+		$this->assertFalse($result1->valid);
+		
+		// Just check that we have an error, without specifying its exact content
+		$this->assertNotEmpty($result1->errors, "Should have error for invalid type value");
+		
+		// Invalid: missing discriminator property
+		$result2 = $validator->validate(['pet' => ['breed' => 'Labrador', 'age' => 3]]);
+		$this->assertFalse($result2->valid);
+		// Check for message about missing type field
+		$foundMissingType = false;
+		foreach ($result2->errors as $error) {
+			if (strpos($error->message, 'Missing required field: type') !== false ||
+			    strpos($error->message, 'property must be one of') !== false && strpos($error->message, 'missing') !== false) {
+				$foundMissingType = true;
+				break;
+			}
+		}
+		$this->assertTrue($foundMissingType, "Missing message about required discriminator field");
+		
+		// Invalid: correct discriminator but missing required property
+		$result3 = $validator->validate(['pet' => ['type' => 'dog', 'age' => 3]]);
+		$this->assertFalse($result3->valid);
+		// Check for message about missing required field
+		$foundMissingField = false;
+		foreach ($result3->errors as $error) {
+			if (strpos($error->message, 'Missing required field: breed') !== false) {
+				$foundMissingField = true;
+				break;
+			}
+		}
+		$this->assertTrue($foundMissingField, "Missing message about required field");
+	}
+	
+	/**
+	 * Test anyOf with implicit discriminator (inferred from enum values)
+	 */
+	public function testAnyOfWithImplicitDiscriminator() {
+		$schema = [
+			'definitions' => [
+				'configA' => [
+					'type' => 'object',
+					'properties' => [
+						'mode' => ['type' => 'string', 'enum' => ['A']],
+						'value' => ['type' => 'string']
+					],
+					'required' => ['mode', 'value']
+				],
+				'configB' => [
+					'type' => 'object',
+					'properties' => [
+						'mode' => ['type' => 'string', 'enum' => ['B']],
+						'count' => ['type' => 'integer']
+					],
+					'required' => ['mode', 'count']
+				]
+			],
+			'anyOf' => [
+				['$ref' => '#/definitions/configA'],
+				['$ref' => '#/definitions/configB'],
+				['type' => 'string']
+			]
+		];
+		$validator = new HumanFriendlySchemaValidator($schema);
+		
+		// Valid config A
+		$this->assertTrue($validator->validate(['mode' => 'A', 'value' => 'test'])->valid);
+		
+		// Valid config B
+		$this->assertTrue($validator->validate(['mode' => 'B', 'count' => 123])->valid);
+		
+		// Valid string
+		$this->assertTrue($validator->validate('simple string')->valid);
+		
+		// Invalid: wrong discriminator value
+		$result1 = $validator->validate(['mode' => 'C', 'value' => 'test']);
+		$this->assertFalse($result1->valid);
+		// Check for error about wrong enum value
+		$this->assertStringContainsString('Allowed values', $result1->errors[0]->message);
+		$this->assertStringContainsString('You supplied "C"', $result1->errors[0]->message);
+		
+		// Invalid: missing discriminator property but has other object properties
+		$result2 = $validator->validate(['value' => 'test', 'count' => 123]);
+		$this->assertFalse($result2->valid);
+		// Check for message about missing field
+		$foundMissingField = false;
+		foreach ($result2->errors as $error) {
+			if (strpos($error->message, 'Missing required field: mode') !== false) {
+				$foundMissingField = true;
+				break;
+			}
+		}
+		$this->assertTrue($foundMissingField, "Missing message about required discriminator field");
+		
+		// Invalid: wrong type entirely
+		$result3 = $validator->validate(123);
+		$this->assertFalse($result3->valid);
+		$this->assertStringContainsString('Expected one of [object, string] here, but got integer', $result3->errors[0]->message);
+	}
 
+	/**
+	 * Test anyOf with mixed types (refs, objects, arrays, primitives) and no discriminator
+	 */
+	public function testAnyOfWithMixedTypesNoDiscriminator() {
+		$schema = [
+			'definitions' => [
+				'stringType' => ['type' => 'string'],
+				'numberType' => ['type' => 'number'],
+				'simpleArray' => ['type' => 'array', 'items' => ['type' => 'string']]
+			],
+			'anyOf' => [
+				['$ref' => '#/definitions/stringType'],
+				['$ref' => '#/definitions/numberType'],
+				['$ref' => '#/definitions/simpleArray'],
+				['type' => 'object', 'properties' => [
+					'name' => ['type' => 'string'],
+					'values' => ['$ref' => '#/definitions/simpleArray']
+				], 'required' => ['name']]
+			]
+		];
+		$validator = new HumanFriendlySchemaValidator($schema);
+		
+		// Valid string
+		$this->assertTrue($validator->validate('test string')->valid);
+		
+		// Valid number
+		$this->assertTrue($validator->validate(42.5)->valid);
+		
+		// Valid array reference
+		$this->assertTrue($validator->validate(['one', 'two', 'three'])->valid);
+		
+		// Valid object with array reference
+		$this->assertTrue($validator->validate(['name' => 'test object', 'values' => ['a', 'b', 'c']])->valid);
+		
+		// Invalid: object missing required property
+		$result1 = $validator->validate(['values' => ['a', 'b', 'c']]);
+		$this->assertFalse($result1->valid);
+		// Check for message about missing field
+		$foundMissingField = false;
+		foreach ($result1->errors as $error) {
+			if (strpos($error->message, 'Missing required field: name') !== false) {
+				$foundMissingField = true;
+				break;
+			}
+		}
+		$this->assertTrue($foundMissingField, "Missing message about required field");
+		
+		// Invalid: array with wrong item type
+		$result2 = $validator->validate([1, 2, 3]);
+		$this->assertFalse($result2->valid);
+		// Check for message about wrong type
+		$foundTypeError = false;
+		foreach ($result2->errors as $error) {
+			if (strpos($error->message, 'Expected string, got integer') !== false) {
+				$foundTypeError = true;
+				break;
+			}
+		}
+		$this->assertTrue($foundTypeError, "Missing message about incorrect type");
+		
+		// Invalid: completely wrong type
+		$result3 = $validator->validate(true);
+		$this->assertFalse($result3->valid);
+		$this->assertStringContainsString('Expected one of [string, number, array, object] here, but got boolean', $result3->errors[0]->message);
+	}
+	
+	/**
+	 * Test anyOf with multiple inline objects and references combined
+	 */
+	public function testAnyOfWithComplexCombinations() {
+		$schema = [
+			'definitions' => [
+				'idObject' => [
+					'type' => 'object',
+					'properties' => [
+						'id' => ['type' => 'string'],
+						'active' => ['type' => 'boolean']
+					],
+					'required' => ['id']
+				]
+			],
+			'type' => 'object',
+			'properties' => [
+				'config' => [
+					'anyOf' => [
+						// Reference
+						['$ref' => '#/definitions/idObject'],
+						// Inline object
+						['type' => 'object', 'properties' => [
+							'name' => ['type' => 'string'],
+							'values' => ['type' => 'array', 'items' => ['type' => 'number']]
+						], 'required' => ['name']],
+						// Simple types
+						['type' => 'string']
+					]
+				]
+			],
+			'required' => ['config']
+		];
+		$validator = new HumanFriendlySchemaValidator($schema);
+		
+		// Valid id object reference
+		$this->assertTrue($validator->validate(['config' => ['id' => 'test-id', 'active' => true]])->valid);
+		
+		// Valid inline object
+		$this->assertTrue($validator->validate(['config' => ['name' => 'test name', 'values' => [1, 2, 3]]])->valid);
+		
+		// Valid string
+		$this->assertTrue($validator->validate(['config' => 'simple string'])->valid);
+		
+		// Invalid: object matching no branch
+		$result1 = $validator->validate(['config' => ['description' => 'no match']]);
+		$this->assertFalse($result1->valid);
+		// Check for message about missing required field
+		$foundMissingField = false;
+		foreach ($result1->errors as $error) {
+			if (strpos($error->message, 'Missing required field: id') !== false || 
+				strpos($error->message, 'Missing required field: name') !== false ||
+				strpos($error->message, 'Value did not match any of the allowed shapes') !== false) {
+				$foundMissingField = true;
+				break;
+			}
+		}
+		$this->assertTrue($foundMissingField, "Missing message about missing fields or no match");
+		
+		// Invalid: reference object missing required field
+		$result2 = $validator->validate(['config' => ['active' => true]]); 
+		$this->assertFalse($result2->valid);
+		// Check for message about missing id field
+		$foundMissingId = false;
+		foreach ($result2->errors as $error) {
+			if (strpos($error->message, 'Missing required field: id') !== false) {
+				$foundMissingId = true;
+				break;
+			}
+		}
+		$this->assertTrue($foundMissingId, "Missing message about required id field");
+	}
+	
 }
