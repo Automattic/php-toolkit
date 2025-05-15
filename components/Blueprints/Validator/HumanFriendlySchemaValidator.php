@@ -97,6 +97,11 @@ final class HumanFriendlySchemaValidator
         $this->arrayIsValidObject = $options['array_is_valid_object'] ?? true;
     }
 
+    public function validate(mixed $data): null|ValidationError
+    {
+        return $this->validateNode(['root'], $data, $this->schema);
+    }
+
     private function convertPathToString(array $path): string
     {
         if (empty($path) || $path[0] !== 'root') {
@@ -150,15 +155,6 @@ final class HumanFriendlySchemaValidator
     }
 
     // ───────────────────────────────────────────────────────── validation ─┐
-
-    public function validate(mixed $data): bool|ValidationError
-    {
-        $violations = $this->validateNode(['root'], $data, $this->schema);
-		if($violations === null){
-			return true;
-		}
-		return $violations;
-    }
 
     private function validateNode(array $path, mixed $data, array $schema): ?ValidationError
     {
@@ -315,14 +311,23 @@ final class HumanFriendlySchemaValidator
         }, $branches), fn($type) => $type !== null)));
         
         if (!empty($allowedTypes) && !$this->typeMatchesAny($data, $allowedTypes)) {
+			if(count($allowedTypes) === 1){
+				$message = sprintf(
+					'Expected type "%s" but got type "%s".',
+					$allowedTypes[0],
+					gettype($data)
+				);
+			} else {
+				$message = sprintf(
+					'Value must be one of the following types: [%s], but it was of type "%s".',
+					implode(', ', $allowedTypes),
+					gettype($data)
+				);
+			}
             return new ValidationError(
                 $pointer,
                 'type-mismatch',
-                sprintf(
-                    'Value must be one of the following types: [%s], but it was of type "%s".',
-                    implode(', ', $allowedTypes),
-                    gettype($data)
-                ),
+                $message,
                 [
                     'expected' => ['types' => $allowedTypes],
                     'actual'   => ['type' => gettype($data), 'snippet' => $this->valueSnippet($data)],
@@ -360,7 +365,13 @@ final class HumanFriendlySchemaValidator
             }
         }
 
-        // 3. Fallback: Generic message with children errors
+		// 3. If there's only one child error, return it directly.
+		//    No need to wrap it in a parent error.
+		if(count($childErrors) === 1) {
+			return $childErrors[0];
+		}
+
+        // 4. Fallback: Generic message with children errors
         $labels = array_unique(array_map([$this,'branchLabel'], $branches));
 		$message = 'Value did not match any of the allowed shapes: '.implode(', ', $labels).'.';
         if ($keyword === 'oneOf') {
@@ -549,10 +560,11 @@ final class HumanFriendlySchemaValidator
             throw new UnsupportedSchemaException("The array constraint \"uniqueItems\" is not supported.");
         }
         
+		if(count($childrenErrors) === 1){
+			return $childrenErrors[0];
+		}
+
         if (!empty($childrenErrors)) {
-			if(count($childrenErrors) === 1){
-				return $childrenErrors[0];
-			}
             return new ValidationError(
                 $currentPathStr,
                 'array-validation-failed',
@@ -621,24 +633,26 @@ final class HumanFriendlySchemaValidator
         
         // Auto‑guess single‑value enums
         $candidates=[];
-        $firstObjSchema = isset($objs[0]['$ref']) ? $this->resolveReference($objs[0]['$ref']) : $objs[0];
-        if (!isset($firstObjSchema['properties'])) return null; // Should not happen due to filter above
+		if(isset($objs[0])){
+			$firstObjSchema = isset($objs[0]['$ref']) ? $this->resolveReference($objs[0]['$ref']) : $objs[0];
+			if (!isset($firstObjSchema['properties'])) return null; // Should not happen due to filter above
 
-        foreach(array_keys($firstObjSchema['properties']) as $prop){
-            $possibleValues = [];
-            $allObjsHaveThisEnumProp = true;
-            foreach($objs as $s_wrapper){
-                $s = isset($s_wrapper['$ref']) ? $this->resolveReference($s_wrapper['$ref']) : $s_wrapper;
-                if (!isset($s['properties'][$prop]['enum']) || count($s['properties'][$prop]['enum']) !== 1) {
-                    $allObjsHaveThisEnumProp = false;
-                    break;
-                }
-                $possibleValues[] = $s['properties'][$prop]['enum'][0];
-            }
-            if ($allObjsHaveThisEnumProp && count(array_unique($possibleValues)) === count($objs)) {
-                $candidates[$prop] = $possibleValues;
-            }
-        }
+			foreach(array_keys($firstObjSchema['properties']) as $prop){
+				$possibleValues = [];
+				$allObjsHaveThisEnumProp = true;
+				foreach($objs as $s_wrapper){
+					$s = isset($s_wrapper['$ref']) ? $this->resolveReference($s_wrapper['$ref']) : $s_wrapper;
+					if (!isset($s['properties'][$prop]['enum']) || count($s['properties'][$prop]['enum']) !== 1) {
+						$allObjsHaveThisEnumProp = false;
+						break;
+					}
+					$possibleValues[] = $s['properties'][$prop]['enum'][0];
+				}
+				if ($allObjsHaveThisEnumProp && count(array_unique($possibleValues)) === count($objs)) {
+					$candidates[$prop] = $possibleValues;
+				}
+			}
+		}
 
         if(count($candidates)===1){ // Only one property serves as a unique discriminator
             return [key($candidates), current($candidates)];

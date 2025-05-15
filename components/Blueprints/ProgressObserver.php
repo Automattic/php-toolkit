@@ -15,6 +15,8 @@ class ProgressObserver {
 	 */
 	private $logCallback;
 
+	private ?Runtime $runtime = null;
+
 	/**
 	 * Create a new progress logger with the given logging function
 	 *
@@ -35,15 +37,19 @@ class ProgressObserver {
 		$tracker->events->addListener(
 			ProgressEvent::class,
 			function ( ProgressEvent $event ) {
-				call_user_func( $this->logCallback, $event->getProgress(), $event->getCaption() );
+				call_user_func( $this->logCallback, $event->getProgress(), $event->getCaption(), $this->runtime );
 			}
 		);
 
 		$tracker->events->addListener(
 			DoneEvent::class,
 			function () {
-				call_user_func( $this->logCallback, 100, 'Complete' );
+				call_user_func( $this->logCallback, 100, 'Complete', $this->runtime );
 			}
 		);
+	}
+
+	public function setRuntime(Runtime $runtime) {
+		$this->runtime = $runtime;
 	}
 }

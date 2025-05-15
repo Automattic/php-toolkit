@@ -37,23 +37,6 @@ class ExecutionContextPath extends DataReference {
 	}
 
 	/**
-	 * Get the normalized path (without ./ or / prefix).
-	 *
-	 * @return string The normalized path.
-	 */
-	public function get_normalized_path(): string {
-		$path = $this->path;
-
-		// Remove ./ prefix if present
-		if ( strpos( $path, './' ) === 0 ) {
-			$path = substr( $path, 2 );
-		}
-
-		// Remove leading / if present
-		return ltrim( $path, '/' );
-	}
-
-	/**
 	 * Checks if a string is a valid context-relative path.
 	 * A valid path must start with either '/' or './'.
 	 * At this stage, we're not yet concerned whether the file actually
@@ -75,6 +58,6 @@ class ExecutionContextPath extends DataReference {
 	 * @return string The human-readable name.
 	 */
 	public function get_human_readable_name(): string {
-		return "Context path: " . $this->path;
+		return $this->path;
 	}
 }

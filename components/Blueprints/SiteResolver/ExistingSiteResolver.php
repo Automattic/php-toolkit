@@ -2,6 +2,7 @@
 
 namespace WordPress\Blueprints\SiteResolver;
 
+use WordPress\Blueprints\Exception\BlueprintExecutionException;
 use WordPress\Blueprints\Progress\Tracker;
 use WordPress\Blueprints\Runtime;
 use WordPress\Blueprints\VersionConstraint;
@@ -21,7 +22,7 @@ class ExistingSiteResolver {
 		// 1. Verify it's a valid WordPress installation
 		$stages['verify_installation']->setCaption( 'Verifying WordPress installation' );
 		if ( ! $targetFs->exists( 'wp-load.php' ) ) {
-			throw new \RuntimeException(
+			throw new BlueprintExecutionException(
 				'The target site does not appear to be a valid WordPress installation (wp-load.php not found)'
 			);
 		}
@@ -37,12 +38,12 @@ class ExistingSiteResolver {
 			)->outputFileContent;
 
 			if ( $result !== 'WordPress is installed: true' ) {
-				throw new \RuntimeException(
+				throw new BlueprintExecutionException(
 					'The target site exists but WordPress is not properly installed or configured'
 				);
 			}
 		} catch ( \Exception $e ) {
-			throw new \RuntimeException(
+			throw new BlueprintExecutionException(
 				'Failed to load WordPress installation: ' . $e->getMessage()
 			);
 		}
@@ -63,7 +64,7 @@ class ExistingSiteResolver {
 			)->outputFileContent;
 
 			if ( ! $wpVersionConstraint->satisfiedBy( trim( $currentWordPressVersion ) ) ) {
-				throw new \RuntimeException(
+				throw new BlueprintExecutionException(
 					sprintf(
 						'WordPress version incompatible. Blueprint requires %s, but the site has version %s',
 						$wpVersionConstraint->__toString(),
@@ -99,7 +100,7 @@ class ExistingSiteResolver {
 			)->outputFileContent;
 
 			if ( trim( $sqliteActive ) !== 'true' ) {
-				throw new \RuntimeException(
+				throw new BlueprintExecutionException(
 					'The Blueprint requires SQLite database engine, but the site is not using SQLite integration'
 				);
 			}
@@ -124,7 +125,7 @@ class ExistingSiteResolver {
 			)->outputFileContent;
 
 			if ( trim( $usingMysql ) !== 'true' ) {
-				throw new \RuntimeException(
+				throw new BlueprintExecutionException(
 					'The Blueprint requires MySQL database engine, but the site appears to be using SQLite'
 				);
 			}

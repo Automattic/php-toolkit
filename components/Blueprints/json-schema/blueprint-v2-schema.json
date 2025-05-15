@@ -6,6 +6,7 @@
 	"required": [
 		"version"
 	],
+	"additionalProperties": false,
 	"properties": {
 		"version": {
 			"type": "integer",
@@ -309,7 +310,8 @@
 						"type": "object",
 						"required": [
 							"type",
-							"source"
+							"source",
+							"title"
 						],
 						"properties": {
 							"type": {
@@ -351,7 +353,8 @@
 						"type": "object",
 						"required": [
 							"type",
-							"source"
+							"source",
+							"title"
 						],
 						"properties": {
 							"type": {
@@ -402,7 +405,8 @@
 						"type": "object",
 						"required": [
 							"type",
-							"source"
+							"source",
+							"title"
 						],
 						"properties": {
 							"type": {

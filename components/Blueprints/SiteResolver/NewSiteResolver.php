@@ -4,6 +4,7 @@ namespace WordPress\Blueprints\SiteResolver;
 
 use WordPress\Blueprints\DataReference\DataReference;
 use WordPress\Blueprints\DataReference\File;
+use WordPress\Blueprints\Exception\BlueprintExecutionException;
 use WordPress\Blueprints\Progress\Tracker;
 use WordPress\Blueprints\Runtime;
 use WordPress\Blueprints\VersionConstraint;
@@ -26,7 +27,7 @@ class NewSiteResolver {
 		// Ensure document root directory exists (LocalFilesystem::create creates it)
 		$targetFs = $runtime->getTargetFilesystem();
 		if ( count( $targetFs->ls( '/' ) ) > 0 ) {
-			throw new \RuntimeException( 'The target site root directory must be empty in the create-new-site mode, but it wasn\'t.' );
+			throw new BlueprintExecutionException( 'The target site root directory must be empty in the create-new-site mode, but it wasn\'t.' );
 		}
 
 		// Unzip WordPress core into document root
@@ -50,7 +51,7 @@ class NewSiteResolver {
 
 		$resolved = $runtime->resolve( $assets['wordpress'] );
 		if ( ! $resolved instanceof File ) {
-			throw new \InvalidArgumentException( 'Provided zip reference does not resolve to a file' );
+			throw new BlueprintExecutionException( 'Provided zip reference does not resolve to a file' );
 		}
 		$zipFs = ZipFilesystem::create( $resolved->stream );
 
@@ -76,7 +77,7 @@ class NewSiteResolver {
 			$stages['resolve_assets']->setCaption( 'Downloading SQLite integration plugin' );
 			$resolved = $runtime->resolve( $assets['sqlite-integration'] );
 			if ( ! $resolved instanceof File ) {
-				throw new \InvalidArgumentException( 'Provided zip reference does not resolve to a file' );
+				throw new BlueprintExecutionException( 'Provided zip reference does not resolve to a file' );
 			}
 			$zipFs = ZipFilesystem::create( $resolved->stream );
 
@@ -122,7 +123,7 @@ class NewSiteResolver {
 				$stages['resolve_assets']->setCaption( 'Downloading wp-cli' );
 				$resolved = $runtime->resolve( $assets['wp-cli'] );
 				if ( ! $resolved instanceof File ) {
-					throw new \InvalidArgumentException( 'Provided zip reference does not resolve to a file' );
+					throw new BlueprintExecutionException( 'Provided zip reference does not resolve to a file' );
 				}
 				$write_stream = $targetFs->open_write_stream( $wp_cli_filename );
 				pipe_stream( $resolved->stream, $write_stream );
@@ -133,7 +134,7 @@ class NewSiteResolver {
 				if ( $targetFs->exists( 'wp-config-sample.php' ) ) {
 					$targetFs->copy( 'wp-config-sample.php', 'wp-config.php' );
 				} else {
-					throw new \RuntimeException( 'Neither wp-config.php, nor wp-config-sample.php was found in the WordPress archive.' );
+					throw new BlueprintExecutionException( 'Neither wp-config.php, nor wp-config-sample.php was found in the WordPress archive.' );
 				}
 			}
 

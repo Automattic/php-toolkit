@@ -12,6 +12,7 @@ use WordPress\Blueprints\DataReference\InlineFile;
 use WordPress\Blueprints\DataReference\URLReference;
 use WordPress\Blueprints\DataReference\WordPressOrgPlugin;
 use WordPress\Blueprints\DataReference\WordPressOrgTheme;
+use WordPress\Blueprints\Exception\BlueprintExecutionException;
 use WordPress\Blueprints\Progress\Tracker;
 use WordPress\Blueprints\SiteResolver\ExistingSiteResolver;
 use WordPress\Blueprints\SiteResolver\NewSiteResolver;
@@ -36,6 +37,7 @@ use WordPress\Blueprints\Steps\SetSiteOptionsStep;
 use WordPress\Blueprints\Steps\UnzipStep;
 use WordPress\Blueprints\Steps\WPCLIStep;
 use WordPress\Blueprints\Steps\WriteFilesStep;
+use WordPress\Blueprints\Validator\HumanFriendlySchemaValidator;
 use WordPress\ByteStream\ReadStream\FileReadStream;
 use WordPress\Filesystem\Filesystem;
 use WordPress\Filesystem\InMemoryFilesystem;
@@ -60,7 +62,7 @@ class Runner {
 	public ?Runtime $runtime;
 
 	public function __construct( private RunnerConfiguration $configuration ) {
-		$this->client      = new Client( [
+		$this->client = new Client( [
 			/**
 			 * Store cached HTTP responses in a temporary directory with a stable path
 			 * to reuse across multiple runs.
@@ -114,6 +116,7 @@ class Runner {
 				$this->blueprintArray,
 				$tempRoot
 			);
+			$this->progressObserver->setRuntime($this->runtime);
 
 			if ( $this->configuration->getExecutionMode() === 'apply-to-existing-site' ) {
 				ExistingSiteResolver::resolve( $this->runtime, $targetResolutionStage );
@@ -125,6 +128,7 @@ class Runner {
 			$plan = $this->createExecutionPlan();
 			$this->assets->startEagerResolution( $this->dataReferences, $dataResolutionStage );
 			$this->executePlan( $executionStage, $plan, $this->runtime );
+			$this->mainTracker->finish();
 		} finally {
 			// TODO: Optionally preserve workspace in case of error? Support resuming after error?
 			LocalFilesystem::create( $tempRoot )->rmdir( '/', [
@@ -145,9 +149,9 @@ class Runner {
 		}
 
 		if ( $reference instanceof ExecutionContextPath ) {
-			$absolute_path = $reference->get_normalized_path();
+			$absolute_path = $reference->get_path();
 			if ( substr( $absolute_path, 0, 1 ) !== '/' ) {
-				throw new \Exception( 'Blueprint path must be absolute' );
+				throw new BlueprintExecutionException( 'Blueprint path must be absolute (given: ' . $absolute_path . ')' );
 			}
 			$resolved = new File(
 				FileReadStream::from_path( $absolute_path ),
@@ -167,7 +171,7 @@ class Runner {
 				// JSON file
 				$blueprintString = $stream->consume_all();
 				if ( $reference instanceof URLReference ) {
-					throw new \Exception( 'URLReference not supported yet as a blueprint reference type' );
+					throw new BlueprintExecutionException( 'URLReference is not supported yet as a blueprint reference type' );
 				} elseif ( $reference instanceof ExecutionContextPath ) {
 					// It was resolved as an ExecutionContextPath, but it's actually a local
 					// filesystem path at this point.
@@ -176,21 +180,19 @@ class Runner {
 				} elseif ( $reference instanceof InlineFile ) {
 					$this->blueprintExecutionContext = $this->configuration->getExecutionContext() ?? InMemoryFilesystem::create();
 				} else {
-					throw new \Exception( 'Unsupported blueprint reference type: ' . get_class( $reference ) );
+					throw new BlueprintExecutionException( 'Unsupported blueprint reference type: ' . get_class( $reference ) );
 				}
 			}
 		} elseif ( $resolved instanceof Directory ) {
 			$blueprintString = $resolved->filesystem->get_contents( '/blueprint.json' );
 			$this->blueprintExecutionContext = $this->configuration->getExecutionContext() ?? $resolved->filesystem;
 		} else {
-			throw new \Exception( 'Invalid blueprint reference' );
+			throw new BlueprintExecutionException( 'Invalid blueprint reference type: ' . get_class( $reference ) );
 		}
 
-		// ### Validate the Blueprint
+		// Validate the Blueprint string we've just loaded.
 
-		// Preliminary validation of the provided Blueprint string:
-
-		// 1. **UTF-8 Encoding:** Assert the Blueprint input is UTF-8 encoded.
+		// **UTF-8 Encoding:** Assert the Blueprint input is UTF-8 encoded.
 		$is_valid_utf8 = false;
 		if ( function_exists( 'mb_check_encoding' ) ) {
 			$is_valid_utf8 = mb_check_encoding( $blueprintString, 'UTF-8' );
@@ -199,23 +201,24 @@ class Runner {
 		}
 		
 		if ( ! $is_valid_utf8 ) {
-			throw new \Exception( 'Blueprint must be encoded as UTF-8' );
+			throw new BlueprintExecutionException( 'Blueprint must be encoded as UTF-8.' );
 		}
 
-		// 2. **JSON Validity:** Assert the input is a valid JSON document.
+		// **JSON Validity:** Assert the input is a valid JSON document.
 		$this->blueprintArray = json_decode( $blueprintString, true );
 		if ( json_last_error() !== JSON_ERROR_NONE ) {
-			throw new \Exception( 'Blueprint must be a valid JSON document' );
+			throw new BlueprintExecutionException( 'Blueprint must be a valid JSON document.' );
 		}
 	}
 
 	private function validateBlueprint(): void {
-		// Schema conformance
-		$v        = new Validator();
-		$is_valid = $v->validate( $this->blueprintArray );
-		if ( ! $is_valid ) {
-			print_r( $v->get_errors() );
-			throw new \Exception( 'Blueprint is invalid' );
+		// Assert the Blueprint conforms to the JSON schema.
+		$v = new HumanFriendlySchemaValidator(
+			json_decode( file_get_contents( __DIR__ . '/json-schema/blueprint-v2-schema.json' ), true )
+		);
+		$error = $v->validate( $this->blueprintArray );
+		if ( $error ) {
+			throw new BlueprintExecutionException( 'Blueprint does not conform to the schema.', $error );
 		}
 
 		if ( isset( $this->blueprintArray['phpVersion'] ) ) {
