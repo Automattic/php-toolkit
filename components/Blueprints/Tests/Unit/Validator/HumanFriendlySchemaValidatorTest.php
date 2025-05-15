@@ -275,6 +275,267 @@ class HumanFriendlySchemaValidatorTest extends TestCase {
 				5, // Matches both 'number' and 'integer'
 				true // anyOf should pass if at least one matches
 			],
+			// Partial matches with object schemas
+			'anyOf: partial match with object schemas' => [
+				['anyOf' => [
+					['type' => 'object', 'properties' => ['a' => ['type' => 'string'], 'b' => ['type' => 'integer']], 'required' => ['a', 'b']],
+					['type' => 'object', 'properties' => ['c' => ['type' => 'string'], 'd' => ['type' => 'integer']], 'required' => ['c', 'd']]
+				]],
+				['a' => 'value', 'b' => 123], // Matches first schema
+				true
+			],
+			'anyOf: another partial match with object schemas' => [
+				['anyOf' => [
+					['type' => 'object', 'properties' => ['a' => ['type' => 'string'], 'b' => ['type' => 'integer']], 'required' => ['a', 'b']],
+					['type' => 'object', 'properties' => ['c' => ['type' => 'string'], 'd' => ['type' => 'integer']], 'required' => ['c', 'd']]
+				]],
+				['c' => 'value', 'd' => 456], // Matches second schema
+				true
+			],
+			'anyOf: no match with useful error message' => [
+				['anyOf' => [
+					['type' => 'object', 'properties' => ['a' => ['type' => 'string'], 'b' => ['type' => 'integer']], 'required' => ['a', 'b']],
+					['type' => 'object', 'properties' => ['c' => ['type' => 'string'], 'd' => ['type' => 'integer']], 'required' => ['c', 'd']]
+				]],
+				['a' => 'value', 'c' => 'value'], // Missing required properties
+				false,
+				'Value did not match any of the allowed shapes: object.'
+			],
+			// Near misses with useful error messages
+			'anyOf: near miss with wrong type' => [
+				['anyOf' => [
+					['type' => 'object', 'properties' => ['a' => ['type' => 'string']], 'required' => ['a']],
+					['type' => 'object', 'properties' => ['b' => ['type' => 'string']], 'required' => ['b']]
+				]],
+				['a' => 123], // a should be string but is integer
+				false,
+				'Value did not match any of the allowed shapes: object.'
+			],
+			// Nested anyOf (one level deeper)
+			'anyOf: one level nested' => [
+				['type' => 'object', 'properties' => [
+					'nested' => ['anyOf' => [
+						['type' => 'string'],
+						['type' => 'integer']
+					]]
+				]],
+				['nested' => 'string value'], // Valid nested string
+				true
+			],
+			'anyOf: one level nested failure' => [
+				['type' => 'object', 'properties' => [
+					'nested' => ['anyOf' => [
+						['type' => 'string'],
+						['type' => 'integer']
+					]]
+				]],
+				['nested' => true], // Invalid nested value (boolean)
+				false,
+				'Expected one of [string, integer] here, but got boolean.'
+			],
+			// Two levels deeper nesting
+			'anyOf: two levels nested' => [
+				['type' => 'object', 'properties' => [
+					'level1' => ['type' => 'object', 'properties' => [
+						'level2' => ['anyOf' => [
+							['type' => 'string'],
+							['type' => 'integer']
+						]]
+					]]
+				]],
+				['level1' => ['level2' => 42]], // Valid nested integer
+				true
+			],
+			'anyOf: two levels nested failure' => [
+				['type' => 'object', 'properties' => [
+					'level1' => ['type' => 'object', 'properties' => [
+						'level2' => ['anyOf' => [
+							['type' => 'string'],
+							['type' => 'integer']
+						]]
+					]]
+				]],
+				['level1' => ['level2' => false]], // Invalid nested value (boolean)
+				false,
+				'Expected one of [string, integer] here, but got boolean.'
+			],
+			// Mixed types in anyOf
+			'anyOf: mixed types - string input' => [
+				['anyOf' => [
+					['type' => 'string'],
+					['type' => 'object', 'properties' => ['a' => ['type' => 'string']]],
+					['type' => 'array', 'items' => ['type' => 'integer']]
+				]],
+				'valid string', // Valid string input
+				true
+			],
+			'anyOf: mixed types - object input' => [
+				['anyOf' => [
+					['type' => 'string'],
+					['type' => 'object', 'properties' => ['a' => ['type' => 'string']]],
+					['type' => 'array', 'items' => ['type' => 'integer']]
+				]],
+				['a' => 'valid object'], // Valid object input
+				true
+			],
+			'anyOf: mixed types - array input' => [
+				['anyOf' => [
+					['type' => 'string'],
+					['type' => 'object', 'properties' => ['a' => ['type' => 'string']]],
+					['type' => 'array', 'items' => ['type' => 'integer']]
+				]],
+				[1, 2, 3], // Valid array input
+				true
+			],
+			'anyOf: mixed types - invalid input' => [
+				['anyOf' => [
+					['type' => 'string'],
+					['type' => 'object', 'properties' => ['a' => ['type' => 'string']]],
+					['type' => 'array', 'items' => ['type' => 'integer']]
+				]],
+				false, // Boolean doesn't match any schema
+				false,
+				'Expected one of [string, object, array] here, but got boolean.'
+			],
+			// Deep ambiguity resolution test
+			'anyOf: ambiguity resolved at second level' => [
+				['anyOf' => [
+					[
+						'type' => 'object',
+						'properties' => [
+							'data' => [
+								'type' => 'object',
+								'properties' => [
+									'type' => ['type' => 'string', 'enum' => ['typeA']],
+									'value' => ['type' => 'string']
+								],
+								'required' => ['type', 'value']
+							]
+						],
+						'required' => ['data']
+					],
+					[
+						'type' => 'object',
+						'properties' => [
+							'data' => [
+								'type' => 'object',
+								'properties' => [
+									'type' => ['type' => 'string', 'enum' => ['typeB']],
+									'count' => ['type' => 'integer']
+								],
+								'required' => ['type', 'count']
+							]
+						],
+						'required' => ['data']
+					]
+				]],
+				['data' => ['type' => 'typeA', 'value' => 'test string']], // Should match first schema
+				true
+			],
+			'anyOf: ambiguity resolved at second level without enums' => [
+				['anyOf' => [
+					[
+						'type' => 'object',
+						'properties' => [
+							'data' => [
+								'type' => 'object',
+								'properties' => [
+									'type' => ['type' => 'string'],
+									'value' => ['type' => 'string']
+								],
+								'required' => ['type', 'value']
+							]
+						],
+						'required' => ['data']
+					],
+					[
+						'type' => 'object',
+						'properties' => [
+							'data' => [
+								'type' => 'object',
+								'properties' => [
+									'name' => ['type' => 'string'],
+									'count' => ['type' => 'integer']
+								],
+								'required' => ['name', 'count']
+							]
+						],
+						'required' => ['data']
+					]
+				]],
+				['data' => ['name' => 'test name', 'count' => 123]], // Should match first schema
+				true
+			],
+			'anyOf: invalid at second level' => [
+				['anyOf' => [
+					[
+						'type' => 'object',
+						'properties' => [
+							'data' => [
+								'type' => 'object',
+								'properties' => [
+									'type' => ['type' => 'string', 'enum' => ['typeA']],
+									'value' => ['type' => 'string']
+								],
+								'required' => ['type', 'value']
+							]
+						],
+						'required' => ['data']
+					],
+					[
+						'type' => 'object',
+						'properties' => [
+							'data' => [
+								'type' => 'object',
+								'properties' => [
+									'type' => ['type' => 'string', 'enum' => ['typeB']],
+									'count' => ['type' => 'integer']
+								],
+								'required' => ['type', 'count']
+							]
+						],
+						'required' => ['data']
+					]
+				]],
+				['data' => ['type' => 'typeA', 'count' => 123]], // "typeA" but missing required "value"
+				false,
+				'Value did not match any of the allowed shapes: object.'
+			],
+			'anyOf: ambiguity unresolved at second level without enums' => [
+				['anyOf' => [
+					[
+						'type' => 'object',
+						'properties' => [
+							'data' => [
+								'type' => 'object',
+								'properties' => [
+									'type' => ['type' => 'string'],
+									'value' => ['type' => 'string']
+								],
+								'required' => ['type', 'value']
+							]
+						],
+						'required' => ['data']
+					],
+					[
+						'type' => 'object',
+						'properties' => [
+							'data' => [
+								'type' => 'object',
+								'properties' => [
+									'name' => ['type' => 'string'],
+									'count' => ['type' => 'integer']
+								],
+								'required' => ['name', 'count']
+							]
+						],
+						'required' => ['data']
+					]
+				]],
+				['data' => ['lastName' => 'test name', 'count' => 123]], // Should match first schema
+				false,
+				'Value did not match any of the allowed shapes: object.'
+			],
 		];
 	}
 
@@ -298,7 +559,7 @@ class HumanFriendlySchemaValidatorTest extends TestCase {
 					}
 				}
 				// This assertion might be too strict depending on how explanations are added for all anyOf failures.
-				// $this->assertTrue($hasExplanation, "Expected an explanation for anyOf failure.");
+				$this->assertTrue($hasExplanation, "Expected an explanation for anyOf failure.");
 			}
 		}
 	}
@@ -328,6 +589,33 @@ class HumanFriendlySchemaValidatorTest extends TestCase {
 				false, // oneOf should fail if more than one matches
 				'Data matches more than one allowed shape—make it unambiguous.'
 			],
+			'oneOf: ambiguous object schemas without discriminator' => [
+				['oneOf' => [
+					['type' => 'object', 'properties' => ['a' => ['type' => 'string']]],
+					['type' => 'object', 'properties' => ['b' => ['type' => 'string']]]
+				]],
+				['a' => 'value', 'b' => 'value'],
+				false, // Should fail because it matches both schemas
+				'Data matches more than one allowed shape—make it unambiguous.'
+			],
+			'oneOf: ambiguous object schemas with overlapping properties' => [
+				['oneOf' => [
+					['type' => 'object', 'properties' => ['a' => ['type' => 'string'], 'c' => ['type' => 'integer']]],
+					['type' => 'object', 'properties' => ['a' => ['type' => 'string'], 'd' => ['type' => 'integer']]]
+				]],
+				['a' => 'value', 'c' => 1, 'd' => 2],
+				false, // Should fail because it matches both schemas
+				'Data matches more than one allowed shape—make it unambiguous.'
+			],
+			'oneOf: ambiguous object schemas with missing discriminator' => [
+				['oneOf' => [
+					['type' => 'object', 'properties' => ['type' => ['enum' => ['A']], 'value' => ['type' => 'string']]],
+					['type' => 'object', 'properties' => ['type' => ['enum' => ['B']], 'value' => ['type' => 'string']]]
+				]],
+				['value' => 'test'],
+				false, // Should fail because discriminator is missing
+				'Data matches more than one allowed shape—make it unambiguous.'
+			],
 		];
 	}
 
@@ -348,7 +636,7 @@ class HumanFriendlySchemaValidatorTest extends TestCase {
 	public function testLocalRefValidation() {
 		$schema = [
 			'definitions' => [
-				'name' => ['type' => 'string', 'maxLength' => 10],
+				'name' => ['type' => 'string'],
 				'user' => [
 					'type' => 'object',
 					'properties' => [
@@ -368,12 +656,6 @@ class HumanFriendlySchemaValidatorTest extends TestCase {
 		// Valid
 		$this->assertTrue($validator->validate(['admin' => ['username' => 'test', 'id' => 1]])->valid);
 		
-		// Invalid due to $ref constraint (maxLength)
-		// $resultInvalidRef = $validator->validate(['admin' => ['username' => 'longusername', 'id' => 2]]);
-		// $this->assertFalse($resultInvalidRef->valid);
-		// The current validator does not implement maxLength. If it did, we would assert the error.
-		// For now, this specific check for maxLength violation is commented out.
-
 		// Invalid: property type within referenced schema
 		$resultInvalidType = $validator->validate(['admin' => ['username' => 'test', 'id' => 'not-an-int']]);
 		$this->assertFalse($resultInvalidType->valid);
@@ -601,5 +883,70 @@ class HumanFriendlySchemaValidatorTest extends TestCase {
         $resultObject = $validatorStrict->validate($stdClass);
         $this->assertTrue($resultObject->valid);
     }
+
+	// Test for unsupported schema keywords
+	public function testAllOfThrows() {
+		$schema = ['allOf' => [['type' => 'string'], ['type' => 'string']]];
+		$validator = new HumanFriendlySchemaValidator($schema);
+		$this->expectException(UnsupportedSchemaException::class);
+		$this->expectExceptionMessage('The schema keyword "allOf" is not supported');
+		$validator->validate('test');
+	}
+
+	public function testNotThrows() {
+		$schema = ['not' => ['type' => 'string']];
+		$validator = new HumanFriendlySchemaValidator($schema);
+		$this->expectException(UnsupportedSchemaException::class);
+		$this->expectExceptionMessage('The schema keyword "not" is not supported');
+		$validator->validate('test');
+	}
+
+	public function testPatternThrows() {
+		$schema = ['type' => 'string', 'pattern' => '^[a-z]+$'];
+		$validator = new HumanFriendlySchemaValidator($schema);
+		$this->expectException(UnsupportedSchemaException::class);
+		$this->expectExceptionMessage('The string constraint "pattern" is not supported');
+		$validator->validate('test');
+	}
+
+	public function testMinimumThrows() {
+		$schema = ['type' => 'number', 'minimum' => 5];
+		$validator = new HumanFriendlySchemaValidator($schema);
+		$this->expectException(UnsupportedSchemaException::class);
+		$this->expectExceptionMessage('The numeric constraint "minimum" is not supported');
+		$validator->validate(10);
+	}
+
+	public function testMaximumThrows() {
+		$schema = ['type' => 'integer', 'maximum' => 100];
+		$validator = new HumanFriendlySchemaValidator($schema);
+		$this->expectException(UnsupportedSchemaException::class);
+		$this->expectExceptionMessage('The numeric constraint "maximum" is not supported');
+		$validator->validate(50);
+	}
+
+	public function testUniqueItemsThrows() {
+		$schema = ['type' => 'array', 'items' => ['type' => 'string'], 'uniqueItems' => true];
+		$validator = new HumanFriendlySchemaValidator($schema);
+		$this->expectException(UnsupportedSchemaException::class);
+		$this->expectExceptionMessage('The array constraint "uniqueItems" is not supported');
+		$validator->validate(['a', 'b', 'c']);
+	}
+
+	public function testTypeAsArrayThrows() {
+		$schema = ['type' => ['string', 'integer']];
+		$validator = new HumanFriendlySchemaValidator($schema);
+		$this->expectException(UnsupportedSchemaException::class);
+		$this->expectExceptionMessage("Defining 'type' as an array of types is not supported");
+		$validator->validate('test');
+	}
+
+	public function testEnumMismatchedTypeThrows() {
+		$schema = ['type' => 'string', 'enum' => ['valid', 123]]; // 123 is not a string
+		$validator = new HumanFriendlySchemaValidator($schema);
+		$this->expectException(UnsupportedSchemaException::class);
+		$this->expectExceptionMessage('Enum value 123 does not match the declared type "string"');
+		$validator->validate('valid');
+	}
 
 }

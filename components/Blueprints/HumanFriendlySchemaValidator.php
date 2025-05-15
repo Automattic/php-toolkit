@@ -237,6 +237,23 @@ final class HumanFriendlySchemaValidator
             $schema = $this->resolveReference($schema['$ref']);
         }
 
+        // Check for unsupported keywords
+        $unsupportedKeywords = [
+            'allOf', 'not', 'patternProperties', 'dependencies',
+            'if', 'then', 'else', 'contentMediaType', 'contentEncoding',
+            'contentSchema',
+        ];
+        foreach ($unsupportedKeywords as $keyword) {
+            if (isset($schema[$keyword])) {
+                throw new UnsupportedSchemaException("The schema keyword \"{$keyword}\" is not supported.");
+            }
+        }
+
+        // Check if 'type' is an array, which is not supported
+        if (isset($schema['type']) && is_array($schema['type'])) {
+            throw new UnsupportedSchemaException("Defining 'type' as an array of types is not supported. Use anyOf or oneOf instead.");
+        }
+
         $result = match (true) {
             isset($schema['anyOf']) => $this->validateAnyOf($path, $data, $schema),
             isset($schema['oneOf']) => $this->validateOneOf($path, $data, $schema),
@@ -371,9 +388,10 @@ final class HumanFriendlySchemaValidator
 
         // 3. fallback generic + attach best‑failure details
         $labels = array_unique(array_map([$this,'branchLabel'],$branches));
+		$message = 'Value did not match any of the allowed shapes: '.implode(', ', $labels).'.';
         $summary = ValidationResult::err(
             $path,
-            ($ctx==='oneOf'?'Exactly one of ':'One of ').implode(', ', $labels).' is required, but none matched.',
+            $message,
         );
         if ($fails) { $summary->addExplanation($this->bestFailure($fails)); }
         return $summary;
@@ -395,15 +413,45 @@ final class HumanFriendlySchemaValidator
             );
         }
 
-        if(isset($schema['enum']) && !in_array($data,$schema['enum'],true)){
-            return ValidationResult::err(
-                $path,
-                'Allowed values: '.implode(', ',$schema['enum']).'. You supplied '.json_encode($data).'.',
-                meta:[
-                    'expected'=>['enum'=>$schema['enum']],
-                    'actual'  =>['value'=>$data,'snippet'=>$this->valueSnippet($data)],
-                ]
-            );
+        // Check for unsupported string constraints
+        if ($type === 'string') {
+            $unsupportedStringKeywords = ['pattern', 'minLength', 'maxLength', 'format'];
+            foreach ($unsupportedStringKeywords as $keyword) {
+                if (isset($schema[$keyword])) {
+                    throw new UnsupportedSchemaException("The string constraint \"{$keyword}\" is not supported.");
+                }
+            }
+        }
+
+        // Check for unsupported numeric constraints
+        if ($type === 'number' || $type === 'integer') {
+            $unsupportedNumericKeywords = ['minimum', 'maximum', 'exclusiveMinimum', 'exclusiveMaximum', 'multipleOf'];
+            foreach ($unsupportedNumericKeywords as $keyword) {
+                if (isset($schema[$keyword])) {
+                    throw new UnsupportedSchemaException("The numeric constraint \"{$keyword}\" is not supported.");
+                }
+            }
+        }
+
+        if(isset($schema['enum'])){
+            // Validate enum values against the declared type
+            foreach ($schema['enum'] as $enumValue) {
+                if (!$this->typeMatches($enumValue, $type)) {
+                    throw new UnsupportedSchemaException(
+                        "Enum value " . json_encode($enumValue) . " does not match the declared type \"{$type}\"."
+                    );
+                }
+            }
+            if(!in_array($data,$schema['enum'],true)){
+                return ValidationResult::err(
+                    $path,
+                    'Allowed values: '.implode(', ',$schema['enum']).'. You supplied '.json_encode($data).'.',
+                    meta:[
+                        'expected'=>['enum'=>$schema['enum']],
+                        'actual'  =>['value'=>$data,'snippet'=>$this->valueSnippet($data)],
+                    ]
+                );
+            }
         }
 
         return match($type){
@@ -472,6 +520,9 @@ final class HumanFriendlySchemaValidator
         }
         if(isset($schema['maxItems']) && count($data)>$schema['maxItems']){
             $results[]=ValidationResult::err($path,'May contain at most '.$schema['maxItems'].' items, found '.count($data).'.');
+        }
+        if(isset($schema['uniqueItems'])){
+            throw new UnsupportedSchemaException("The array constraint \"uniqueItems\" is not supported.");
         }
         return ValidationResult::combine(...$results);
     }
