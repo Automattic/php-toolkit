@@ -4,8 +4,7 @@
 	"description": "JSON Schema for WordPress Blueprint v2 format",
 	"type": "object",
 	"required": [
-		"version",
-		"content"
+		"version"
 	],
 	"properties": {
 		"version": {
@@ -1519,6 +1518,10 @@
 			}
 		},
 		"Step": {
+			"discriminator": {
+				"propertyName": "step",
+				"mapping": {}
+			},
 			"oneOf": [
 				{
 					"type": "object",

@@ -4,7 +4,6 @@ namespace WordPress\Blueprints\Tests;
 
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
-use WordPress\Blueprints\BlueprintV2Validator;
 use WordPress\Blueprints\Validator;
 
 /**
@@ -45,6 +44,8 @@ class BlueprintV2ValidatorTest extends TestCase {
 
 	/**
 	 * Test valid blueprints.
+	 * 
+	 * @dataProvider validBlueprintsProvider
 	 */
 	#[DataProvider( 'validBlueprintsProvider' )]
 	public function testValidBlueprints( string $fixturePath ) {
@@ -52,7 +53,7 @@ class BlueprintV2ValidatorTest extends TestCase {
 		$result    = $this->validator->validate( $blueprint );
 
 		$this->assertTrue( $result, 'Validation should pass for valid blueprint' );
-		$this->assertEmpty( $this->validator->get_errors(), 'No errors should be present' );
+		$this->assertEmpty( $this->validator->getErrors(), 'No errors should be present' );
 	}
 
 	/**
@@ -109,6 +110,8 @@ class BlueprintV2ValidatorTest extends TestCase {
 
 	/**
 	 * Test invalid blueprints.
+	 * 
+	 * @dataProvider invalidBlueprintsProvider
 	 */
 	#[DataProvider( 'invalidBlueprintsProvider' )]
 	public function testInvalidBlueprints(
@@ -121,7 +124,7 @@ class BlueprintV2ValidatorTest extends TestCase {
 		$result    = $this->validator->validate( $blueprint );
 
 		$this->assertFalse( $result, $assertMessage );
-		$errors = $this->validator->get_errors();
+		$errors = $this->validator->getErrors();
 		$this->assertNotEmpty( $errors, 'Errors should be present' );
 
 		if ( $expectedErrorPath !== null ) {
@@ -155,7 +158,7 @@ class BlueprintV2ValidatorTest extends TestCase {
 		$missingRequiredBlueprint = $this->loadFixture( 'invalid/missing-required.json' );
 		$result                   = $this->validator->validate( $missingRequiredBlueprint );
 		$this->assertFalse( $result );
-		$errors = $this->validator->get_errors();
+		$errors = $this->validator->getErrors();
 		$this->assertNotEmpty( $errors );
 
 		$versionError = false;
@@ -172,7 +175,7 @@ class BlueprintV2ValidatorTest extends TestCase {
 		$invalidContentBlueprint = $this->loadFixture( 'invalid/invalid-content-type.json' );
 		$result                  = $this->validator->validate( $invalidContentBlueprint );
 		$this->assertFalse( $result );
-		$errors = $this->validator->get_errors();
+		$errors = $this->validator->getErrors();
 		$this->assertNotEmpty( $errors );
 
 		$contentError = false;
@@ -189,7 +192,7 @@ class BlueprintV2ValidatorTest extends TestCase {
 		$invalidPostTypeBlueprint = $this->loadFixture( 'invalid/invalid-post-types.json' );
 		$result                   = $this->validator->validate( $invalidPostTypeBlueprint );
 		$this->assertFalse( $result );
-		$errors = $this->validator->get_errors();
+		$errors = $this->validator->getErrors();
 		$this->assertNotEmpty( $errors );
 
 		$postTypeError = false;
@@ -206,7 +209,7 @@ class BlueprintV2ValidatorTest extends TestCase {
 		$invalidStepsBlueprint = $this->loadFixture( 'invalid/invalid-additional-steps.json' );
 		$result                = $this->validator->validate( $invalidStepsBlueprint );
 		$this->assertFalse( $result );
-		$errors = $this->validator->get_errors();
+		$errors = $this->validator->getErrors();
 		$this->assertNotEmpty( $errors );
 
 		$stepsError = false;

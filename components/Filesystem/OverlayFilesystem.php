@@ -167,7 +167,7 @@ class OverlayFilesystem implements Filesystem {
 		return $fs->put_contents( $relative_path, $contents, $options );
 	}
 
-	public function get_meta() {
+	public function get_meta(): array {
 		return [];
 	}
 }
