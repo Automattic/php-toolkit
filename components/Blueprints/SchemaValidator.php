@@ -74,68 +74,213 @@ final class SchemaValidator
         };
     }
 
-	/** -------------------------------------------------
-	 *  anyOf – succeed if one branch valid, else:
-	 *          • if at least one branch “fits” but is invalid → bubble that branch’s errors
-	 *          • otherwise → aggregate mismatch hint
-	 * ------------------------------------------------- */
+	/* -------------------------------------------------
+	*  Helper: does this branch’s broad `type` fit $data?
+	* ------------------------------------------------- */
+	private function typeMatchesAny(mixed $data, array $types): bool
+	{
+		foreach ($types as $type) {
+			if(is_array($type)) {
+				$type = isset($type['$ref']) ? $this->resolveReference($type['$ref']) : $type;
+			}
+			if(is_array($type)) {
+				$type = $type['type'] ?? null;
+			}
+			if ($this->typeMatches($data, $type)) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	private function typeMatches(mixed $data, ?string $type): bool
+	{
+		return match ($type) {
+			'object'  => is_object($data) || ($this->arrayIsValidObject && is_array($data)),
+			'array'   => is_array($data),
+			'string'  => is_string($data),
+			'integer' => is_int($data),
+			'number'  => is_int($data) || is_float($data),
+			'boolean' => is_bool($data),
+			null      => true,
+			default   => false,
+		};
+	}
+
+	/* -------------------------------------------------
+	*  Helper: human-readable label for a branch
+	*          – `$ref` ➜ last path segment
+	*          – otherwise `title`, else `type`
+	* ------------------------------------------------- */
+	private function branchLabel(array $branch): string
+	{
+		if (isset($branch['$ref'])) {
+			$ref = $branch['$ref'];
+			return substr($ref, strrpos($ref, '/') + 1);
+		}
+		return $branch['title'] ?? ($branch['type'] ?? '<schema>');
+	}
+
+	/* -------------------------------------------------
+	*  Helper: trim obvious non-candidates, maybe by discriminator
+	* ------------------------------------------------- */
+	private function narrowBranches(mixed $data, array $branches, array $schema): array
+	{
+		// prune by top-level type
+		$candidates = array_filter(
+			$branches,
+			function ($branch) use ($data) {
+				$schema_subset = isset($branch['$ref']) ? $this->resolveReference($branch['$ref']) : $branch;
+				return $this->typeMatches(
+					$data,
+					$schema_subset['type'] ?? null
+				);
+			}
+		);
+
+		// apply discriminator if present + value available
+		$disc = $this->inferDiscriminator($schema['discriminator'] ?? null, $branches);
+		if ($disc && is_array($data) && array_key_exists($disc[0], $data)) {
+			$wanted = $data[$disc[0]];
+			$candidates = array_values(array_filter($candidates, function ($b) use ($disc, $wanted) {
+				$r = isset($b['$ref']) ? $this->resolveReference($b['$ref']) : $b;
+				return ($r['properties'][$disc[0]]['enum'][0] ?? null) === $wanted;
+			}));
+		}
+		return $candidates ?: $branches;      // never return empty
+	}
+
+	/* -------------------------------------------------
+	*  anyOf – succeed if one passes.
+	*          If a single narrowed branch fails ⇒ bubble its error.
+	*          Else ⇒ generic message listing all possibilities.
+	* ------------------------------------------------- */
 	private function validateAnyOf(array $path, mixed $data, array $schema): ValidationResult
 	{
-		$branches = $schema['anyOf'];
-		$discriminator = $this->inferDiscriminator($schema['discriminator'] ?? null, $branches);
-		$compatibleFailures = [];
+		$branches    = $schema['anyOf'];
+		$candidates  = $this->narrowBranches($data, $branches, $schema);
+		$narrowed    = count($candidates) < count($branches);
+		$failures    = [];
 
-		foreach ($branches as $idx => $branch) {
-			$resolved = isset($branch['$ref']) ? $this->resolveReference($branch['$ref']) : $branch;
-			$result   = $this->validateNode($path, $data, $resolved);
-
-			if ($result->valid) {
-				return ValidationResult::ok();                            // ✅ one branch passed – we’re done
+		foreach ($candidates as $b) {
+			$r = $this->validateNode(
+				$path,
+				$data,
+				isset($b['$ref']) ? $this->resolveReference($b['$ref']) : $b
+			);
+			if ($r->valid) {
+				return ValidationResult::ok();
 			}
-
-			if ($this->typeMatches($data, $resolved)) {
-				$compatibleFailures[] = $result;                          // same shape, but failed deeper
-			}
+			$failures[] = $r;
 		}
 
-		// at least one branch matched type → surface its errors
-		if ($compatibleFailures) {
-			return ValidationResult::combine(...$compatibleFailures);
+		if ($narrowed && $failures) {
+			return ValidationResult::combine(...$failures);        // precise variant-specific error(s)
 		}
 
-		// nothing matched even the broad type → aggregate mismatch diagnostics
-		return $this->explainAggregateMismatch($path, $data, $schema, $discriminator, 'anyOf');
+		$disc = $this->inferDiscriminator($schema['discriminator'] ?? null, $branches);
+		return $this->explainAggregateMismatch($path, $data, $branches, $disc, 'anyOf');
+	}
+
+	/* -------------------------------------------------
+	*  oneOf – must have *exactly* one passing branch.
+	* ------------------------------------------------- */
+	private function validateOneOf(array $path, mixed $data, array $schema): ValidationResult
+	{
+		$branches   = $schema['oneOf'];
+		$candidates = $this->narrowBranches($data, $branches, $schema);
+		$narrowed   = count($candidates) < count($branches);
+
+		$valid   = 0;
+		$fails   = [];
+
+		foreach ($candidates as $b) {
+			$r = $this->validateNode(
+				$path,
+				$data,
+				isset($b['$ref']) ? $this->resolveReference($b['$ref']) : $b
+			);
+			$valid += $r->valid ? 1 : 0;
+			if (!$r->valid) { $fails[] = $r; }
+		}
+
+		return match (true) {
+			$valid === 1 => ValidationResult::ok(),
+			$valid > 1   => ValidationResult::err($path, 'oneOf matched multiple clauses'),
+			$narrowed && $fails
+				=> ValidationResult::combine(...$fails),             // specific branch errors
+			default => $this->explainAggregateMismatch(
+				$path,
+				$data,
+				$branches,
+				$this->inferDiscriminator($schema['discriminator'] ?? null, $branches),
+				'oneOf'
+			),
+		};
 	}
 
 	/** Produce richer error message for anyOf/oneOf aggregate failure */
-	private function explainAggregateMismatch(array $path, mixed $data, array $branches, $discriminator, string $baseMsg): ValidationResult
-	{
-		// 1. type mismatch?
-		$branchTypes = array_filter(array_unique(array_map(fn ($b) => $b['type'] ?? null, $branches)));
-		$actualType  = gettype($data);
-		if (count($branchTypes) > 0 && !in_array($actualType, $branchTypes, true)) {
-			$hint = " Expected one of [".implode(', ', $branchTypes)."], got $actualType.";
-			return ValidationResult::err($path, $baseMsg.$hint);
+	/* ------------------------------------------------------------------
+	*  Helper: craft the aggregate error message in priority order
+	*          1 type mismatch          → list allowed PHP types
+	*          2 discriminator mismatch → list allowed discriminator values
+	*          3 fallback               → list branch labels once
+	* ------------------------------------------------------------------ */
+	private function explainAggregateMismatch(
+		array  $path,
+		mixed  $data,
+		array  $branches,
+		?array $discriminator,            // [$prop, $allowed]|null
+		string $ctx                       // 'anyOf' | 'oneOf'
+	): ValidationResult {
+		// a) type information
+		$allowedTypes = [];
+		foreach ($branches as $b) {
+			$r = isset($b['$ref']) ? $this->resolveReference($b['$ref']) : $b;
+			if (isset($r['type'])) { $allowedTypes[] = $r['type']; }
+		}
+		$allowedTypes = array_unique($allowedTypes);
+		if (!$this->typeMatchesAny($data, $allowedTypes)) {
+			return ValidationResult::err(
+				$path,
+				"$ctx: expected one of [" . implode(', ', $allowedTypes) . "], got " . gettype($data)
+			);
+		}
+		$actualType   = gettype($data);
+		if($this->arrayIsValidObject && $actualType === 'array' && in_array('object', $allowedTypes, true)) {
+			$actualType = 'object';
+		}
+		$allowedTypes = array_unique($allowedTypes);
+		if ($allowedTypes && !in_array($actualType, $allowedTypes, true)) {
+			return ValidationResult::err(
+				$path,
+				"$ctx: expected one of [" . implode(', ', $allowedTypes) . "], got $actualType"
+			);
 		}
 
-		// 2. common discriminator?
+		// b) discriminator information
 		if ($discriminator) {
 			[$prop, $allowed] = $discriminator;
-			$val = is_array($data) && array_key_exists($prop, $data) ? $data[$prop] : null;
-			$hint = " Discriminator '$prop' must be one of [".implode(', ', $allowed)."]. Got ".var_export($val, true).".";
-			return ValidationResult::err($path, $baseMsg.$hint);
+			$val = (is_array($data) && array_key_exists($prop, $data))
+				? var_export($data[$prop], true)
+				: 'missing';
+			return ValidationResult::err(
+				$path,
+				"$ctx: discriminator '$prop' must be " .
+				"[" . implode(', ', $allowed) . "], got $val"
+			);
 		}
 
-		// 3. pure $ref list?
-		$refs = array_values(array_filter(array_map(fn ($b) => $b['$ref'] ?? null, $branches)));
-		if ($refs) {
-			$names = array_map(fn ($r) => basename($r), $refs);
-			$hint  = " Value must match one of referenced schemas: ".implode(', ', $names).".";
-			return ValidationResult::err($path, $baseMsg.$hint);
-		}
-
-		return ValidationResult::err($path, $baseMsg);   // fall-back
+		// c) generic – list unique labels once
+		$labels = array_unique(array_map([$this, 'branchLabel'], $branches));
+		return ValidationResult::err(
+			$path,
+			"$ctx: value must match " .
+			($ctx === 'oneOf' ? 'exactly one of ' : 'one of ') .
+			implode(', ', $labels)
+		);
 	}
+
 
 	/** Try to find a single enum-based discriminator shared by all object branches */
 	private function inferDiscriminator(?array $explicit_discriminator, array $branches): ?array
@@ -194,116 +339,6 @@ final class SchemaValidator
 		return [$prop, $values];
 	}
 
-	/** -------------------------------------------------
-	 *  oneOf – succeed if exactly one branch valid.
-	 *          Failure cases:
-	 *          • >1 valid → multiple-match error (as before)
-	 *          • 0 valid  → pick nearest match if any, else aggregate mismatch
-	 * ------------------------------------------------- */
-	private function validateOneOf(array $path, mixed $data, array $schema): ValidationResult
-	{
-		$branches = $schema['oneOf'];
-		// Check if data matches any of the types defined in $schema
-		if (isset($schema['type'])) {
-			$types = is_array($schema['type']) ? $schema['type'] : [$schema['type']];
-			$matchesType = false;
-			foreach ($types as $type) {
-				if ($this->typeMatches($data, ['type' => $type])) {
-					$matchesType = true;
-					break;
-				}
-			}
-			if (!$matchesType) {
-				// @TODO: List the allowed types
-				return ValidationResult::err($path, 'Data does not match any allowed type(s) for oneOf');
-			}
-		}
-
-		// If there is only one branch matching the data type, only validate against that branch
-		$typeMatchingBranches = [];
-		foreach ($branches as $branch) {
-			$resolved = isset($branch['$ref']) ? $this->resolveReference($branch['$ref']) : $branch;
-			if ($this->typeMatches($data, $resolved)) {
-				$typeMatchingBranches[] = $branch;
-			}
-		}
-		if (count($typeMatchingBranches) === 1) {
-			return $this->validateNode($path, $data, $typeMatchingBranches[0]);
-		}
-
-		// If there's a discriminator, choose the branch that matches the discriminator
-		$discriminator = $this->inferDiscriminator($schema['discriminator'] ?? null, $branches);
-		if ($discriminator) {
-			if(!isset($data[$discriminator[0]])) {
-				return ValidationResult::err($path, 'Data does not match any allowed type(s) for oneOf: ' . $discriminator[0]);
-			}
-			if(!is_string($data[$discriminator[0]])) {
-				return ValidationResult::err($path, 'Data does not match any allowed type(s) for oneOf: ' . $discriminator[0]);
-			}
-
-			$discriminator_value = $data[$discriminator[0]];
-
-			$matchingBranch = null;
-			foreach ($branches as $branch) {
-				$expected_discriminator_value = $branch['properties'][$discriminator[0]]['enum'][0] ?? null;
-				if ($expected_discriminator_value === $discriminator_value) {
-					$matchingBranch = $branch;
-					break;
-				}
-			}
-			if (!$matchingBranch) {
-				return ValidationResult::err($path, 'Data does not match any allowed type(s) for oneOf: ' . $data[$discriminator[0]]);
-			}
-			// Validate just the matching branch
-			return $this->validateNode($path, $data, $matchingBranch);
-		}
-
-		// We cannot prune the branches any further.
-		// We need to validate against all branches.
-		// @TODO: Smaller error message – no need to combine errors from all the branches.
-
-		$validCount          = 0;
-		$compatibleFailures  = [];
-		foreach ($branches as $branch) {
-			$resolved = isset($branch['$ref']) ? $this->resolveReference($branch['$ref']) : $branch;
-			$result   = $this->validateNode($path, $data, $resolved);
-
-			if ($result->valid) {
-				$validCount++;
-			} elseif ($this->typeMatches($data, $resolved)) {
-				$compatibleFailures[] = $result;
-			}
-		}
-
-		if ($validCount === 1) {
-			return ValidationResult::ok();                                // ✅ exactly one branch ok
-		}
-		if ($validCount > 1) {
-			return ValidationResult::err($path, 'oneOf matched multiple clauses');
-		}
-		// 0 valid
-		if ($compatibleFailures) {
-			return ValidationResult::combine(...$compatibleFailures);     // bubble variant-specific errors
-		}
-		return $this->explainAggregateMismatch($path, $data, $branches, $discriminator, 'oneOf did not match any clause');
-	}
-
-	/** quick structural/type check used to spot “compatible but invalid” branches */
-	private function typeMatches(mixed $data, array $schema): bool
-	{
-		$t = $schema['type'] ?? null;
-		return match ($t) {
-			'object'  => is_object($data) || ($this->arrayIsValidObject && is_array($data)),
-			'array'   => is_array($data),
-			'string'  => is_string($data),
-			'integer' => is_int($data),
-			'number'  => is_int($data) || is_float($data),
-			'boolean' => is_bool($data),
-			null      => true,                                            // no type declared – assume compatible
-			default   => false,
-		};
-	}
-
     /** Primitive + composite type validation */
     private function validateType(array $path, mixed $data, array $schema): ValidationResult
     {
@@ -331,9 +366,27 @@ final class SchemaValidator
         return match ($type) {
             'object' => $this->validateObject($path, $data, $schema),
             'array'  => $this->validateArray($path, $data, $schema),
+			'string' => $this->validateString($path, $data, $schema),
             default  => ValidationResult::ok(),
         };
     }
+
+	private function validateString(array $path, string $data, array $schema): ValidationResult
+	{
+		if(isset($schema['minLength'])) {
+			throw new \RuntimeException('minLength validation is not supported at ' . implode('.', $path));
+		}
+
+		if(isset($schema['maxLength'])) {
+			throw new \RuntimeException('maxLength validation is not supported at ' . implode('.', $path));
+		}
+
+		if(isset($schema['pattern'])) {
+			throw new \RuntimeException('pattern validation is not supported at ' . implode('.', $path));
+		}
+
+		return ValidationResult::ok();
+	}
 
     private function validateObject(array $path, array|object $data, array $schema): ValidationResult
     {
@@ -385,10 +438,17 @@ final class SchemaValidator
             }
         }
 
-        // minItems / maxItems / uniqueItems placeholders
-        if (isset($schema['minItems']) || isset($schema['maxItems']) || isset($schema['uniqueItems'])) {
-            throw new \RuntimeException('minItems, maxItems, uniqueItems not implemented');
-        }
+		if(isset($schema['minItems'])) {
+			if(count($data) < $schema['minItems']) {
+				$results[] = ValidationResult::err([...$path], 'Expected at least ' . $schema['minItems'] . ' items, got ' . count($data));
+			}
+		}
+
+		if(isset($schema['maxItems'])) {
+			if(count($data) > $schema['maxItems']) {
+				$results[] = ValidationResult::err([...$path], 'Expected at most ' . $schema['maxItems'] . ' items, got ' . count($data));
+			}
+		}
 
         return ValidationResult::combine(...$results);
     }
@@ -411,6 +471,7 @@ final class SchemaValidator
     }
 }
 
+echo 'before validation' . PHP_EOL;
 
 $schema = json_decode(file_get_contents(__DIR__ . '/json-schema/blueprint-v2-schema.json'), true);
 $validator = new SchemaValidator($schema);
@@ -486,7 +547,7 @@ $result = $validator->validate([
 	"media" => [
 		"https://wordpress.org/files/2024/10/design-visual-6-7.png",
 		[
-			"source" => "https://wordpress.org/files/2024/10/design-visual-6-7.png",
+			"source" => 2,//"2",
 			"title" => "Introduction Video",
 			"description" => "A brief introduction to our company",
 			"alt" => "Company introduction video"
@@ -495,7 +556,7 @@ $result = $validator->validate([
 	"additionalStepsAfterExecution" => [
 		[
 			"step" => "writeFiles",
-			"filesz" => [
+			"files" => [
 				"wp-content/uploads/custom-file.txt" => [
 					"filename" => "custom-file.txt",
 					"content" => "This is a custom file created by the Blueprint."
