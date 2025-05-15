@@ -2,248 +2,229 @@
 
 namespace WordPress\Blueprints;
 
-class ValidationResult {
-	public function __construct(
-		public bool $valid,
-		public array $errors = []
-	) {}
+class ValidationResult
+{
+    public function __construct(
+        public bool   $valid,
+        public array  $errors = []        // array<ValidationError>
+    ) {}
+
+    /** Fast constructor for success */
+    public static function ok(): self
+    {
+        return new self(true, []);
+    }
+
+    /** Merge two results, preserving all errors */
+    public function merge(self $other): self
+    {
+        if ($this->valid && $other->valid) {
+            return self::ok();
+        }
+        return new self(false, array_merge($this->errors, $other->errors));
+    }
+
+    /** Convenience wrapper around merge for variadic use */
+    public static function combine(self ...$results): self
+    {
+        return array_reduce(
+            $results,
+            fn (self $carry, self $item) => $carry->merge($item),
+            self::ok()
+        );
+    }
 }
 
-class ValidationError extends ValidationResult {
-	public function __construct(
-		public array $path,
-		public string $message		
-	) {
-		parent::__construct(false, [$this]);
-	}
+final class ValidationError extends ValidationResult
+{
+    public function __construct(
+        public array  $path,
+        public string $message,
+    ) {
+        parent::__construct(false, [$this]);
+    }
 }
 
-class SchemaValidator {
-	private $array_is_valid_object = false;
-	public function __construct(
-		private array $schema,
-		array $options = []
-	) {
-		$this->array_is_valid_object = $options['array_is_valid_object'] ?? true;
-	}
+final class SchemaValidator
+{
+    private bool $arrayIsValidObject;
 
-	public function validate($data): ValidationResult {
-		return $this->validate_node(['root'], $data, $this->schema);
-	}
+    public function __construct(
+        private array $schema,
+        array $options = [],
+    ) {
+        $this->arrayIsValidObject = $options['array_is_valid_object'] ?? true;
+    }
 
-	private function validate_node(array $data_path, $data_node, array $schema_node): ValidationResult {
-		if(isset($schema_node['$ref'])) {
-			$schema_node = $this->resolve_reference($schema_node['$ref']);
-		}
-		if(isset($schema_node['anyOf'])) {
-			return $this->validate_anyof($data_path, $data_node, $schema_node);
-		}
-		else if(isset($schema_node['oneOf'])) {
-			return $this->validate_oneof($data_path, $data_node, $schema_node);
-		}
-		else if(isset($schema_node['type'])) {
-			return $this->validate_type($data_path, $data_node, $schema_node);
-		}
-		else {
-			$this->add_error($data_path, 'Unsupported schema node type: ' . $schema_node['type']);
-			return false;
-		}
-	}
+    public function validate(mixed $data): ValidationResult
+    {
+        return $this->validateNode(['root'], $data, $this->schema);
+    }
 
-	private function validate_anyof(array $data_path, $data_node, array $schema_node): ValidationResult|bool {
-		if(!isset($schema_node['anyOf'])) {
-			return true;
-		}
-		foreach($schema_node['anyOf'] as $anyof_schema) {
-			if( $this->validate_node($data_path, $data_node, $anyof_schema) ) {
-				return true;
-			}
-		}
-		return new ValidationError($data_path, 'anyOf did not match any clause');
-	}
+    /** Core dispatch */
+    private function validateNode(array $path, mixed $data, array $schema): ValidationResult
+    {
+        if (isset($schema['$ref'])) {
+            $schema = $this->resolveReference($schema['$ref']);
+        }
 
-	private function validate_oneof(array $data_path, $data_node, array $schema_node) {
-		if(!isset($schema_node['oneOf'])) {
-			return true;
-		}
-		$matched_oneof = false;
-		foreach($schema_node['oneOf'] as $oneof_schema) {
-			if( ! $this->validate_node($data_path, $data_node, $oneof_schema) ) {
-				continue;
-			}
-			if( $matched_oneof ) {
-				$this->add_error($data_path, 'oneOf matched multiple clauses');
-				return false;
-			}
-			$matched_oneof = true;
-		}
-		if( ! $matched_oneof ) {
-			$this->add_error($data_path, 'oneOf did not match any clause');
-			return false;
-		}
-		return true;
-	}
+        return match (true) {
+            isset($schema['anyOf']) => $this->validateAnyOf($path, $data, $schema['anyOf']),
+            isset($schema['oneOf']) => $this->validateOneOf($path, $data, $schema['oneOf']),
+            isset($schema['type'])  => $this->validateType($path, $data, $schema),
+            default                 => new ValidationError($path, 'Unsupported schema node'),
+        };
+    }
 
-	private function validate_type(array $data_path, $data_node, array $schema_node): bool {
-		// Validate the type of the data node
-		if(!isset($schema_node['type'])) {
-			return true;
-		}
-		switch($schema_node['type']) {
-			case 'object':
-				$is_valid_object = is_object($data_node) || ($this->array_is_valid_object && is_array($data_node));
-				if(!$is_valid_object) {
-					$this->add_error($data_path, 'Must be an object but got ' . gettype($data_node));
-					return false;
-				}
-				
-				if(!$this->validate_object($data_path, $data_node, $schema_node)) {
-					return false;
-				}				
-				break;
-			case 'array':
-				$is_valid_array = is_array($data_node);
-				if(!$is_valid_array) {
-					$this->add_error($data_path, 'Must be an array but got ' . gettype($data_node));
-					return false;
-				}
-				if(!$this->validate_array($data_path, $data_node, $schema_node)) {
-					return false;
-				}
-				break;
-			case 'string':
-				$is_valid_string = is_string($data_node);
-				if(!$is_valid_string) {
-					$this->add_error($data_path, 'Must be a string but got ' . gettype($data_node));
-					return false;
-				}
-				break;
-			case 'integer':
-				$is_valid_integer = is_int($data_node);
-				if(!$is_valid_integer) {
-					$this->add_error($data_path, 'Must be an integer but got ' . gettype($data_node));
-					return false;
-				}
-				break;
-			case 'number':
-				$is_valid_number = is_numeric($data_node);
-				if(!$is_valid_number) {
-					$this->add_error($data_path, 'Must be a number but got ' . gettype($data_node));
-					return false;
-				}
-				break;
-			case 'boolean':
-				$is_valid_boolean = is_bool($data_node);
-				if(!$is_valid_boolean) {
-					$this->add_error($data_path, 'Must be a boolean but got ' . gettype($data_node));
-					return false;
-				}
-				break;
-			default:
-				throw new \Exception(sprintf(
-					'Schema specified unsupported type %s at %s', $schema_node['type'], implode('.', $data_path)
-				));
-		}
+    /** anyOf: succeed if at least one child succeeds */
+    private function validateAnyOf(array $path, mixed $data, array $branches): ValidationResult
+    {
+        $errors = [];
+        foreach ($branches as $branch) {
+            $res = $this->validateNode($path, $data, $branch);
+            if ($res->valid) {
+                return ValidationResult::ok();
+            }
+            $errors = array_merge($errors, $res->errors);
+        }
+        return new ValidationError($path, 'anyOf did not match any clause');
+    }
 
-		// Validate enum
-		if(isset($schema_node['enum'])) {
-			if(!in_array($data_node, $schema_node['enum'], true)) {
-				$this->add_error($data_path, 'Must be one of ' . implode(', ', $schema_node['enum']));
-				return false;
-			}
-		}
-		return true;
-	}
+    /** oneOf: succeed if exactly one child succeeds */
+    private function validateOneOf(array $path, mixed $data, array $branches): ValidationResult
+    {
+        $matches = 0;
+        $errors  = [];
 
-	private function validate_object(array $data_path, $data_node, array $schema_node): bool {
-		// Confirm the required fields are present
-		if(isset($schema_node['required']) && is_array($schema_node['required'])) {
-			foreach($schema_node['required'] as $required_field) {
-				if(!isset($data_node[$required_field])) {
-					$this->add_error([...$data_path, $required_field], 'Required field ' . $required_field . ' is missing');
-				}
-			}
-		}
+        foreach ($branches as $branch) {
+            $res = $this->validateNode($path, $data, $branch);
+            if ($res->valid) {
+                $matches++;
+            } else {
+                $errors = array_merge($errors, $res->errors);
+            }
+        }
 
-		// Validate the properties of the data node
-		if(isset($schema_node['properties']) && is_array($schema_node['properties'])) {
-			foreach($schema_node['properties'] as $property_name => $property_schema) {
-				if(isset($data_node[$property_name])) {
-					$this->validate_node([...$data_path, $property_name], $data_node[$property_name], $property_schema);
-				}
-			}
-		}
+        return match ($matches) {
+            1       => ValidationResult::ok(),
+            0       => new ValidationError($path, 'oneOf did not match any clause'),
+            default => new ValidationError($path, 'oneOf matched multiple clauses'),
+        };
+    }
 
-		// Validate additional properties
-		if(isset($schema_node['additionalProperties'])) {
-			foreach($data_node as $property_name => $property_value) {
-				if(isset($schema_node['properties'][$property_name])) {
-					// Not an additional property, skip
-					continue;
-				}
+    /** Primitive + composite type validation */
+    private function validateType(array $path, mixed $data, array $schema): ValidationResult
+    {
+        $type = $schema['type'];
 
-				if($schema_node['additionalProperties'] === false) {
-					// Additional property not allowed – error
-					$this->add_error([...$data_path, $property_name], 'Unexpected property ' . $property_name);
-				} else {
-					// Additional property allowed, validate it
-					$this->validate_node([...$data_path, $property_name], $property_value, $schema_node['additionalProperties']);
-				}
-			}
-		}
-	}
+        $typeCheck = match ($type) {
+            'object'  => is_object($data) || ($this->arrayIsValidObject && is_array($data)),
+            'array'   => is_array($data),
+            'string'  => is_string($data),
+            'integer' => is_int($data),
+            'number'  => is_int($data) || is_float($data),
+            'boolean' => is_bool($data),
+            default   => throw new \RuntimeException("Unsupported type $type at " . implode('.', $path)),
+        };
 
-	private function validate_array(array $data_path, $data_node, array $schema_node) {
-		if(!is_array($data_node)) {
-			$this->add_error($data_path, 'Must be an array but got ' . gettype($data_node));
-		}
-		if(isset($schema_node['items'])) {
-			foreach($data_node as $item_index => $item_node) {
-				$this->validate_node([...$data_path, "[$item_index]"], $item_node, $schema_node['items']);
-			}
-		}
-		if(isset($schema_node['minItems'], $schema_node['maxItems'], $schema_node['uniqueItems'])) {
-			throw new \Exception('minItems and maxItems are not yet supported for arrays');
-		}
-	}
+        if (!$typeCheck) {
+            return new ValidationError($path, "Expected $type, got " . gettype($data));
+        }
 
-	private function add_error($data_path, $message) {
-		$this->errors[] = [
-			'message' => $message,
-			'path' => $data_path
-		];
-	}
+        // enum constraint
+        if (isset($schema['enum']) && !in_array($data, $schema['enum'], true)) {
+            return new ValidationError($path, 'Value not in enum: ' . implode(', ', $schema['enum']));
+        }
 
-	public function get_errors(): array {
-		return $this->errors;
-	}
+        return match ($type) {
+            'object' => $this->validateObject($path, $data, $schema),
+            'array'  => $this->validateArray($path, $data, $schema),
+            default  => ValidationResult::ok(),
+        };
+    }
 
-	private function resolve_reference($ref_string) {
-		if(strlen($ref_string) === 0) {
-			throw new \Exception('Reference string cannot be empty');
-		}
-		if($ref_string[0] !== '#' || $ref_string[1] !== '/') {
-			throw new \Exception('Object reference must start with "#/". External references are not supported.');
-		}
-		$ref_string = substr($ref_string, 2);
-		$ref_parts = explode('/', $ref_string);
-		$schema_node = $this->schema;
-		foreach($ref_parts as $ref_part) {
-			if(!isset($schema_node[$ref_part])) {
-				throw new \Exception('Reference path not found: ' . $ref_string);
-			}
-			$schema_node = $schema_node[$ref_part];
-		}
-		return $schema_node;
-	}
+    private function validateObject(array $path, array|object $data, array $schema): ValidationResult
+    {
+        $dataArr = is_object($data) ? (array) $data : $data;
+        $results = [];
 
+        // required
+        if (!empty($schema['required'])) {
+            foreach ($schema['required'] as $field) {
+                if (!array_key_exists($field, $dataArr)) {
+                    $results[] = new ValidationError([...$path, $field], 'Missing required field');
+                }
+            }
+        }
+
+        // properties
+        if (!empty($schema['properties'])) {
+            foreach ($schema['properties'] as $name => $propSchema) {
+                if (array_key_exists($name, $dataArr)) {
+                    $results[] = $this->validateNode([...$path, $name], $dataArr[$name], $propSchema);
+                }
+            }
+        }
+
+        // additionalProperties
+        if (array_key_exists('additionalProperties', $schema)) {
+            foreach ($dataArr as $name => $value) {
+                if (isset($schema['properties'][$name])) {
+                    continue;
+                }
+                if ($schema['additionalProperties'] === false) {
+                    $results[] = new ValidationError([...$path, $name], 'Unexpected property');
+                } else {
+                    $results[] = $this->validateNode([...$path, $name], $value, $schema['additionalProperties']);
+                }
+            }
+        }
+
+        return ValidationResult::combine(...$results);
+    }
+
+    private function validateArray(array $path, array $data, array $schema): ValidationResult
+    {
+        $results = [];
+
+        if (isset($schema['items'])) {
+            foreach ($data as $idx => $item) {
+                $results[] = $this->validateNode([...$path, $idx], $item, $schema['items']);
+            }
+        }
+
+        // minItems / maxItems / uniqueItems placeholders
+        if (isset($schema['minItems']) || isset($schema['maxItems']) || isset($schema['uniqueItems'])) {
+            throw new \RuntimeException('minItems, maxItems, uniqueItems not implemented');
+        }
+
+        return ValidationResult::combine(...$results);
+    }
+
+    private function resolveReference(string $ref): array
+    {
+        if ($ref === '' || !str_starts_with($ref, '#/')) {
+            throw new \RuntimeException('Only in-document #/ references supported');
+        }
+        $parts = explode('/', substr($ref, 2));
+        $node  = $this->schema;
+
+        foreach ($parts as $part) {
+            if (!array_key_exists($part, $node)) {
+                throw new \RuntimeException("Reference $ref not found");
+            }
+            $node = $node[$part];
+        }
+        return $node;
+    }
 }
+
 
 $schema = json_decode(file_get_contents(__DIR__ . '/json-schema/blueprint-v2-schema.json'), true);
 $validator = new SchemaValidator($schema);
-$is_valid = $validator->validate([
+$result = $validator->validate([
 	"version" => 2,
-	'$schema' => "https://raw.githubusercontent.com/WordPress/blueprints/trunk/blueprints/schema.json",
+	'$schema' => 2, //"https://raw.githubusercontent.com/WordPress/blueprints/trunk/blueprints/schema.json",
 	"plugins" => [
 		"friends"
 	],
@@ -340,11 +321,11 @@ $is_valid = $validator->validate([
 	]
 ]);
 
-if($is_valid) {
+if($result->valid) {
 	echo "The data is valid according to the schema.\n";
 } else {
 	echo "The data is invalid according to the schema.\n";
-	foreach($validator->get_errors() as $error) {
+	foreach($result->errors as $error) {
 		print_r($error);
 	}
 }
