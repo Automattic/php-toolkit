@@ -2,22 +2,47 @@
 
 namespace WordPress\Blueprints;
 
-class ValidationResult
+/**
+ * Single validation issue enriched with context.
+ */
+final class Issue
 {
+    public const TYPE_ISSUE       = 'issue';
+    public const TYPE_EXPLANATION = 'explanation';
+
+    public function __construct(
+        public array   $path,
+        public string  $message,
+        public string  $type   = self::TYPE_ISSUE,
+        public ?string $branch = null,                 // e.g. VideoObject, DataReference …
+        public array   $meta   = [],                   // expected/actual, snippet …
+    ){}
+}
+
+/**
+ * (In-)valid result plus aggregated issues.
+ */
+final class ValidationResult
+{
+    /** @param Issue[] $errors */
     public function __construct(
         public bool  $valid,
-        /** @var Issue[] */
-        public array $errors = []
-    ) {}
+        public array $errors = [],
+    ){}
 
     public static function ok(): self
     {
         return new self(true);
     }
 
-    public static function err(array $path, string $message): self
-    {
-        return new self(false, [new Issue($path, $message)]);
+    public static function err(
+        array   $path,
+        string  $message,
+        ?string $branch = null,
+        array   $meta   = [],
+        string  $type   = Issue::TYPE_ISSUE,
+    ): self {
+        return new self(false, [new Issue($path, $message, $type, $branch, $meta)]);
     }
 
     public function merge(self $other): self
@@ -28,34 +53,43 @@ class ValidationResult
         return new self(false, [...$this->errors, ...$other->errors]);
     }
 
-	public function addExplanation(ValidationResult $explanation)
-	{
-		foreach ($explanation->errors as $error) {
-			$this->errors[] = new Issue($error->path, $error->message, Issue::TYPE_EXPLANATION);
-			// don't add more than one explanation
-			break;
-		}
-	}
-
     public static function combine(self ...$results): self
     {
         return array_reduce($results, fn ($c, $r) => $c->merge($r), self::ok());
     }
+
+    /**
+     * Append the first error of another result as an explanatory note.
+     */
+    public function addExplanation(ValidationResult $why): void
+    {
+        if ($why->valid) { return; }
+        $first = $why->errors[0];
+        $this->errors[] = new Issue(
+            $first->path,
+            $first->message,
+            Issue::TYPE_EXPLANATION,
+            $first->branch,
+            $first->meta,
+        );
+    }
 }
 
-final class Issue
-{
-	const TYPE_ISSUE = 'issue';
-	const TYPE_EXPLANATION = 'explanation';
-
-	public string $type = self::TYPE_ISSUE;
-
-    public function __construct(
-        public array  $path,
-        public string $message
-    ) {}
+class Symbol {
+	public function __construct(
+		public string $value,
+	) {}
+	public function __toString(): string
+	{
+		return $this->value;
+	}
 }
 
+const MISSING = new Symbol('missing');
+
+/**
+ * JSON-schema-lite validator with human‑centred errors and original narrowing logic.
+ */
 final class SchemaValidator
 {
     private bool $arrayIsValidObject;
@@ -67,12 +101,62 @@ final class SchemaValidator
         $this->arrayIsValidObject = $options['array_is_valid_object'] ?? true;
     }
 
+    // ─────────────────────────────────────────────────────── helpers ─┐
+
+    private function valueSnippet(mixed $v): string
+    {
+        return substr(json_encode($v, JSON_PARTIAL_OUTPUT_ON_ERROR | JSON_UNESCAPED_SLASHES), 0, 80);
+    }
+
+    private function tagBranch(string $branch, ValidationResult $r): void
+    {
+        foreach ($r->errors as $e) { $e->branch ??= $branch; }
+    }
+
+    private function branchLabel(array $s): string
+    {
+        if (isset($s['$ref'])) {
+            return substr($s['$ref'], strrpos($s['$ref'], '/') + 1);
+        }
+        return $s['title'] ?? ($s['type'] ?? '<schema>');
+    }
+
+    private function typeMatches(mixed $data, ?string $type): bool
+    {
+        return match ($type) {
+            'object'  => is_object($data) || ($this->arrayIsValidObject && is_array($data)),
+            'array'   => is_array($data),
+            'string'  => is_string($data),
+            'integer' => is_int($data),
+            'number'  => is_int($data) || is_float($data),
+            'boolean' => is_bool($data),
+            null      => true,
+            default   => false,
+        };
+    }
+
+    private function typeMatchesAny(mixed $data, array $types): bool
+    {
+        foreach ($types as $t) {
+            if (is_array($t)) { $t = $t['type'] ?? null; }
+            if ($this->typeMatches($data, $t)) { return true; }
+        }
+        return false;
+    }
+
+    private function bestFailure(array $results): ValidationResult
+    {
+        usort($results, fn($a,$b) => count($a->errors) <=> count($b->errors));
+        return $results[0];
+    }
+
+    // ───────────────────────────────────────────────────────── validation ─┐
+
     public function validate(mixed $data): ValidationResult
     {
         return $this->validateNode(['root'], $data, $this->schema);
     }
 
-    /** Core dispatch */
     private function validateNode(array $path, mixed $data, array $schema): ValidationResult
     {
         if (isset($schema['$ref'])) {
@@ -83,439 +167,279 @@ final class SchemaValidator
             isset($schema['anyOf']) => $this->validateAnyOf($path, $data, $schema),
             isset($schema['oneOf']) => $this->validateOneOf($path, $data, $schema),
             isset($schema['type'])  => $this->validateType($path, $data, $schema),
-            default                 => ValidationResult::err($path, 'Unsupported schema node'),
+            default                 => ValidationResult::err($path, 'Validator doesn\'t understand this schema node.'),
         };
     }
 
-	/* -------------------------------------------------
-	*  Helper: does this branch’s broad `type` fit $data?
-	* ------------------------------------------------- */
-	private function typeMatchesAny(mixed $data, array $types): bool
-	{
-		foreach ($types as $type) {
-			if(is_array($type)) {
-				$type = isset($type['$ref']) ? $this->resolveReference($type['$ref']) : $type;
-			}
-			if(is_array($type)) {
-				$type = $type['type'] ?? null;
-			}
-			if ($this->typeMatches($data, $type)) {
-				return true;
-			}
-		}
-		return false;
-	}
+    // ───────────────────────────────────────────── anyOf / oneOf ─┐
 
-	private function typeMatches(mixed $data, ?string $type): bool
-	{
-		return match ($type) {
-			'object'  => is_object($data) || ($this->arrayIsValidObject && is_array($data)),
-			'array'   => is_array($data),
-			'string'  => is_string($data),
-			'integer' => is_int($data),
-			'number'  => is_int($data) || is_float($data),
-			'boolean' => is_bool($data),
-			null      => true,
-			default   => false,
-		};
-	}
+    private function narrowBranches(mixed $data, array $branches, array $schema): array
+    {
+        // 1. filter by declared top‑level type
+        $candidates = array_filter($branches, function($b) use($data){
+            $spec = isset($b['$ref']) ? $this->resolveReference($b['$ref']) : $b;
+            return $this->typeMatches($data, $spec['type'] ?? null);
+        });
 
-	/* -------------------------------------------------
-	*  Helper: human-readable label for a branch
-	*          – `$ref` ➜ last path segment
-	*          – otherwise `title`, else `type`
-	* ------------------------------------------------- */
-	private function branchLabel(array $branch): string
-	{
-		if (isset($branch['$ref'])) {
-			$ref = $branch['$ref'];
-			return substr($ref, strrpos($ref, '/') + 1);
-		}
-		return $branch['title'] ?? ($branch['type'] ?? '<schema>');
-	}
+        // 2. filter by discriminator (explicit or inferred)
+        $disc = $this->inferDiscriminator($schema['discriminator'] ?? null, $branches);
+        if ($disc && is_array($data)) {
+            [$prop, $allowed] = $disc;
+            if (array_key_exists($prop, $data)) {
+                $wanted = $data[$prop];
+                $candidates = array_values(array_filter($candidates, function($b) use($prop,$wanted){
+                    $r = isset($b['$ref']) ? $this->resolveReference($b['$ref']) : $b;
+                    return ($r['properties'][$prop]['enum'][0] ?? null) === $wanted;
+                }));
+            }
+        }
+        return $candidates ?: $branches; // never empty
+    }
 
-	/* -------------------------------------------------
-	*  Helper: trim obvious non-candidates, maybe by discriminator
-	* ------------------------------------------------- */
-	private function narrowBranches(mixed $data, array $branches, array $schema): array
-	{
-		// prune by top-level type
-		$candidates = array_filter(
-			$branches,
-			function ($branch) use ($data) {
-				$schema_subset = isset($branch['$ref']) ? $this->resolveReference($branch['$ref']) : $branch;
-				return $this->typeMatches(
-					$data,
-					$schema_subset['type'] ?? null
-				);
-			}
-		);
+    private function validateAnyOf(array $path, mixed $data, array $schema): ValidationResult
+    {
+        $branches = $schema['anyOf'];
+        $cands    = $this->narrowBranches($data, $branches, $schema);
+        $narrowed = count($cands) < count($branches);
+        $fails    = [];
 
-		// apply discriminator if present + value available
-		$disc = $this->inferDiscriminator($schema['discriminator'] ?? null, $branches);
-		if ($disc && is_array($data) && array_key_exists($disc[0], $data)) {
-			$wanted = $data[$disc[0]];
-			$candidates = array_values(array_filter($candidates, function ($b) use ($disc, $wanted) {
-				$r = isset($b['$ref']) ? $this->resolveReference($b['$ref']) : $b;
-				return ($r['properties'][$disc[0]]['enum'][0] ?? null) === $wanted;
-			}));
-		}
-		return $candidates ?: $branches;      // never return empty
-	}
+        foreach ($cands as $b) {
+            $label = $this->branchLabel($b);
+            $r = $this->validateNode($path, $data, isset($b['$ref']) ? $this->resolveReference($b['$ref']) : $b);
+            if ($r->valid) { return ValidationResult::ok(); }
+            $this->tagBranch($label, $r);
+            $fails[] = $r;
+        }
 
-	/* -------------------------------------------------
-	*  anyOf – succeed if one passes.
-	*          If a single narrowed branch fails ⇒ bubble its error.
-	*          Else ⇒ generic message listing all possibilities.
-	* ------------------------------------------------- */
-	private function validateAnyOf(array $path, mixed $data, array $schema): ValidationResult
-	{
-		$branches    = $schema['anyOf'];
-		$candidates  = $this->narrowBranches($data, $branches, $schema);
-		$narrowed    = count($candidates) < count($branches);
-		$failures    = [];
+        if ($narrowed && $fails) { // only one plausible branch → propagate its specific errors
+            return ValidationResult::combine(...$fails);
+        }
 
-		foreach ($candidates as $b) {
-			$r = $this->validateNode(
-				$path,
-				$data,
-				isset($b['$ref']) ? $this->resolveReference($b['$ref']) : $b
-			);
-			if ($r->valid) {
-				return ValidationResult::ok();
-			}
-			$failures[] = $r;
-		}
+        return $this->explainAggregateMismatch($path, $data, $branches, $schema, 'anyOf', $fails);
+    }
 
-		if ($narrowed && $failures) {
-			return ValidationResult::combine(...$failures);        // precise variant-specific error(s)
-		}
+    private function validateOneOf(array $path, mixed $data, array $schema): ValidationResult
+    {
+        $branches = $schema['oneOf'];
+        $cands    = $this->narrowBranches($data, $branches, $schema);
+        $narrowed = count($cands) < count($branches);
 
-		$disc = $this->inferDiscriminator($schema['discriminator'] ?? null, $branches);
-		return $this->explainAggregateMismatch($path, $data, $branches, $disc, 'anyOf', $failures);
-	}
+        $valid = 0; $fails = [];
+        foreach ($cands as $b) {
+            $label=$this->branchLabel($b);
+            $r=$this->validateNode($path,$data,isset($b['$ref'])?$this->resolveReference($b['$ref']):$b);
+            if($r->valid){$valid++;}
+            else{ $this->tagBranch($label,$r); $fails[]=$r; }
+        }
 
-	/* -------------------------------------------------
-	*  oneOf – must have *exactly* one passing branch.
-	* ------------------------------------------------- */
-	private function validateOneOf(array $path, mixed $data, array $schema): ValidationResult
-	{
-		$branches   = $schema['oneOf'];
-		$candidates = $this->narrowBranches($data, $branches, $schema);
-		$narrowed   = count($candidates) < count($branches);
+        if ($valid === 1) { return ValidationResult::ok(); }
+        if ($valid > 1)  { return ValidationResult::err($path, 'Data matches more than one allowed shape—make it unambiguous.'); }
+        if ($narrowed && $fails) { return ValidationResult::combine(...$fails); }
 
-		$valid   = 0;
-		$fails   = [];
+        return $this->explainAggregateMismatch($path, $data, $branches, $schema, 'oneOf', $fails);
+    }
 
-		foreach ($candidates as $b) {
-			$r = $this->validateNode(
-				$path,
-				$data,
-				isset($b['$ref']) ? $this->resolveReference($b['$ref']) : $b
-			);
-			$valid += $r->valid ? 1 : 0;
-			if (!$r->valid) { $fails[] = $r; }
-		}
+    /**
+     * Restore nuanced mismatch explanation:
+     *   1. Type mismatch → list allowed types.
+     *   2. Discriminator mismatch → point out expected vs actual.
+     *   3. Otherwise generic list of branch labels with best‑failure note.
+     */
+    private function explainAggregateMismatch(
+        array  $path,
+        mixed  $data,
+        array  $branches,
+        array  $parentSchema,
+        string $ctx,
+        array  $fails
+    ): ValidationResult {
+        // 1. type check
+        $allowedTypes = array_unique(array_map(function($b){
+            $s = isset($b['$ref']) ? $this->resolveReference($b['$ref']) : $b;
+            return $s['type'] ?? null;
+        }, $branches));
+        if (!$this->typeMatchesAny($data, $allowedTypes)) {
+            return ValidationResult::err(
+                $path,
+                'Expected one of ['.implode(', ', $allowedTypes).'] here, but got '.gettype($data).'.',
+                meta:[
+                    'expected'=>['types'=>$allowedTypes],
+                    'actual'  =>['type'=>gettype($data),'snippet'=>$this->valueSnippet($data)],
+                ]
+            );
+        }
 
-		if ($valid === 1) {
-			return ValidationResult::ok();
-		}
-		if ($valid > 1) {
-			return ValidationResult::err($path, 'oneOf matched multiple clauses');
-		}
-		if ($narrowed && $fails) {
-			return ValidationResult::combine(...$fails);
-		}
-		return $this->explainAggregateMismatch(
-			$path,
-			$data,
-			$branches,
-			$this->inferDiscriminator($schema['discriminator'] ?? null, $branches),
-			'oneOf',
-			$fails
-		);
-	}
+        // 2. discriminator check
+        $disc = $this->inferDiscriminator($parentSchema['discriminator'] ?? null, $branches);
+        if ($disc) {
+            [$prop, $allowed] = $disc;
+            $actual = is_array($data) && array_key_exists($prop, $data) ? $data[$prop] : MISSING;
+            if (!in_array($actual, $allowed, true)) {
+				$actual_humanized = $actual === MISSING ? 'missing' : json_encode($actual);
+                return ValidationResult::err(
+                    $path,
+                    "The '$prop' property must be one of [".implode(', ', $allowed)."], but it was " . $actual_humanized . '.',
+                    meta:[
+                        'expected'=>['discriminator'=>$allowed,'property'=>$prop],
+                        'actual'  =>['value'=>$actual,'snippet'=>$this->valueSnippet($actual)],
+                    ]
+                );
+            }
+        }
 
-	/** Produce richer error message for anyOf/oneOf aggregate failure */
-	/* ------------------------------------------------------------------
-	*  Helper: craft the aggregate error message in priority order
-	*          1 type mismatch          → list allowed PHP types
-	*          2 discriminator mismatch → list allowed discriminator values
-	*          3 fallback               → list branch labels once
-	* ------------------------------------------------------------------ */
-	private function explainAggregateMismatch(
-		array  $path,
-		mixed  $data,
-		array  $branches,
-		?array $discriminator,            // [$prop, $allowed]|null
-		string $ctx,                      // 'anyOf' | 'oneOf'
-		array $failures = []
-	): ValidationResult {
-		// a) type information
-		$allowedTypes = [];
-		foreach ($branches as $b) {
-			$r = isset($b['$ref']) ? $this->resolveReference($b['$ref']) : $b;
-			if (isset($r['type'])) { $allowedTypes[] = $r['type']; }
-		}
-		$allowedTypes = array_unique($allowedTypes);
-		if (!$this->typeMatchesAny($data, $allowedTypes)) {
-			return ValidationResult::err(
-				$path,
-				"$ctx: expected one of [" . implode(', ', $allowedTypes) . "], got " . gettype($data)
-			);
-		}
-		$actualType   = gettype($data);
-		if($this->arrayIsValidObject && $actualType === 'array' && in_array('object', $allowedTypes, true)) {
-			$actualType = 'object';
-		}
-		$allowedTypes = array_unique($allowedTypes);
-		if ($allowedTypes && !in_array($actualType, $allowedTypes, true)) {
-			return ValidationResult::err(
-				$path,
-				"$ctx: expected one of [" . implode(', ', $allowedTypes) . "], got $actualType"
-			);
-		}
+        // 3. fallback generic + attach best‑failure details
+        $labels = array_unique(array_map([$this,'branchLabel'],$branches));
+        $summary = ValidationResult::err(
+            $path,
+            ($ctx==='oneOf'?'Exactly one of ':'One of ').implode(', ', $labels).' is required, but none matched.',
+        );
+        if ($fails) { $summary->addExplanation($this->bestFailure($fails)); }
+        return $summary;
+    }
 
-		// b) discriminator information
-		if ($discriminator) {
-			[$prop, $allowed] = $discriminator;
-			$val = (is_array($data) && array_key_exists($prop, $data))
-				? var_export($data[$prop], true)
-				: 'missing';
-			return ValidationResult::err(
-				$path,
-				"$ctx: discriminator '$prop' must be " .
-				"[" . implode(', ', $allowed) . "], got $val"
-			);
-		}
+    // ─────────────────────────────────────────── primitives / objects / arrays ─┐
 
-		// c) generic – list unique labels once
-		$labels = array_unique(array_map([$this, 'branchLabel'], $branches));
-		$error = ValidationResult::err(
-			$path,
-			"$ctx: value must match " .
-			($ctx === 'oneOf' ? 'exactly one of ' : 'one of ') .
-			implode(', ', $labels)
-		);
-		// Only add an additional explanation if there's no clear-cut mismatch
-		// of the type of discriminator.
-		$error->addExplanation($this->bestFailure($failures));
-		return $error;
-	}
-
-	/* -------------------------------------------------
-	*  Smallest-damage heuristic
-	* ------------------------------------------------- */
-	private function bestFailure(array $results): ValidationResult
-	{
-		usort(
-			$results,
-			function (ValidationResult $a, ValidationResult $b) {
-				$errorCountA = count($a->errors);
-				$errorCountB = count($b->errors);
-				if ($errorCountA !== $errorCountB) {
-					return $errorCountA <=> $errorCountB;
-				}
-				// If error counts are equal, compare path specificity (longer paths first)
-				$maxPathA = max(array_map(fn($e) => count($e->path), $a->errors));
-				$maxPathB = max(array_map(fn($e) => count($e->path), $b->errors));
-				return $maxPathB <=> $maxPathA; // more specific first
-			}
-		);
-		return $results[0]; // first = fewest violations, most specific
-	}
-
-	/** Try to find a single enum-based discriminator shared by all object branches */
-	private function inferDiscriminator(?array $explicit_discriminator, array $branches): ?array
-	{
-		// keep only object branches with properties
-		$objects = array_filter($branches, fn ($b) => ($b['type'] ?? null) === 'object' && isset($b['properties']));
-		if (count($objects) !== count($branches) || count($objects) < 2) {
-			return null;
-		}
-
-		// Use the explicitly defined discriminator if one exists
-		if ($explicit_discriminator && isset($explicit_discriminator['propertyName'])) {
-			$prop = $explicit_discriminator['propertyName'];
-			$values = [];
-			foreach ($objects as $schema) {
-				$def = $schema['properties'][$prop] ?? null;
-				if ($def && isset($def['enum']) && count($def['enum']) === 1) {
-					$values[] = $def['enum'][0];
-				}
-			}
-
-			if (count(array_unique($values)) !== count($values)) {
-				return null; // values not unique => not a discriminator
-			}
-
-			return [$prop, $values];
-		}
-
-		// No explicit discriminator. Let's try to infer one.
-
-		// collect all props that are single-value enums
-		$candidates = [];
-		foreach ($objects as $schema) {
-			foreach ($schema['properties'] as $prop => $def) {
-				if (isset($def['enum']) && count($def['enum']) === 1) {
-					$candidates[$prop][] = $def['enum'][0];
-				}
-			}
-		}
-
-		// discriminator exists if there's:
-		//
-		// * exactly one single-value enum
-		// * that appears in every branch
-		// * that has a unique value in every branch
-		$candidates = array_filter($candidates, fn ($vals) => count($vals) === count($branches));
-		if (count($candidates) !== 1) {
-			return null;
-		}
-
-		[$prop, $values] = [key($candidates), current($candidates)];
-		if (count(array_unique($values)) !== count($values)) {
-			return null; // values not unique => not a discriminator
-		}
-
-		return [$prop, $values];
-	}
-
-    /** Primitive + composite type validation */
-    private function validateType(array $path, mixed $data, array $schema): ValidationResult
+    private function validateType(array $path,mixed $data,array $schema):ValidationResult
     {
         $type = $schema['type'];
-
-        $typeCheck = match ($type) {
-            'object'  => is_object($data) || ($this->arrayIsValidObject && is_array($data)),
-            'array'   => is_array($data),
-            'string'  => is_string($data),
-            'integer' => is_int($data),
-            'number'  => is_int($data) || is_float($data),
-            'boolean' => is_bool($data),
-            default   => throw new \RuntimeException("Unsupported type $type at " . implode('.', $path)),
-        };
-
-        if (!$typeCheck) {
-            return ValidationResult::err($path, "Expected $type, got " . gettype($data));
+        if (!$this->typeMatches($data, $type)) {
+            return ValidationResult::err(
+                $path,
+                'Expected '.$type.', got '.gettype($data).'.',
+                meta:[
+                    'expected'=>['type'=>$type],
+                    'actual'  =>['type'=>gettype($data),'snippet'=>$this->valueSnippet($data)],
+                ]
+            );
         }
 
-        // enum constraint
-        if (isset($schema['enum']) && !in_array($data, $schema['enum'], true)) {
-            return ValidationResult::err($path, 'Value not in enum: ' . implode(', ', $schema['enum']));
+        if(isset($schema['enum']) && !in_array($data,$schema['enum'],true)){
+            return ValidationResult::err(
+                $path,
+                'Allowed values: '.implode(', ',$schema['enum']).'. You supplied '.json_encode($data).'.',
+                meta:[
+                    'expected'=>['enum'=>$schema['enum']],
+                    'actual'  =>['value'=>$data,'snippet'=>$this->valueSnippet($data)],
+                ]
+            );
         }
 
-        return match ($type) {
-            'object' => $this->validateObject($path, $data, $schema),
-            'array'  => $this->validateArray($path, $data, $schema),
-			'string' => $this->validateString($path, $data, $schema),
+        return match($type){
+            'object' => $this->validateObject($path,$data,$schema),
+            'array'  => $this->validateArray($path,$data,$schema),
             default  => ValidationResult::ok(),
         };
     }
 
-	private function validateString(array $path, string $data, array $schema): ValidationResult
-	{
-		if(isset($schema['minLength'])) {
-			throw new \RuntimeException('minLength validation is not supported at ' . implode('.', $path));
-		}
+    // ───────────────────────────────────────────────────────────── object ─┐
 
-		if(isset($schema['maxLength'])) {
-			throw new \RuntimeException('maxLength validation is not supported at ' . implode('.', $path));
-		}
-
-		if(isset($schema['pattern'])) {
-			throw new \RuntimeException('pattern validation is not supported at ' . implode('.', $path));
-		}
-
-		return ValidationResult::ok();
-	}
-
-    private function validateObject(array $path, array|object $data, array $schema): ValidationResult
+    private function validateObject(array $path,array|object $data,array $schema):ValidationResult
     {
-        $dataArr = is_object($data) ? (array) $data : $data;
-        $results = [];
+        $arr=is_object($data)?(array)$data:$data;
+        $results=[];
 
-        // required
-            // Start of Selection
-            if (!empty($schema['required'])) {
-                $missing = [];
-                foreach ($schema['required'] as $field) {
-                    if (!array_key_exists($field, $dataArr)) {
-                        $missing[] = $field;
-                    }
-                }
-                if (!empty($missing)) {
-                    $results[] = ValidationResult::err([...$path], 'Missing required fields: ' . implode(', ', $missing));
-                }
+        if(!empty($schema['required'])){
+            $missing=array_diff($schema['required'],array_keys($arr));
+            if($missing){
+                $results[]=ValidationResult::err(
+                    $path,
+                    'Missing required field(s): '.implode(', ',$missing).'.',
+                    meta:[
+                        'expected'=>['required'=>$schema['required']],
+                        'actual'=>['present'=>array_keys($arr)],
+                    ]
+                );
             }
+        }
 
-        // properties
-        if (!empty($schema['properties'])) {
-            foreach ($schema['properties'] as $name => $propSchema) {
-                if (array_key_exists($name, $dataArr)) {
-                    $results[] = $this->validateNode([...$path, $name], $dataArr[$name], $propSchema);
+        if(!empty($schema['properties'])){
+            foreach($schema['properties'] as $name=>$propSpec){
+                if(array_key_exists($name,$arr)){
+                    $results[]=$this->validateNode([...$path,$name],$arr[$name],$propSpec);
                 }
             }
         }
 
-        // additionalProperties
-        if (array_key_exists('additionalProperties', $schema)) {
-            foreach ($dataArr as $name => $value) {
-                if (isset($schema['properties'][$name])) {
-                    continue;
-                }
-                if ($schema['additionalProperties'] === false) {
-                    $results[] = ValidationResult::err([...$path, $name], 'Unexpected property');
-                } else {
-                    $results[] = $this->validateNode([...$path, $name], $value, $schema['additionalProperties']);
+        if(array_key_exists('additionalProperties',$schema)){
+            foreach($arr as $name=>$v){
+                if(isset($schema['properties'][$name])){continue;}
+                if($schema['additionalProperties']===false){
+                    $results[]=ValidationResult::err([...$path,$name],"Property '$name' isn't allowed here.");
+                }else{
+                    $results[]=$this->validateNode([...$path,$name],$v,$schema['additionalProperties']);
                 }
             }
         }
-
         return ValidationResult::combine(...$results);
     }
 
-    private function validateArray(array $path, array $data, array $schema): ValidationResult
-    {
-        $results = [];
+    // ───────────────────────────────────────────────────────────── array ─┐
 
-        if (isset($schema['items'])) {
-            foreach ($data as $idx => $item) {
-                $results[] = $this->validateNode([...$path, $idx], $item, $schema['items']);
+    private function validateArray(array $path,array $data,array $schema):ValidationResult
+    {
+        $results=[];
+        if(isset($schema['items'])){
+            foreach($data as $idx=>$item){
+                $results[]=$this->validateNode([...$path,$idx],$item,$schema['items']);
             }
         }
-
-		if(isset($schema['minItems'])) {
-			if(count($data) < $schema['minItems']) {
-				$results[] = ValidationResult::err([...$path], 'Expected at least ' . $schema['minItems'] . ' items, got ' . count($data));
-			}
-		}
-
-		if(isset($schema['maxItems'])) {
-			if(count($data) > $schema['maxItems']) {
-				$results[] = ValidationResult::err([...$path], 'Expected at most ' . $schema['maxItems'] . ' items, got ' . count($data));
-			}
-		}
-
+        if(isset($schema['minItems']) && count($data)<$schema['minItems']){
+            $results[]=ValidationResult::err($path,'Need at least '.$schema['minItems'].' items, found '.count($data).'.');
+        }
+        if(isset($schema['maxItems']) && count($data)>$schema['maxItems']){
+            $results[]=ValidationResult::err($path,'May contain at most '.$schema['maxItems'].' items, found '.count($data).'.');
+        }
         return ValidationResult::combine(...$results);
     }
+
+    // ────────────────────────────────────────────────────────── references ─┐
 
     private function resolveReference(string $ref): array
     {
-        if ($ref === '' || !str_starts_with($ref, '#/')) {
-            throw new \RuntimeException('Only in-document #/ references supported');
+        if(!str_starts_with($ref,'#/')){
+            throw new \RuntimeException('Only local #/ refs are supported');
         }
-        $parts = explode('/', substr($ref, 2));
-        $node  = $this->schema;
-
-        foreach ($parts as $part) {
-            if (!array_key_exists($part, $node)) {
+        $node=$this->schema;
+        foreach(explode('/',substr($ref,2)) as $p){
+            if(!array_key_exists($p,$node)){
                 throw new \RuntimeException("Reference $ref not found");
             }
-            $node = $node[$part];
+            $node=$node[$p];
         }
         return $node;
+    }
+
+    // ───────────────────────────────────────────── discriminator inference ─┐
+
+    private function inferDiscriminator(?array $explicit,array $branches):?array
+    {
+        $objs=array_filter($branches,fn($b)=>($b['type']??null)==='object'&&isset($b['properties']));
+        if(count($objs)!==count($branches)||count($objs)<2){return null;}
+
+        if($explicit&&isset($explicit['propertyName'])){
+            $prop=$explicit['propertyName'];
+            $vals=[];
+            foreach($objs as $s){
+                $d=$s['properties'][$prop]??null;
+                if($d&&isset($d['enum'])&&count($d['enum'])===1){$vals[]=$d['enum'][0];}
+            }
+            if(count($vals)===count($branches)&&count(array_unique($vals))===count($vals)){
+                return [$prop,$vals];
+            }
+        }
+        // auto‑guess single‑value enums
+        $candidates=[];
+        foreach($objs as $s){
+            foreach($s['properties'] as $prop=>$def){
+                if(isset($def['enum'])&&count($def['enum'])===1){$candidates[$prop][]=$def['enum'][0];}
+            }
+        }
+        $candidates=array_filter($candidates,fn($v)=>count($v)===count($branches));
+        if(count($candidates)===1){
+            [$prop,$vals]=[key($candidates),current($candidates)];
+            if(count(array_unique($vals))===count($vals)){return [$prop,$vals];}
+        }
+        return null;
     }
 }
 
@@ -603,7 +527,7 @@ $result = $validator->validate([
 	],
 	"additionalStepsAfterExecution" => [
 		[
-			"step" => "writeFiles",
+			"step3" => "writeFiles",
 			"files" => [
 				"wp-content/uploads/custom-file.txt" => [
 					"filename" => "custom-file.txt",
