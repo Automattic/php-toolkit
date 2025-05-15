@@ -67,8 +67,8 @@ final class SchemaValidator
         }
 
         return match (true) {
-            isset($schema['anyOf']) => $this->validateAnyOf($path, $data, $schema['anyOf']),
-            isset($schema['oneOf']) => $this->validateOneOf($path, $data, $schema['oneOf']),
+            isset($schema['anyOf']) => $this->validateAnyOf($path, $data, $schema),
+            isset($schema['oneOf']) => $this->validateOneOf($path, $data, $schema),
             isset($schema['type'])  => $this->validateType($path, $data, $schema),
             default                 => ValidationResult::err($path, 'Unsupported schema node'),
         };
@@ -79,8 +79,10 @@ final class SchemaValidator
 	 *          • if at least one branch “fits” but is invalid → bubble that branch’s errors
 	 *          • otherwise → aggregate mismatch hint
 	 * ------------------------------------------------- */
-	private function validateAnyOf(array $path, mixed $data, array $branches): ValidationResult
+	private function validateAnyOf(array $path, mixed $data, array $schema): ValidationResult
 	{
+		$branches = $schema['anyOf'];
+		$discriminator = $this->inferDiscriminator($schema['discriminator'] ?? null, $branches);
 		$compatibleFailures = [];
 
 		foreach ($branches as $idx => $branch) {
@@ -102,11 +104,11 @@ final class SchemaValidator
 		}
 
 		// nothing matched even the broad type → aggregate mismatch diagnostics
-		return $this->explainAggregateMismatch($path, $data, $branches, 'anyOf');
+		return $this->explainAggregateMismatch($path, $data, $schema, $discriminator, 'anyOf');
 	}
 
 	/** Produce richer error message for anyOf/oneOf aggregate failure */
-	private function explainAggregateMismatch(array $path, mixed $data, array $branches, string $baseMsg): ValidationResult
+	private function explainAggregateMismatch(array $path, mixed $data, array $branches, $discriminator, string $baseMsg): ValidationResult
 	{
 		// 1. type mismatch?
 		$branchTypes = array_filter(array_unique(array_map(fn ($b) => $b['type'] ?? null, $branches)));
@@ -117,8 +119,8 @@ final class SchemaValidator
 		}
 
 		// 2. common discriminator?
-		if ($disc = $this->inferDiscriminator($branches)) {
-			[$prop, $allowed] = $disc;
+		if ($discriminator) {
+			[$prop, $allowed] = $discriminator;
 			$val = is_array($data) && array_key_exists($prop, $data) ? $data[$prop] : null;
 			$hint = " Discriminator '$prop' must be one of [".implode(', ', $allowed)."]. Got ".var_export($val, true).".";
 			return ValidationResult::err($path, $baseMsg.$hint);
@@ -136,7 +138,7 @@ final class SchemaValidator
 	}
 
 	/** Try to find a single enum-based discriminator shared by all object branches */
-	private function inferDiscriminator(array $branches): ?array
+	private function inferDiscriminator(?array $explicit_discriminator, array $branches): ?array
 	{
 		// keep only object branches with properties
 		$objects = array_filter($branches, fn ($b) => ($b['type'] ?? null) === 'object' && isset($b['properties']));
@@ -144,7 +146,27 @@ final class SchemaValidator
 			return null;
 		}
 
-		// collect candidate props that appear everywhere and have a single-value enum
+		// Use the explicitly defined discriminator if one exists
+		if ($explicit_discriminator && isset($explicit_discriminator['propertyName'])) {
+			$prop = $explicit_discriminator['propertyName'];
+			$values = [];
+			foreach ($objects as $schema) {
+				$def = $schema['properties'][$prop] ?? null;
+				if ($def && isset($def['enum']) && count($def['enum']) === 1) {
+					$values[] = $def['enum'][0];
+				}
+			}
+
+			if (count(array_unique($values)) !== count($values)) {
+				return null; // values not unique => not a discriminator
+			}
+
+			return [$prop, $values];
+		}
+
+		// No explicit discriminator. Let's try to infer one.
+
+		// collect all props that are single-value enums
 		$candidates = [];
 		foreach ($objects as $schema) {
 			foreach ($schema['properties'] as $prop => $def) {
@@ -154,7 +176,11 @@ final class SchemaValidator
 			}
 		}
 
-		// discriminator exists if exactly one prop meets criteria and has unique values
+		// discriminator exists if there's:
+		//
+		// * exactly one single-value enum
+		// * that appears in every branch
+		// * that has a unique value in every branch
 		$candidates = array_filter($candidates, fn ($vals) => count($vals) === count($branches));
 		if (count($candidates) !== 1) {
 			return null;
@@ -174,11 +200,70 @@ final class SchemaValidator
 	 *          • >1 valid → multiple-match error (as before)
 	 *          • 0 valid  → pick nearest match if any, else aggregate mismatch
 	 * ------------------------------------------------- */
-	private function validateOneOf(array $path, mixed $data, array $branches): ValidationResult
+	private function validateOneOf(array $path, mixed $data, array $schema): ValidationResult
 	{
+		$branches = $schema['oneOf'];
+		// Check if data matches any of the types defined in $schema
+		if (isset($schema['type'])) {
+			$types = is_array($schema['type']) ? $schema['type'] : [$schema['type']];
+			$matchesType = false;
+			foreach ($types as $type) {
+				if ($this->typeMatches($data, ['type' => $type])) {
+					$matchesType = true;
+					break;
+				}
+			}
+			if (!$matchesType) {
+				// @TODO: List the allowed types
+				return ValidationResult::err($path, 'Data does not match any allowed type(s) for oneOf');
+			}
+		}
+
+		// If there is only one branch matching the data type, only validate against that branch
+		$typeMatchingBranches = [];
+		foreach ($branches as $branch) {
+			$resolved = isset($branch['$ref']) ? $this->resolveReference($branch['$ref']) : $branch;
+			if ($this->typeMatches($data, $resolved)) {
+				$typeMatchingBranches[] = $branch;
+			}
+		}
+		if (count($typeMatchingBranches) === 1) {
+			return $this->validateNode($path, $data, $typeMatchingBranches[0]);
+		}
+
+		// If there's a discriminator, choose the branch that matches the discriminator
+		$discriminator = $this->inferDiscriminator($schema['discriminator'] ?? null, $branches);
+		if ($discriminator) {
+			if(!isset($data[$discriminator[0]])) {
+				return ValidationResult::err($path, 'Data does not match any allowed type(s) for oneOf: ' . $discriminator[0]);
+			}
+			if(!is_string($data[$discriminator[0]])) {
+				return ValidationResult::err($path, 'Data does not match any allowed type(s) for oneOf: ' . $discriminator[0]);
+			}
+
+			$discriminator_value = $data[$discriminator[0]];
+
+			$matchingBranch = null;
+			foreach ($branches as $branch) {
+				$expected_discriminator_value = $branch['properties'][$discriminator[0]]['enum'][0] ?? null;
+				if ($expected_discriminator_value === $discriminator_value) {
+					$matchingBranch = $branch;
+					break;
+				}
+			}
+			if (!$matchingBranch) {
+				return ValidationResult::err($path, 'Data does not match any allowed type(s) for oneOf: ' . $data[$discriminator[0]]);
+			}
+			// Validate just the matching branch
+			return $this->validateNode($path, $data, $matchingBranch);
+		}
+
+		// We cannot prune the branches any further.
+		// We need to validate against all branches.
+		// @TODO: Smaller error message – no need to combine errors from all the branches.
+
 		$validCount          = 0;
 		$compatibleFailures  = [];
-
 		foreach ($branches as $branch) {
 			$resolved = isset($branch['$ref']) ? $this->resolveReference($branch['$ref']) : $branch;
 			$result   = $this->validateNode($path, $data, $resolved);
@@ -200,7 +285,7 @@ final class SchemaValidator
 		if ($compatibleFailures) {
 			return ValidationResult::combine(...$compatibleFailures);     // bubble variant-specific errors
 		}
-		return $this->explainAggregateMismatch($path, $data, $branches, 'oneOf did not match any clause');
+		return $this->explainAggregateMismatch($path, $data, $branches, $discriminator, 'oneOf did not match any clause');
 	}
 
 	/** quick structural/type check used to spot “compatible but invalid” branches */
@@ -259,7 +344,7 @@ final class SchemaValidator
         if (!empty($schema['required'])) {
             foreach ($schema['required'] as $field) {
                 if (!array_key_exists($field, $dataArr)) {
-                    $results[] = ValidationResult::err([...$path, $field], 'Missing required field');
+                    $results[] = ValidationResult::err([...$path], 'Missing required field "' . $field . '"');
                 }
             }
         }
@@ -409,8 +494,8 @@ $result = $validator->validate([
 	],
 	"additionalStepsAfterExecution" => [
 		[
-			"step" => "writeFiless",
-			"files" => [
+			"step" => "writeFiles",
+			"filesz" => [
 				"wp-content/uploads/custom-file.txt" => [
 					"filename" => "custom-file.txt",
 					"content" => "This is a custom file created by the Blueprint."
