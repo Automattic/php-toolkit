@@ -252,13 +252,13 @@ function validateRunnerConfiguration(RunnerConfiguration $config, array $options
 function showUsageShort(): void
 {
     $script = basename($_SERVER['argv'][0]);
-    echo "Usage: php $script <blueprint> --site-url=<url> --site-path=<path> [options]\n";
+    echo "\033[1mUsage:\033[0m php $script \033[33m<blueprint>\033[0m --site-url=\033[33m<url>\033[0m --site-path=\033[33m<path>\033[0m [options]\n";
 }
 
 function showHelp(array $optionDefs): void
 {
     $script = basename($_SERVER['argv'][0]);
-    echo "\n\033[1mWordPress Blueprint Runner\033[0m\n";
+    echo "\033[1mWordPress Blueprint Runner\033[0m\n";
     showUsageShort();
     echo "\n";
     echo "\033[1mPositional arguments:\033[0m\n";
