@@ -9,6 +9,7 @@ use WordPress\Blueprints\DataReference\Directory;
 use WordPress\Blueprints\DataReference\File;
 use WordPress\Blueprints\Exception\BlueprintExecutionException;
 use WordPress\Blueprints\Progress\Tracker;
+use WordPress\ByteStream\WriteStream\FileWriteStream;
 use WordPress\Filesystem\Filesystem;
 use WordPress\Filesystem\LocalFilesystem;
 use WordPress\HttpClient\Client;
@@ -66,13 +67,13 @@ class Runtime {
 	}
 
 	public function getWpCliPath(): string {
-		$wp_cli_path = wp_join_paths( $this->getConfiguration()->getTargetSiteRoot(), 'wp-cli.phar' );
+		$wp_cli_path = wp_join_paths( $this->getTempRoot(), 'wp-cli.phar' );
 		if(!file_exists( $wp_cli_path )){
 			$resolved = $this->resolve( $this->wpCliReference );
 			if ( ! $resolved instanceof File ) {
 				throw new BlueprintExecutionException( 'Error downloading WP-CLI' );
 			}
-			$write_stream = $this->getTargetFilesystem()->open_write_stream( 'wp-cli.phar' );
+			$write_stream = FileWriteStream::from_path( $wp_cli_path );
 			pipe_stream( $resolved->stream, $write_stream );
 			$write_stream->close_writing();
 			chmod( $wp_cli_path, 0755 );

@@ -107,14 +107,6 @@ class LocalFilesystem implements Filesystem {
 	}
 
 	protected function mkdir_single( $path, $options = array() ) {
-		// @TODO: Remove this debug section
-		if (substr_count($path, 'var/folders/sb') > 1) {
-			$trace = debug_backtrace();
-			error_log('Double path detected: ' . $path . "\n" . print_r($trace, true));
-			throw new FilesystemException(
-				sprintf('Invalid path with duplicate var/folders/sb: %s', $path)
-			);
-		}
 		if ( $this->exists( $path ) ) {
 			throw new FilesystemException(
 				sprintf( 'Path already exists: %s', $path )

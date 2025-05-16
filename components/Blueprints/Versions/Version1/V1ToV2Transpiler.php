@@ -8,6 +8,10 @@ use WordPress\Blueprints\Validator\ValidationError;
 
 use function WordPress\Filesystem\wp_join_paths;
 
+/**
+ * @TODO: rewrite https://github.com urls to raw.githubusercontent.com urls like
+ *        Blueprint v1 do. Maybe even do it in v2 runner in general?
+ */
 class V1ToV2Transpiler {
 
 	static public function validate_v1_blueprint(array $v1): ?ValidationError {
@@ -145,8 +149,8 @@ class V1ToV2Transpiler {
 						}
 						$v2steps[] = [
 							'step' => 'cp',
-							'fromPath' => $v1step['fromPath'],
-							'toPath' => $v1step['toPath'],
+							'fromPath' => self::translatePath($v1step['fromPath']),
+							'toPath' => self::translatePath($v1step['toPath']),
 						];
 						break;
 					case 'defineWpConfigConsts':
@@ -273,7 +277,7 @@ class V1ToV2Transpiler {
 						}
 						$v2steps[] = [
 							'step' => 'mkdir',
-							'path' => $v1step['path'],
+							'path' => self::translatePath($v1step['path']),
 						];
 						break;
 					case 'mv':
@@ -282,8 +286,8 @@ class V1ToV2Transpiler {
 						}
 						$v2steps[] = [
 							'step' => 'mv',
-							'fromPath' => $v1step['fromPath'],
-							'toPath' => $v1step['toPath'],
+							'fromPath' => self::translatePath($v1step['fromPath']),
+							'toPath' => self::translatePath($v1step['toPath']),
 						];
 						break;
 					case 'request':
@@ -297,7 +301,7 @@ class V1ToV2Transpiler {
 							'step' => 'runPHP',
 							'code' => [
 								"filename" => "script.php",
-								"contents" => <<<'PHP'
+								"content" => <<<'PHP'
 								<?php
 								require getenv('DOCROOT') . '/wp-load.php';
 
@@ -322,7 +326,7 @@ class V1ToV2Transpiler {
 						}
 						$v2steps[] = [
 							'step' => 'rm',
-							'path' => $v1step['path'],
+							'path' => self::translatePath($v1step['path']),
 						];
 						break;
 					case 'rmDir':
@@ -331,7 +335,7 @@ class V1ToV2Transpiler {
 						}
 						$v2steps[] = [
 							'step' => 'rmdir',
-							'path' => $v1step['path'],
+							'path' => self::translatePath($v1step['path']),
 						];
 						break;
 					case 'runPHP':
@@ -342,7 +346,7 @@ class V1ToV2Transpiler {
 							'step' => 'runPHP',
 							'code' => [
 								"filename" => "script.php",
-								"contents" => $v1step['code']
+								"content" => self::convertPhpCode($v1step['code'])
 							],
 						];
 						break;
@@ -354,7 +358,7 @@ class V1ToV2Transpiler {
 							'step' => 'runSQL',
 							'source' => [
 								"filename" => "script.sql",
-								"contents" => $v1step['sql']
+								"content" => $v1step['sql']
 							],
 						];
 						break;
@@ -386,7 +390,7 @@ class V1ToV2Transpiler {
 								$v1step['zipPath'] ??
 								$v1step['zipFile']
 							),
-							'extractToPath' => $v1step['extractToPath'],
+							'extractToPath' => self::translatePath($v1step['extractToPath']),
 						];
 						break;
 					case 'updateUserMeta':
@@ -417,12 +421,14 @@ class V1ToV2Transpiler {
 						if(isset($v1step['progress'])) {
 							error_log('The `progress` option on writeFile step is not supported Blueprint v2 schema and will be ignored: %s. Use the runtime configuration to set the progress bar instead.');
 						}
+						$path = self::translatePath($v1step['path']);
 						$v2steps[] = [
 							'step' => 'writeFiles',
 							'files' => [
-								// In v1, file content can be an inline string literal
-								// or a reference to a resource.
-								$v1step['path'] => is_string($v1step['data']) ? $v1step['data'] : self::convertV1ResourceToV2Reference(
+								$path => is_string($v1step['data']) ? [
+									'filename' => basename($path),
+									'content' => $v1step['data'],
+								] : self::convertV1ResourceToV2Reference(
 									$v1step['data']
 								)
 							]
@@ -438,7 +444,7 @@ class V1ToV2Transpiler {
 						];
 						// Prefix paths with "writeToPath".
 						// The rest of the data format is compliant with v2.
-						$base_path = $v1step['writeToPath'];
+						$base_path = self::translatePath($v1step['writeToPath']);
 						foreach($v1step['filesTree'] as $path => $data) {
 							$joined_path = wp_join_paths($base_path, $path);
 							$v2step['files'][$joined_path] = $data;
@@ -458,7 +464,6 @@ class V1ToV2Transpiler {
 			}
 		}
 		$v2['additionalStepsAfterExecution'] = $v2steps;
-
 		return $v2;
 	}
 
@@ -476,7 +481,7 @@ class V1ToV2Transpiler {
 					// InlineFile
 					return [
 						'filename' => $resource['name'],
-						'contents' => $resource['contents'],
+						'content' => $resource['contents'],
 					];
 				case 'wordpress.org/themes':
 					// WordPressOrgThemeReference
@@ -516,5 +521,33 @@ class V1ToV2Transpiler {
 			}
 		}
 	}
+
+	protected static function translatePath($path) {
+		// V1 Blueprint paths are absolute
+		if(str_starts_with($path, '/wordpress/')) {
+			return substr($path, strlen('/wordpress/'));
+		}
+		return $path;
+	}
+
+	protected static function convertPhpCode($code) {
+		$tokens = token_get_all('<?php ' . $code);
+		$convertedCode = '';
+		foreach ($tokens as $token) {
+			if (is_array($token)) {
+				[$id, $text] = $token;
+				if ($id === T_CONSTANT_ENCAPSED_STRING && str_starts_with(trim($text, '\'"'), '/wordpress/')) {
+					$convertedCode .= 'getenv(\'DOCROOT\') . ' . var_export(substr(trim($text, '\'"'), strlen('/wordpress/')), true);
+				} else {
+					$convertedCode .= $text;
+				}
+			} else {
+				$convertedCode .= $token;
+			}
+		}
+		$code = substr($convertedCode, 6); // Remove the initial '<?php ' added for tokenization
+		return $code;
+	}
+
 
 }

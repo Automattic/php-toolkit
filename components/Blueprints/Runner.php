@@ -561,21 +561,14 @@ class Runner {
 			case 'importThemeStarterContent':
 				return new ImportThemeStarterContentStep( $data['themeSlug'] ?? null );
 			case 'installPlugin':
-				$pluginDef = $data['plugin'];
-				if ( is_string( $pluginDef ) ) {
-					return new InstallPluginStep( $this->createDataReference( $pluginDef, [
-						WordPressOrgPlugin::class,
-					] ) );
-				} else {
-					$source  = $this->createDataReference( $pluginDef['source'], [
-						WordPressOrgPlugin::class,
-					] );
-					$active  = $pluginDef['active'] ?? true;
-					$options = $pluginDef['activationOptions'] ?? null;
-					$onError = isset( $pluginDef['onError'] ) ? $pluginDef['onError'] : 'throw';
+				$source  = $this->createDataReference( $data['source'], [
+					WordPressOrgPlugin::class,
+				] );
+				$active  = $data['active'] ?? true;
+				$options = $data['activationOptions'] ?? null;
+				$onError = isset( $pluginDef['onError'] ) ? $pluginDef['onError'] : 'throw';
 
-					return new InstallPluginStep( $source, $active, $options, $onError );
-				}
+				return new InstallPluginStep( $source, $active, $options, $onError );
 			case 'installTheme':
 				$source = $this->createDataReference( $data['source'], [
 					WordPressOrgTheme::class,
