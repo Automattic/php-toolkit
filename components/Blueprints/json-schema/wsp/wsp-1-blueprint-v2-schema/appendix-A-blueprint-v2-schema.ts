@@ -15,7 +15,6 @@ export type Blueprint = {
 	 * 5, etc will be different from version 2.
 	 */
 	version: 2;
-
 	/**
 	 * JSON Schema URL.
 	 */
@@ -121,7 +120,7 @@ export type Blueprint = {
 		 * @default "/%postname%/"
 		 */
 		permalink_structure?: string | false;
-	} & Omit<Record<string, JsonValue>, 'siteUrl'>;
+	} & Record<Exclude<string, 'siteUrl'>, JsonValue>;
 
 	/**
 	 * }}}

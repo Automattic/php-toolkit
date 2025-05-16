@@ -31,6 +31,7 @@
     },
     "scripts": {
         "regenerate-composer": "php bin/regenerate_composer.json.php",
+        "regenerate-json-schema": "node components/Blueprints/json-schema/regenerate-schema.ts",
         "test": "phpunit -c phpunit.xml",
         "lint": "phpcs --standard=WordPress .",
         "lint-fix": "phpcbf --standard=WordPress ."
