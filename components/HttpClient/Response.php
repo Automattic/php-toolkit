@@ -2,6 +2,8 @@
 
 namespace WordPress\HttpClient;
 
+use WordPress\HttpServer\StatusCode;
+
 class Response {
 
 	public $protocol;
@@ -19,5 +21,9 @@ class Response {
 
 	public function get_header( $name ) {
 		return $this->headers[ strtolower( $name ) ] ?? null;
+	}
+
+	public function get_reason_phrase() {
+		return StatusCode::text( $this->status_code );
 	}
 }

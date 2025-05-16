@@ -29,6 +29,7 @@ class Runtime {
 		private DataReferenceResolver $assets,
 		private Client $client,
 		private array $blueprint,
+		private callable $logWarning,
 		private string $tempRoot
 	) {
 	}
@@ -61,12 +62,8 @@ class Runtime {
 		return $this->assets->resolve( $r, $progress_tracker );
 	}
 
-	/**
-	 * @TODO: Find a more useful way of communicating warnings. Perhaps an interface that captures output
-	 *        of the runtime, similar to progress reporter?
-	 */
 	public function logWarning( string $message ) {
-		error_log( $message );
+		call_user_func( $this->logWarning, $message );
 	}
 
 	public function withTemporaryDirectory( callable $callback ) {

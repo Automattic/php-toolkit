@@ -112,6 +112,10 @@ class SeekableRequestReadStream implements ByteReadStream {
 		return $this->cache->consume_all();
 	}
 
+	public function await_response() {
+		return $this->remote->await_response();
+	}
+
 	public function close_reading(): void {
 		$this->remote->close_reading();
 		$this->cache->close_reading();

@@ -44,6 +44,7 @@ use WordPress\Filesystem\InMemoryFilesystem;
 use WordPress\Filesystem\LocalFilesystem;
 use WordPress\HttpClient\Client;
 use WordPress\HttpClient\FilesystemCache;
+use WordPress\HttpClient\HttpClientException;
 use WordPress\Zip\ZipFilesystem;
 
 use function WordPress\Encoding\utf8_is_valid_byte_stream;
@@ -63,7 +64,7 @@ class Runner {
 
 	public function __construct( private RunnerConfiguration $configuration ) {
 		$this->validateConfiguration( $configuration );
-		
+
 		$this->client = new Client( [
 			/**
 			 * Store cached HTTP responses in a temporary directory with a stable path
@@ -176,6 +177,9 @@ class Runner {
 				$this->assets,
 				$this->client,
 				$this->blueprintArray,
+				function($message) {
+					$this->logWarning( $message );
+				},
 				$tempRoot
 			);
 			$this->progressObserver->setRuntime($this->runtime);
@@ -197,6 +201,14 @@ class Runner {
 				'recursive' => true,
 			]);
 		}
+	}
+
+	/**
+	 * @TODO: Find a more useful way of communicating warnings. Perhaps an interface that captures output
+	 *        of the runtime, similar to progress reporter?
+	 */
+	public function logWarning(string $message): void {
+		error_log( $message );
 	}
 
 	/*──────────────── Blueprint load / validation / createExecutionPlan ─────────────*/
@@ -225,6 +237,17 @@ class Runner {
 		
 		if ( $resolved instanceof File ) {
 			$stream = $resolved->stream;
+			$response = $stream->await_response();
+			if($response->status_code < 200 || $response->status_code >= 400) {
+				throw new BlueprintExecutionException(
+					sprintf(
+						'Failed to load blueprint from %s. Server responded with %d %s.',
+						$reference->get_url(),
+						$response->status_code,
+						$response->get_reason_phrase()
+					)
+				);
+			}
 
 			if ( is_zip_file_stream( $stream ) ) {
 				$blueprintString        = $this->blueprintExecutionContext->get_contents( '/blueprint.json' );
@@ -233,7 +256,12 @@ class Runner {
 				// JSON file
 				$blueprintString = $stream->consume_all();
 				if ( $reference instanceof URLReference ) {
-					throw new BlueprintExecutionException( 'URLReference is not supported yet as a blueprint reference type' );
+					if($this->configuration->getExecutionContext()) {
+						$this->blueprintExecutionContext = $this->configuration->getExecutionContext();
+					} else {
+						$this->logWarning( 'When the Blueprint is loaded as JSON from a remote URL, the execution context is empty.' );
+						$this->blueprintExecutionContext = InMemoryFilesystem::create();
+					}
 				} elseif ( $reference instanceof ExecutionContextPath ) {
 					// It was resolved as an ExecutionContextPath, but it's actually a local
 					// filesystem path at this point.
