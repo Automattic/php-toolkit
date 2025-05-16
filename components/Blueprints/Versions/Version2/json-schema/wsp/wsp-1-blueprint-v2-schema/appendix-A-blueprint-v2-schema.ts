@@ -599,7 +599,8 @@ type PluginDefinition =
 			 * } );
 			 * ```
 			 */
-			activationOptions?: Record<string, JsonValue>;
+		activationOptions?: Record<string, JsonValue>;
+			
 			/**
 			 * Sometimes it's fine when a plugin fails to install.
 			 *
@@ -641,10 +642,6 @@ type ThemeDefinition =
 	| DataReference
 	| {
 			source: ThemeDirectoryReference | DataReference;
-			/**
-			 * Whether to activate the theme after installing it.
-			 */
-			activate?: boolean;
 			/**
 			 * Whether to import the theme's starter content after installing it.
 			 */

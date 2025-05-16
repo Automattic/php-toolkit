@@ -38,6 +38,7 @@ use WordPress\Blueprints\Steps\UnzipStep;
 use WordPress\Blueprints\Steps\WPCLIStep;
 use WordPress\Blueprints\Steps\WriteFilesStep;
 use WordPress\Blueprints\Validator\HumanFriendlySchemaValidator;
+use WordPress\Blueprints\Versions\Version1\V1ToV2Transpiler;
 use WordPress\ByteStream\ReadStream\FileReadStream;
 use WordPress\Filesystem\Filesystem;
 use WordPress\Filesystem\InMemoryFilesystem;
@@ -299,12 +300,29 @@ class Runner {
 		if ( json_last_error() !== JSON_ERROR_NONE ) {
 			throw new BlueprintExecutionException( 'Blueprint must be a valid JSON document.' );
 		}
+
+		if(!is_array($this->blueprintArray)) {
+			throw new BlueprintExecutionException('Blueprint must be an array.');
+		}
 	}
 
 	private function validateBlueprint(): void {
-		// Assert the Blueprint conforms to the JSON schema.
+		if(
+			!isset($this->blueprintArray['version']) && 
+			null === V1ToV2Transpiler::validate_v1_blueprint($this->blueprintArray)
+		) {
+			// @TODO: Should we log what we're doing along the way? E.g. the fact
+			//        that we're upgrading? Maybe in some "verbose" mode? But remember
+			//        this is not a CLI tool. This is a generic library for all Blueprint
+			//        runners. Hmm... Let's write messages to a logger interface maybe?
+			//        And the caller will decide how to log them?
+			$this->mainTracker->setCaption('Blueprint v1 detected. Transpiling to v2...');
+			$this->blueprintArray = V1ToV2Transpiler::upgrade($this->blueprintArray);
+		}
+
+		// Assert the Blueprint conforms to the latest JSON schema.
 		$v = new HumanFriendlySchemaValidator(
-			json_decode( file_get_contents( __DIR__ . '/json-schema/blueprint-v2-schema.json' ), true )
+			json_decode( file_get_contents( __DIR__ . '/Versions/Version2/json-schema/schema-v2.json' ), true )
 		);
 		$error = $v->validate( $this->blueprintArray );
 		if ( $error ) {

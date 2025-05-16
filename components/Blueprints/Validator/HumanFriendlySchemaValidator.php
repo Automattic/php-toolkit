@@ -140,6 +140,7 @@ final class HumanFriendlySchemaValidator
             'integer' => is_int($data),
             'number'  => is_int($data) || is_float($data),
             'boolean' => is_bool($data),
+			'null'    => is_null($data),
             null      => true,
             default   => throw new UnsupportedSchemaException("Type \"{$type}\" is not supported."),
         };
@@ -501,8 +502,10 @@ final class HumanFriendlySchemaValidator
                         ['propertyName' => $name]
                     );
 				} else if(is_array($schema['additionalProperties'])) {
-                    $error = $this->validateNode($currentPropPath,$v,$schema['additionalProperties']);
-                    if ($error) $childrenErrors[] = $error;
+					if(count($schema['additionalProperties'])) {
+						$error = $this->validateNode($currentPropPath,$v,$schema['additionalProperties']);
+						if ($error) $childrenErrors[] = $error;
+					}
                 } else {
 					// This is a schema definition issue, not a data validation issue for this specific property.
 					throw new UnsupportedSchemaException('Invalid additionalProperties schema. Expected boolean or object for schema at path: ' . $this->convertPathToString($path));
