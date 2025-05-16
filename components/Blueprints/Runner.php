@@ -62,6 +62,8 @@ class Runner {
 	public ?Runtime $runtime;
 
 	public function __construct( private RunnerConfiguration $configuration ) {
+		$this->validateConfiguration( $configuration );
+		
 		$this->client = new Client( [
 			/**
 			 * Store cached HTTP responses in a temporary directory with a stable path
@@ -78,6 +80,66 @@ class Runner {
 		// Set up progress logging
 		$this->progressObserver = $configuration->getProgressObserver() ?? new ProgressObserver();
 		$this->progressObserver->attachTo( $this->mainTracker );
+	}
+
+	private function validateConfiguration(RunnerConfiguration $config): void {
+		// Validate blueprint reference
+		$blueprint = $config->getBlueprint();
+		if (empty($blueprint)) {
+			throw new BlueprintExecutionException("A Blueprint reference is required.");
+		}
+	
+		// Validate execution mode
+		$mode = $config->getExecutionMode();
+		if (!in_array($mode, ['create-new-site', 'apply-to-existing-site'], true)) {
+			throw new BlueprintExecutionException("Execution mode must be either 'create-new-site' or 'apply-to-existing-site'.");
+		}
+	
+		// Validate site URL
+		// Note: $options is not defined in this context, so we skip this block.
+		// If you want to validate the site URL, you should use $config->getTargetSiteUrl().
+		$siteUrl = $config->getTargetSiteUrl();
+		if ($mode === 'create-new-site') {
+			if (empty($siteUrl)) {
+				throw new BlueprintExecutionException("Site URL is required when the execution mode is 'create-new-site'.");
+			}
+		}
+		if (!empty($siteUrl) && !filter_var($siteUrl, FILTER_VALIDATE_URL)) {
+			throw new BlueprintExecutionException("Site URL is not a valid URL.");
+		}
+	
+		// Validate database engine
+		$dbEngine = $config->getDatabaseEngine();
+		if (!in_array($dbEngine, ['mysql', 'sqlite'], true)) {
+			throw new BlueprintExecutionException("Database engine must be either 'mysql' or 'sqlite'.");
+		}
+	
+		// Validate database credentials
+		$dbCreds = $config->getDatabaseCredentials();
+		if ($dbEngine === 'mysql') {
+			if (empty($dbCreds['username']) || empty($dbCreds['databaseName'])) {
+				throw new BlueprintExecutionException("MySQL credentials are required when database engine is 'mysql'.");
+			}
+			// Check if you can connect to the database
+			$host = $dbCreds['host'] ?? 'localhost';
+			$port = $dbCreds['port'] ?? 3306;
+			$username = $dbCreds['username'] ?? '';
+			$password = $dbCreds['password'] ?? '';
+			$database = $dbCreds['databaseName'] ?? '';
+			$dsn = "mysql:host=$host;port=$port;dbname=$database;charset=utf8mb4";
+			try {
+				new \PDO($dsn, $username, $password, [
+					\PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION,
+					\PDO::ATTR_TIMEOUT => 3,
+				]);
+			} catch (\PDOException $e) {
+				throw new BlueprintExecutionException("Could not connect to MySQL database: " . $e->getMessage());
+			}
+		} elseif ($dbEngine === 'sqlite') {
+			if (empty($dbCreds['path'])) {
+				throw new BlueprintExecutionException("SQLite file path is required when database engine is 'sqlite'.");
+			}
+		}
 	}
 
 	public function run(): void {

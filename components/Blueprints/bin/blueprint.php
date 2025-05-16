@@ -10,6 +10,7 @@ use WordPress\Blueprints\DataReference\DataReference;
 use WordPress\Blueprints\Exception\BlueprintExecutionException;
 use WordPress\Blueprints\ProgressObserver;
 use WordPress\Blueprints\Runner;
+use WordPress\Filesystem\LocalFilesystem;
 
 // Enable colours on Windows 10+ (safe‑no‑op elsewhere)
 if (\PHP_OS_FAMILY === 'Windows' && \function_exists('sapi_windows_vt100_support')) {
@@ -133,9 +134,8 @@ function cliArgsToRunnerConfiguration(array $positionals, array $options): Runne
         if ($absoluteExecutionContext === false) {
             throw new InvalidArgumentException("The execution context path does not exist: {$executionContext}");
         }
-        $config->setTargetSiteRoot($absoluteExecutionContext);
+        $config->setExecutionContext(LocalFilesystem::create($absoluteExecutionContext));
     }
-
 
     if (empty($options['site-path'])) {
         throw new InvalidArgumentException("--site-path option is required.");
@@ -147,6 +147,8 @@ function cliArgsToRunnerConfiguration(array $positionals, array $options): Runne
         throw new InvalidArgumentException("The target site root path does not exist: {$targetSiteRoot}");
     }
     $config->setTargetSiteRoot($absoluteTargetSiteRoot);
+
+	$config->setTargetSiteUrl($options['site-url']);
 
     // Set execution mode
     if (!empty($options['mode'])) {
@@ -193,56 +195,6 @@ function cliArgsToRunnerConfiguration(array $positionals, array $options): Runne
     }
 
     return $config;
-}
-
-function validateRunnerConfiguration(RunnerConfiguration $config, array $options): ?string
-{
-    // Validate blueprint reference
-    $blueprint = $config->getBlueprint();
-    if (empty($blueprint)) {
-        return "A blueprint must be specified as a positional argument.";
-    }
-
-    // Validate execution mode
-    $mode = $config->getExecutionMode();
-    if (!in_array($mode, ['create-new-site', 'apply-to-existing-site'], true)) {
-        return "Execution mode must be either 'create-new-site' or 'apply-to-existing-site'.";
-    }
-
-    // Validate site URL
-	if(!empty($options['site-url'])) {
-		if(!filter_var($options['site-url'], FILTER_VALIDATE_URL)) {
-			return "Site URL is not a valid URL.";
-		}
-		$config->setTargetSiteUrl($options['site-url']);
-	}
-
-	if($mode === 'create-new-site') {
-		if(empty($options['site-url'])) {
-			return "Site URL is required when the execution mode is 'create-new-site'.";
-		}
-		$config->setTargetSiteUrl($options['site-url']);
-	}
-
-    // Validate database engine
-    $dbEngine = $config->getDatabaseEngine();
-    if (!in_array($dbEngine, ['mysql', 'sqlite'], true)) {
-        return "Database engine must be either 'mysql' or 'sqlite'.";
-    }
-
-    // Validate database credentials
-    $dbCreds = $config->getDatabaseCredentials();
-    if ($dbEngine === 'mysql') {
-        if (empty($dbCreds['username']) || empty($dbCreds['databaseName'])) {
-            return "MySQL credentials are required when database engine is 'mysql'.";
-        }
-    } elseif ($dbEngine === 'sqlite') {
-        if (empty($dbCreds['path'])) {
-            return "SQLite file path is required when database engine is 'sqlite'.";
-        }
-    }
-
-    return null;
 }
 
 
@@ -332,13 +284,6 @@ try {
     // Convert CLI arguments to RunnerConfiguration
     $config = cliArgsToRunnerConfiguration($positionals, $options);
 
-    // Validate the configuration (now passes $options for output check)
-    $validationError = validateRunnerConfiguration($config, $options);
-    if ($validationError !== null) {
-        showUsageShort();
-        throw new InvalidArgumentException($validationError);
-    }
-
     if ($options['dry-run']) {
         echo "\033[32mArguments valid – dry‑run mode, exiting without changes.\033[0m\n";
         exit(0);
@@ -347,6 +292,7 @@ try {
 		->setProgressObserver(new ProgressObserver(function ($progress, $caption) {
 			reportProgress($progress, $caption);
 		}));
+	$runner = new Runner($config);
 } catch (InvalidArgumentException $ex) {
     echo "\033[31mError:\033[0m ".$ex->getMessage().PHP_EOL;
     echo "Try '--help' for usage.".PHP_EOL;
@@ -368,7 +314,7 @@ try {
 	echo sprintf("  Blueprint: %s\n", $config->getBlueprint()->get_human_readable_name());
 	echo PHP_EOL;
     // In a real application you might now pass $config to a service class.
-	(new Runner($config))->run();
+	$runner->run();
 	echo PHP_EOL;
 	echo sprintf("\033[32m✔ Blueprint successfully executed.\033[0m\n");
 } catch (BlueprintExecutionException $ex) {
