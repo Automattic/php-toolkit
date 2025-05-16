@@ -44,9 +44,10 @@ export type ExecutionContextPath = `/${string}` | `./${string}`;
  * ```
  */
 export type InlineFile = {
-  filename: string;
-  content: string;
+	filename: string;
+	content: InlineFileContent;
 };
+type InlineFileContent = string;
 
 /**
  * A directory that is inlined within the Blueprint JSON document.
@@ -55,117 +56,57 @@ export type InlineFile = {
  *
  * ```json
  * {
- *     "name": "my-directory",
- *     "children": [
- *         {
- *             "filename": "index.php",
- *             "content": "<?php echo 'Hello, world!'; ?>"
- *         },
- *         {
- *             "name": "my-sub-directory",
- *             "children": [
- *                 {
- *                     "filename": "index.php",
- *                     "content": "<?php echo 'Hello, world!'; ?>"
- *                 }
- *             ]
+ *     "directoryName": "my-directory",
+ *     "files": {
+ *         "index.php": "<?php echo 'Hello, world!'; ?>",
+ *         "my-sub-directory": {
+ *             "files": {
+ *                 "index.php": "<?php echo 'Hello, world!'; ?>"
+ *             }
  *         }
- *     ]
+ *     }
+ * }
+ * ```
  */
 export type InlineDirectory = {
-  name: string;
-  children: Array<InlineFile | InlineDirectory>;
+	directoryName: string;
+	files: Record<string, InlineFileContent | InlineDirectory>;
 };
 
 /**
  * A reference to a remote git repository.
  */
 export type GitPath = {
-  /**
-   * A HTTP or HTTPS URL of the remote git repository.
-   */
-  gitRepository: URLReference;
+	/**
+	 * A HTTP or HTTPS URL of the remote git repository.
+	 */
+	gitRepository: URLReference;
 
-  /**
-   * A branch name, commit hash, or tag name.
-   *
-   * Defaults to HEAD.
-   */
-  ref?: string;
+	/**
+	 * A branch name, commit hash, or tag name.
+	 *
+	 * Defaults to HEAD.
+	 */
+	ref?: string;
 
-  /**
-   * A path to a directory inside the repository.
-   *
-   * Defaults to the root of the repository.
-   */
-  path?: string;
-
-  /**
-   * A name of the local directory that will contain the remote git
-   * repository files.
-   *
-   * For example, this Blueprint:
-   *
-   * ```json
-   * {
-   *     "plugins": [
-   *         {
-   *             "gitRepository": "https://github.com/Automattic/jetpack.git",
-   *             "localDirectoryName": "jetpack-trunk"
-   *         }
-   *     ]
-   * }
-   * ```
-   *
-   * will clone the Jetpack repository into a directory called "jetpack-trunk"
-   * and use it to install the plugin.
-   *
-   * Defaults to the name of the repository and, if that's not available,
-   * to "git-repo".
-   */
-  localDirectoryName?: string;
+	/**
+	 * A path inside the git repository this data reference points to.
+	 *
+	 * Defaults to the root of the repository.
+	 */
+	pathInRepository?: string;
 };
 
 /**
  * A union of all general data reference types.
  */
-export type DataReferencePlain =
-  | URLReference
-  | ExecutionContextPath
-  | InlineFile
-  | InlineDirectory
-  | GitPath;
-
 export type DataReference =
-  | DataReferencePlain
-  | {
-  /**
-   * Where the file is located.
-   */
-  file: DataReferencePlain;
+	| URLReference
+	| ExecutionContextPath
+	| InlineFile
+	| InlineDirectory
+	| GitPath;
 
-  /**
-   * Human-readable name of the file. It's used to communicate the name of the
-   * file in the progress bar.
-   *
-   * For example, with the following Blueprint:
-   *
-   * ```json
-   * {
-   *     "plugins": [
-   *         {
-   *             "source": "https://github.com/Automattic/jetpack/archive/refs/heads/beta.zip",
-   *             "humanReadableName": "Jetpack Beta"
-   *         }
-   *     ]
-   * }
-   * ```
-   *
-   * The progress bar will show "Installing Jetpack Beta" instead of
-   * "Installing https://github.com/Automattic/jetpack/archive/refs/heads/beta.zip".
-   */
-  humanReadableName?: string;
-};
 /**
  * }}}
  */
@@ -192,9 +133,9 @@ export type DataReference =
  */
 export type Slug = string;
 export type SimpleVersionExpression =
-  | 'latest'
-  | `${number}.${number}`
-  | `${number}.${number}.${number}`;
+	| 'latest'
+	| `${number}.${number}`
+	| `${number}.${number}.${number}`;
 export type WordPressVersionSuffix = `beta${number}` | `rc${number}`;
 /** }}} Helper types */
 
@@ -212,8 +153,8 @@ export type WordPressVersionSuffix = `beta${number}` | `rc${number}`;
  * * The `installPlugin` imperative step
  */
 export type PluginDirectoryReference =
-  | Slug
-  | `${Slug}@${SimpleVersionExpression}`;
+	| Slug
+	| `${Slug}@${SimpleVersionExpression}`;
 
 /**
  * Theme directory reference, e.g. "twentytwentythree", "adventurer@4.6.0", or "twentytwentyfour@latest".
@@ -229,8 +170,8 @@ export type PluginDirectoryReference =
  * * The `installTheme` imperative step
  */
 export type ThemeDirectoryReference =
-  | Slug
-  | `${Slug}@${SimpleVersionExpression}`;
+	| Slug
+	| `${Slug}@${SimpleVersionExpression}`;
 
 /**
  * WordPress version, e.g. "6.4", "6.4.3", "6.8-RC1", or "6.7-beta2".
@@ -242,8 +183,8 @@ export type ThemeDirectoryReference =
  * `wordpressVersion` property.
  */
 export type WordPressVersion =
-  | SimpleVersionExpression
-  | `${SimpleVersionExpression}-${WordPressVersionSuffix}`;
+	| SimpleVersionExpression
+	| `${SimpleVersionExpression}-${WordPressVersionSuffix}`;
 
 /**
  * PHP version, e.g. "8.1" or "8.1.3".

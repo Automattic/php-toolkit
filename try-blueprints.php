@@ -4,10 +4,12 @@
  * @TODO: A large test suite.
  * @TODO: Client HTTP queue deadlock when we enqueued a lot of requests and need to fetch a small
  *        ad-hoc resource such as a JSON list of translations.
- * @TODO: Blueprint JSON validation.
- * @TODO [_spec_]: Add importMedia step to the specification.
  * @TODO [_spec_]: How to handle the default WordPress theme? Should it be preserved for new sites?
  *        What if we want to remove it? And what should be the semantics for existing sites?
+ *        -> how to handle conflicts in general? pre-existing themes conflicting with new themes?
+ *           pre-existing plugins conflicting with new plugins? refuse to execute? tell the user what
+ *           to do? As in change the Blueprint? What if I don't want to change it? maybe interact with the user
+ *           and ask whether they want to bale or override the theme/plugin?
  * @TODO (low priority): Production-grade HTTP Cache support for remote files. Not the stopgap we have now.
  *                       We can ship Blueprints without http cache support, but do not ship the stopgap solution 
  *                       in production.
@@ -17,6 +19,8 @@
  * @TODO (low priority): Restrictions on supported step types, media files types, SQL queries types, etc.
  * @TODO (low priority): Fast unzipping of remote Zip Files by iterating over the entries
  *        instead of skipping over to the end central directory index entry.
+ * ✅ @TODO: Blueprint JSON validation.
+ * ✅ @TODO [_spec_]: Add importMedia step to the specification.
  * ✅ @TODO: Support chunked encoding Zip Files without the Content-Length header.
  */
   
