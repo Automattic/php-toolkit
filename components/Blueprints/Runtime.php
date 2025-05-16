@@ -7,11 +7,13 @@ use WordPress\Blueprints\DataReference\DataReference;
 use WordPress\Blueprints\DataReference\DataReferenceResolver;
 use WordPress\Blueprints\DataReference\Directory;
 use WordPress\Blueprints\DataReference\File;
+use WordPress\Blueprints\Exception\BlueprintExecutionException;
 use WordPress\Blueprints\Progress\Tracker;
 use WordPress\Filesystem\Filesystem;
 use WordPress\Filesystem\LocalFilesystem;
 use WordPress\HttpClient\Client;
 
+use function WordPress\Filesystem\pipe_stream;
 use function WordPress\Filesystem\wp_join_paths;
 
 class EvalResult {
@@ -29,8 +31,9 @@ class Runtime {
 		private DataReferenceResolver $assets,
 		private Client $client,
 		private array $blueprint,
-		private callable $logWarning,
-		private string $tempRoot
+		private $logWarning,
+		private string $tempRoot,
+		private DataReference $wpCliReference
 	) {
 	}
 
@@ -60,6 +63,21 @@ class Runtime {
 
 	public function resolve( DataReference $r, ?Tracker $progress_tracker = null ): File|Directory {
 		return $this->assets->resolve( $r, $progress_tracker );
+	}
+
+	public function getWpCliPath(): string {
+		$wp_cli_path = wp_join_paths( $this->getConfiguration()->getTargetSiteRoot(), 'wp-cli.phar' );
+		if(!file_exists( $wp_cli_path )){
+			$resolved = $this->resolve( $this->wpCliReference );
+			if ( ! $resolved instanceof File ) {
+				throw new BlueprintExecutionException( 'Error downloading WP-CLI' );
+			}
+			$write_stream = $this->getTargetFilesystem()->open_write_stream( 'wp-cli.phar' );
+			pipe_stream( $resolved->stream, $write_stream );
+			$write_stream->close_writing();
+			chmod( $wp_cli_path, 0755 );
+		}
+		return $wp_cli_path;
 	}
 
 	public function logWarning( string $message ) {

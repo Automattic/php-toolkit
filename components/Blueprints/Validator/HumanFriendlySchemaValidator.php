@@ -146,9 +146,12 @@ final class HumanFriendlySchemaValidator
         };
     }
 
-    private function typeMatchesAny(mixed $data, array $types): bool
+    private function typeMatchesAny(mixed $data, $type_or_types): bool
     {
-        foreach ($types as $t) {
+		if(!is_array($type_or_types)) {
+			return $this->typeMatches($data, $type_or_types);
+		}
+        foreach ($type_or_types as $t) {
             if (is_array($t)) { $t = $t['type'] ?? null; }
             if ($this->typeMatches($data, $t)) { return true; }
         }
@@ -174,12 +177,6 @@ final class HumanFriendlySchemaValidator
                 // This should remain an exception as it's a schema configuration issue, not a data validation issue.
                 throw new UnsupportedSchemaException("The schema keyword \"{$keyword}\" is not supported.");
             }
-        }
-
-        // Check if 'type' is an array, which is not supported
-        if (isset($schema['type']) && is_array($schema['type'])) {
-            // This should remain an exception.
-            throw new UnsupportedSchemaException("Defining 'type' as an array of types is not supported. Use anyOf or oneOf instead.");
         }
 
         $error = match (true) {
@@ -208,7 +205,7 @@ final class HumanFriendlySchemaValidator
         // 1. filter by declared top‑level type
         $candidates = array_filter($branches, function($b) use($data){
             $spec = isset($b['$ref']) ? $this->resolveReference($b['$ref']) : $b;
-            return $this->typeMatches($data, $spec['type'] ?? null);
+            return $this->typeMatchesAny($data, $spec['type'] ?? null);
         });
 
         // 2. filter by discriminator (explicit or inferred)
@@ -221,10 +218,17 @@ final class HumanFriendlySchemaValidator
                 $candidates = array_values(array_filter($candidates, function($b) use($prop,$wanted){
                     $r = isset($b['$ref']) ? $this->resolveReference($b['$ref']) : $b;
                     // Ensure properties exist before accessing
-                    return isset($r['properties'][$prop]['enum'][0]) && ($r['properties'][$prop]['enum'][0] === $wanted);
+					if(isset($r['properties'][$prop]['enum'][0]) && ($r['properties'][$prop]['enum'][0] === $wanted)){
+						return true;
+					}
+					if(isset($r['properties'][$prop]['const']) && ($r['properties'][$prop]['const'] === $wanted)){
+						return true;
+					}
+					return false;
                 }));
             }
         }
+
         return $candidates ?: $branches; // never empty
     }
 
@@ -306,10 +310,24 @@ final class HumanFriendlySchemaValidator
         $pointer = $this->convertPathToString($path);
         
         // 1. Type mismatch (if data type doesn't match any of the branch types)
-        $allowedTypes = array_unique(array_values(array_filter(array_map(function($b){
+        $allowedTypes = [];
+        foreach ($branches as $b) {
             $s = isset($b['$ref']) ? $this->resolveReference($b['$ref']) : $b;
-            return $s['type'] ?? null;
-        }, $branches), fn($type) => $type !== null)));
+            $type = $s['type'] ?? null;
+            if ($type !== null) {
+                if (is_array($type)) {
+                    foreach ($type as $t) {
+                        if (!in_array($t, $allowedTypes, true)) {
+                            $allowedTypes[] = $t;
+                        }
+                    }
+                } else {
+                    if (!in_array($type, $allowedTypes, true)) {
+                        $allowedTypes[] = $type;
+                    }
+                }
+            }
+        }
         
         if (!empty($allowedTypes) && !$this->typeMatchesAny($data, $allowedTypes)) {
 			if(count($allowedTypes) === 1){
@@ -393,7 +411,7 @@ final class HumanFriendlySchemaValidator
     private function validateType(array $path,mixed $data,array $schema):?ValidationError
     {
         $type = $schema['type'];
-        if (!$this->typeMatches($data, $type)) {
+        if (!$this->typeMatchesAny($data, $type)) {
             return new ValidationError(
                 $this->convertPathToString($path),
                 'type-mismatch',
@@ -449,6 +467,20 @@ final class HumanFriendlySchemaValidator
                 );
             }
         }
+
+		if(isset($schema['const'])){
+			if($data !== $schema['const']){
+				return new ValidationError(
+					$this->convertPathToString($path),
+					'const-mismatch',
+					sprintf('Expected value "%s" but got "%s".', $this->valueSnippet($schema['const']), $this->valueSnippet($data)),
+					[
+						'expected' => ['const' => $schema['const']],
+						'actual'   => ['value' => $data, 'snippet' => $this->valueSnippet($data)],
+					]
+				);
+			}
+		}
 
         return match($type){
             'object' => $this->validateObject($path,$data,$schema),
@@ -622,6 +654,8 @@ final class HumanFriendlySchemaValidator
                 $d=$s['properties'][$prop]??null;
                 if($d&&isset($d['enum'])&&count($d['enum'])===1){
                     $vals[]=$d['enum'][0];
+                } else if($d&&isset($d['const'])) {
+                    $vals[]=$d['const'];
                 } else {
                     // If an explicit discriminator property is not a single-value enum in a branch, it can't be used.
                     return null;
@@ -634,7 +668,7 @@ final class HumanFriendlySchemaValidator
             return null; // Explicit discriminator not viable (e.g. not present in all, or not single enum)
         }
         
-        // Auto‑guess single‑value enums
+        // Auto‑guess single‑value enums and consts
         $candidates=[];
 		if(isset($objs[0])){
 			$firstObjSchema = isset($objs[0]['$ref']) ? $this->resolveReference($objs[0]['$ref']) : $objs[0];
@@ -645,11 +679,16 @@ final class HumanFriendlySchemaValidator
 				$allObjsHaveThisEnumProp = true;
 				foreach($objs as $s_wrapper){
 					$s = isset($s_wrapper['$ref']) ? $this->resolveReference($s_wrapper['$ref']) : $s_wrapper;
-					if (!isset($s['properties'][$prop]['enum']) || count($s['properties'][$prop]['enum']) !== 1) {
-						$allObjsHaveThisEnumProp = false;
-						break;
+					if(isset($s['properties'][$prop]['const'])){
+						$possibleValues[] = $s['properties'][$prop]['const'];
+						continue;
 					}
-					$possibleValues[] = $s['properties'][$prop]['enum'][0];
+					if (isset($s['properties'][$prop]['enum']) && count($s['properties'][$prop]['enum']) === 1) {
+						$possibleValues[] = $s['properties'][$prop]['enum'][0];
+						continue;
+					}
+					$allObjsHaveThisEnumProp = false;
+					break;
 				}
 				if ($allObjsHaveThisEnumProp && count(array_unique($possibleValues)) === count($objs)) {
 					$candidates[$prop] = $possibleValues;

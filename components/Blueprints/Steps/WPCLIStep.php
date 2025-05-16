@@ -30,6 +30,11 @@ class WPCLIStep implements StepInterface {
 
 	public function run( Runtime $runtime, Tracker $tracker ) {
 		$tracker->setCaption( 'Running WP-CLI command: ' . $this->command );
-		$runtime->runShellCommand( $this->command );
+		$command = $this->command;
+		if(substr($command, 0, 3) !== 'wp '){
+			throw new \Exception( 'WP-CLI command must start with "wp ".' );
+		}
+		$command = ($this->wpCliPath ?? $runtime->getWpCliPath()) . ' ' . substr( $command, 3 );
+		$runtime->runShellCommand( $command );
 	}
 }

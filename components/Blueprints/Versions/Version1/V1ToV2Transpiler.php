@@ -29,6 +29,7 @@ class V1ToV2Transpiler {
 		$v2 = [
 			'version' => 2,
 		];
+		$v2steps = [];
 
 		// Map $schema if present
 		if (isset($v1['$schema'])) {
@@ -45,7 +46,7 @@ class V1ToV2Transpiler {
 				$v2['blueprintMeta']['description'] = $v1['meta']['description'];
 			}
 			if(isset($v1['meta']['categories'])) {
-				$v2['blueprintMeta']['tags'] = $v1['meta']['tags'];
+				$v2['blueprintMeta']['tags'] = $v1['meta']['categories'];
 			}
 			if(isset($v1['meta']['author'])) {
 				$v2['blueprintMeta']['authors'] = [$v1['meta']['author']];
@@ -91,7 +92,7 @@ class V1ToV2Transpiler {
 		// Plugins
 		if(isset($v1['plugins'])) {
 			foreach($v1['plugins'] as $plugin) {
-				$steps[] = [
+				$v2steps[] = [
 					'step' => 'installPlugin',
 					'source' => self::convertV1ResourceToV2Reference($plugin),
 				];
@@ -110,28 +111,33 @@ class V1ToV2Transpiler {
 
 		// STEPS:
 		if (isset($v1['steps']) && is_array($v1['steps'])) {
-			$v2steps = [];
 			foreach ($v1['steps'] as $v1step) {
 				switch ($v1step['step']) {
 					case 'activatePlugin':
 						if(isset($v1step['progress'])) {
 							error_log('The `progress` option is not supported on activatePlugin step and will be ignored: %s. Use the runtime configuration to set the progress bar instead.');
 						}
-						$v2steps[] = [
+						$v2step = [
 							'step' => 'activatePlugin',
 							'pluginPath' => $v1step['pluginPath'],
-							'humanReadableName' => $v1step['pluginName'],
 						];
+						if(isset($v1step['humanReadableName'])) {
+							$v2step['humanReadableName'] = $v1step['humanReadableName'];
+						}
+						$v2steps[] = $v2step;
 						break;
 					case 'activateTheme':
 						if(isset($v1step['progress'])) {
 							error_log('The `progress` option is not supported on activateTheme step and will be ignored: %s. Use the runtime configuration to set the progress bar instead.');
 						}
-						$v2steps[] = [
+						$v2step = [
 							'step' => 'activateTheme',
 							'themeFolderName' => $v1step['themeFolderName'],
-							'humanReadableName' => $v1step['themeName'],
 						];
+						if(isset($v1step['humanReadableName'])) {
+							$v2step['humanReadableName'] = $v1step['humanReadableName'];
+						}
+						$v2steps[] = $v2step;
 						break;
 					case 'cp':
 						if(isset($v1step['progress'])) {
@@ -391,7 +397,7 @@ class V1ToV2Transpiler {
 							'step' => 'runPHP',
 							'code' => [
 								"filename" => "script.php",
-								"contents" => <<<'PHP'
+								"content" => <<<'PHP'
 								<?php
 								include getenv("DOCROOT") . '/wp-load.php';
 								$meta = json_decode(getenv("META"), true);
@@ -402,7 +408,7 @@ class V1ToV2Transpiler {
 								PHP
 							],
 							'env' => [
-								'USER_ID' => $v1step['userId'],
+								'USER_ID' => $v1step['userId']."",
 								'META' => json_encode($v1step['meta'])
 							],
 						];
@@ -445,14 +451,13 @@ class V1ToV2Transpiler {
 							'command' => $v1step['command'],
 						];
 						break;
-						
 					default:
 						error_log(sprintf('The `%s` step is not yet supported by the v1->v2 Blueprint transpiler and will be ignored.', $v1step['step']));
 						break;
 				}
 			}
-			$v2['additionalStepsAfterExecution'][] = $v2step;
 		}
+		$v2['additionalStepsAfterExecution'] = $v2steps;
 
 		return $v2;
 	}

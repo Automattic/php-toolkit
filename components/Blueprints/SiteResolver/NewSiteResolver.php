@@ -43,7 +43,6 @@ class NewSiteResolver {
 		if ( $runtime->getConfiguration()->getDatabaseEngine() === 'sqlite' ) {
 			$assets['sqlite-integration'] = $runtime->getConfiguration()->getSqliteIntegrationPlugin();
 		}
-		$assets['wp-cli'] = DataReference::create( 'https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar' );
 
 		$runtime->getDataReferenceResolver()->startEagerResolution( $assets, $stages['resolve_assets'] );
 
@@ -118,18 +117,6 @@ class NewSiteResolver {
 		)->outputFileContent;
 
 		if ( trim( $installCheck ) !== '1' ) {
-			$wp_cli_filename = 'wp-cli.phar';
-			if ( ! $targetFs->exists( $wp_cli_filename ) ) {
-				$stages['resolve_assets']->setCaption( 'Downloading wp-cli' );
-				$resolved = $runtime->resolve( $assets['wp-cli'] );
-				if ( ! $resolved instanceof File ) {
-					throw new BlueprintExecutionException( 'Provided zip reference does not resolve to a file' );
-				}
-				$write_stream = $targetFs->open_write_stream( $wp_cli_filename );
-				pipe_stream( $resolved->stream, $write_stream );
-				$write_stream->close_writing();
-			}
-
 			if ( ! $targetFs->exists( '/wp-config.php' ) ) {
 				if ( $targetFs->exists( 'wp-config-sample.php' ) ) {
 					$targetFs->copy( 'wp-config-sample.php', 'wp-config.php' );
@@ -141,7 +128,7 @@ class NewSiteResolver {
 			// Perform installation using WP-CLI
 			// @TODO (low priority): Remove the WP-CLI dependency to lower the download size for blueprints.phar.
 			$stages['install_wordpress']->set( 0.7, 'Installing WordPress' );
-			$wp_cli_path = wp_join_paths( $runtime->getConfiguration()->getTargetSiteRoot(), 'wp-cli.phar' );
+			$wp_cli_path = $runtime->getWpCliPath();
 			$runtime->runShellCommand( [
 				'php',
 				$wp_cli_path,

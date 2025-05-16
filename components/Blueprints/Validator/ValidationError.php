@@ -22,11 +22,15 @@ class ValidationError {
     ) {}
 
 	public function getPath(): array {
-		return explode('/', substr($this->pointer, 2));
+		$path_string = substr($this->pointer, 2);
+		if(!$path_string) {
+			return [];
+		}
+		return explode('/', $path_string);
 	}
 
 	public function getPrettyPath(): string {
-		$segments = ['Blueprint'];
+		$segments = ['Blueprint root'];
 		foreach($this->getPath() as $segment) {
 			if(ctype_digit($segment)) {
 				$segment = (int) $segment;

@@ -45,7 +45,6 @@ use WordPress\Filesystem\InMemoryFilesystem;
 use WordPress\Filesystem\LocalFilesystem;
 use WordPress\HttpClient\Client;
 use WordPress\HttpClient\FilesystemCache;
-use WordPress\HttpClient\HttpClientException;
 use WordPress\Zip\ZipFilesystem;
 
 use function WordPress\Encoding\utf8_is_valid_byte_stream;
@@ -157,7 +156,9 @@ class Runner {
 			// They have to add up to 1.
 			$blueprintStage        = $this->mainTracker->stage( 0.05, 'Resolving Blueprint' );
 			$targetResolutionStage = $this->mainTracker->stage( 0.2, 'Setting up WordPress site' );
-			$dataResolutionStage   = $this->mainTracker->stage( 0.25, 'Resolving data references' );
+			// @TODO: Put this inside dataResolutionStage
+			$wpCliDownloadStage    = $this->mainTracker->stage( 0.01, 'Downloading WP-CLI' );
+			$dataResolutionStage   = $this->mainTracker->stage( 0.24, 'Resolving data references' );
 			$executionStage        = $this->mainTracker->stage( 0.5, 'Executing Blueprint steps' );
 
 			// TODO: What's the client? 
@@ -172,6 +173,7 @@ class Runner {
 			$targetResolutionStage->setCaption( 'Resolving target site' );
 
 			$targetSiteFs = LocalFilesystem::create( $this->configuration->getTargetSiteRoot() );
+			$wpCliReference = DataReference::create( 'https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar' );
 			$this->runtime      = new Runtime(
 				$targetSiteFs,
 				$this->configuration,
@@ -181,9 +183,13 @@ class Runner {
 				function($message) {
 					$this->logWarning( $message );
 				},
-				$tempRoot
+				$tempRoot,
+				$wpCliReference
 			);
 			$this->progressObserver->setRuntime($this->runtime);
+			$this->assets->startEagerResolution( [
+				'wp-cli' => $wpCliReference
+			], $wpCliDownloadStage );
 
 			if ( $this->configuration->getExecutionMode() === 'apply-to-existing-site' ) {
 				ExistingSiteResolver::resolve( $this->runtime, $targetResolutionStage );
@@ -307,10 +313,11 @@ class Runner {
 	}
 
 	private function validateBlueprint(): void {
-		if(
-			!isset($this->blueprintArray['version']) && 
-			null === V1ToV2Transpiler::validate_v1_blueprint($this->blueprintArray)
-		) {
+		if( !isset($this->blueprintArray['version']) ) {
+			$error = V1ToV2Transpiler::validate_v1_blueprint($this->blueprintArray);
+			if($error) {
+				throw new BlueprintExecutionException('Invalid Blueprint v1 provided.', $error);
+			}
 			// @TODO: Should we log what we're doing along the way? E.g. the fact
 			//        that we're upgrading? Maybe in some "verbose" mode? But remember
 			//        this is not a CLI tool. This is a generic library for all Blueprint
@@ -589,7 +596,10 @@ class Runner {
 			case 'rmdir':
 				return new RmDirStep( $data['path'] );
 			case 'runPHP':
-				return RunPHPStep::fromArray( $data );
+				return new RunPHPStep( 
+					$this->createDataReference( $data['code'] ),
+					$data['env'] ?? []
+				);
 			case 'runSql':
 				$source = $this->createDataReference( $data['source'] );
 
@@ -639,10 +649,13 @@ class Runner {
                 }
             ';
 
-				return RunPHPStep::fromArray( [
-					'code' => $code,
-					'env'  => [ 'ROLES' => $data['roles'] ],
-				] );
+				return new RunPHPStep( 
+					$this->createDataReference( [
+						'filename' => 'create-roles.php',
+						'content'  => $code,
+					] ),
+					[ 'ROLES' => $data['roles'] ]
+				);
 
 			case 'createUsers':
 				if ( empty( $data['users'] ) || ! is_array( $data['users'] ) ) {
@@ -685,10 +698,13 @@ class Runner {
                     }
                 }';
 
-				return RunPHPStep::fromArray( [
-					'code' => $code,
-					'env'  => [ 'USERS' => $data['users'] ],
-				] );
+				return new RunPHPStep( 
+					$this->createDataReference( [
+						'filename' => 'create-users.php',
+						'content'  => $code,
+					] ),
+					[ 'USERS' => $data['users'] ]
+				);
 
 			case 'createPostTypes':
 				if ( empty( $data['postTypes'] ) || ! is_array( $data['postTypes'] ) ) {
@@ -791,14 +807,22 @@ class Runner {
 				unset(\$__bp_posts, \$__bp_post, \$postData);
 				PHP;
 
-				return RunPHPStep::fromArray( [
-					'code' => $code,
-				] );
+				return new RunPHPStep( 
+					$this->createDataReference( [
+						'filename' => 'import-posts.php',
+						'content'  => $code,
+					] ),
+					[ 'POSTS' => $data['posts'] ]
+				);
 
 			case 'runPHP':
-				$method = isset( $data['method'] ) ? $data['method'] : 'GET';
-
-				return RunPHPStep::fromArray( $data );
+				return new RunPHPStep( 
+					$this->createDataReference( [
+						'filename' => 'run-php.php',
+						'content'  => $data['code'],
+					] ),
+					$data['env'] ?? []
+				);
 			case 'unzip':
 				$zipFile = $this->createDataReference( $data['zipFile'] );
 
