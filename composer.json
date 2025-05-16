@@ -75,6 +75,7 @@
         }
     },
     "scripts": {
+        "build-blueprints-phar": "box compile -c phar-box.json",
         "regenerate-composer": "php bin/regenerate_composer.json.php",
         "regenerate-json-schema": "node components/Blueprints/json-schema/regenerate-schema.ts",
         "test": "phpunit -c phpunit.xml",
