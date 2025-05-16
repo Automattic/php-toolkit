@@ -205,15 +205,11 @@
                     }
                   ]
                 },
-                "activate": {
-                  "type": "boolean",
-                  "description": "Whether to activate the theme after installing it."
-                },
                 "importStarterContent": {
                   "type": "boolean",
                   "description": "Whether to import the theme's starter content after installing it."
                 },
-                "targetFolderName": {
+                "targetDirectoryName": {
                   "type": "string",
                   "description": "An explicit directory name within wp-content/themes to install the theme at. If not provided, it will be inferred from the theme source."
                 },
@@ -253,15 +249,11 @@
                       }
                     ]
                   },
-                  "activate": {
-                    "type": "boolean",
-                    "description": "Whether to activate the theme after installing it."
-                  },
                   "importStarterContent": {
                     "type": "boolean",
                     "description": "Whether to import the theme's starter content after installing it."
                   },
-                  "targetFolderName": {
+                  "targetDirectoryName": {
                     "type": "string",
                     "description": "An explicit directory name within wp-content/themes to install the theme at. If not provided, it will be inferred from the theme source."
                   },
@@ -323,18 +315,22 @@
                         {
                           "type": "array",
                           "items": {
-                            "$ref": "#/definitions/alias-1465201393-41223-41320-1465201393-0-41321"
+                            "$ref": "#/definitions/alias-1068919986-42634-42731-1068919986-0-42732"
                           }
                         },
                         {
                           "type": "object",
                           "additionalProperties": {
-                            "$ref": "#/definitions/alias-1465201393-41223-41320-1465201393-0-41321"
+                            "$ref": "#/definitions/alias-1068919986-42634-42731-1068919986-0-42732"
                           }
                         }
                       ]
                     },
                     "description": "Parameters to pass to the plugin during activation.\n\nThese options are stored in a site option that the plugin can access during its activation hook. The option name is:\n\n```php 'blueprint_activation_' . plugin_basename( __FILE__ ) ```\n\nThis ensures uniqueness even when multiple versions of the same plugin exist. This is similar to how the `register_activation_hook` function requires the plugin file path as its first argument.\n\nThe Blueprint runner will remove the option after activating the plugin.\n\nExample:\n\nIn the Blueprint: ```json {     \"source\": \"woocommerce\",     \"activationOptions\": {         \"storeCity\": \"Wrocław\",         \"storeCountry\": \"Poland\",         \"storePostalCode\": \"53-607\"     } } ```\n\nIn the plugin's activation hook:\n\n```php register_activation_hook( __FILE__, function( $network_wide ) {     // Get the activation options from the transient     $option_name = 'blueprint_activation_' . plugin_basename( __FILE__ );     $blueprint_activation_options = get_option( $option_name ) ?? [];\n\n    if ( $blueprint_activation_options ) {         $store_city = $blueprint_activation_options['storeCity'] ?? '';         $store_country = $blueprint_activation_options['storeCountry'] ?? '';         $store_postal_code = $blueprint_activation_options['storePostalCode'] ?? '';\n\n        // ...do something with the options...     }\n\n    // Continue with normal activation... } ); ```"
+                  },
+                  "targetDirectoryName": {
+                    "type": "string",
+                    "description": "An explicit directory name within wp-content/plugins to install the plugin at. If not provided, it will be inferred from the plugin source."
                   },
                   "onError": {
                     "type": "string",
@@ -752,13 +748,13 @@
                               {
                                 "type": "array",
                                 "items": {
-                                  "$ref": "#/definitions/alias-1465201393-41223-41320-1465201393-0-41321"
+                                  "$ref": "#/definitions/alias-1068919986-42634-42731-1068919986-0-42732"
                                 }
                               },
                               {
                                 "type": "object",
                                 "additionalProperties": {
-                                  "$ref": "#/definitions/alias-1465201393-41223-41320-1465201393-0-41321"
+                                  "$ref": "#/definitions/alias-1068919986-42634-42731-1068919986-0-42732"
                                 }
                               }
                             ]
@@ -1195,13 +1191,13 @@
                                 {
                                   "type": "array",
                                   "items": {
-                                    "$ref": "#/definitions/alias-1465201393-41223-41320-1465201393-0-41321"
+                                    "$ref": "#/definitions/alias-1068919986-42634-42731-1068919986-0-42732"
                                   }
                                 },
                                 {
                                   "type": "object",
                                   "additionalProperties": {
-                                    "$ref": "#/definitions/alias-1465201393-41223-41320-1465201393-0-41321"
+                                    "$ref": "#/definitions/alias-1068919986-42634-42731-1068919986-0-42732"
                                   }
                                 }
                               ]
@@ -1338,13 +1334,13 @@
                                   {
                                     "type": "array",
                                     "items": {
-                                      "$ref": "#/definitions/alias-1465201393-41223-41320-1465201393-0-41321"
+                                      "$ref": "#/definitions/alias-1068919986-42634-42731-1068919986-0-42732"
                                     }
                                   },
                                   {
                                     "type": "object",
                                     "additionalProperties": {
-                                      "$ref": "#/definitions/alias-1465201393-41223-41320-1465201393-0-41321"
+                                      "$ref": "#/definitions/alias-1068919986-42634-42731-1068919986-0-42732"
                                     }
                                   }
                                 ]
@@ -1528,6 +1524,10 @@
                   "pluginPath": {
                     "type": "string",
                     "description": "Path to the plugin directory as absolute path (/wordpress/wp-content/plugins/plugin-name); or the plugin entry file relative to the plugins directory (plugin-name/plugin-name.php)."
+                  },
+                  "humanReadableName": {
+                    "type": "string",
+                    "description": "Human-readable name of the plugin for the progress bar.\n\nFor example, with the following Blueprint:\n\n```json {     \"steps\": [         {             \"step\": \"activatePlugin\",             \"pluginPath\": \"wordpress-seo/wp-seo.php\",             \"humanReadableName\": \"Yoast SEO\"         }     ] } ```\n\nThe progress bar will show \"Activating Yoast SEO\" instead of \"Activating wordpress-seo/wp-seo.php\"."
                   }
                 },
                 "required": [
@@ -1544,14 +1544,18 @@
                     "type": "string",
                     "const": "activateTheme"
                   },
-                  "themeFolderName": {
+                  "themeDirectoryName": {
                     "type": "string",
-                    "description": "The name of the theme folder inside wp-content/themes/"
+                    "description": "The name of the theme directory inside wp-content/themes/"
+                  },
+                  "humanReadableName": {
+                    "type": "string",
+                    "description": "Human-readable name of the theme for the progress bar.\n\nFor example, with the following Blueprint:\n\n```json {     \"steps\": [         {             \"step\": \"activateTheme\",             \"themeDirectoryName\": \"twentytwentythree\",             \"humanReadableName\": \"Twenty Twenty-Three\"         }     ] } ```\n\nThe progress bar will show \"Activating Twenty Twenty-Three\" instead of \"Activating twentytwentythree\"."
                   }
                 },
                 "required": [
                   "step",
-                  "themeFolderName"
+                  "themeDirectoryName"
                 ],
                 "additionalProperties": false
               },
@@ -1593,6 +1597,485 @@
                 "required": [
                   "step",
                   "constants"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "step": {
+                    "type": "string",
+                    "const": "importContent"
+                  },
+                  "content": {
+                    "type": "array",
+                    "items": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "properties": {
+                            "urlsMode": {
+                              "type": "string",
+                              "enum": [
+                                "rewrite",
+                                "preserve"
+                              ],
+                              "description": "Whether to rewrite the hrefs in the remote site's content URLs in the WXR file from the remote site domain to the current site domain's (and path etc).\n\nPossible values:\n\n* \"rewrite\" – Rewrite the hrefs to the current site domain's (and path etc).\n* \"preserve\" – Preserve the hrefs as they are.",
+                              "default": "\"rewrite\"."
+                            },
+                            "urlsMap": {
+                              "type": "object",
+                              "additionalProperties": {
+                                "$ref": "#/definitions/URLReference"
+                              },
+                              "description": "A mapping of base URLs to rewrite."
+                            },
+                            "type": {
+                              "type": "string",
+                              "const": "mysql-dump"
+                            },
+                            "source": {
+                              "anyOf": [
+                                {
+                                  "$ref": "#/definitions/DataReference"
+                                },
+                                {
+                                  "type": "array",
+                                  "items": {
+                                    "$ref": "#/definitions/DataReference"
+                                  }
+                                }
+                              ]
+                            }
+                          },
+                          "required": [
+                            "source",
+                            "type"
+                          ]
+                        },
+                        {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "properties": {
+                            "urlsMode": {
+                              "type": "string",
+                              "enum": [
+                                "rewrite",
+                                "preserve"
+                              ],
+                              "description": "Whether to rewrite the hrefs in the remote site's content URLs in the WXR file from the remote site domain to the current site domain's (and path etc).\n\nPossible values:\n\n* \"rewrite\" – Rewrite the hrefs to the current site domain's (and path etc).\n* \"preserve\" – Preserve the hrefs as they are.",
+                              "default": "\"rewrite\"."
+                            },
+                            "urlsMap": {
+                              "type": "object",
+                              "additionalProperties": {
+                                "$ref": "#/definitions/URLReference"
+                              },
+                              "description": "A mapping of base URLs to rewrite."
+                            },
+                            "type": {
+                              "type": "string",
+                              "const": "posts"
+                            },
+                            "source": {
+                              "anyOf": [
+                                {
+                                  "$ref": "#/definitions/DataReference"
+                                },
+                                {
+                                  "type": "array",
+                                  "items": {
+                                    "$ref": "#/definitions/DataReference"
+                                  }
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "post_author": {
+                                      "type": "number",
+                                      "description": "Username of the post author.\n\nIf missing, the default value will be resolved in the following order until one is available:\n\n* Default user defined in the runner configuration.\n* The first administrator in the database.\n* The first user in the database.\n* A newly created user.\n\nThe aggressive resolution is necessary because post_author is NOT NULL in the database schema."
+                                    },
+                                    "post_date": {
+                                      "type": "string",
+                                      "description": "The date of the post in UTC. Accepts format 'YYYY-MM-DD HH:MM:SS'. Can be used to schedule future posts (when used with post_status: 'future').",
+                                      "default": "Current time"
+                                    },
+                                    "post_content": {
+                                      "type": "string",
+                                      "description": "The main post content. Can contain HTML, shortcodes, etc. While technically optional, posts are usually expected to have content.",
+                                      "default": ""
+                                    },
+                                    "post_title": {
+                                      "type": "string",
+                                      "description": "The post title."
+                                    },
+                                    "post_excerpt": {
+                                      "type": "string",
+                                      "description": "The post excerpt. Default empty."
+                                    },
+                                    "post_status": {
+                                      "type": "string",
+                                      "enum": [
+                                        "publish",
+                                        "pending",
+                                        "draft",
+                                        "auto-draft",
+                                        "future",
+                                        "private",
+                                        "inherit",
+                                        "trash"
+                                      ],
+                                      "description": "The post status"
+                                    },
+                                    "post_type": {
+                                      "type": "string",
+                                      "description": "The post type (e.g., 'post', 'page'). Default 'post'."
+                                    },
+                                    "comment_status": {
+                                      "type": "string",
+                                      "enum": [
+                                        "open",
+                                        "closed"
+                                      ],
+                                      "description": "Whether comments are allowed ('open' or 'closed').",
+                                      "default": "'open'."
+                                    },
+                                    "post_password": {
+                                      "type": "string",
+                                      "description": "A password to protect access. Default empty."
+                                    },
+                                    "post_name": {
+                                      "type": "string",
+                                      "description": "The URL slug. Default sanitized post_title for new posts."
+                                    },
+                                    "post_parent_name": {
+                                      "type": "string",
+                                      "description": "Post parent name for hierarchical post types (e.g., pages). Default empty."
+                                    },
+                                    "menu_order": {
+                                      "type": "number",
+                                      "description": "Menu order within a post type. Default 0."
+                                    },
+                                    "post_mime_type": {
+                                      "type": "string",
+                                      "description": "MIME type for attachments. Default empty."
+                                    },
+                                    "guid": {
+                                      "type": "string",
+                                      "description": "Global Unique ID. Default empty."
+                                    },
+                                    "post_category": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string"
+                                      },
+                                      "description": "Array of category slugs. Defaults to the site's default category."
+                                    },
+                                    "post_tags": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string"
+                                      },
+                                      "description": "Array of tag names. Default empty."
+                                    },
+                                    "tax_input": {
+                                      "type": "object",
+                                      "additionalProperties": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "string"
+                                        }
+                                      },
+                                      "description": "Taxonomy terms keyed by taxonomy name. For hierarchical taxonomies: array of term names. For non-hierarchical: array of term names or slugs.\n\nExamples: ```json tax_input: {   // For hierarchical taxonomies like categories   \"category\": [\"Books\", \"Fiction\", \"Science Fiction\"],\n\n  // For non-hierarchical taxonomies like tags   \"post_tag\": [\"bestseller\", \"featured\", \"summer-reading\"],\n\n  // For custom taxonomies   \"genre\": [\"mystery\", \"thriller\"],   \"author\": [\"Jane Doe\", \"John Smith\"] } ```"
+                                    },
+                                    "meta_input": {
+                                      "type": "object",
+                                      "additionalProperties": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "boolean"
+                                          },
+                                          {
+                                            "type": "number"
+                                          },
+                                          {
+                                            "type": "array",
+                                            "items": {
+                                              "$ref": "#/definitions/alias-1068919986-42634-42731-1068919986-0-42732"
+                                            }
+                                          },
+                                          {
+                                            "type": "object",
+                                            "additionalProperties": {
+                                              "$ref": "#/definitions/alias-1068919986-42634-42731-1068919986-0-42732"
+                                            }
+                                          }
+                                        ]
+                                      },
+                                      "description": "Post meta keyed by meta key to value. Default empty.\n\nExamples: ```json meta_input: {   // Simple values   \"price\": \"19.99\",   \"in_stock\": true,   \"stock\": 42,\n\n  // Array values   \"related_products\": [123, 456, 789],   \"product_colors\": [\"red\", \"blue\", \"green\"],\n\n  // Object values   \"_product_attributes\": {     \"color\": {       \"name\": \"Color\",       \"value\": \"Red\",       \"position\": 0,       \"visible\": true     }   },   \"seo_data\": {     \"title\": \"Custom SEO Title\",     \"description\": \"Custom meta description\",     \"keywords\": [\"product\", \"featured\"]   } } ```"
+                                    },
+                                    "page_template": {
+                                      "type": "string",
+                                      "description": "Specifies the page template file to use. This parameter only applies if post_type is 'page'. For other post types, it's ignored. Provide the template filename (e.g., 'template-contact.php'). Include subdirectory if applicable (e.g., 'templates/full-width.php'). To set a template for non-page post types, use meta_input with key '_wp_page_template'.",
+                                      "default": ""
+                                    }
+                                  },
+                                  "required": [
+                                    "post_title"
+                                  ],
+                                  "additionalProperties": false,
+                                  "description": "Post data type. It is inspired by the wp_insert_post() arguments, but it diverges from it in a few ways."
+                                },
+                                {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "post_author": {
+                                        "type": "number",
+                                        "description": "Username of the post author.\n\nIf missing, the default value will be resolved in the following order until one is available:\n\n* Default user defined in the runner configuration.\n* The first administrator in the database.\n* The first user in the database.\n* A newly created user.\n\nThe aggressive resolution is necessary because post_author is NOT NULL in the database schema."
+                                      },
+                                      "post_date": {
+                                        "type": "string",
+                                        "description": "The date of the post in UTC. Accepts format 'YYYY-MM-DD HH:MM:SS'. Can be used to schedule future posts (when used with post_status: 'future').",
+                                        "default": "Current time"
+                                      },
+                                      "post_content": {
+                                        "type": "string",
+                                        "description": "The main post content. Can contain HTML, shortcodes, etc. While technically optional, posts are usually expected to have content.",
+                                        "default": ""
+                                      },
+                                      "post_title": {
+                                        "type": "string",
+                                        "description": "The post title."
+                                      },
+                                      "post_excerpt": {
+                                        "type": "string",
+                                        "description": "The post excerpt. Default empty."
+                                      },
+                                      "post_status": {
+                                        "type": "string",
+                                        "enum": [
+                                          "publish",
+                                          "pending",
+                                          "draft",
+                                          "auto-draft",
+                                          "future",
+                                          "private",
+                                          "inherit",
+                                          "trash"
+                                        ],
+                                        "description": "The post status"
+                                      },
+                                      "post_type": {
+                                        "type": "string",
+                                        "description": "The post type (e.g., 'post', 'page'). Default 'post'."
+                                      },
+                                      "comment_status": {
+                                        "type": "string",
+                                        "enum": [
+                                          "open",
+                                          "closed"
+                                        ],
+                                        "description": "Whether comments are allowed ('open' or 'closed').",
+                                        "default": "'open'."
+                                      },
+                                      "post_password": {
+                                        "type": "string",
+                                        "description": "A password to protect access. Default empty."
+                                      },
+                                      "post_name": {
+                                        "type": "string",
+                                        "description": "The URL slug. Default sanitized post_title for new posts."
+                                      },
+                                      "post_parent_name": {
+                                        "type": "string",
+                                        "description": "Post parent name for hierarchical post types (e.g., pages). Default empty."
+                                      },
+                                      "menu_order": {
+                                        "type": "number",
+                                        "description": "Menu order within a post type. Default 0."
+                                      },
+                                      "post_mime_type": {
+                                        "type": "string",
+                                        "description": "MIME type for attachments. Default empty."
+                                      },
+                                      "guid": {
+                                        "type": "string",
+                                        "description": "Global Unique ID. Default empty."
+                                      },
+                                      "post_category": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "string"
+                                        },
+                                        "description": "Array of category slugs. Defaults to the site's default category."
+                                      },
+                                      "post_tags": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "string"
+                                        },
+                                        "description": "Array of tag names. Default empty."
+                                      },
+                                      "tax_input": {
+                                        "type": "object",
+                                        "additionalProperties": {
+                                          "type": "array",
+                                          "items": {
+                                            "type": "string"
+                                          }
+                                        },
+                                        "description": "Taxonomy terms keyed by taxonomy name. For hierarchical taxonomies: array of term names. For non-hierarchical: array of term names or slugs.\n\nExamples: ```json tax_input: {   // For hierarchical taxonomies like categories   \"category\": [\"Books\", \"Fiction\", \"Science Fiction\"],\n\n  // For non-hierarchical taxonomies like tags   \"post_tag\": [\"bestseller\", \"featured\", \"summer-reading\"],\n\n  // For custom taxonomies   \"genre\": [\"mystery\", \"thriller\"],   \"author\": [\"Jane Doe\", \"John Smith\"] } ```"
+                                      },
+                                      "meta_input": {
+                                        "type": "object",
+                                        "additionalProperties": {
+                                          "anyOf": [
+                                            {
+                                              "type": "string"
+                                            },
+                                            {
+                                              "type": "boolean"
+                                            },
+                                            {
+                                              "type": "number"
+                                            },
+                                            {
+                                              "type": "array",
+                                              "items": {
+                                                "$ref": "#/definitions/alias-1068919986-42634-42731-1068919986-0-42732"
+                                              }
+                                            },
+                                            {
+                                              "type": "object",
+                                              "additionalProperties": {
+                                                "$ref": "#/definitions/alias-1068919986-42634-42731-1068919986-0-42732"
+                                              }
+                                            }
+                                          ]
+                                        },
+                                        "description": "Post meta keyed by meta key to value. Default empty.\n\nExamples: ```json meta_input: {   // Simple values   \"price\": \"19.99\",   \"in_stock\": true,   \"stock\": 42,\n\n  // Array values   \"related_products\": [123, 456, 789],   \"product_colors\": [\"red\", \"blue\", \"green\"],\n\n  // Object values   \"_product_attributes\": {     \"color\": {       \"name\": \"Color\",       \"value\": \"Red\",       \"position\": 0,       \"visible\": true     }   },   \"seo_data\": {     \"title\": \"Custom SEO Title\",     \"description\": \"Custom meta description\",     \"keywords\": [\"product\", \"featured\"]   } } ```"
+                                      },
+                                      "page_template": {
+                                        "type": "string",
+                                        "description": "Specifies the page template file to use. This parameter only applies if post_type is 'page'. For other post types, it's ignored. Provide the template filename (e.g., 'template-contact.php'). Include subdirectory if applicable (e.g., 'templates/full-width.php'). To set a template for non-page post types, use meta_input with key '_wp_page_template'.",
+                                        "default": ""
+                                      }
+                                    },
+                                    "required": [
+                                      "post_title"
+                                    ],
+                                    "additionalProperties": false,
+                                    "description": "Post data type. It is inspired by the wp_insert_post() arguments, but it diverges from it in a few ways."
+                                  }
+                                }
+                              ]
+                            }
+                          },
+                          "required": [
+                            "source",
+                            "type"
+                          ]
+                        },
+                        {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "properties": {
+                            "urlsMode": {
+                              "type": "string",
+                              "enum": [
+                                "rewrite",
+                                "preserve"
+                              ],
+                              "description": "Whether to rewrite the hrefs in the remote site's content URLs in the WXR file from the remote site domain to the current site domain's (and path etc).\n\nPossible values:\n\n* \"rewrite\" – Rewrite the hrefs to the current site domain's (and path etc).\n* \"preserve\" – Preserve the hrefs as they are.",
+                              "default": "\"rewrite\"."
+                            },
+                            "urlsMap": {
+                              "type": "object",
+                              "additionalProperties": {
+                                "$ref": "#/definitions/URLReference"
+                              },
+                              "description": "A mapping of base URLs to rewrite."
+                            },
+                            "type": {
+                              "type": "string",
+                              "const": "wxr"
+                            },
+                            "source": {
+                              "$ref": "#/definitions/DataReference"
+                            },
+                            "staticAssets": {
+                              "type": "string",
+                              "enum": [
+                                "fetch",
+                                "hotlink"
+                              ],
+                              "description": "Static assets handling.\n\nPossible values:\n\n* \"fetch\" – Fetch the static assets and save them to the local filesystem.\n* \"hotlink\" – Hotlink the static assets from the remote site.",
+                              "default": "\"fetch\"."
+                            },
+                            "authorsMode": {
+                              "type": "string",
+                              "enum": [
+                                "create",
+                                "default-author",
+                                "map"
+                              ],
+                              "description": "How to handle authors that don't exist on the current site.\n\nPossible values:\n\n* \"create\" – Create a new author.\n* \"default-author\" – Use the default author.\n* \"map\" – Map the author to an existing author on the current site.",
+                              "default": "\"create\"."
+                            },
+                            "defaultAuthorUsername": {
+                              "type": "string",
+                              "description": "The default author to use when `mode` is \"default-author\".",
+                              "default": "\"admin\"."
+                            },
+                            "authorsMap": {
+                              "type": "object",
+                              "properties": {
+                                "string": {
+                                  "type": "string",
+                                  "const": "string"
+                                }
+                              },
+                              "required": [
+                                "string"
+                              ],
+                              "additionalProperties": false,
+                              "description": "Map post authors from the remote site to the current site.\n\nWhen not provided, the importer will attempt to match the authors by username, email, or name.\n\nRequired when `authorsMode` is \"map\".",
+                              "default": "undefined."
+                            },
+                            "importUsers": {
+                              "type": "boolean",
+                              "description": "Whether to import users from the remote site.",
+                              "default": "false."
+                            },
+                            "importComments": {
+                              "type": "boolean",
+                              "description": "Whether to import comments from the remote site.",
+                              "default": "false."
+                            },
+                            "importSiteOptions": {
+                              "type": "boolean",
+                              "description": "Whether to import site settings from the remote site.",
+                              "default": "false."
+                            }
+                          },
+                          "required": [
+                            "source",
+                            "type"
+                          ]
+                        }
+                      ]
+                    }
+                  }
+                },
+                "required": [
+                  "step",
+                  "content"
                 ],
                 "additionalProperties": false
               },
@@ -1789,18 +2272,22 @@
                         {
                           "type": "array",
                           "items": {
-                            "$ref": "#/definitions/alias-1465201393-41223-41320-1465201393-0-41321"
+                            "$ref": "#/definitions/alias-1068919986-42634-42731-1068919986-0-42732"
                           }
                         },
                         {
                           "type": "object",
                           "additionalProperties": {
-                            "$ref": "#/definitions/alias-1465201393-41223-41320-1465201393-0-41321"
+                            "$ref": "#/definitions/alias-1068919986-42634-42731-1068919986-0-42732"
                           }
                         }
                       ]
                     },
                     "description": "Parameters to pass to the plugin during activation.\n\nThese options are stored in a site option that the plugin can access during its activation hook. The option name is:\n\n```php 'blueprint_activation_' . plugin_basename( __FILE__ ) ```\n\nThis ensures uniqueness even when multiple versions of the same plugin exist. This is similar to how the `register_activation_hook` function requires the plugin file path as its first argument.\n\nThe Blueprint runner will remove the option after activating the plugin.\n\nExample:\n\nIn the Blueprint: ```json {     \"source\": \"woocommerce\",     \"activationOptions\": {         \"storeCity\": \"Wrocław\",         \"storeCountry\": \"Poland\",         \"storePostalCode\": \"53-607\"     } } ```\n\nIn the plugin's activation hook:\n\n```php register_activation_hook( __FILE__, function( $network_wide ) {     // Get the activation options from the transient     $option_name = 'blueprint_activation_' . plugin_basename( __FILE__ );     $blueprint_activation_options = get_option( $option_name ) ?? [];\n\n    if ( $blueprint_activation_options ) {         $store_city = $blueprint_activation_options['storeCity'] ?? '';         $store_country = $blueprint_activation_options['storeCountry'] ?? '';         $store_postal_code = $blueprint_activation_options['storePostalCode'] ?? '';\n\n        // ...do something with the options...     }\n\n    // Continue with normal activation... } ); ```"
+                  },
+                  "targetDirectoryName": {
+                    "type": "string",
+                    "description": "An explicit directory name within wp-content/plugins to install the plugin at. If not provided, it will be inferred from the plugin source."
                   },
                   "onError": {
                     "type": "string",
@@ -1831,6 +2318,10 @@
                   "step": {
                     "type": "string",
                     "const": "installTheme"
+                  },
+                  "activate": {
+                    "type": "boolean",
+                    "description": "Whether to activate the theme after installing it.\n\nThis is not a part of the theme definition. Only the step can explicitly provide this option. The default value is `true`."
                   }
                 },
                 "required": [
@@ -1853,6 +2344,10 @@
                   "step": {
                     "type": "string",
                     "const": "installTheme"
+                  },
+                  "activate": {
+                    "type": "boolean",
+                    "description": "Whether to activate the theme after installing it.\n\nThis is not a part of the theme definition. Only the step can explicitly provide this option. The default value is `true`."
                   }
                 },
                 "required": [
@@ -1884,6 +2379,10 @@
                   "step": {
                     "type": "string",
                     "const": "installTheme"
+                  },
+                  "activate": {
+                    "type": "boolean",
+                    "description": "Whether to activate the theme after installing it.\n\nThis is not a part of the theme definition. Only the step can explicitly provide this option. The default value is `true`."
                   }
                 },
                 "required": [
@@ -1911,6 +2410,10 @@
                   "step": {
                     "type": "string",
                     "const": "installTheme"
+                  },
+                  "activate": {
+                    "type": "boolean",
+                    "description": "Whether to activate the theme after installing it.\n\nThis is not a part of the theme definition. Only the step can explicitly provide this option. The default value is `true`."
                   }
                 },
                 "required": [
@@ -1932,15 +2435,11 @@
                       }
                     ]
                   },
-                  "activate": {
-                    "type": "boolean",
-                    "description": "Whether to activate the theme after installing it."
-                  },
                   "importStarterContent": {
                     "type": "boolean",
                     "description": "Whether to import the theme's starter content after installing it."
                   },
-                  "targetFolderName": {
+                  "targetDirectoryName": {
                     "type": "string",
                     "description": "An explicit directory name within wp-content/themes to install the theme at. If not provided, it will be inferred from the theme source."
                   },
@@ -1951,6 +2450,10 @@
                   "step": {
                     "type": "string",
                     "const": "installTheme"
+                  },
+                  "activate": {
+                    "type": "boolean",
+                    "description": "Whether to activate the theme after installing it.\n\nThis is not a part of the theme definition. Only the step can explicitly provide this option. The default value is `true`."
                   }
                 },
                 "required": [
@@ -2114,13 +2617,13 @@
                         {
                           "type": "array",
                           "items": {
-                            "$ref": "#/definitions/alias-1465201393-41223-41320-1465201393-0-41321"
+                            "$ref": "#/definitions/alias-1068919986-42634-42731-1068919986-0-42732"
                           }
                         },
                         {
                           "type": "object",
                           "additionalProperties": {
-                            "$ref": "#/definitions/alias-1465201393-41223-41320-1465201393-0-41321"
+                            "$ref": "#/definitions/alias-1068919986-42634-42731-1068919986-0-42732"
                           }
                         }
                       ]
@@ -2348,7 +2851,7 @@
       ],
       "description": "Plugin directory reference, e.g. \"jetpack\", \"jetpack@6.4\", or \"akismet@6.4.3\".\n\nThese refer to a specific plugin slugs in the WordPress.org plugin repository.\n\nFor example, a reference to \"wordpress-seo\" means the Yoast SEO plugin as seen on https://wordpress.org/plugins/wordpress-seo/.\n\nThe Plugin Directory Reference are only meaningful in:\n\n* The top-level `plugins` array\n* The `installPlugin` imperative step"
     },
-    "alias-1465201393-41223-41320-1465201393-0-41321": {
+    "alias-1068919986-42634-42731-1068919986-0-42732": {
       "anyOf": [
         {
           "type": "string"
@@ -2362,13 +2865,13 @@
         {
           "type": "array",
           "items": {
-            "$ref": "#/definitions/alias-1465201393-41223-41320-1465201393-0-41321"
+            "$ref": "#/definitions/alias-1068919986-42634-42731-1068919986-0-42732"
           }
         },
         {
           "type": "object",
           "additionalProperties": {
-            "$ref": "#/definitions/alias-1465201393-41223-41320-1465201393-0-41321"
+            "$ref": "#/definitions/alias-1068919986-42634-42731-1068919986-0-42732"
           }
         }
       ]

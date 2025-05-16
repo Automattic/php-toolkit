@@ -6,7 +6,7 @@ import { dirname, resolve } from "path";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const entry = resolve(scriptDir, "wsp/wsp-1-blueprint-v2-schema/appendix-A-blueprint-v2-schema.ts");
-const out = resolve(scriptDir, "blueprint-v2-schema.json");
+const out = resolve(scriptDir, "schema-v2.json");
 
 const cfg: Config = {
   path: resolve(entry),

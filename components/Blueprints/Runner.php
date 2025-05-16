@@ -21,6 +21,7 @@ use WordPress\Blueprints\Steps\ActivateThemeStep;
 use WordPress\Blueprints\Steps\CpStep;
 use WordPress\Blueprints\Steps\DefineConstantsStep;
 use WordPress\Blueprints\Steps\Exception;
+use WordPress\Blueprints\Steps\ImportContentStep;
 use WordPress\Blueprints\Steps\ImportMediaStep;
 use WordPress\Blueprints\Steps\ImportThemeStarterContentStep;
 use WordPress\Blueprints\Steps\InstallPluginStep;
@@ -428,7 +429,7 @@ class Runner {
 						'source'               => $themeRef['source'],
 						'activate'             => $themeRef['activate'] ?? false,
 						'importStarterContent' => $themeRef['importStarterContent'] ?? false,
-						'targetFolderName'     => $themeRef['targetFolderName'] ?? null,
+						'targetDirectoryName'     => $themeRef['targetDirectoryName'] ?? null,
 					] );
 				} else {
 					throw new InvalidArgumentException( 'Invalid theme reference format in "themes" array.' );
@@ -450,7 +451,7 @@ class Runner {
 					'source'               => $themeRef['source'],
 					'activate'             => true,
 					'importStarterContent' => $themeRef['importStarterContent'] ?? false,
-					'targetFolderName'     => $themeRef['targetFolderName'] ?? null,
+					'targetDirectoryName'     => $themeRef['targetDirectoryName'] ?? null,
 				] );
 			} else {
 				throw new InvalidArgumentException( 'Invalid theme reference format for "activeTheme".' );
@@ -494,45 +495,24 @@ class Runner {
 			$plan[] = $this->createStepObject( 'createPostTypes', [ 'postTypes' => $validated_array['postTypes'] ] );
 		}
 
-		// 13. content – Import inline posts via wp_insert_post().
+		// 13. content imports
 		if ( ! empty( $validated_array['content'] ) && is_array( $validated_array['content'] ) ) {
-			foreach ( $validated_array['content'] as $contentEntry ) {
-				if ( ! isset( $contentEntry['type'], $contentEntry['source'] ) ) {
-					throw new InvalidArgumentException( 'Invalid content entry: missing "type" or "source" key.' );
-				}
-
-				// Only handle 'posts' content type for now.
-				if ( 'posts' !== $contentEntry['type'] ) {
-					throw new InvalidArgumentException(
-						sprintf( 'Unsupported content type: "%s". Only "posts" is currently supported.', $contentEntry['type'] )
-					);
-				}
-
-				if ( ! is_array( $contentEntry['source'] ) ) {
-					throw new InvalidArgumentException( 'Invalid content source: must be an array.' );
-				}
-
-				// Filter inline post definitions (arrays) – skip file paths/URLs (strings).
-				$inlinePosts = array_values(
-					array_filter(
-						$contentEntry['source'],
-						static fn( $item ) => is_array( $item )
-					)
-				);
-
-				if ( ! $inlinePosts ) {
-					// Nothing inline to import – skip.
-					continue;
-				}
-
-				$plan[] = $this->createStepObject( 'importPosts', [ 'posts' => $inlinePosts ] );
-			}
+			// @TODO: Consider splitting this into multiple importContent steps, one per piece of content.
+			$plan[] = $this->createStepObject( 'importContent', [ 'content' => $validated_array['content'] ] );
 		}
 
 		// 14. additionalStepsAfterExecution
 		if ( ! empty( $validated_array['additionalStepsAfterExecution'] ) && is_array( $validated_array['additionalStepsAfterExecution'] ) ) {
 			foreach ( $validated_array['additionalStepsAfterExecution'] as $stepData ) {
 				$plan[] = $this->createStepObject( $stepData['step'], $stepData );
+			}
+		}
+
+		foreach($plan as $step) {
+			// @TODO: Make sure this doesn't get included twice in the execution plan.
+			if($step instanceof ImportContentStep) {
+				array_unshift($plan, $this->createStepObject('installPlugin', [ 'source' => $this->createDataReference('https://playground.wordpress.net/wordpress-importer.zip') ]));
+				break;
 			}
 		}
 
@@ -553,11 +533,20 @@ class Runner {
 			case 'activatePlugin':
 				return new ActivatePluginStep( $data['pluginPath'] );
 			case 'activateTheme':
-				return new ActivateThemeStep( $data['themeFolderName'] );
+				return new ActivateThemeStep( $data['themeDirectoryName'] );
 			case 'cp':
 				return new CpStep( $data['fromPath'], $data['toPath'] );
 			case 'defineConstants':
 				return new DefineConstantsStep( $data['constants'] );
+			case 'importContent':
+				$content = [];
+				foreach($data['content'] as $item) {
+					$content[] = [
+						...$item,
+						'source' => $this->createDataReference($item['source']),
+					];
+				}
+				return new ImportContentStep( $content );
 			case 'importThemeStarterContent':
 				return new ImportThemeStarterContentStep( $data['themeSlug'] ?? null );
 			case 'installPlugin':
@@ -578,7 +567,7 @@ class Runner {
 					$source,
 					$data['activate'] ?? false,
 					$data['importStarterContent'] ?? false,
-					$data['targetFolderName'] ?? null
+					$data['targetDirectoryName'] ?? null
 				);
 			case 'mkdir':
 				return new MkdirStep( $data['path'] );
@@ -595,7 +584,6 @@ class Runner {
 				);
 			case 'runSql':
 				$source = $this->createDataReference( $data['source'] );
-
 				return new RunSqlStep( $source );
 			case 'setSiteLanguage':
 				return new SetSiteLanguageStep( $data['language'] );

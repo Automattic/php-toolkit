@@ -15,6 +15,7 @@ export type Blueprint = {
 	 * 5, etc will be different from version 2.
 	 */
 	version: 2;
+
 	/**
 	 * JSON Schema URL.
 	 */
@@ -345,111 +346,7 @@ export type Blueprint = {
 
 	// Site data {{{
 
-	content?: Array<
-		| ({
-				type: 'mysql-dump';
-				source: DataReference | DataReference[];
-		  } & URLMappingConfig)
-		| ({
-				type: 'posts';
-				source:
-					| DataReference
-					| DataReference[]
-					| WordPressPost
-					| WordPressPost[];
-		  } & URLMappingConfig)
-		/**
-		 * WXR files to import.
-		 *
-		 * Example:
-		 *
-		 * ```json
-		 * content: [
-		 *     {
-		 *         "type": "wxr",
-		 *         "https://raw.githubusercontent.com/wordpress/blueprints/trunk/blueprints/stylish-press/woo-products.wxr"
-		 *     },
-		 *     {
-		 *         "type": "wxr",
-		 *         "url": "https://raw.githubusercontent.com/wordpress/blueprints/trunk/blueprints/stylish-press/site-content.wxr",
-		 *         "rewriteUrls": true,
-		 *         "fetchStaticAssets": false,
-		 *         "users": false,
-		 *         "comments": false,
-		 *     }
-		 * ]
-		 * ```
-		 */
-		| ({
-				type: 'wxr';
-				source: DataReference;
-
-				/**
-				 * Static assets handling.
-				 *
-				 * Possible values:
-				 *
-				 * * "fetch" – Fetch the static assets and save them to the local filesystem.
-				 * * "hotlink" – Hotlink the static assets from the remote site.
-				 *
-				 * @default "fetch".
-				 */
-				staticAssets?: 'fetch' | 'hotlink';
-
-				/**
-				 * How to handle authors that don't exist on the current site.
-				 *
-				 * Possible values:
-				 *
-				 * * "create" – Create a new author.
-				 * * "default-author" – Use the default author.
-				 * * "map" – Map the author to an existing author on the current site.
-				 *
-				 * @default "create".
-				 */
-				authorsMode?: 'create' | 'default-author' | 'map';
-
-				/**
-				 * The default author to use when `mode` is "default-author".
-				 *
-				 * @default "admin".
-				 */
-				defaultAuthorUsername?: string;
-
-				/**
-				 * Map post authors from the remote site to the current site.
-				 *
-				 * When not provided, the importer will attempt to match the authors by
-				 * username, email, or name.
-				 *
-				 * Required when `authorsMode` is "map".
-				 *
-				 * @default undefined.
-				 */
-				authorsMap?: Record<RemoteUsername, LocalUsername>;
-
-				/**
-				 * Whether to import users from the remote site.
-				 *
-				 * @default false.
-				 */
-				importUsers?: boolean;
-
-				/**
-				 * Whether to import comments from the remote site.
-				 *
-				 * @default false.
-				 */
-				importComments?: boolean;
-
-				/**
-				 * Whether to import site settings from the remote site.
-				 *
-				 * @default false.
-				 */
-				importSiteOptions?: boolean;
-		  } & URLMappingConfig)
-	>;
+	content?: Array<ContentDefinition>;
 
 	users?: Array<{
 		username: string;
@@ -526,6 +423,111 @@ type URLMappingConfig = {
 	urlsMap?: Record<URLReference, URLReference>;
 };
 
+type ContentDefinition =
+	| ({
+			type: 'mysql-dump';
+			source: DataReference | DataReference[];
+	  } & URLMappingConfig)
+	| ({
+			type: 'posts';
+			source:
+				| DataReference
+				| DataReference[]
+				| WordPressPost
+				| WordPressPost[];
+	  } & URLMappingConfig)
+	/**
+	 * WXR files to import.
+	 *
+	 * Example:
+	 *
+	 * ```json
+	 * content: [
+	 *     {
+	 *         "type": "wxr",
+	 *         "https://raw.githubusercontent.com/wordpress/blueprints/trunk/blueprints/stylish-press/woo-products.wxr"
+	 *     },
+	 *     {
+	 *         "type": "wxr",
+	 *         "url": "https://raw.githubusercontent.com/wordpress/blueprints/trunk/blueprints/stylish-press/site-content.wxr",
+	 *         "rewriteUrls": true,
+	 *         "fetchStaticAssets": false,
+	 *         "users": false,
+	 *         "comments": false,
+	 *     }
+	 * ]
+	 * ```
+	 */
+	| ({
+			type: 'wxr';
+			source: DataReference;
+
+			/**
+			 * Static assets handling.
+			 *
+			 * Possible values:
+			 *
+			 * * "fetch" – Fetch the static assets and save them to the local filesystem.
+			 * * "hotlink" – Hotlink the static assets from the remote site.
+			 *
+			 * @default "fetch".
+			 */
+			staticAssets?: 'fetch' | 'hotlink';
+
+			/**
+			 * How to handle authors that don't exist on the current site.
+			 *
+			 * Possible values:
+			 *
+			 * * "create" – Create a new author.
+			 * * "default-author" – Use the default author.
+			 * * "map" – Map the author to an existing author on the current site.
+			 *
+			 * @default "create".
+			 */
+			authorsMode?: 'create' | 'default-author' | 'map';
+
+			/**
+			 * The default author to use when `mode` is "default-author".
+			 *
+			 * @default "admin".
+			 */
+			defaultAuthorUsername?: string;
+
+			/**
+			 * Map post authors from the remote site to the current site.
+			 *
+			 * When not provided, the importer will attempt to match the authors by
+			 * username, email, or name.
+			 *
+			 * Required when `authorsMode` is "map".
+			 *
+			 * @default undefined.
+			 */
+			authorsMap?: Record<RemoteUsername, LocalUsername>;
+
+			/**
+			 * Whether to import users from the remote site.
+			 *
+			 * @default false.
+			 */
+			importUsers?: boolean;
+
+			/**
+			 * Whether to import comments from the remote site.
+			 *
+			 * @default false.
+			 */
+			importComments?: boolean;
+
+			/**
+			 * Whether to import site settings from the remote site.
+			 *
+			 * @default false.
+			 */
+			importSiteOptions?: boolean;
+	  } & URLMappingConfig);
+
 type MediaDefinition =
 	| DataReference
 	| {
@@ -599,8 +601,14 @@ type PluginDefinition =
 			 * } );
 			 * ```
 			 */
-		activationOptions?: Record<string, JsonValue>;
-			
+			activationOptions?: Record<string, JsonValue>;
+
+			/**
+			 * An explicit directory name within wp-content/plugins to install the plugin at.
+			 * If not provided, it will be inferred from the plugin source.
+			 */
+			targetDirectoryName?: string;
+
 			/**
 			 * Sometimes it's fine when a plugin fails to install.
 			 *
@@ -650,7 +658,7 @@ type ThemeDefinition =
 			 * An explicit directory name within wp-content/themes to install the theme at.
 			 * If not provided, it will be inferred from the theme source.
 			 */
-			targetFolderName?: string;
+			targetDirectoryName?: string;
 			/**
 			 * Human-readable name of the theme for the progress bar.
 			 *
@@ -1369,14 +1377,56 @@ type ActivatePluginStep = {
 	 * relative to the plugins directory (plugin-name/plugin-name.php).
 	 */
 	pluginPath: string;
+	/**
+	 * Human-readable name of the plugin for the progress bar.
+	 *
+	 * For example, with the following Blueprint:
+	 *
+	 * ```json
+	 * {
+	 *     "steps": [
+	 *         {
+	 *             "step": "activatePlugin",
+	 *             "pluginPath": "wordpress-seo/wp-seo.php",
+	 *             "humanReadableName": "Yoast SEO"
+	 *         }
+	 *     ]
+	 * }
+	 * ```
+	 *
+	 * The progress bar will show "Activating Yoast SEO" instead of
+	 * "Activating wordpress-seo/wp-seo.php".
+	 */
+	humanReadableName?: string;
 };
 
 type ActivateThemeStep = {
 	step: 'activateTheme';
 	/**
-	 * The name of the theme folder inside wp-content/themes/
+	 * The name of the theme directory inside wp-content/themes/
 	 */
-	themeFolderName: string;
+	themeDirectoryName: string;
+	/**
+	 * Human-readable name of the theme for the progress bar.
+	 *
+	 * For example, with the following Blueprint:
+	 *
+	 * ```json
+	 * {
+	 *     "steps": [
+	 *         {
+	 *             "step": "activateTheme",
+	 *             "themeDirectoryName": "twentytwentythree",
+	 *             "humanReadableName": "Twenty Twenty-Three"
+	 *         }
+	 *     ]
+	 * }
+	 * ```
+	 *
+	 * The progress bar will show "Activating Twenty Twenty-Three" instead of
+	 * "Activating twentytwentythree".
+	 */
+	humanReadableName?: string;
 };
 
 type CpStep = {
@@ -1388,6 +1438,11 @@ type CpStep = {
 type DefineConstantsStep = {
 	step: 'defineConstants';
 	constants: Record<string, string>;
+};
+
+type ImportContentStep = {
+	step: 'importContent';
+	content: ContentDefinition[];
 };
 
 type ImportMediaStep = {
@@ -1494,6 +1549,13 @@ type PluginStep = {
 
 type ThemeStep = {
 	step: 'installTheme';
+	/**
+	 * Whether to activate the theme after installing it.
+	 *
+	 * This is not a part of the theme definition. Only the step
+	 * can explicitly provide this option. The default value is `true`.
+	 */
+	activate?: boolean;
 } & ThemeDefinition;
 
 type Step =
@@ -1501,6 +1563,7 @@ type Step =
 	| ActivateThemeStep
 	| CpStep
 	| DefineConstantsStep
+	| ImportContentStep
 	| ImportMediaStep
 	| ImportThemeStarterContentStep
 	| PluginStep

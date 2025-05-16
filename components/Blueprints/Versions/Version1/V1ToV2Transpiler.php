@@ -136,7 +136,7 @@ class V1ToV2Transpiler {
 						}
 						$v2step = [
 							'step' => 'activateTheme',
-							'themeFolderName' => $v1step['themeFolderName'],
+							'themeDirectoryName' => $v1step['themeFolderName'],
 						];
 						if(isset($v1step['humanReadableName'])) {
 							$v2step['humanReadableName'] = $v1step['humanReadableName'];
@@ -197,13 +197,15 @@ class V1ToV2Transpiler {
 						if(isset($v1step['progress'])) {
 							error_log('The `progress` option is not supported on importWxr step and will be ignored: %s. Use the runtime configuration to set the progress bar instead.');
 						}
-						$v2step = [
-							'step' => 'importThemeStarterContent',
+						$v2steps[] = [
+							'step' => 'importContent',
+							'content' => [
+								[
+									'type' => 'wxr',
+									'source' => self::convertV1ResourceToV2Reference($v1step['file']),
+								]
+							]
 						];
-						if(isset($v1step['themeSlug'])) {
-							$v2step['themeSlug'] = $v1step['themeSlug'];
-						}
-						$v2steps[] = $v2step;
 						break;
 					case 'importThemeStarterContent':
 						// @TODO: We really need to support this in the v2 runner!
