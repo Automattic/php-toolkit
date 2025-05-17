@@ -46,7 +46,7 @@ class DataReferenceResolverTest extends TestCase
             ->with($url, $this->arrayHasKey('progress_tracker'))
             ->willReturn($dummyStream);
 
-        $result = $this->resolver->resolve($reference, $this->tracker);
+        $result = $this->resolver->resolve($reference);
         $this->assertInstanceOf(\WordPress\Blueprints\DataReference\File::class, $result);
         $this->assertSame($dummyStream, $result->stream);
         $this->assertEquals('file.zip', $result->filename);
@@ -62,7 +62,7 @@ class DataReferenceResolverTest extends TestCase
             ->with($expectedUrl, $this->arrayHasKey('progress_tracker'))
             ->willReturn($dummyStream);
 
-        $result = $this->resolver->resolve($reference, $this->tracker);
+        $result = $this->resolver->resolve($reference);
         $this->assertInstanceOf(\WordPress\Blueprints\DataReference\File::class, $result);
         $this->assertSame($dummyStream, $result->stream);
         $this->assertEquals('akismet.latest-stable.zip', $result->filename);
@@ -78,7 +78,7 @@ class DataReferenceResolverTest extends TestCase
             ->with($expectedUrl, $this->arrayHasKey('progress_tracker'))
             ->willReturn($dummyStream);
 
-        $result = $this->resolver->resolve($reference, $this->tracker);
+        $result = $this->resolver->resolve($reference);
         $this->assertInstanceOf(\WordPress\Blueprints\DataReference\File::class, $result);
         $this->assertSame($dummyStream, $result->stream);
         $this->assertEquals('twentytwentyfour.latest-stable.zip', $result->filename);
@@ -93,7 +93,7 @@ class DataReferenceResolverTest extends TestCase
         $dummyStream = $this->createMock(\WordPress\ByteStream\ReadStream\ByteReadStream::class);
         $this->executionContext->method('open_read_stream')->with('./foo.txt')->willReturn($dummyStream);
 
-        $result = $this->resolver->resolve($reference, $this->tracker);
+        $result = $this->resolver->resolve($reference);
         $this->assertInstanceOf(\WordPress\Blueprints\DataReference\File::class, $result);
         $this->assertEquals('foo.txt', $result->filename);
     }
@@ -105,7 +105,7 @@ class DataReferenceResolverTest extends TestCase
         $this->executionContext->method('is_file')->with('./bar')->willReturn(false);
         $this->executionContext->method('is_dir')->with('./bar')->willReturn(true);
         // ChrootLayer is used, but we just check Directory is returned
-        $result = $this->resolver->resolve($reference, $this->tracker);
+        $result = $this->resolver->resolve($reference);
         $this->assertInstanceOf(\WordPress\Blueprints\DataReference\Directory::class, $result);
         $this->assertEquals('bar', $result->dirname);
     }
@@ -113,7 +113,7 @@ class DataReferenceResolverTest extends TestCase
     public function testResolveInlineFile()
     {
         $reference = new InlineFile('baz.txt', 'hello world');
-        $result = $this->resolver->resolve($reference, $this->tracker);
+        $result = $this->resolver->resolve($reference);
         $this->assertInstanceOf(\WordPress\Blueprints\DataReference\File::class, $result);
         $this->assertEquals('baz.txt', $result->filename);
         $this->assertInstanceOf(\WordPress\ByteStream\MemoryPipe::class, $result->stream);
@@ -125,7 +125,7 @@ class DataReferenceResolverTest extends TestCase
     {
         $children = [new InlineFile('child.txt', 'child content')];
         $reference = new InlineDirectory('dir', $children);
-        $result = $this->resolver->resolve($reference, $this->tracker);
+        $result = $this->resolver->resolve($reference);
         $this->assertInstanceOf(\WordPress\Blueprints\DataReference\Directory::class, $result);
         $fs = $result->filesystem;
         $this->assertTrue($fs->is_file('child.txt'));
@@ -148,7 +148,7 @@ class DataReferenceResolverTest extends TestCase
 			'refs/heads/trunk',
 			'tools/scripts'
 		);
-        $result = $this->resolver->resolve($reference, $this->tracker);
+        $result = $this->resolver->resolve($reference);
         $this->assertInstanceOf(\WordPress\Blueprints\DataReference\Directory::class, $result);
         $this->assertEquals('scripts', $result->dirname);
 		$this->assertEquals(
@@ -164,14 +164,14 @@ class DataReferenceResolverTest extends TestCase
         $reference = new ExecutionContextPath('./missing.txt');
         $this->executionContext->method('exists')->with('./missing.txt')->willReturn(false);
         $this->expectException(\RuntimeException::class);
-        $this->resolver->resolve($reference, $this->tracker);
+        $this->resolver->resolve($reference);
     }
 
     public function testResolveUnsupportedReferenceTypeThrows()
     {
         $reference = $this->getMockForAbstractClass(DataReference::class);
         $this->expectException(\Exception::class);
-        $this->resolver->resolve($reference, $this->tracker);
+        $this->resolver->resolve($reference);
     }
 
     public function testResolveURLReferenceFetchFailureThrows()
@@ -183,6 +183,6 @@ class DataReferenceResolverTest extends TestCase
             ->with($url, $this->arrayHasKey('progress_tracker'))
             ->will($this->throwException(new \RuntimeException('Fetch failed')));
         $this->expectException(\RuntimeException::class);
-        $this->resolver->resolve($reference, $this->tracker);
+        $this->resolver->resolve($reference);
     }
 } 

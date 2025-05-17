@@ -46,15 +46,13 @@ class DataReferenceResolver {
 	}
 
 	/** Core service method shared by runner, target resolvers and steps */
-	public function resolve( DataReference $reference, ?Tracker $progress_tracker = null ): File|Directory {
+	public function resolve( DataReference $reference ): File|Directory {
 		// TODO: Comment this. Make semantics clearer.
 		if ( isset( $this->resolvedDataReferences[ $reference->id ] ) ) {
 			return $this->resolvedDataReferences[ $reference->id ];
 		}
 
-		if ( $progress_tracker === null ) {
-			$progress_tracker = $this->subTrackers[ $reference->id ] ?? new Tracker();
-		}
+		$progress_tracker = $this->subTrackers[ $reference->id ] ?? new Tracker();
 
 		if ( $reference instanceof WordPressOrgPlugin ) {
 			$reference = new URLReference( 'https://downloads.wordpress.org/plugin/' . $reference->get_slug() . '.latest-stable.zip' );

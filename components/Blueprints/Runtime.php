@@ -62,8 +62,8 @@ class Runtime {
 		return $this->assets;
 	}
 
-	public function resolve( DataReference $r, ?Tracker $progress_tracker = null ): File|Directory {
-		return $this->assets->resolve( $r, $progress_tracker );
+	public function resolve( DataReference $r ): File|Directory {
+		return $this->assets->resolve( $r );
 	}
 
 	public function getWpCliPath(): string {

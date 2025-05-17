@@ -70,7 +70,7 @@ class ImportContentStep implements StepInterface {
 			pipe_stream($resolved->stream, $write_stream);
 			$write_stream->close_writing();
 
-			$runtime->evalPhpInSubProcess(
+			$process = $runtime->evalPhpInSubProcess(
 				<<<'PHP'
 				<?php
 				require_once getenv('DOCROOT') . '/wp-load.php';
@@ -84,6 +84,9 @@ class ImportContentStep implements StepInterface {
 					'TEMP_FILE' => $tempFile,
 				]
 			);
+			var_dump($process->getOutput());
+			var_dump($process->getErrorOutput());
+			die();
 		});
 	}
 
