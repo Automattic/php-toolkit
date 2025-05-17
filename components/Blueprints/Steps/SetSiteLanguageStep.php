@@ -189,7 +189,7 @@ class SetSiteLanguageStep implements StepInterface {
 				 * scenario. Not all plugins and themes are translated to all languages.
 				 */
 				if ( isset( $target['is_plugin'] ) ) {
-					$runtime->logWarning( 
+					$runtime->getLogger()->warning( 
 						sprintf(
 							"Warning: Failed to download translations for plugin %s: %s",
 							$target['slug'],
@@ -197,7 +197,7 @@ class SetSiteLanguageStep implements StepInterface {
 						)
 					);
 				} elseif ( isset( $target['is_theme'] ) ) {
-					$runtime->logWarning(
+					$runtime->getLogger()->warning(
 						sprintf(
 							"Warning: Failed to download translations for theme %s: %s",
 							$target['slug'],
@@ -237,7 +237,7 @@ class SetSiteLanguageStep implements StepInterface {
 				}
 			}
 		} catch ( \Exception $e ) {
-			$runtime->logWarning( "Warning: Failed to fetch translations details from WordPress.org API: " . $e->getMessage() );
+			$runtime->getLogger()->warning( "Warning: Failed to fetch translations details from WordPress.org API: " . $e->getMessage() );
 		}
 
 		return false;

@@ -2,7 +2,9 @@
 
 namespace WordPress\Blueprints;
 
+use Psr\Log\LoggerInterface;
 use WordPress\Blueprints\DataReference\DataReference;
+use WordPress\Blueprints\Logger\NoopLogger;
 use WordPress\Filesystem\Filesystem;
 
 class RunnerConfiguration {
@@ -14,6 +16,7 @@ class RunnerConfiguration {
 	private string $databaseEngine = 'mysql';
 	private array $databaseCredentials = [];
 	private $progressObserver = null;
+	private LoggerInterface $logger;
 
 	/**
 	 * @var DataReference|null
@@ -23,6 +26,7 @@ class RunnerConfiguration {
 
 	public function __construct() {
 		$this->sqliteIntegrationPlugin = DataReference::create( 'https://downloads.wordpress.org/plugin/sqlite-database-integration.zip' );
+		$this->logger = new NoopLogger();
 	}
 
 	public function setBlueprint( DataReference|array $r ): self {
@@ -33,6 +37,15 @@ class RunnerConfiguration {
 
 	public function getBlueprint(): DataReference|array {
 		return $this->blueprintRef;
+	}
+
+	public function setLogger( LoggerInterface $logger ): self {
+		$this->logger = $logger;
+		return $this;
+	}
+
+	public function getLogger(): LoggerInterface {
+		return $this->logger;
 	}
 
 	public function setExecutionMode( string $m ): self {

@@ -2,6 +2,7 @@
 
 namespace WordPress\Blueprints\Versions\Version1;
 
+use Psr\Log\LoggerInterface;
 use WordPress\Blueprints\Exception\BlueprintExecutionException;
 use WordPress\Blueprints\Validator\HumanFriendlySchemaValidator;
 use WordPress\Blueprints\Validator\ValidationError;
@@ -14,11 +15,17 @@ use function WordPress\Filesystem\wp_join_paths;
  */
 class V1ToV2Transpiler {
 
+	private LoggerInterface $logger;
+
 	static public function validate_v1_blueprint(array $v1): ?ValidationError {
 		$v = new HumanFriendlySchemaValidator(
 			json_decode( file_get_contents( __DIR__ . '/schema-v1.json' ), true )
 		);
 		return $v->validate( $v1 );
+	}
+
+	public function __construct(LoggerInterface $logger) {
+		$this->logger = $logger;
 	}
 
 	/**
@@ -28,7 +35,7 @@ class V1ToV2Transpiler {
 	 * @return array
 	 * @throws BlueprintExecutionException
 	 */
-	static public function upgrade( array $validated_v1_blueprint ): array {
+	public function upgrade( array $validated_v1_blueprint ): array {
 		$v1 = $validated_v1_blueprint;
 		$v2 = [
 			'version' => 2,
@@ -88,7 +95,7 @@ class V1ToV2Transpiler {
 			}
 		}
 		if (!empty($presentUnsupportedFields)) {
-			error_log(sprintf('The following fields are not yet supported by the v1->v2 Blueprint transpiler and will be ignored: %s.', implode(', ', $presentUnsupportedFields)));
+			$this->logger->warning(sprintf('The following fields are not yet supported by the v1->v2 Blueprint transpiler and will be ignored: %s.', implode(', ', $presentUnsupportedFields)));
 		}
 
 		// SHORTHANDS:
@@ -119,7 +126,7 @@ class V1ToV2Transpiler {
 				switch ($v1step['step']) {
 					case 'activatePlugin':
 						if(isset($v1step['progress'])) {
-							error_log('The `progress` option is not supported on activatePlugin step and will be ignored: %s. Use the runtime configuration to set the progress bar instead.');
+							$this->logger->warning('The `progress` option is not supported on activatePlugin step and will be ignored: %s. Use the runtime configuration to set the progress bar instead.');
 						}
 						$v2step = [
 							'step' => 'activatePlugin',
@@ -132,7 +139,7 @@ class V1ToV2Transpiler {
 						break;
 					case 'activateTheme':
 						if(isset($v1step['progress'])) {
-							error_log('The `progress` option is not supported on activateTheme step and will be ignored: %s. Use the runtime configuration to set the progress bar instead.');
+							$this->logger->warning('The `progress` option is not supported on activateTheme step and will be ignored: %s. Use the runtime configuration to set the progress bar instead.');
 						}
 						$v2step = [
 							'step' => 'activateTheme',
@@ -145,7 +152,7 @@ class V1ToV2Transpiler {
 						break;
 					case 'cp':
 						if(isset($v1step['progress'])) {
-							error_log('The `progress` option is not supported on cp step and will be ignored: %s. Use the runtime configuration to set the progress bar instead.');
+							$this->logger->warning('The `progress` option is not supported on cp step and will be ignored: %s. Use the runtime configuration to set the progress bar instead.');
 						}
 						$v2steps[] = [
 							'step' => 'cp',
@@ -155,13 +162,13 @@ class V1ToV2Transpiler {
 						break;
 					case 'defineWpConfigConsts':
 						if(isset($v1step['progress'])) {
-							error_log('The `progress` option is not supported on defineWpConfigConsts step and will be ignored: %s. Use the runtime configuration to set the progress bar instead.');
+							$this->logger->warning('The `progress` option is not supported on defineWpConfigConsts step and will be ignored: %s. Use the runtime configuration to set the progress bar instead.');
 						}
 						if(isset($v1step['method'])) {
-							error_log('The `method` option is not supported on defineWpConfigConsts step and will be ignored: %s. Use the runtime configuration to set the method instead.');
+							$this->logger->warning('The `method` option is not supported on defineWpConfigConsts step and will be ignored: %s. Use the runtime configuration to set the method instead.');
 						}
 						if(isset($v1step['virtualize'])) {
-							error_log('The `virtualize` option is not supported on defineWpConfigConsts step and will be ignored: %s. This option is deprecated and will be removed in a future version.');
+							$this->logger->warning('The `virtualize` option is not supported on defineWpConfigConsts step and will be ignored: %s. This option is deprecated and will be removed in a future version.');
 						}
 						$v2steps[] = [
 							'step' => 'defineWpConfigConsts',
@@ -169,19 +176,19 @@ class V1ToV2Transpiler {
 						];
 						break;
 					case 'defineSiteUrl':
-						error_log('The `defineSiteUrl` step is not supported by the Blueprint v2 schema. Use the runner configuration to set the site URL instead.');
+						$this->logger->warning('The `defineSiteUrl` step is not supported by the Blueprint v2 schema. Use the runner configuration to set the site URL instead.');
 						break;
 					case 'enableMultisite':
 						// @TODO: Support this step in v3. Multisites will require a separate schema
 						//        that defines what's related to which site.
-						error_log('The `enableMultisite` step is not supported by the Blueprint v2 schema and will be ignored.');
+						$this->logger->warning('The `enableMultisite` step is not supported by the Blueprint v2 schema and will be ignored.');
 						break;
 					case 'importWordPressFiles':
 						if(isset($v1step['progress'])) {
-							error_log('The `progress` option is not supported on importWordPressFiles step and will be ignored: %s. Use the runtime configuration to set the progress bar instead.');
+							$this->logger->warning('The `progress` option is not supported on importWordPressFiles step and will be ignored: %s. Use the runtime configuration to set the progress bar instead.');
 						}
 						if(isset($v1step['pathInZip'])) {
-							error_log('The `pathInZip` option is not supported on importWordPressFiles step. The entire step will be ignored.');
+							$this->logger->warning('The `pathInZip` option is not supported on importWordPressFiles step. The entire step will be ignored.');
 						} else {
 							/**
 							 * wordPressFilesZip refers to a zip file with a full WordPress installation.
@@ -191,11 +198,11 @@ class V1ToV2Transpiler {
 						}
 						break;
 					case 'runWpInstallationWizard':
-						error_log('The `runWpInstallationWizard` step is not supported by the Blueprint v2 schema. Provide your WordPress export URL in the top-level "wordpressVersion" key and the runner will handle the installation automatically.');
+						$this->logger->warning('The `runWpInstallationWizard` step is not supported by the Blueprint v2 schema. Provide your WordPress export URL in the top-level "wordpressVersion" key and the runner will handle the installation automatically.');
 						break;
 					case 'importWxr':
 						if(isset($v1step['progress'])) {
-							error_log('The `progress` option is not supported on importWxr step and will be ignored: %s. Use the runtime configuration to set the progress bar instead.');
+							$this->logger->warning('The `progress` option is not supported on importWxr step and will be ignored: %s. Use the runtime configuration to set the progress bar instead.');
 						}
 						$v2steps[] = [
 							'step' => 'importContent',
@@ -210,14 +217,14 @@ class V1ToV2Transpiler {
 					case 'importThemeStarterContent':
 						// @TODO: We really need to support this in the v2 runner!
 						//        Let's add an importContent step.
-						error_log('The `importThemeStarterContent` step is not supported by the Blueprint v2 schema. Use the runner configuration to set the import behavior instead.');
+						$this->logger->warning('The `importThemeStarterContent` step is not supported by the Blueprint v2 schema. Use the runner configuration to set the import behavior instead.');
 						break;
 					case 'installPlugin':
 						if(isset($v1step['ifAlreadyInstalled'])) {
-							error_log(sprintf('The `ifAlreadyInstalled` option is not yet supported by the v1->v2 Blueprint transpiler and will be ignored: %s. Use the runtime configuration to set the behavior instead.', $v1step['ifAlreadyInstalled']));
+							$this->logger->warning(sprintf('The `ifAlreadyInstalled` option is not yet supported by the v1->v2 Blueprint transpiler and will be ignored: %s. Use the runtime configuration to set the behavior instead.', $v1step['ifAlreadyInstalled']));
 						}
 						if(isset($v1step['progress']['weight'])) {
-							error_log('The `progress.weight` option is not supported Blueprint v2 schema and will be ignored: %s. Use the runtime configuration to set the progress bar instead.');
+							$this->logger->warning('The `progress.weight` option is not supported Blueprint v2 schema and will be ignored: %s. Use the runtime configuration to set the progress bar instead.');
 						}
 						$v2step = [
 							'step' => 'installPlugin',
@@ -243,10 +250,10 @@ class V1ToV2Transpiler {
 						break;
 					case 'installTheme':
 						if(isset($v1step['ifAlreadyInstalled'])) {
-							error_log(sprintf('The `ifAlreadyInstalled` option is not yet supported by the v1->v2 Blueprint transpiler and will be ignored: %s. Use the runtime configuration to set the behavior instead.', $v1step['ifAlreadyInstalled']));
+							$this->logger->warning(sprintf('The `ifAlreadyInstalled` option is not yet supported by the v1->v2 Blueprint transpiler and will be ignored: %s. Use the runtime configuration to set the behavior instead.', $v1step['ifAlreadyInstalled']));
 						}
 						if(isset($v1step['progress']['weight'])) {
-							error_log('The `progress.weight` option is not supported Blueprint v2 schema and will be ignored: %s. Use the runtime configuration to set the progress bar instead.');
+							$this->logger->warning('The `progress.weight` option is not supported Blueprint v2 schema and will be ignored: %s. Use the runtime configuration to set the progress bar instead.');
 						}
 						$v2step = [
 							'step' => 'installTheme',
@@ -271,11 +278,11 @@ class V1ToV2Transpiler {
 						$v2steps[] = $v2step;
 						break;
 					case 'login':
-						error_log('The `login` step is not yet supported by the v1->v2 Blueprint transpiler and will be ignored.');
+						$this->logger->warning('The `login` step is not yet supported by the v1->v2 Blueprint transpiler and will be ignored.');
 						break;
 					case 'mkdir':
 						if(isset($v1step['progress'])) {
-							error_log('The `progress` option on mkDir step is not supported Blueprint v2 schema and will be ignored: %s. Use the runtime configuration to set the progress bar instead.');
+							$this->logger->warning('The `progress` option on mkDir step is not supported Blueprint v2 schema and will be ignored: %s. Use the runtime configuration to set the progress bar instead.');
 						}
 						$v2steps[] = [
 							'step' => 'mkdir',
@@ -284,7 +291,7 @@ class V1ToV2Transpiler {
 						break;
 					case 'mv':
 						if(isset($v1step['progress'])) {
-							error_log('The `progress` option on mv step is not supported Blueprint v2 schema and will be ignored: %s. Use the runtime configuration to set the progress bar instead.');
+							$this->logger->warning('The `progress` option on mv step is not supported Blueprint v2 schema and will be ignored: %s. Use the runtime configuration to set the progress bar instead.');
 						}
 						$v2steps[] = [
 							'step' => 'mv',
@@ -293,11 +300,11 @@ class V1ToV2Transpiler {
 						];
 						break;
 					case 'request':
-						error_log('The `request` step was deprecated in Blueprints v1 and is not supported anymore by Blueprints v2. Replace it with a wp-cli step or a runPHP step.');
+						$this->logger->warning('The `request` step was deprecated in Blueprints v1 and is not supported anymore by Blueprints v2. Replace it with a wp-cli step or a runPHP step.');
 						break;
 					case 'resetData':
 						if(isset($v1step['progress'])) {
-							error_log('The `progress` option on resetData step is not supported Blueprint v2 schema and will be ignored: %s. Use the runtime configuration to set the progress bar instead.');
+							$this->logger->warning('The `progress` option on resetData step is not supported Blueprint v2 schema and will be ignored: %s. Use the runtime configuration to set the progress bar instead.');
 						}
 						$v2steps[] = [
 							'step' => 'runPHP',
@@ -324,7 +331,7 @@ class V1ToV2Transpiler {
 						break;
 					case 'rm':
 						if(isset($v1step['progress'])) {
-							error_log('The `progress` option on rm step is not supported Blueprint v2 schema and will be ignored: %s. Use the runtime configuration to set the progress bar instead.');
+							$this->logger->warning('The `progress` option on rm step is not supported Blueprint v2 schema and will be ignored: %s. Use the runtime configuration to set the progress bar instead.');
 						}
 						$v2steps[] = [
 							'step' => 'rm',
@@ -333,7 +340,7 @@ class V1ToV2Transpiler {
 						break;
 					case 'rmDir':
 						if(isset($v1step['progress'])) {
-							error_log('The `progress` option on rmDir step is not supported Blueprint v2 schema and will be ignored: %s. Use the runtime configuration to set the progress bar instead.');
+							$this->logger->warning('The `progress` option on rmDir step is not supported Blueprint v2 schema and will be ignored: %s. Use the runtime configuration to set the progress bar instead.');
 						}
 						$v2steps[] = [
 							'step' => 'rmdir',
@@ -342,7 +349,7 @@ class V1ToV2Transpiler {
 						break;
 					case 'runPHP':
 						if(isset($v1step['progress'])) {
-							error_log('The `progress` option on runPHP step is not supported Blueprint v2 schema and will be ignored: %s. Use the runtime configuration to set the progress bar instead.');
+							$this->logger->warning('The `progress` option on runPHP step is not supported Blueprint v2 schema and will be ignored: %s. Use the runtime configuration to set the progress bar instead.');
 						}
 						$v2steps[] = [
 							'step' => 'runPHP',
@@ -354,7 +361,7 @@ class V1ToV2Transpiler {
 						break;
 					case 'runSQL':
 						if(isset($v1step['progress'])) {
-							error_log('The `progress` option on runSQL step is not supported Blueprint v2 schema and will be ignored: %s. Use the runtime configuration to set the progress bar instead.');
+							$this->logger->warning('The `progress` option on runSQL step is not supported Blueprint v2 schema and will be ignored: %s. Use the runtime configuration to set the progress bar instead.');
 						}
 						$v2steps[] = [
 							'step' => 'runSQL',
@@ -366,7 +373,7 @@ class V1ToV2Transpiler {
 						break;
 					case 'setSiteLanguage':
 						if(isset($v1step['progress'])) {
-							error_log('The `progress` option on setSiteLanguage step is not supported Blueprint v2 schema and will be ignored: %s. Use the runtime configuration to set the progress bar instead.');
+							$this->logger->warning('The `progress` option on setSiteLanguage step is not supported Blueprint v2 schema and will be ignored: %s. Use the runtime configuration to set the progress bar instead.');
 						}
 						$v2steps[] = [
 							'step' => 'setSiteLanguage',
@@ -375,7 +382,7 @@ class V1ToV2Transpiler {
 						break;
 					case 'setSiteOptions':
 						if(isset($v1step['progress'])) {
-							error_log('The `progress` option on setSiteOptions step is not supported Blueprint v2 schema and will be ignored: %s. Use the runtime configuration to set the progress bar instead.');
+							$this->logger->warning('The `progress` option on setSiteOptions step is not supported Blueprint v2 schema and will be ignored: %s. Use the runtime configuration to set the progress bar instead.');
 						}
 						$v2steps[] = [
 							'step' => 'setSiteOptions',
@@ -384,7 +391,7 @@ class V1ToV2Transpiler {
 						break;
 					case 'unzip':
 						if(isset($v1step['progress'])) {
-							error_log('The `progress` option on unzip step is not supported Blueprint v2 schema and will be ignored: %s. Use the runtime configuration to set the progress bar instead.');
+							$this->logger->warning('The `progress` option on unzip step is not supported Blueprint v2 schema and will be ignored: %s. Use the runtime configuration to set the progress bar instead.');
 						}
 						$v2steps[] = [
 							'step' => 'unzip',
@@ -397,7 +404,7 @@ class V1ToV2Transpiler {
 						break;
 					case 'updateUserMeta':
 						if(isset($v1step['progress'])) {
-							error_log('The `progress` option on updateUserMeta step is not supported Blueprint v2 schema and will be ignored: %s. Use the runtime configuration to set the progress bar instead.');
+							$this->logger->warning('The `progress` option on updateUserMeta step is not supported Blueprint v2 schema and will be ignored: %s. Use the runtime configuration to set the progress bar instead.');
 						}
 						$v2steps[] = [
 							'step' => 'runPHP',
@@ -421,7 +428,7 @@ class V1ToV2Transpiler {
 						break;
 					case 'writeFile':
 						if(isset($v1step['progress'])) {
-							error_log('The `progress` option on writeFile step is not supported Blueprint v2 schema and will be ignored: %s. Use the runtime configuration to set the progress bar instead.');
+							$this->logger->warning('The `progress` option on writeFile step is not supported Blueprint v2 schema and will be ignored: %s. Use the runtime configuration to set the progress bar instead.');
 						}
 						$path = self::translatePath($v1step['path']);
 						$v2steps[] = [
@@ -438,7 +445,7 @@ class V1ToV2Transpiler {
 						break;
 					case 'writeFiles':
 						if(isset($v1step['progress'])) {
-							error_log('The `progress` option on writeFiles step is not supported Blueprint v2 schema and will be ignored: %s. Use the runtime configuration to set the progress bar instead.');
+							$this->logger->warning('The `progress` option on writeFiles step is not supported Blueprint v2 schema and will be ignored: %s. Use the runtime configuration to set the progress bar instead.');
 						}
 						$v2step = [
 							'step' => 'writeFiles',
@@ -460,7 +467,7 @@ class V1ToV2Transpiler {
 						];
 						break;
 					default:
-						error_log(sprintf('The `%s` step is not yet supported by the v1->v2 Blueprint transpiler and will be ignored.', $v1step['step']));
+						$this->logger->warning(sprintf('The `%s` step is not yet supported by the v1->v2 Blueprint transpiler and will be ignored.', $v1step['step']));
 						break;
 				}
 			}

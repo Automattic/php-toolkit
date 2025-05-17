@@ -180,9 +180,6 @@ class Runner {
 				$this->assets,
 				$this->client,
 				$this->blueprintArray,
-				function($message) {
-					$this->logWarning( $message );
-				},
 				$tempRoot,
 				$wpCliReference
 			);
@@ -211,14 +208,6 @@ class Runner {
 				'recursive' => true,
 			]);
 		}
-	}
-
-	/**
-	 * @TODO: Find a more useful way of communicating warnings. Perhaps an interface that captures output
-	 *        of the runtime, similar to progress reporter?
-	 */
-	public function logWarning(string $message): void {
-		error_log( $message );
 	}
 
 	/*──────────────── Blueprint load / validation / createExecutionPlan ─────────────*/
@@ -269,7 +258,9 @@ class Runner {
 					if($this->configuration->getExecutionContext()) {
 						$this->blueprintExecutionContext = $this->configuration->getExecutionContext();
 					} else {
-						$this->logWarning( 'When the Blueprint is loaded as JSON from a remote URL, the execution context is empty.' );
+						// @TODO: Only display this if the Blueprint references any bundled files. And in that case,
+						//        make it a fatal error.
+						$this->configuration->getLogger()->warning( 'Blueprints loaded from remote URLs have no execution context.' );
 						$this->blueprintExecutionContext = InMemoryFilesystem::create();
 					}
 				} elseif ( $reference instanceof ExecutionContextPath ) {
@@ -321,14 +312,13 @@ class Runner {
 			if($error) {
 				throw new BlueprintExecutionException('Invalid Blueprint v1 provided.', $error);
 			}
-			// @TODO: Should we log what we're doing along the way? E.g. the fact
-			//        that we're upgrading? Maybe in some "verbose" mode? But remember
-			//        this is not a CLI tool. This is a generic library for all Blueprint
-			//        runners. Hmm... Let's write messages to a logger interface maybe?
-			//        And the caller will decide how to log them?
-			$this->mainTracker['blueprint']->setCaption('Blueprint v1 detected. Transpiling to v2...');
-			$this->blueprintArray = V1ToV2Transpiler::upgrade($this->blueprintArray);
+			$this->configuration->getLogger()->debug('Blueprint v1 detected. Transpiling to v2...');
+
+			$transpiler = new V1ToV2Transpiler($this->configuration->getLogger());
+			$this->blueprintArray = $transpiler->upgrade($this->blueprintArray);
 		}
+
+		$this->configuration->getLogger()->debug('Final resolved Blueprint: ' . json_encode($this->blueprintArray, JSON_PRETTY_PRINT));
 
 		// Assert the Blueprint conforms to the latest JSON schema.
 		$v = new HumanFriendlySchemaValidator(

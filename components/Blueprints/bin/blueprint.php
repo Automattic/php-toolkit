@@ -5,6 +5,7 @@
 
 require __DIR__ . '/../../../vendor/autoload.php';
 
+use WordPress\Blueprints\Logger\CLILogger;
 use WordPress\Blueprints\RunnerConfiguration;
 use WordPress\Blueprints\DataReference\DataReference;
 use WordPress\Blueprints\Exception\BlueprintExecutionException;
@@ -193,6 +194,10 @@ function cliArgsToRunnerConfiguration(array $positionals, array $options): Runne
             $config->setExecutionContext($fs);
         }
     }
+
+	$config->setLogger(
+		new CLILogger('php://stdout', CLILogger::VERBOSITY_INFO)
+	);
 
     return $config;
 }

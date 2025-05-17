@@ -2,6 +2,7 @@
 
 namespace WordPress\Blueprints;
 
+use Psr\Log\LoggerInterface;
 use Symfony\Component\Process\Process;
 use WordPress\Blueprints\DataReference\DataReference;
 use WordPress\Blueprints\DataReference\DataReferenceResolver;
@@ -31,7 +32,6 @@ class Runtime {
 		private DataReferenceResolver $assets,
 		private Client $client,
 		private array $blueprint,
-		private $logWarning,
 		private string $tempRoot,
 		private DataReference $wpCliReference
 	) {
@@ -88,8 +88,8 @@ class Runtime {
 		return $wp_cli_path;
 	}
 
-	public function logWarning( string $message ) {
-		call_user_func( $this->logWarning, $message );
+	public function getLogger(): LoggerInterface {
+		return $this->configuration->getLogger();
 	}
 
 	public function withTemporaryDirectory( callable $callback ) {

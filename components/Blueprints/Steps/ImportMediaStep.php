@@ -169,7 +169,8 @@ class ImportMediaStep implements StepInterface {
 				$progress['import'][$i]->finish();
 			} catch ( \Exception $e ) {
 				// Log error but continue with other media files
-				error_log( "Failed to import media file {$target_path}: " . $e->getMessage() );
+				// @TODO: Think through exception handling here.
+				$runtime->getLogger()->warning( "Failed to import media file {$target_path}: " . $e->getMessage() );
 			}
 
 			$files_imported ++;
