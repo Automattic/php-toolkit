@@ -3,11 +3,9 @@
 namespace WordPress\Blueprints\Steps;
 
 use WordPress\Blueprints\DataReference\File;
+use WordPress\Blueprints\Exception\BlueprintExecutionException;
 use WordPress\Blueprints\Progress\Tracker;
 use WordPress\Blueprints\Runtime;
-use WordPress\ByteStream\WriteStream\FileWriteStream;
-
-use function WordPress\Filesystem\pipe_stream;
 
 /**
  * Represents the 'importContent' step.
@@ -22,38 +20,28 @@ class ImportContentStep implements StepInterface {
 	public function run( Runtime $runtime, Tracker $progress ) {
 		$progress->setCaption( 'Importing content' );
 
-		$contents = $this->content;
-
-		$total_files = count( $contents );
+		$total_files = count( $this->content );
 		if ( $total_files === 0 ) {
 			$progress->finish();
 
 			return true;
 		}
 
-		$files_imported = 0;
 		$progress->split($total_files);
 
-		foreach ( $contents as $i => $content_definition ) {
-			try {
-				if ($content_definition['type'] === 'wxr') {
-					// @TODO: More useful captions – include the url
-					$progress[$i]->setCaption( 'Importing WXR file ' );
-					$this->importWxr($runtime, $content_definition);
-				} elseif ($content_definition['type'] === 'posts') {
-					$progress[$i]->setCaption( 'Importing a post ' );
-					$this->importPosts($runtime, $content_definition);
-				} else {
-					throw new \RuntimeException( 'Unsupported content type: ' . $content_definition['type'] );
-				}
-
-				$progress[$i]->finish();
-			} catch ( \Exception $e ) {
-				// Log error but continue with other content
-				error_log( 'Failed to import content: ' . $e->getMessage() );
+		foreach ( $this->content as $i => $content_definition ) {
+			if ($content_definition['type'] === 'wxr') {
+				// @TODO: More useful captions – include the url
+				$progress[$i]->setCaption( 'Importing WXR file ' );
+				$this->importWxr($runtime, $content_definition);
+			} elseif ($content_definition['type'] === 'posts') {
+				$progress[$i]->setCaption( 'Importing a post ' );
+				$this->importPosts($runtime, $content_definition);
+			} else {
+				throw new \RuntimeException( 'Unsupported content type: ' . $content_definition['type'] );
 			}
 
-			$files_imported++;
+			$progress[$i]->finish();
 		}
 
 		$progress->finish();
@@ -62,32 +50,60 @@ class ImportContentStep implements StepInterface {
 	private function importWxr(Runtime $runtime, array $content_definition): void {
 		$resolved = $runtime->resolve($content_definition['source']);
 		if (!$resolved instanceof File) {
-			throw new \RuntimeException('Failed to resolve WXR file.');
+			throw new BlueprintExecutionException(sprintf(
+				'Imported content reference must be a file, but %s was a Directory.',
+				$content_definition['source']->get_human_readable_name()
+			));
 		}
 
-		$runtime->withTemporaryFile(function ($tempFile) use ($resolved, $runtime) {
-			$write_stream = FileWriteStream::from_path($tempFile);
-			pipe_stream($resolved->stream, $write_stream);
-			$write_stream->close_writing();
+		$wxrPath = $runtime->saveToTemporaryFile($resolved);
+		$runtime->evalPhpInSubProcess(
+			<<<'PHP'
+			<?php
+			require_once getenv('DOCROOT') . '/wp-load.php';
+			require_once getenv('DOCROOT') . '/wp-admin/includes/admin.php';
 
-			$process = $runtime->evalPhpInSubProcess(
-				<<<'PHP'
-				<?php
-				require_once getenv('DOCROOT') . '/wp-load.php';
-				require_once getenv('DOCROOT') . '/wp-admin/includes/admin.php';
-				kses_remove_filters();
-				wp_set_current_user(get_current_user_id());
-				$importer = new WXR_Importer(['fetch_attachments' => true]);
-				$importer->import(getenv('TEMP_FILE'));
-				PHP,
-				[
-					'TEMP_FILE' => $tempFile,
-				]
-			);
-			var_dump($process->getOutput());
-			var_dump($process->getErrorOutput());
-			die();
-		});
+			kses_remove_filters();
+			$admin_id = get_users(array('role' => 'Administrator') )[0]->ID;
+			wp_set_current_user( $admin_id );
+
+			wp_set_current_user( $admin_id );
+			$importer = new WXR_Importer( array(
+				'fetch_attachments' => true,
+				// @TODO: Support custom author
+				'default_author' => $admin_id
+			) );
+			$logger = new WP_Importer_Logger_CLI();
+			$importer->set_logger( $logger );
+			// Slashes from the imported content are lost if we don't call wp_slash here.
+			add_action( 'wp_insert_post_data', function( $data ) {
+				return wp_slash($data);
+			});
+			
+			// Ensure that Site Editor templates are associated with the correct taxonomy.
+			add_filter( 'wp_import_post_terms', function ( $terms, $post_id ) {
+				foreach ( $terms as $post_term ) {
+					if ( 'wp_theme' !== $term['taxonomy'] ) continue;
+					$post_term = get_term_by('slug', $term['slug'], $term['taxonomy'] );
+					if ( ! $post_term ) {
+						$post_term = wp_insert_term(
+						$term['slug'],
+						$term['taxonomy']
+						);
+						$term_id = $post_term['term_id'];
+					} else {
+						$term_id = $post_term->term_id;
+					}
+					wp_set_object_terms( $post_id, $term_id, $term['taxonomy']) ;
+				}
+				return $terms;
+			}, 10, 2 );
+			$result = $importer->import( getenv('WXR_PATH') );
+			PHP,
+			[
+				'WXR_PATH' => $wxrPath,
+			]
+		);
 	}
 
 	private function importPosts(Runtime $runtime, array $content_definition): void {

@@ -8,7 +8,6 @@ use WordPress\Blueprints\DataReference\DataReferenceResolver;
 use WordPress\Blueprints\DataReference\Directory;
 use WordPress\Blueprints\DataReference\File;
 use WordPress\Blueprints\Exception\BlueprintExecutionException;
-use WordPress\Blueprints\Progress\Tracker;
 use WordPress\ByteStream\WriteStream\FileWriteStream;
 use WordPress\Filesystem\Filesystem;
 use WordPress\Filesystem\LocalFilesystem;
@@ -64,6 +63,14 @@ class Runtime {
 
 	public function resolve( DataReference $r ): File|Directory {
 		return $this->assets->resolve( $r );
+	}
+
+	public function saveToTemporaryFile( File $file ) {
+		$tempFile = $this->createTemporaryFile();
+		$write_stream = FileWriteStream::from_path( $tempFile );
+		pipe_stream( $file->stream, $write_stream );
+		$write_stream->close_writing();
+		return $tempFile;
 	}
 
 	public function getWpCliPath(): string {
@@ -129,6 +136,28 @@ class Runtime {
 	 * * DOCROOT environment variable: The path to the WordPress root directory.
 	 * * OUTPUT_FILE environment variable: The path to a file where the output of the code will be appended.
 	 * 
+	 * @TODO: Useful error messages on process failure. Right now we get this mouthful error message:
+	 * 
+	 * FAILED: The command "'php' '/var/folders/sb/cywb...
+     * Fatal error: Uncaught Symfony\Component\Process\Exception\ProcessFailedException: The command "'php' '/var/folders/sb/cywb762129g3f0jzq1_p2q5h0000gp/T/wp-blueprints-runtime-68290ca22b771/tmp_68290cac6bea8'" failed.
+     * 
+     * Exit Code: 255(Unknown error)
+     * 
+     * Working directory: /Users/cloudnik/www/Automattic/core/plugins/wordpress-components/untracked/newsite
+     * 
+     * Output:
+     * =================
+     * 
+     * Fatal error: Uncaught Error: Call to a member function info() on null in /Users/cloudnik/www/Automattic/core/plugins/wordpress-components/untracked/newsite/wp-content/plugins/WordPress-Importer-master/class-wxr-importer.php on line 1561
+	 * 
+	 * It could be simpler, e.g.:
+	 * 
+	 * The command "php /var/folders/..." failed with exit code 255.
+	 * 
+	 * Stdout:
+	 * 
+	 * Stderr:
+	 *
 	 * @param  mixed[]|null  $env
 	 * @param  float  $timeout
 	 */

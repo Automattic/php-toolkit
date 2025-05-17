@@ -154,37 +154,24 @@ class Runner {
 			// Create all top-level progress stages upfront so the tracker knows what %
 			// of the total work is being done with every progress update.
 			$progress->split([
-				'blueprint' => [
-					'ratio' => 5,
-					'caption' => 'Loading Blueprint data',
-				],
-				'targetResolution' => [
-					'ratio' => 20,
-					'caption' => 'Resolving target site',
-				],
+				'blueprint' => 5,
+				'targetResolution' => 20,
 				// @TODO: Put this inside dataResolutionStage
-				'wpCli' => [
-					'ratio' => 1,
-					'caption' => 'Downloading WP-CLI',
-				],
-				'data' => [
-					'ratio' => 24,
-					'caption' => 'Resolving data references',
-				],
-				'execution' => [
-					'ratio' => 50,
-					'caption' => 'Executing Blueprint steps',
-				],
+				'wpCli' => 1,
+				'data' => 24,
+				'execution' => 50,
 			]);
 
 			// TODO: What's the client? 
 			$this->assets = new DataReferenceResolver( $this->client );
 
+			$progress['blueprint']->setCaption('Loading Blueprint data');
 			$this->loadBlueprint();
 			$this->validateBlueprint();
 			$this->assets->setExecutionContext( $this->blueprintExecutionContext );
 			$progress['blueprint']->finish();
 
+			$progress['targetResolution']->setCaption('Resolving target site');
 			$targetSiteFs = LocalFilesystem::create( $this->configuration->getTargetSiteRoot() );
 			$wpCliReference = DataReference::create( 'https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar' );
 			$this->runtime      = new Runtime(
@@ -200,10 +187,12 @@ class Runner {
 				$wpCliReference
 			);
 			$this->progressObserver->setRuntime($this->runtime);
+			$progress['wpCli']->setCaption('Downloading WP-CLI');
 			$this->assets->startEagerResolution( [
 				'wp-cli' => $wpCliReference
 			], $progress['wpCli'] );
 
+			$progress['targetResolution']->setCaption('Resolving target site');
 			if ( $this->configuration->getExecutionMode() === 'apply-to-existing-site' ) {
 				ExistingSiteResolver::resolve( $this->runtime, $progress['targetResolution'] );
 			} else {
@@ -211,6 +200,7 @@ class Runner {
 			}
 			$progress['targetResolution']->finish();
 
+			$progress['data']->setCaption('Resolving data references');
 			$plan = $this->createExecutionPlan();
 			$this->assets->startEagerResolution( $this->dataReferences, $progress['data'] );
 			$this->executePlan( $progress['execution'], $plan, $this->runtime );
