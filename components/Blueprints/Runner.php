@@ -44,6 +44,7 @@ use WordPress\ByteStream\ReadStream\FileReadStream;
 use WordPress\Filesystem\Filesystem;
 use WordPress\Filesystem\InMemoryFilesystem;
 use WordPress\Filesystem\LocalFilesystem;
+use WordPress\HttpClient\ByteStream\RequestReadStream;
 use WordPress\HttpClient\Client;
 use WordPress\HttpClient\FilesystemCache;
 use WordPress\Zip\ZipFilesystem;
@@ -59,6 +60,7 @@ class Runner {
 	private array $blueprintArray;
 	private array $dataReferences = [];
 	private ?VersionConstraint $phpVersionConstraint;
+	private ?VersionConstraint $wpVersionConstraint;
 	private Tracker $mainTracker;
 	private ProgressObserver $progressObserver;
 	public ?Runtime $runtime;
@@ -236,16 +238,20 @@ class Runner {
 		
 		if ( $resolved instanceof File ) {
 			$stream = $resolved->stream;
-			$response = $stream->await_response();
-			if($response->status_code < 200 || $response->status_code >= 400) {
-				throw new BlueprintExecutionException(
-					sprintf(
-						'Failed to load blueprint from %s. Server responded with %d %s.',
-						$reference->get_url(),
-						$response->status_code,
-						$response->get_reason_phrase()
-					)
-				);
+
+			// @TODO: A general http error checking solution for all resources
+			if($stream instanceof RequestReadStream) {
+				$response = $stream->await_response();
+				if($response->status_code < 200 || $response->status_code >= 400) {
+					throw new BlueprintExecutionException(
+						sprintf(
+							'Failed to load blueprint from %s. Server responded with %d %s.',
+							$reference->get_url(),
+							$response->status_code,
+							$response->get_reason_phrase()
+						)
+					);
+				}
 			}
 
 			if ( is_zip_file_stream( $stream ) ) {
@@ -329,45 +335,39 @@ class Runner {
 			throw new BlueprintExecutionException( 'Blueprint does not conform to the schema.', $error );
 		}
 
+		// PHP Version Constraint
 		if ( isset( $this->blueprintArray['phpVersion'] ) ) {
-			$this->phpVersionConstraint = VersionConstraint::fromMixed( $this->blueprintArray['phpVersion'] );
+			$this->phpVersionConstraint = VersionConstraint::fromMixed( $this->blueprintArray['phpVersion'], 'php' );
 		} else {
 			$this->phpVersionConstraint = VersionConstraint::fromMixed( [
 				'recommended' => '8.0',
-			] );
+			], 'php' );
 		}
-
-		// Validate the constraint is satisfiable
-		// @TODO: Explore moving this over to the VersionConstraint class
-		//        we'll need a WordPressVersionConstraint class that understands
-		//        WordPress versioning scheme (and "latest", "nightly", etc)
-		if ( $this->phpVersionConstraint->getMin() !== null ) {
-			if ( $this->phpVersionConstraint->getMin() > $this->phpVersionConstraint->getMax() ) {
-				throw new \Exception( 'min must be less than or equal to max' );
-			}
-			if ( $this->phpVersionConstraint->getRecommended() < $this->phpVersionConstraint->getMin() ) {
-				throw new \Exception( 'recommended must be between min and max' );
-			}
+		$phpConstraintErrors = $this->phpVersionConstraint->validate();
+		if (!empty($phpConstraintErrors)) {
+			throw new BlueprintExecutionException('Invalid PHP version constraint: ' . implode('; ', $phpConstraintErrors));
 		}
-
-		if ( $this->phpVersionConstraint->getMax() !== null ) {
-			if ( $this->phpVersionConstraint->getRecommended() > $this->phpVersionConstraint->getMax() ) {
-				throw new \Exception( 'recommended must be less than or equal to max' );
-			}
-		}
-
-		// Validate PHP version constraint if specified in the blueprint
 		$currentPhpVersion = PHP_VERSION;
-
-		// Check if the current PHP version satisfies the constraint
-		if ( ! $this->phpVersionConstraint->satisfiedBy( $currentPhpVersion ) ) {
-			throw new \Exception(
+		if ( !$this->phpVersionConstraint->satisfiedBy( $currentPhpVersion ) ) {
+			throw new BlueprintExecutionException(
 				sprintf(
 					'PHP version requirement not satisfied. Blueprint requires %s, but current version is %s',
 					$this->phpVersionConstraint->__toString(),
 					$currentPhpVersion
 				)
 			);
+		}
+
+		// WordPress Version Constraint
+		if ( isset( $this->blueprintArray['wordpressVersion'] ) ) {
+			$this->wpVersionConstraint = VersionConstraint::fromMixed( $this->blueprintArray['wordpressVersion'], 'wordpress' );
+			$wpConstraintErrors = $this->wpVersionConstraint->validate();
+			if (!empty($wpConstraintErrors)) {
+				throw new BlueprintExecutionException('Invalid WordPress version constraint: ' . implode('; ', $wpConstraintErrors));
+			}
+			// Note: Actual version check for WordPress is done in ExistingSiteResolver, not here.
+		} else {
+			$this->wpVersionConstraint = null;
 		}
 	}
 
