@@ -127,7 +127,8 @@ abstract class BaseByteReadStream implements ByteReadStream {
 			return;
 		}
 		if ( null !== $this->length() && $target_offset > $this->length() ) {
-			throw new NotEnoughDataException( 'Cannot seek past the available data. Call append_bytes() first.' );
+			$length = $this->length();
+			throw new NotEnoughDataException( sprintf('Cannot seek to past the stream length (seeked to %d, stream length is %d).', $target_offset, $length) );
 		}
 
 		if($target_offset < 0) {

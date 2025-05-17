@@ -26,8 +26,8 @@ class SetSiteLanguageStep implements StepInterface {
 		$this->language = $language;
 	}
 
-	public function run( Runtime $runtime, Tracker $tracker ) {
-		$tracker->setCaption( 'Translating' );
+	public function run( Runtime $runtime, Tracker $progress ) {
+		$progress->setCaption( 'Translating' );
 		$language = $this->language;
 
 		// Define WPLANG constant
@@ -162,12 +162,12 @@ class SetSiteLanguageStep implements StepInterface {
 		}
 
 		// Download all translations in parallel
-		$nb_requests = count( $download_targets );
+		$progress->split(count($download_targets));
 		foreach ( $download_targets as $k => $target ) {
-			$stage                            = $tracker->stage( 1 / $nb_requests, 'Fetching translations for ' );
+			$progress[$k]->setCaption( 'Fetching translations for ' . $target['name'] );
 			$download_targets[ $k ]['stream'] = $client->fetch( $target['request'], [
 				// @see Runtime for more details on these options
-				'progress_tracker' => $stage,
+				'progress_tracker' => $progress[$k],
 				'eagerly_enqueue'  => true,
 				'buffer_size'      => 100 * 1024 * 1024,
 			] );

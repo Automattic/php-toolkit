@@ -150,28 +150,40 @@ class Runner {
 		mkdir( $tempRoot, 0777, true );
 
 		try {
+			$progress = $this->mainTracker;
 			// Create all top-level progress stages upfront so the tracker knows what %
 			// of the total work is being done with every progress update.
-			//
-			// The stage weights are arbitrary and can be tweaked as needed.
-			// They have to add up to 1.
-			$blueprintStage        = $this->mainTracker->stage( 0.05, 'Resolving Blueprint' );
-			$targetResolutionStage = $this->mainTracker->stage( 0.2, 'Setting up WordPress site' );
-			// @TODO: Put this inside dataResolutionStage
-			$wpCliDownloadStage    = $this->mainTracker->stage( 0.01, 'Downloading WP-CLI' );
-			$dataResolutionStage   = $this->mainTracker->stage( 0.24, 'Resolving data references' );
-			$executionStage        = $this->mainTracker->stage( 0.5, 'Executing Blueprint steps' );
+			$progress->split([
+				'blueprint' => [
+					'ratio' => 5,
+					'caption' => 'Loading Blueprint data',
+				],
+				'targetResolution' => [
+					'ratio' => 20,
+					'caption' => 'Resolving target site',
+				],
+				// @TODO: Put this inside dataResolutionStage
+				'wpCli' => [
+					'ratio' => 1,
+					'caption' => 'Downloading WP-CLI',
+				],
+				'data' => [
+					'ratio' => 24,
+					'caption' => 'Resolving data references',
+				],
+				'execution' => [
+					'ratio' => 50,
+					'caption' => 'Executing Blueprint steps',
+				],
+			]);
 
 			// TODO: What's the client? 
 			$this->assets = new DataReferenceResolver( $this->client );
 
-			$blueprintStage->setCaption( 'Loading Blueprint data' );
 			$this->loadBlueprint();
 			$this->validateBlueprint();
 			$this->assets->setExecutionContext( $this->blueprintExecutionContext );
-			$blueprintStage->finish();
-
-			$targetResolutionStage->setCaption( 'Resolving target site' );
+			$progress['blueprint']->finish();
 
 			$targetSiteFs = LocalFilesystem::create( $this->configuration->getTargetSiteRoot() );
 			$wpCliReference = DataReference::create( 'https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar' );
@@ -190,19 +202,19 @@ class Runner {
 			$this->progressObserver->setRuntime($this->runtime);
 			$this->assets->startEagerResolution( [
 				'wp-cli' => $wpCliReference
-			], $wpCliDownloadStage );
+			], $progress['wpCli'] );
 
 			if ( $this->configuration->getExecutionMode() === 'apply-to-existing-site' ) {
-				ExistingSiteResolver::resolve( $this->runtime, $targetResolutionStage );
+				ExistingSiteResolver::resolve( $this->runtime, $progress['targetResolution'] );
 			} else {
-				NewSiteResolver::resolve( $this->runtime, $targetResolutionStage );
+				NewSiteResolver::resolve( $this->runtime, $progress['targetResolution'] );
 			}
-			$targetResolutionStage->finish();
+			$progress['targetResolution']->finish();
 
 			$plan = $this->createExecutionPlan();
-			$this->assets->startEagerResolution( $this->dataReferences, $dataResolutionStage );
-			$this->executePlan( $executionStage, $plan, $this->runtime );
-			$this->mainTracker->finish();
+			$this->assets->startEagerResolution( $this->dataReferences, $progress['data'] );
+			$this->executePlan( $progress['execution'], $plan, $this->runtime );
+			$progress->finish();
 		} finally {
 			// TODO: Optionally preserve workspace in case of error? Support resuming after error?
 			LocalFilesystem::create( $tempRoot )->rmdir( '/', [
@@ -324,7 +336,7 @@ class Runner {
 			//        this is not a CLI tool. This is a generic library for all Blueprint
 			//        runners. Hmm... Let's write messages to a logger interface maybe?
 			//        And the caller will decide how to log them?
-			$this->mainTracker->setCaption('Blueprint v1 detected. Transpiling to v2...');
+			$this->mainTracker['blueprint']->setCaption('Blueprint v1 detected. Transpiling to v2...');
 			$this->blueprintArray = V1ToV2Transpiler::upgrade($this->blueprintArray);
 		}
 
@@ -860,7 +872,7 @@ class Runner {
 	 *
 	 * @return array Results from each step execution
 	 */
-	private function executePlan( Tracker $parentTracker, array $steps, Runtime $runtime ): array {
+	private function executePlan( Tracker $progress, array $steps, Runtime $runtime ): array {
 		/**
 		 * Execute the steps in the execution plan with progress tracking
 		 */
@@ -868,29 +880,16 @@ class Runner {
 		$stepCount = count( $steps );
 
 		if ( $stepCount === 0 ) {
-			$parentTracker->finish();
+			$progress->finish();
 
 			return $results;
 		}
 
-		// Create sub-trackers for each step with equal weight
-		$stepWeight   = 1.0 / $stepCount;
-		$stepTrackers = [];
-
-		// Create all step trackers upfront for accurate progress calculation
-		for ( $i = 0; $i < $stepCount; $i ++ ) {
-			$step               = $steps[ $i ];
-			$stepNumber         = $i + 1;
-			$stepTrackers[ $i ] = $parentTracker->stage(
-				$stepWeight,
-				sprintf( "Step %d/%d", $stepNumber, $stepCount )
-			);
-		}
-
-		// Execute each step
+		// Create progress trackers for each step upfront
+		$progress->split(range(0, $stepCount));
 		for ( $i = 0; $i < $stepCount; $i ++ ) {
 			$step        = $steps[ $i ];
-			$stepTracker = $stepTrackers[ $i ];
+			$stepTracker = $progress[ $i ];
 
 			try {
 				$results[ $i ] = $step->run( $runtime, $stepTracker );

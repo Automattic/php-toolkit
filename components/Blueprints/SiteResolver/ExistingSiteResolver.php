@@ -8,19 +8,19 @@ use WordPress\Blueprints\Runtime;
 use WordPress\Blueprints\VersionConstraint;
 
 class ExistingSiteResolver {
-	static public function resolve( Runtime $runtime, Tracker $targetResolutionStage ) {
-		$stages = [
-			'verify_installation' => $targetResolutionStage->stage( 0.3, 'Verifying WordPress installation' ),
-			'check_compatibility' => $targetResolutionStage->stage( 0.3, 'Checking compatibility' ),
-			'verify_database'     => $targetResolutionStage->stage( 0.4, 'Verifying database configuration' ),
-		];
+	static public function resolve( Runtime $runtime, Tracker $progress ) {
+		$progress->split([
+			'verify_installation' => 3,
+			'check_compatibility' => 3,
+			'verify_database'     => 4,
+		]);
 
 		$blueprint = $runtime->getBlueprint();
 		$config    = $runtime->getConfiguration();
 		$targetFs  = $runtime->getTargetFilesystem();
 
 		// 1. Verify it's a valid WordPress installation
-		$stages['verify_installation']->setCaption( 'Verifying WordPress installation' );
+		$progress['verify_installation']->setCaption( 'Verifying WordPress installation' );
 		if ( ! $targetFs->exists( 'wp-load.php' ) ) {
 			throw new BlueprintExecutionException(
 				'The target site does not appear to be a valid WordPress installation (wp-load.php not found)'
@@ -48,10 +48,10 @@ class ExistingSiteResolver {
 			);
 		}
 
-		$stages['verify_installation']->finish();
+		$progress['verify_installation']->finish();
 
 		// 2. Check WordPress version compatibility
-		$stages['check_compatibility']->setCaption( 'Checking WordPress version compatibility' );
+		$progress['check_compatibility']->setCaption( 'Checking WordPress version compatibility' );
 		if ( isset( $blueprint['wordpressVersion'] ) ) {
 			$wpVersionConstraint = VersionConstraint::fromMixed( $blueprint['wordpressVersion'] );
 
@@ -77,10 +77,10 @@ class ExistingSiteResolver {
 		// 3. Check PHP version compatibility (already verified at the Blueprint runner level)
 		// See BlueprintRunner::validateBlueprint()
 
-		$stages['check_compatibility']->finish();
+		$progress['check_compatibility']->finish();
 
 		// 4. Verify database engine matches
-		$stages['verify_database']->setCaption( 'Verifying database configuration' );
+		$progress['verify_database']->setCaption( 'Verifying database configuration' );
 		$requiredEngine = $config->getDatabaseEngine();
 
 		// Check if SQLite integration plugin is active when using SQLite
@@ -131,7 +131,7 @@ class ExistingSiteResolver {
 			}
 		}
 
-		$stages['verify_database']->finish();
-		$targetResolutionStage->finish();
+		$progress['verify_database']->finish();
+		$progress->finish();
 	}
 }

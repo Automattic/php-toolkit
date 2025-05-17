@@ -16,11 +16,11 @@ use function WordPress\Filesystem\pipe_stream;
 use function WordPress\Filesystem\wp_join_paths;
 
 class NewSiteResolver {
-	static public function resolve( Runtime $runtime, Tracker $targetResolutionStage ) {
-		$stages = [
-			'resolve_assets'    => $targetResolutionStage->stage( 0.66 ),
-			'install_wordpress' => $targetResolutionStage->stage( 0.33, 'Installing WordPress' ),
-		];
+	static public function resolve( Runtime $runtime, Tracker $progress ) {
+		$progress->split([
+			'resolve_assets'    => 2,
+			'install_wordpress' => 1,
+		]);
 
 		$blueprint = $runtime->getBlueprint();
 
@@ -44,9 +44,9 @@ class NewSiteResolver {
 			$assets['sqlite-integration'] = $runtime->getConfiguration()->getSqliteIntegrationPlugin();
 		}
 
-		$runtime->getDataReferenceResolver()->startEagerResolution( $assets, $stages['resolve_assets'] );
+		$runtime->getDataReferenceResolver()->startEagerResolution( $assets, $progress['resolve_assets'] );
 
-		$stages['resolve_assets']->setCaption( 'Downloading WordPress' );
+		$progress['resolve_assets']->setCaption( 'Downloading WordPress' );
 
 		$resolved = $runtime->resolve( $assets['wordpress'] );
 		if ( ! $resolved instanceof File ) {
@@ -59,7 +59,7 @@ class NewSiteResolver {
 			$path_in_zip = '/wordpress';
 		}
 
-		$stages['install_wordpress']->set( 0.2, 'Setting up WordPress files' );
+		$progress['install_wordpress']->set( 0.2, 'Setting up WordPress files' );
 
 		copy_between_filesystems( [
 			'source_filesystem' => $zipFs,
@@ -69,11 +69,11 @@ class NewSiteResolver {
 			'recursive'         => true,
 		] );
 
-		$stages['install_wordpress']->set( 0.6, 'Installing WordPress' );
+		$progress['install_wordpress']->set( 0.6, 'Installing WordPress' );
 
 		// If SQLite integration zip provided, unzip into appropriate folder
 		if ( $runtime->getConfiguration()->getDatabaseEngine() === 'sqlite' ) {
-			$stages['resolve_assets']->setCaption( 'Downloading SQLite integration plugin' );
+			$progress['resolve_assets']->setCaption( 'Downloading SQLite integration plugin' );
 			$resolved = $runtime->resolve( $assets['sqlite-integration'] );
 			if ( ! $resolved instanceof File ) {
 				throw new BlueprintExecutionException( 'Provided zip reference does not resolve to a file' );
@@ -127,7 +127,7 @@ class NewSiteResolver {
 
 			// Perform installation using WP-CLI
 			// @TODO (low priority): Remove the WP-CLI dependency to lower the download size for blueprints.phar.
-			$stages['install_wordpress']->set( 0.7, 'Installing WordPress' );
+			$progress['install_wordpress']->set( 0.7, 'Installing WordPress' );
 			$wp_cli_path = $runtime->getWpCliPath();
 			$runtime->runShellCommand( [
 				'php',
@@ -142,7 +142,7 @@ class NewSiteResolver {
 				'--skip-email',
 			] );
 		}
-		$targetResolutionStage->finish();
+		$progress->finish();
 	}
 
 	static private function resolveWordPressZipUrl( Client $client, ?VersionConstraint $constraint ): string {

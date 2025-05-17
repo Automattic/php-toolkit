@@ -2,6 +2,7 @@
 
 namespace WordPress\Blueprints\Steps;
 
+use RuntimeException;
 use WordPress\Blueprints\DataReference\DataReference;
 use WordPress\Blueprints\DataReference\File;
 use WordPress\Blueprints\MediaFileDefinition;
@@ -41,19 +42,20 @@ class ImportMediaStep implements StepInterface {
 		$this->media = $media;
 	}
 
-	public function run( Runtime $runtime, Tracker $tracker ) {
-		$tracker->setCaption( 'Importing media files' );
-		$progress_import   = $tracker->stage( 0.5 );
-		$progress_download = $tracker->stage( 0.5 );
-
+	public function run( Runtime $runtime, Tracker $progress ) {
 		$medias = $this->getMedia();
 
 		$total_files = count( $medias );
 		if ( $total_files === 0 ) {
-			$tracker->finish();
-
+			$progress->finish();
 			return true;
 		}
+
+		$progress->setCaption( 'Importing media files' );
+		$progress->split([
+			'download' => 0.5,
+			'import'   => 0.5,
+		]);
 
 		$files_imported = 0;
 		$fs             = $runtime->getTargetFilesystem();
@@ -79,16 +81,15 @@ class ImportMediaStep implements StepInterface {
 			$fs->mkdir( $upload_base_dir, [ 'recursive' => true ] );
 		}
 
-
 		$resolved = $runtime->getDataReferenceResolver()->startEagerResolution(
 			array_map( fn( $media ) => $media->source, $medias ),
-			$progress_download
+			$progress['download']
 		);
 
-		$progress_import_step = 1.0 / $total_files;
-		foreach ( $medias as $media_definition ) {
+		$progress['import']->split($$total_files);
+		foreach ( $medias as $i => $media_definition ) {
 			$human_readable_name = $media_definition->source->get_human_readable_name();
-			$progress_import->setCaption( "Importing media file {$files_imported}/{$total_files}: {$human_readable_name}" );
+			$progress['import'][$i]->setCaption( "Importing media file {$i}/{$total_files}: {$human_readable_name}" );
 
 			try {
 				$resolved = $runtime->resolve( $media_definition->source );
@@ -165,7 +166,7 @@ class ImportMediaStep implements StepInterface {
 					throw new \RuntimeException( "Failed to import media file: $human_readable_name" );
 				}
 
-				$progress_import->increment( $progress_import_step );
+				$progress['import'][$i]->finish();
 			} catch ( \Exception $e ) {
 				// Log error but continue with other media files
 				error_log( "Failed to import media file {$target_path}: " . $e->getMessage() );
@@ -174,7 +175,7 @@ class ImportMediaStep implements StepInterface {
 			$files_imported ++;
 		}
 
-		$tracker->finish();
+		$progress->finish();
 	}
 
 	private function resolveTargetPath(
