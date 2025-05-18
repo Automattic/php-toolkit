@@ -1,6 +1,14 @@
 <?php
 /**
  * blueprint.php – the main entry point to the WordPress Blueprint Runner CLI.
+ * 
+ * @TODO: Get the tests to pass
+ * @TODO: Support commands: "exec", "validate", "to-execution-plan" etc. See the Blueprints v2 spec for more commands ideas.
+ * @TODO: Support --truncate-site-directory option for easy development – just re-run the same command to override a previous site.
+ * @TODO: Prevent remote resources from using local bundle paths
+ * @TODO: Get explicit user consent before using paths from a local directory
+ * @TODO: Add a flag that allows user-defined runPHP steps?
+ * @TODO: Add a verbose mode
  */
 
 require __DIR__ . '/../../../vendor/autoload.php';
