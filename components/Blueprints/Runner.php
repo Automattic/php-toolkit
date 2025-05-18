@@ -40,6 +40,9 @@ use WordPress\Blueprints\Steps\WPCLIStep;
 use WordPress\Blueprints\Steps\WriteFilesStep;
 use WordPress\Blueprints\Validator\HumanFriendlySchemaValidator;
 use WordPress\Blueprints\Versions\Version1\V1ToV2Transpiler;
+use WordPress\Blueprints\VersionStrings\PHPVersion;
+use WordPress\Blueprints\VersionStrings\VersionConstraint;
+use WordPress\Blueprints\VersionStrings\WordPressVersion;
 use WordPress\ByteStream\ReadStream\FileReadStream;
 use WordPress\Filesystem\Filesystem;
 use WordPress\Filesystem\InMemoryFilesystem;
@@ -74,7 +77,7 @@ class Runner {
 			 * to reuse across multiple runs.
 			 */
 			'cache' => new FilesystemCache(
-				LocalFilesystem::create( 
+				LocalFilesystem::create(
 					sys_get_temp_dir() . '/wp-blueprints'
 				)
 			)
@@ -92,13 +95,13 @@ class Runner {
 		if (empty($blueprint)) {
 			throw new BlueprintExecutionException("A Blueprint reference is required.");
 		}
-	
+
 		// Validate execution mode
 		$mode = $config->getExecutionMode();
 		if (!in_array($mode, ['create-new-site', 'apply-to-existing-site'], true)) {
 			throw new BlueprintExecutionException("Execution mode must be either 'create-new-site' or 'apply-to-existing-site'.");
 		}
-	
+
 		// Validate site URL
 		// Note: $options is not defined in this context, so we skip this block.
 		// If you want to validate the site URL, you should use $config->getTargetSiteUrl().
@@ -111,13 +114,13 @@ class Runner {
 		if (!empty($siteUrl) && !filter_var($siteUrl, FILTER_VALIDATE_URL)) {
 			throw new BlueprintExecutionException("Site URL is not a valid URL.");
 		}
-	
+
 		// Validate database engine
 		$dbEngine = $config->getDatabaseEngine();
 		if (!in_array($dbEngine, ['mysql', 'sqlite'], true)) {
 			throw new BlueprintExecutionException("Database engine must be either 'mysql' or 'sqlite'.");
 		}
-	
+
 		// Validate database credentials
 		$dbCreds = $config->getDatabaseCredentials();
 		if ($dbEngine === 'mysql') {
@@ -164,7 +167,7 @@ class Runner {
 				'execution' => 50,
 			]);
 
-			// TODO: What's the client? 
+			// TODO: What's the client?
 			$this->assets = new DataReferenceResolver( $this->client );
 
 			$progress['blueprint']->setCaption('Loading Blueprint data');
@@ -235,7 +238,7 @@ class Runner {
 		} else {
 			$resolved = $this->assets->resolve( $reference );
 		}
-		
+
 		if ( $resolved instanceof File ) {
 			$stream = $resolved->stream;
 
@@ -296,7 +299,7 @@ class Runner {
 		} else {
 			$is_valid_utf8 = utf8_is_valid_byte_stream( $blueprintString );
 		}
-		
+
 		if ( ! $is_valid_utf8 ) {
 			throw new BlueprintExecutionException( 'Blueprint must be encoded as UTF-8.' );
 		}
@@ -336,38 +339,104 @@ class Runner {
 		}
 
 		// PHP Version Constraint
+		$this->phpVersionConstraint = new VersionConstraint();
 		if ( isset( $this->blueprintArray['phpVersion'] ) ) {
-			$this->phpVersionConstraint = VersionConstraint::fromMixed( $this->blueprintArray['phpVersion'], 'php' );
-		} else {
-			$this->phpVersionConstraint = VersionConstraint::fromMixed( [
-				'recommended' => '8.0',
-			], 'php' );
-		}
-		$phpConstraintErrors = $this->phpVersionConstraint->validate();
-		if (!empty($phpConstraintErrors)) {
-			throw new BlueprintExecutionException('Invalid PHP version constraint: ' . implode('; ', $phpConstraintErrors));
-		}
-		$currentPhpVersion = PHP_VERSION;
-		if ( !$this->phpVersionConstraint->satisfiedBy( $currentPhpVersion ) ) {
-			throw new BlueprintExecutionException(
-				sprintf(
-					'PHP version requirement not satisfied. Blueprint requires %s, but current version is %s',
-					$this->phpVersionConstraint->__toString(),
-					$currentPhpVersion
-				)
-			);
+			$min = $max = $recommended = null;
+			
+			$php_version = $this->blueprintArray['phpVersion'];
+			if(is_string($php_version)) {
+				$parsed_version = PHPVersion::fromString($php_version);
+				if(!$parsed_version) {
+					throw new BlueprintExecutionException('Invalid PHP version string in phpVersion: ' . $php_version);
+				}
+				$min = $max = $recommended = $parsed_version;
+			} else {
+				if(isset($php_version['min'])) {
+					$min = PHPVersion::fromString($php_version['min']);
+					if(!$min) {
+						throw new BlueprintExecutionException('Invalid PHP version string in phpVersion.min: ' . $php_version['min']);
+					}
+				}
+				if(isset($php_version['max'])) {
+					$max = PHPVersion::fromString($php_version['max']);
+					if(!$max) {
+						throw new BlueprintExecutionException('Invalid PHP version string in phpVersion.max: ' . $php_version['max']);
+					}
+				}
+				if(isset($php_version['recommended'])) {
+					$recommended = PHPVersion::fromString($php_version['recommended']);
+					if(!$recommended) {
+						throw new BlueprintExecutionException('Invalid PHP version string in phpVersion.recommended: ' . $php_version['recommended']);
+					}
+				}
+			}
+			$this->phpVersionConstraint = new VersionConstraint($min, $max, $recommended);
+			$phpConstraintErrors = $this->phpVersionConstraint->validate();
+			if (!empty($phpConstraintErrors)) {
+				throw new BlueprintExecutionException('Invalid PHP version constraint: ' . implode('; ', $phpConstraintErrors));
+			}
+
+			// Confirm the environment satisfies the PHP version constraint.
+			$currentPhpVersion = PHPVersion::fromString(PHP_VERSION);
+			if ( !$this->phpVersionConstraint->satisfiedBy( $currentPhpVersion ) ) {
+				throw new BlueprintExecutionException(
+					sprintf(
+						'PHP version requirement not satisfied. Blueprint requires %s, but current version is %s',
+						$this->phpVersionConstraint->__toString(),
+						$currentPhpVersion
+					)
+				);
+			}
 		}
 
 		// WordPress Version Constraint
+		$this->wpVersionConstraint = new VersionConstraint();
 		if ( isset( $this->blueprintArray['wordpressVersion'] ) ) {
-			$this->wpVersionConstraint = VersionConstraint::fromMixed( $this->blueprintArray['wordpressVersion'], 'wordpress' );
+			$wp_version = $this->blueprintArray['wordpressVersion'];
+			$min = $max = $recommended = null;
+			if(is_string($wp_version)) {
+				$min = $max = $recommended = WordPressVersion::fromString($wp_version);
+				if(!$min) {
+					throw new BlueprintExecutionException('Invalid WordPress version string in wordpressVersion: ' . $wp_version);
+				}
+			} else {
+				if(isset($wp_version['min'])) {
+					if($wp_version['min'] === 'latest') {
+						throw new BlueprintExecutionException(
+							'Setting wordpressVersion.min to "latest" is not allowed and probably not what you want. Either set wordPressVersion.recommended to "latest" or set wordPressVersion.min to a specific version string instead.'
+						);
+					}
+					$min = WordPressVersion::fromString($wp_version['min']);
+					if(!$min) {
+						throw new BlueprintExecutionException('Invalid WordPress version string in wordpressVersion.min: ' . $wp_version['min']);
+					}
+				}
+				// Latest version is implicitly the default and it's only for resolving
+				// the WordPress version to install. It's not used for version checks on
+				// existing sites and VersionConstraint doesn't support it. It doesn't have
+				// enough information anyway – the meaning of "latest" changes over time.
+				if(isset($wp_version['max']) && $wp_version['max'] !== 'latest') {
+					$max = WordPressVersion::fromString($wp_version['max']);
+					if(!$max) {
+						throw new BlueprintExecutionException('Invalid WordPress version string in wordpressVersion.max: ' . $wp_version['max']);
+					}
+				}
+				if(isset($wp_version['recommended']) && $wp_version['recommended'] !== 'latest') {
+					$recommended = WordPressVersion::fromString($wp_version['recommended']);
+					if(!$recommended) {
+						throw new BlueprintExecutionException('Invalid WordPress version string in wordpressVersion.recommended: ' . $wp_version['recommended']);
+					}
+				}
+			}
+
+			$this->wpVersionConstraint = new VersionConstraint($min, $max, $recommended);
 			$wpConstraintErrors = $this->wpVersionConstraint->validate();
 			if (!empty($wpConstraintErrors)) {
 				throw new BlueprintExecutionException('Invalid WordPress version constraint: ' . implode('; ', $wpConstraintErrors));
 			}
-			// Note: Actual version check for WordPress is done in ExistingSiteResolver, not here.
-		} else {
-			$this->wpVersionConstraint = null;
+			// Note: In here's we're only checking if the version constraint is defined
+			// correctly. The actual version check for WordPress is done in
+			// NewSiteResolver and ExistingSiteResolver.
 		}
 	}
 
@@ -570,7 +639,7 @@ class Runner {
 			case 'rmdir':
 				return new RmDirStep( $data['path'] );
 			case 'runPHP':
-				return new RunPHPStep( 
+				return new RunPHPStep(
 					$this->createDataReference( $data['code'] ),
 					$data['env'] ?? []
 				);
@@ -622,7 +691,7 @@ class Runner {
                 }
             ';
 
-				return new RunPHPStep( 
+				return new RunPHPStep(
 					$this->createDataReference( [
 						'filename' => 'create-roles.php',
 						'content'  => $code,
@@ -671,7 +740,7 @@ class Runner {
                     }
                 }';
 
-				return new RunPHPStep( 
+				return new RunPHPStep(
 					$this->createDataReference( [
 						'filename' => 'create-users.php',
 						'content'  => $code,
@@ -780,7 +849,7 @@ class Runner {
 				unset(\$__bp_posts, \$__bp_post, \$postData);
 				PHP;
 
-				return new RunPHPStep( 
+				return new RunPHPStep(
 					$this->createDataReference( [
 						'filename' => 'import-posts.php',
 						'content'  => $code,
@@ -789,7 +858,7 @@ class Runner {
 				);
 
 			case 'runPHP':
-				return new RunPHPStep( 
+				return new RunPHPStep(
 					$this->createDataReference( [
 						'filename' => 'run-php.php',
 						'content'  => $data['code'],

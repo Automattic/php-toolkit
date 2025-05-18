@@ -160,12 +160,12 @@ export type Blueprint = {
 		| WordPressVersion
 		| DataReference
 		| {
-				minVersion: WordPressVersion;
-				maxVersion?: WordPressVersion;
+				min: WordPressVersion;
+				max?: WordPressVersion;
 				/**
 				 * @default "latest"
 				 */
-				preferredVersion?: WordPressVersion;
+				preferred?: WordPressVersion;
 		  };
 
 	/**
@@ -184,9 +184,9 @@ export type Blueprint = {
 	phpVersion?:
 		| PHPVersion
 		| {
-				minVersion?: PHPVersion;
-				recommendedVersion?: PHPVersion;
-				maxVersion?: PHPVersion;
+				min?: PHPVersion;
+				recommended?: PHPVersion;
+				max?: PHPVersion;
 		  };
 
 	/**

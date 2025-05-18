@@ -5,7 +5,7 @@ namespace WordPress\Blueprints\SiteResolver;
 use WordPress\Blueprints\Exception\BlueprintExecutionException;
 use WordPress\Blueprints\Progress\Tracker;
 use WordPress\Blueprints\Runtime;
-use WordPress\Blueprints\VersionConstraint;
+use WordPress\Blueprints\VersionStrings\VersionConstraint;
 
 class ExistingSiteResolver {
 	static public function resolve( Runtime $runtime, Tracker $progress ) {

@@ -203,8 +203,10 @@ final class HumanFriendlySchemaValidator
     private function narrowBranches(mixed $data, array $branches, array $schema): array
     {
         // 1. filter by declared top‑level type
-        $candidates = array_filter($branches, function($b) use($data){
-            $spec = isset($b['$ref']) ? $this->resolveReference($b['$ref']) : $b;
+        $candidates = array_filter($branches, function($spec) use($data){
+			while(isset($spec['$ref'])){
+				$spec = $this->resolveReference($spec['$ref']);
+			}
             return $this->typeMatchesAny($data, $spec['type'] ?? null);
         });
 
@@ -228,6 +230,7 @@ final class HumanFriendlySchemaValidator
                 }));
             }
         }
+
 
         return $candidates ?: $branches; // never empty
     }
@@ -530,7 +533,7 @@ final class HumanFriendlySchemaValidator
                     $childrenErrors[]= new ValidationError(
                         $this->convertPathToString($currentPropPath),
                         'additional-property-not-allowed',
-                        'Property "'.$name.'" isn\'t allowed here.',
+                        sprintf('Property "%s" isn\'t allowed here. Allowed properties are: %s.', $name, implode(', ', array_keys($schema['properties']))),
                         ['propertyName' => $name]
                     );
 				} else if(is_array($schema['additionalProperties'])) {

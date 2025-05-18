@@ -140,19 +140,19 @@
             {
               "type": "object",
               "properties": {
-                "minVersion": {
+                "min": {
                   "$ref": "#/definitions/WordPressVersion"
                 },
-                "maxVersion": {
+                "max": {
                   "$ref": "#/definitions/WordPressVersion"
                 },
-                "preferredVersion": {
+                "preferred": {
                   "$ref": "#/definitions/WordPressVersion",
                   "default": "latest"
                 }
               },
               "required": [
-                "minVersion"
+                "min"
               ],
               "additionalProperties": false
             }
@@ -168,13 +168,13 @@
             {
               "type": "object",
               "properties": {
-                "minVersion": {
+                "min": {
                   "$ref": "#/definitions/PHPVersion"
                 },
-                "recommendedVersion": {
+                "recommended": {
                   "$ref": "#/definitions/PHPVersion"
                 },
-                "maxVersion": {
+                "max": {
                   "$ref": "#/definitions/PHPVersion"
                 }
               },
@@ -315,13 +315,13 @@
                         {
                           "type": "array",
                           "items": {
-                            "$ref": "#/definitions/alias-1068919986-42634-42731-1068919986-0-42732"
+                            "$ref": "#/definitions/alias-1068919986-42592-42689-1068919986-0-42690"
                           }
                         },
                         {
                           "type": "object",
                           "additionalProperties": {
-                            "$ref": "#/definitions/alias-1068919986-42634-42731-1068919986-0-42732"
+                            "$ref": "#/definitions/alias-1068919986-42592-42689-1068919986-0-42690"
                           }
                         }
                       ]
@@ -748,13 +748,13 @@
                               {
                                 "type": "array",
                                 "items": {
-                                  "$ref": "#/definitions/alias-1068919986-42634-42731-1068919986-0-42732"
+                                  "$ref": "#/definitions/alias-1068919986-42592-42689-1068919986-0-42690"
                                 }
                               },
                               {
                                 "type": "object",
                                 "additionalProperties": {
-                                  "$ref": "#/definitions/alias-1068919986-42634-42731-1068919986-0-42732"
+                                  "$ref": "#/definitions/alias-1068919986-42592-42689-1068919986-0-42690"
                                 }
                               }
                             ]
@@ -1191,13 +1191,13 @@
                                 {
                                   "type": "array",
                                   "items": {
-                                    "$ref": "#/definitions/alias-1068919986-42634-42731-1068919986-0-42732"
+                                    "$ref": "#/definitions/alias-1068919986-42592-42689-1068919986-0-42690"
                                   }
                                 },
                                 {
                                   "type": "object",
                                   "additionalProperties": {
-                                    "$ref": "#/definitions/alias-1068919986-42634-42731-1068919986-0-42732"
+                                    "$ref": "#/definitions/alias-1068919986-42592-42689-1068919986-0-42690"
                                   }
                                 }
                               ]
@@ -1334,13 +1334,13 @@
                                   {
                                     "type": "array",
                                     "items": {
-                                      "$ref": "#/definitions/alias-1068919986-42634-42731-1068919986-0-42732"
+                                      "$ref": "#/definitions/alias-1068919986-42592-42689-1068919986-0-42690"
                                     }
                                   },
                                   {
                                     "type": "object",
                                     "additionalProperties": {
-                                      "$ref": "#/definitions/alias-1068919986-42634-42731-1068919986-0-42732"
+                                      "$ref": "#/definitions/alias-1068919986-42592-42689-1068919986-0-42690"
                                     }
                                   }
                                 ]
@@ -1805,13 +1805,13 @@
                                           {
                                             "type": "array",
                                             "items": {
-                                              "$ref": "#/definitions/alias-1068919986-42634-42731-1068919986-0-42732"
+                                              "$ref": "#/definitions/alias-1068919986-42592-42689-1068919986-0-42690"
                                             }
                                           },
                                           {
                                             "type": "object",
                                             "additionalProperties": {
-                                              "$ref": "#/definitions/alias-1068919986-42634-42731-1068919986-0-42732"
+                                              "$ref": "#/definitions/alias-1068919986-42592-42689-1068919986-0-42690"
                                             }
                                           }
                                         ]
@@ -1948,13 +1948,13 @@
                                             {
                                               "type": "array",
                                               "items": {
-                                                "$ref": "#/definitions/alias-1068919986-42634-42731-1068919986-0-42732"
+                                                "$ref": "#/definitions/alias-1068919986-42592-42689-1068919986-0-42690"
                                               }
                                             },
                                             {
                                               "type": "object",
                                               "additionalProperties": {
-                                                "$ref": "#/definitions/alias-1068919986-42634-42731-1068919986-0-42732"
+                                                "$ref": "#/definitions/alias-1068919986-42592-42689-1068919986-0-42690"
                                               }
                                             }
                                           ]
@@ -2272,13 +2272,13 @@
                         {
                           "type": "array",
                           "items": {
-                            "$ref": "#/definitions/alias-1068919986-42634-42731-1068919986-0-42732"
+                            "$ref": "#/definitions/alias-1068919986-42592-42689-1068919986-0-42690"
                           }
                         },
                         {
                           "type": "object",
                           "additionalProperties": {
-                            "$ref": "#/definitions/alias-1068919986-42634-42731-1068919986-0-42732"
+                            "$ref": "#/definitions/alias-1068919986-42592-42689-1068919986-0-42690"
                           }
                         }
                       ]
@@ -2617,13 +2617,13 @@
                         {
                           "type": "array",
                           "items": {
-                            "$ref": "#/definitions/alias-1068919986-42634-42731-1068919986-0-42732"
+                            "$ref": "#/definitions/alias-1068919986-42592-42689-1068919986-0-42690"
                           }
                         },
                         {
                           "type": "object",
                           "additionalProperties": {
-                            "$ref": "#/definitions/alias-1068919986-42634-42731-1068919986-0-42732"
+                            "$ref": "#/definitions/alias-1068919986-42592-42689-1068919986-0-42690"
                           }
                         }
                       ]
@@ -2851,7 +2851,7 @@
       ],
       "description": "Plugin directory reference, e.g. \"jetpack\", \"jetpack@6.4\", or \"akismet@6.4.3\".\n\nThese refer to a specific plugin slugs in the WordPress.org plugin repository.\n\nFor example, a reference to \"wordpress-seo\" means the Yoast SEO plugin as seen on https://wordpress.org/plugins/wordpress-seo/.\n\nThe Plugin Directory Reference are only meaningful in:\n\n* The top-level `plugins` array\n* The `installPlugin` imperative step"
     },
-    "alias-1068919986-42634-42731-1068919986-0-42732": {
+    "alias-1068919986-42592-42689-1068919986-0-42690": {
       "anyOf": [
         {
           "type": "string"
@@ -2865,13 +2865,13 @@
         {
           "type": "array",
           "items": {
-            "$ref": "#/definitions/alias-1068919986-42634-42731-1068919986-0-42732"
+            "$ref": "#/definitions/alias-1068919986-42592-42689-1068919986-0-42690"
           }
         },
         {
           "type": "object",
           "additionalProperties": {
-            "$ref": "#/definitions/alias-1068919986-42634-42731-1068919986-0-42732"
+            "$ref": "#/definitions/alias-1068919986-42592-42689-1068919986-0-42690"
           }
         }
       ]

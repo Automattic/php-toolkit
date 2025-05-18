@@ -7,12 +7,11 @@ use WordPress\Blueprints\DataReference\File;
 use WordPress\Blueprints\Exception\BlueprintExecutionException;
 use WordPress\Blueprints\Progress\Tracker;
 use WordPress\Blueprints\Runtime;
-use WordPress\Blueprints\VersionConstraint;
+use WordPress\Blueprints\VersionStrings\VersionConstraint;
 use WordPress\HttpClient\Client;
 use WordPress\Zip\ZipFilesystem;
 
 use function WordPress\Filesystem\copy_between_filesystems;
-use function WordPress\Filesystem\pipe_stream;
 use function WordPress\Filesystem\wp_join_paths;
 
 class NewSiteResolver {

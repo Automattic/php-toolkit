@@ -26,4 +26,8 @@ class Response {
 	public function get_reason_phrase() {
 		return StatusCode::text( $this->status_code );
 	}
+
+	public function ok() {
+		return $this->status_code >= 200 && $this->status_code < 400;
+	}
 }

@@ -1,8 +1,8 @@
 <?php
 
-namespace WordPress\Blueprints;
+namespace WordPress\Blueprints\VersionStrings;
 
-class WordPressVersion {
+class PHPVersion implements Version {
     private int $major;
     private int $minor;
     private int $patch;
@@ -52,7 +52,7 @@ class WordPressVersion {
         $this->stageIndex = $stageIndex;
     }
 
-    public function compareTo(WordPressVersion $other): int {
+    public function compareTo(Version $other): int {
         foreach (['major', 'minor'] as $part) {
             if ($this->$part !== $other->$part) {
                 return ($this->$part < $other->$part) ? -1 : 1;
@@ -76,7 +76,7 @@ class WordPressVersion {
         return 0;
     }
 
-	public function is(string $comparison, WordPressVersion $other): bool {
+	public function is(string $comparison, Version $other): bool {
 		switch($comparison) {
 			case '>':
 				return $this->compareTo($other) > 0;
