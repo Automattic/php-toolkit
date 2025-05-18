@@ -73,8 +73,8 @@ class InstallThemeStep implements StepInterface {
 				$zip_absolute_path = wp_join_paths( $temp_dir, $zip_filename );
 				$zip_stream   = FileWriteStream::from_path( $zip_absolute_path, 'truncate' );
 
-				if ( is_zip_file_stream( $theme_data->stream ) ) {
-					pipe_stream( $theme_data->stream, $zip_stream );
+				if ( is_zip_file_stream( $theme_data->getStream() ) ) {
+					pipe_stream( $theme_data->getStream(), $zip_stream );
 				} else {
 					throw new \RuntimeException( "Theme is not a valid zip file." );
 				}

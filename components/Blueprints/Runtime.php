@@ -68,7 +68,7 @@ class Runtime {
 	public function saveToTemporaryFile( File $file ) {
 		$tempFile = $this->createTemporaryFile();
 		$write_stream = FileWriteStream::from_path( $tempFile );
-		pipe_stream( $file->stream, $write_stream );
+		pipe_stream( $file->getStream(), $write_stream );
 		$write_stream->close_writing();
 		return $tempFile;
 	}
@@ -81,7 +81,7 @@ class Runtime {
 				throw new BlueprintExecutionException( 'Error downloading WP-CLI' );
 			}
 			$write_stream = FileWriteStream::from_path( $wp_cli_path );
-			pipe_stream( $resolved->stream, $write_stream );
+			pipe_stream( $resolved->getStream(), $write_stream );
 			$write_stream->close_writing();
 			chmod( $wp_cli_path, 0755 );
 		}

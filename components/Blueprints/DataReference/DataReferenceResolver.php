@@ -86,7 +86,8 @@ class DataReferenceResolver {
 				)
 			);
 
-			return new File(
+			// @TODO: An intermediate File object that waits for response headers when you access a stream and throws if the response is not ok.
+			return new RemoteFile(
 				$tracked_stream,
 				$filename
 			);

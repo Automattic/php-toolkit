@@ -34,7 +34,7 @@ class RunPHPStep implements StepInterface {
 		
 		$resolvedCode = $runtime->resolve( $this->code );
 		if($resolvedCode instanceof File) {
-			$code = $resolvedCode->stream->consume_all();
+			$code = $resolvedCode->getStream()->consume_all();
 		} else {
 			throw new BlueprintExecutionException('The code property must be a File reference.');
 		}

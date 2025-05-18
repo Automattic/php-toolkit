@@ -12,7 +12,7 @@ class File extends DataReference {
 	/**
 	 * @var ByteReadStream The stream representing the file content.
 	 */
-	public $stream;
+	protected $stream;
 
 	/**
 	 * @var string The name of the file.
@@ -39,5 +39,9 @@ class File extends DataReference {
 	 */
 	public function get_human_readable_name(): string {
 		return "File: " . $this->filename;
+	}
+
+	public function getStream(): ByteReadStream {
+		return $this->stream;
 	}
 }

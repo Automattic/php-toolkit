@@ -240,7 +240,7 @@ class Runner {
 		}
 
 		if ( $resolved instanceof File ) {
-			$stream = $resolved->stream;
+			$stream = $resolved->getStream();
 
 			// @TODO: A general http error checking solution for all resources
 			if($stream instanceof RequestReadStream) {
@@ -522,7 +522,12 @@ class Runner {
 		// 6. plugins
 		if ( ! empty( $validated_array['plugins'] ) && is_array( $validated_array['plugins'] ) ) {
 			foreach ( $validated_array['plugins'] as $pluginDef ) {
-				$plan[] = $this->createStepObject( 'installPlugin', [ 'plugin' => $pluginDef ] );
+				if(is_string($pluginDef)) {
+					$pluginDef = [
+						'source' => $pluginDef,
+					];
+				}
+				$plan[] = $this->createStepObject( 'installPlugin', $pluginDef );
 			}
 		}
 
@@ -961,14 +966,7 @@ class Runner {
 				// Determine if we should continue or stop execution
 				$continueOnError = $this->continueOnError ?? false;
 				if ( ! $continueOnError ) {
-					throw new \RuntimeException(
-						sprintf( "Error when executing step %s (number %d in the plan)",
-							get_class( $step ),
-							$i + 1
-						),
-						0,
-						$e
-					);
+					throw $e;
 				}
 			}
 		}

@@ -56,7 +56,7 @@ class WriteFilesStep implements StepInterface {
 					'recursive'         => true,
 				] );
 			} else {
-				$content = $file_or_directory->stream->consume_all();
+				$content = $file_or_directory->getStream()->consume_all();
 				$target_fs->put_contents( $path, $content );
 			}
 

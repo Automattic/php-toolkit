@@ -52,7 +52,7 @@ class RunSqlStep implements StepInterface {
 CODE
 			,
 			null,
-			$sql->stream->consume_all()
+			$sql->getStream()->consume_all()
 		);
 	}
 }

@@ -45,7 +45,7 @@ class UnzipStep implements StepInterface {
 			throw new \InvalidArgumentException( 'The provided resource is not a zip file.' );
 		}
 
-		$zip_fs = ZipFilesystem::create( $zip_stream->stream );
+		$zip_fs = ZipFilesystem::create( $zip_stream->getStream() );
 
 		$tracker->set( 50, 'Extracting files...' );
 

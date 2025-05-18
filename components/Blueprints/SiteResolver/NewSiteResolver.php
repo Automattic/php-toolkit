@@ -51,7 +51,7 @@ class NewSiteResolver {
 		if ( ! $resolved instanceof File ) {
 			throw new BlueprintExecutionException( 'Provided zip reference does not resolve to a file' );
 		}
-		$zipFs = ZipFilesystem::create( $resolved->stream );
+		$zipFs = ZipFilesystem::create( $resolved->getStream() );
 
 		$path_in_zip = '/';
 		if ( ! $zipFs->exists( '/wp-content' ) && $zipFs->exists( '/wordpress' ) ) {
@@ -77,7 +77,7 @@ class NewSiteResolver {
 			if ( ! $resolved instanceof File ) {
 				throw new BlueprintExecutionException( 'Provided zip reference does not resolve to a file' );
 			}
-			$zipFs = ZipFilesystem::create( $resolved->stream );
+			$zipFs = ZipFilesystem::create( $resolved->getStream() );
 
 			$targetPath = '/wp-content/plugins/sqlite-database-integration';
 			$sourcePath = '/';

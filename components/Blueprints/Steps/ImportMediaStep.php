@@ -112,8 +112,8 @@ class ImportMediaStep implements StepInterface {
 				);
 
 				$write_stream = $fs->open_write_stream( $target_path );
-				pipe_stream( $resolved->stream, $write_stream );
-				$resolved->stream->close_reading();
+				pipe_stream( $resolved->getStream(), $write_stream );
+				$resolved->getStream()->close_reading();
 				$write_stream->close_writing();
 
 				// Add to WordPress media library

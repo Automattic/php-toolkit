@@ -48,7 +48,7 @@ class DataReferenceResolverTest extends TestCase
 
         $result = $this->resolver->resolve($reference);
         $this->assertInstanceOf(\WordPress\Blueprints\DataReference\File::class, $result);
-        $this->assertSame($dummyStream, $result->stream);
+        $this->assertSame($dummyStream, $result->getStream());
         $this->assertEquals('file.zip', $result->filename);
     }
 
@@ -64,7 +64,7 @@ class DataReferenceResolverTest extends TestCase
 
         $result = $this->resolver->resolve($reference);
         $this->assertInstanceOf(\WordPress\Blueprints\DataReference\File::class, $result);
-        $this->assertSame($dummyStream, $result->stream);
+        $this->assertSame($dummyStream, $result->getStream());
         $this->assertEquals('akismet.latest-stable.zip', $result->filename);
     }
 
@@ -80,7 +80,7 @@ class DataReferenceResolverTest extends TestCase
 
         $result = $this->resolver->resolve($reference);
         $this->assertInstanceOf(\WordPress\Blueprints\DataReference\File::class, $result);
-        $this->assertSame($dummyStream, $result->stream);
+        $this->assertSame($dummyStream, $result->getStream());
         $this->assertEquals('twentytwentyfour.latest-stable.zip', $result->filename);
     }
 
@@ -116,9 +116,9 @@ class DataReferenceResolverTest extends TestCase
         $result = $this->resolver->resolve($reference);
         $this->assertInstanceOf(\WordPress\Blueprints\DataReference\File::class, $result);
         $this->assertEquals('baz.txt', $result->filename);
-        $this->assertInstanceOf(\WordPress\ByteStream\MemoryPipe::class, $result->stream);
-        $result->stream->seek(0);
-        $this->assertEquals('hello world', $result->stream->consume_all());
+        $this->assertInstanceOf(\WordPress\ByteStream\MemoryPipe::class, $result->getStream());
+        $result->getStream()->seek(0);
+        $this->assertEquals('hello world', $result->getStream()->consume_all());
     }
 
     public function testResolveInlineDirectory()

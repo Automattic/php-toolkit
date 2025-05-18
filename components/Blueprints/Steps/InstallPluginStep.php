@@ -73,18 +73,18 @@ class InstallPluginStep implements StepInterface {
 				$zip_absolute_path = wp_join_paths( $temp_dir, $zip_filename );
 				$zip_stream   = FileWriteStream::from_path( $zip_absolute_path, 'truncate' );
 
-				if ( is_zip_file_stream( $plugin_data->stream ) ) {
-					pipe_stream( $plugin_data->stream, $zip_stream );
+				if ( is_zip_file_stream( $plugin_data->getStream() ) ) {
+					pipe_stream( $plugin_data->getStream(), $zip_stream );
 				} else {
 					$zip_encoder = new ZipEncoder( $zip_stream );
 					$zip_encoder->append_file( new FileEntry( [
 						'path'              => $plugin_data->filename,
-						'body_reader'       => $plugin_data->stream,
+						'body_reader'       => $plugin_data->getStream(),
 						'compressionMethod' => ZipDecoder::COMPRESSION_DEFLATE,
 					] ) );
 					$zip_encoder->close();
 				}
-				$plugin_data->stream->close_reading();
+				$plugin_data->getStream()->close_reading();
 			}
 			$zip_stream->close_writing();
 
