@@ -64,6 +64,8 @@ class DataReferenceResolver {
 			$url      = $reference->get_url();
 			$filename = basename( parse_url( $url, PHP_URL_PATH ) );
 
+			// @TODO: Emit an event such as "onResponse". Alternatively, use a non-populated Response object instead of
+			//        a stream, and observe if(!$response->ok()). If false, throw an exception.
 			$tracked_stream = new SeekableRequestReadStream(
 				$url,
 				array(

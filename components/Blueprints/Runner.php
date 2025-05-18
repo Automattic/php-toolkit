@@ -245,7 +245,7 @@ class Runner {
 			// @TODO: A general http error checking solution for all resources
 			if($stream instanceof RequestReadStream) {
 				$response = $stream->await_response();
-				if($response->status_code < 200 || $response->status_code >= 400) {
+				if(!$response->ok()) {
 					throw new BlueprintExecutionException(
 						sprintf(
 							'Failed to load blueprint from %s. Server responded with %d %s.',
