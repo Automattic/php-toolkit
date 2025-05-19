@@ -24,7 +24,7 @@ class SetSiteOptionsStep implements StepInterface {
 
 	public function run( Runtime $runtime, Tracker $tracker ) {
 		$tracker->setCaption( 'Setting site options' );
-		$runtime->evalPhpInSubProcess(
+		$runtime->evalPhpCodeInSubProcess(
 			'<?php
 		require getenv(\'DOCROOT\'). \'/wp-load.php\';
 		$site_options = getenv("OPTIONS") ? json_decode(getenv("OPTIONS"), true) : [];

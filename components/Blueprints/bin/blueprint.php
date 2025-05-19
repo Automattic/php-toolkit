@@ -4,8 +4,6 @@
  *
  * @TODO: Get the tests to pass
  * @TODO: Support commands: "exec", "validate", "to-execution-plan" etc. See the Blueprints v2 spec for more commands ideas.
- * @TODO: Get explicit user consent before using paths from a local directory
- * @TODO: Add a flag that allows user-defined runPHP steps?
  * @TODO: Add a verbose mode
  * @TODO: A large test suite.
  * @TODO: Client HTTP queue deadlock when we enqueued a lot of requests and need to fetch a small
@@ -16,15 +14,19 @@
  *           pre-existing plugins conflicting with new plugins? refuse to execute? tell the user what
  *           to do? As in change the Blueprint? What if I don't want to change it? maybe interact with the user
  *           and ask whether they want to bale or override the theme/plugin?
+ * @TODO (next spec version?): Add a flag that allows user-defined runPHP steps?
  * @TODO (low priority): Production-grade HTTP Cache support for remote files. Not the stopgap we have now.
  *                       We can ship Blueprints without http cache support, but do not ship the stopgap solution
  *                       in production.
- * @TODO (low priority): Exception structure?
  * @TODO (low priority): Range header-based HTTP stream for fast partial parsing of large remote zip files.
  *                       Needs to support servers lying about their Range support.
  * @TODO (low priority): Restrictions on supported step types, media files types, SQL queries types, etc.
  * @TODO (low priority): Fast unzipping of remote Zip Files by iterating over the entries
  *        instead of skipping over to the end central directory index entry.
+ * @TODO (low priority) never require going through local paths. Make evalPHP explicitly support target filesystem paths so that
+ *        we can be prepared for remote Blueprint execution.
+ * ✅ @TODO: Get explicit user consent before using paths from a local directory
+ * ✅ @TODO (low priority): Exception structure?
  * ✅ @TODO: Support --truncate-new-site-directory option for easy development – just re-run the same command to override a previous site.
  * ✅ @TODO: Prevent remote resources from using local bundle paths
  */

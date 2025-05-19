@@ -128,7 +128,7 @@ PHP;
 	 * @return array Results of constant verification
 	 */
 	private function assertWordPressConstants( array $expected_constants ) {
-		$result = $this->runtime->evalPhpInSubProcess(
+		$result = $this->runtime->evalPhpCodeInSubProcess(
 			<<<'PHP'
 <?php
 // Load WordPress environment

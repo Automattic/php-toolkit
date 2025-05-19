@@ -61,7 +61,7 @@ class ImportMediaStep implements StepInterface {
 
 		$files_imported = 0;
 		$fs             = $runtime->getTargetFilesystem();
-		$wp_upload_dir  = $runtime->evalPhpInSubProcess(
+		$wp_upload_dir  = $runtime->evalPhpCodeInSubProcess(
 			'<?php
 			require_once(getenv("DOCROOT") . "/wp-load.php");
 			$upload_dir = wp_upload_dir();
@@ -121,7 +121,7 @@ class ImportMediaStep implements StepInterface {
 				$write_stream->close_writing();
 
 				// Add to WordPress media library
-				$attachment_id = $runtime->evalPhpInSubProcess(
+				$attachment_id = $runtime->evalPhpCodeInSubProcess(
 					<<<'CODE'
 <?php
 require_once(getenv("DOCROOT") . "/wp-load.php");

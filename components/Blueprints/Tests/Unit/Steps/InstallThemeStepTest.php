@@ -67,7 +67,7 @@ PHP;
 		$this->assertTrue( $fs->exists( 'wp-content/themes/test-theme/style.css' ) );
 		$this->assertTrue( $fs->exists( 'wp-content/themes/test-theme/index.php' ) );
 
-		$active_theme = $this->runtime->evalPhpInSubProcess(
+		$active_theme = $this->runtime->evalPhpCodeInSubProcess(
 			<<<'PHP'
 <?php
 require_once getenv('DOCROOT') . '/wp-load.php';
@@ -105,7 +105,7 @@ PHP
 		$this->assertTrue( $fs->exists( 'wp-content/themes/test-theme/style.css' ) );
 		$this->assertTrue( $fs->exists( 'wp-content/themes/test-theme/index.php' ) );
 
-		$active_theme = $this->runtime->evalPhpInSubProcess(
+		$active_theme = $this->runtime->evalPhpCodeInSubProcess(
 			<<<'PHP'
 <?php
 require_once getenv('DOCROOT') . '/wp-load.php';
@@ -139,7 +139,7 @@ PHP
 		$this->assertTrue( $fs->exists( 'wp-content/themes/test-theme/style.css' ) );
 		$this->assertTrue( $fs->exists( 'wp-content/themes/test-theme/index.php' ) );
 
-		$active_theme = $this->runtime->evalPhpInSubProcess(
+		$active_theme = $this->runtime->evalPhpCodeInSubProcess(
 			<<<'PHP'
 <?php
 require_once getenv('DOCROOT') . '/wp-load.php';

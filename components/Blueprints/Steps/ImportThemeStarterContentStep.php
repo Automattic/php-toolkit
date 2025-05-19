@@ -22,7 +22,7 @@ class ImportThemeStarterContentStep implements StepInterface {
 
 	public function run( Runtime $runtime, Tracker $tracker ) {
 		$tracker->setCaption( 'Importing theme starter content' . ( $this->themeSlug ? ' for ' . $this->themeSlug : '' ) );
-		$runtime->evalPhpInSubProcess(
+		$runtime->evalPhpCodeInSubProcess(
 			file_get_contents( __DIR__ . '/scripts/ImportThemeStarterContent/import.php' ),
 			[
 				'THEME_SLUG' => $this->themeSlug,

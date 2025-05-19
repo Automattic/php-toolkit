@@ -50,7 +50,7 @@ PHP;
 		$this->assertTrue( $fs->exists( 'wp-content/plugins/test-plugin/test-plugin.php' ) );
 
 		// Check if plugin is activated
-		$active_plugins = $this->runtime->evalPhpInSubProcess(
+		$active_plugins = $this->runtime->evalPhpCodeInSubProcess(
 			<<<'PHP'
 <?php
 require_once getenv('DOCROOT') . '/wp-load.php';
@@ -84,7 +84,7 @@ PHP
 		$fs = $this->runtime->getTargetFilesystem();
 		$this->assertTrue( $fs->exists( 'wp-content/plugins/test-plugin' ) );
 		$this->assertTrue( $fs->exists( 'wp-content/plugins/test-plugin/test-plugin.php' ) );
-		$inactive_plugins = $this->runtime->evalPhpInSubProcess(
+		$inactive_plugins = $this->runtime->evalPhpCodeInSubProcess(
 			<<<'PHP'
 <?php
 require_once getenv('DOCROOT') . '/wp-load.php';
@@ -103,7 +103,7 @@ PHP
 		$this->assertContains( 'test-plugin/test-plugin.php', $inactive_plugins );
 
 		// Check if plugin is activated
-		$active_plugins = $this->runtime->evalPhpInSubProcess(
+		$active_plugins = $this->runtime->evalPhpCodeInSubProcess(
 			<<<'PHP'
 <?php
 require_once getenv('DOCROOT') . '/wp-load.php';
@@ -138,7 +138,7 @@ PHP
 		$this->assertTrue( $fs->exists( 'wp-content/plugins/zipped-test-plugin/test-plugin.php' ) );
 
 		// Check if plugin is activated
-		$active_plugins = $this->runtime->evalPhpInSubProcess(
+		$active_plugins = $this->runtime->evalPhpCodeInSubProcess(
 			<<<'PHP'
 <?php
 require_once getenv('DOCROOT') . '/wp-load.php';
@@ -173,7 +173,7 @@ PHP
 		$this->assertTrue( $fs->exists( 'wp-content/plugins/subfolder-name/test-plugin.php' ) );
 
 		// Check if plugin is activated
-		$active_plugins = $this->runtime->evalPhpInSubProcess(
+		$active_plugins = $this->runtime->evalPhpCodeInSubProcess(
 			<<<'PHP'
 <?php
 require_once getenv('DOCROOT') . '/wp-load.php';
@@ -208,7 +208,7 @@ PHP
 		$this->assertTrue( $fs->exists( 'wp-content/plugins/plugin-directory/test-plugin.php' ) );
 
 		// Check if plugin is activated
-		$active_plugins = $this->runtime->evalPhpInSubProcess(
+		$active_plugins = $this->runtime->evalPhpCodeInSubProcess(
 			<<<'PHP'
 <?php
 require_once getenv('DOCROOT') . '/wp-load.php';

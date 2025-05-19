@@ -27,7 +27,7 @@ class DefineConstantsStep implements StepInterface {
 	 */
 	public function run( Runtime $runtime, Tracker $tracker ) {
 		$tracker->setCaption( 'Defining wp-config constants' );
-		$runtime->evalPhpInSubProcess(
+		$runtime->evalPhpCodeInSubProcess(
 			file_get_contents( __DIR__ . '/scripts/DefineWpConfigConsts/define.php' ),
 			array( 'CONSTS' => json_encode( $this->constants ) )
 		);

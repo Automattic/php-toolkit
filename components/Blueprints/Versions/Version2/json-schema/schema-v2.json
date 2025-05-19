@@ -121,12 +121,6 @@
 							"type": "boolean"
 						}
 					},
-					"required": [
-						"SCRIPT_DEBUG",
-						"WP_DEBUG",
-						"WP_DEBUG_DISPLAY",
-						"WP_DEBUG_LOG"
-					],
 					"description": "Constants to define in the wp-config.php file.\n\nThe runner may overwrite the define() calls in the wp-config.php file on the target site. It assumes the wp-config.php file at the Blueprint Execution Target is writable."
 				},
 				"wordpressVersion": {

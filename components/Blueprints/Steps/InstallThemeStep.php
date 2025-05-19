@@ -88,8 +88,8 @@ class InstallThemeStep implements StepInterface {
 
 			$tracker->set( 50 );
 
-			$output = $runtime->evalPhpInSubProcess(
-				file_get_contents( __DIR__ . '/scripts/InstallTheme/wp_install_theme.php' ),
+			$output = $runtime->evalPhpFileInSubProcess(
+				wp_join_paths( __DIR__, 'scripts/InstallTheme/wp_install_theme.php' ),
 				[ 'THEME_ZIP_PATH' => $zip_absolute_path ]
 			);
 
@@ -102,8 +102,8 @@ class InstallThemeStep implements StepInterface {
 
 			if ( $this->activate ) {
 				$tracker->set( 75, 'Activating theme ' . $theme_folder_name );
-				$runtime->evalPhpInSubProcess(
-					file_get_contents( __DIR__ . '/scripts/ActivateTheme/wp_activate_theme.php' ),
+				$runtime->evalPhpFileInSubProcess(
+					wp_join_paths( __DIR__, 'scripts/ActivateTheme/wp_activate_theme.php' ),
 					[ 'THEME_FOLDER_NAME' => $theme_folder_name ]
 				);
 			}

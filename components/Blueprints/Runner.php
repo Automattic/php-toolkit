@@ -1031,7 +1031,7 @@ PHP;
 					//        as in – was the step created because of "installPlugin" or not?
 					//  	  Which entry of it? etc.
 					throw new BlueprintExecutionException(
-						sprintf( "Error when executing step #d %s (#%d in the execution plan)",
+						sprintf( "Error when executing step  %s (#%d in the execution plan)",
 							get_class( $step ),
 							$i + 1
 						),

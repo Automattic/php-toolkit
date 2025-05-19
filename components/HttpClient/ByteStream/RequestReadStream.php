@@ -103,7 +103,7 @@ class RequestReadStream extends BaseByteReadStream {
 		) ) {
 			$request = $this->client->get_request();
 			if ( $request->error ) {
-				throw new HttpClientException( 'HTTP request failed: ' . $request->error->message );
+				throw new HttpClientException( sprintf( 'HTTP request failed: %s. Method=%s, URL=%s', $request->error->message, $request->method, $request->url ) );
 			}
 			$response = $request->response;
 			if ( ! $response ) {

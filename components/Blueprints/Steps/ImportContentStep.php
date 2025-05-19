@@ -61,7 +61,7 @@ class ImportContentStep implements StepInterface {
 		}
 
 		$wxrPath = $runtime->saveToTemporaryFile( $resolved );
-		$runtime->evalPhpInSubProcess(
+		$runtime->evalPhpCodeInSubProcess(
 			<<<'PHP'
 <?php
 require_once getenv('DOCROOT') . '/wp-load.php';
@@ -117,7 +117,7 @@ PHP
 			throw new RuntimeException( 'Invalid posts data.' );
 		}
 
-		$runtime->evalPhpInSubProcess(
+		$runtime->evalPhpCodeInSubProcess(
 			<<<'PHP'
 <?php
 require_once getenv('DOCROOT') . '/wp-load.php';

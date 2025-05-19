@@ -2,7 +2,9 @@
 
 namespace WordPress\Blueprints;
 
+use Exception;
 use Psr\Log\LoggerInterface;
+use RuntimeException;
 use Symfony\Component\Process\Process;
 use WordPress\Blueprints\DataReference\DataReference;
 use WordPress\Blueprints\DataReference\DataReferenceResolver;
@@ -212,46 +214,74 @@ class Runtime {
 	 * @param  mixed[]|null  $env
 	 * @param  float  $timeout
 	 */
-	public function evalPhpInSubProcess(
+	public function evalPhpCodeInSubProcess(
 		$code,
 		$env = null,
 		$input = null,
 		$timeout = 60
 	) {
-		return $this->withTemporaryFile( function ( $tempFile ) use ( $code, $env, $input, $timeout ) {
-			return $this->withTemporaryFile( function ( $outputFile ) use ( $tempFile, $code, $env, $input, $timeout ) {
-				file_put_contents(
-					$tempFile,
-					'<?php 
-					function append_output( $output ) {
-						file_put_contents( getenv("OUTPUT_FILE"), $output, FILE_APPEND );
-					}
-					$_SERVER["HTTP_HOST"] = "localhost";
-					?>' . $code
-				);
+		return $this->withTemporaryFile( function ( $script_path ) use ( $code, $env, $input, $timeout ) {
+			file_put_contents( $script_path, $code );
+			return $this->evalPhpFileInSubProcess( $script_path, $env, $input, $timeout );
+		} );
+	}
 
+	public function evalPhpFileInSubProcess(
+		$script_path,
+		$env = null,
+		$input = null,
+		$timeout = 60
+	) {
+		return $this->withTemporaryDirectory( function ( $tempDir ) use ( $script_path, $env, $input, $timeout ) {
+			$prepend_path = wp_join_paths( $tempDir, 'prepend.php' );
+			file_put_contents(
+				$prepend_path,
+				'<?php 
+				function append_output( $output ) {
+					file_put_contents( getenv("OUTPUT_FILE"), $output, FILE_APPEND );
+				}
+				$_SERVER["HTTP_HOST"] = "localhost";
+				?>'
+			);
+
+			// Still put the script in a temporary file as the path may be refering
+			// to a file inside the currently executed .phar archive.
+			$actual_script_path = wp_join_paths( $tempDir, 'script.php' );
+			$code = file_get_contents( $script_path );
+			file_put_contents( $actual_script_path, $code );
+
+			$output_path = wp_join_paths( $tempDir, 'output.txt' );
+			touch( $output_path );
+
+			try {
 				$process = $this->runShellCommand(
 					array(
 						'php',
-						$tempFile,
+						'-d auto_prepend_file=' . $prepend_path,
+						$actual_script_path,
 					),
 					$this->configuration->getTargetSiteRoot(),
 					array_merge(
 						array(
 							'DOCROOT'     => $this->configuration->getTargetSiteRoot(),
-							'OUTPUT_FILE' => $outputFile,
+							'OUTPUT_FILE' => $output_path,
 						),
 						$env ?? array()
 					),
 					$input,
 					$timeout
 				);
+			} catch ( \Exception $e ) {
+				throw new RuntimeException( sprintf(
+					'PHP script	"%s" failed.',
+					$script_path
+				), 0, $e );
+			}
 
-				return new EvalResult(
-					file_get_contents( $outputFile ),
-					$process
-				);
-			} );
+			return new EvalResult(
+				file_get_contents( $output_path ),
+				$process
+			);
 		} );
 	}
 

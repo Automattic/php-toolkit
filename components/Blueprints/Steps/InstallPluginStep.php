@@ -92,15 +92,15 @@ class InstallPluginStep implements StepInterface {
 			$zip_stream->close_writing();
 
 			$tracker->set( 50 );
-			$relative_path = $runtime->evalPhpInSubProcess(
-				file_get_contents( __DIR__ . '/scripts/InstallPlugin/wp_install_plugin.php' ),
+			$relative_path = $runtime->evalPhpFileInSubProcess(
+				wp_join_paths( __DIR__, 'scripts/InstallPlugin/wp_install_plugin.php' ),
 				[ 'PLUGIN_ZIP_PATH' => $zip_absolute_path ]
 			)->outputFileContent;
 
 			if ( $this->active ) {
 				$tracker->set( 75, 'Activating plugin ' . $plugin_data->get_human_readable_name() );
-				$runtime->evalPhpInSubProcess(
-					file_get_contents( __DIR__ . '/scripts/ActivatePlugin/wp_activate_plugin.php' ),
+				$runtime->evalPhpFileInSubProcess(
+					wp_join_paths( __DIR__, 'scripts/ActivatePlugin/wp_activate_plugin.php' ),
 					[ 'PLUGIN_PATH' => $relative_path ]
 				);
 			}

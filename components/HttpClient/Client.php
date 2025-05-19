@@ -391,7 +391,7 @@ class Client {
 
 		foreach ( $this->get_active_requests() as $request ) {
 			if ( microtime( true ) - $this->requests_started_at[ $request->id ] > $this->timeout ) {
-				$this->set_error( $request, new HttpError( 'Request timed out.' ) );
+				$this->set_error( $request, new HttpError( sprintf( 'Request timed out after %s seconds.', $this->timeout ) ) );
 			}
 		}
 

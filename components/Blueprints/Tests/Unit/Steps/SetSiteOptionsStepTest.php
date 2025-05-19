@@ -11,7 +11,7 @@ class SetSiteOptionsStepTest extends StepTestCase {
 	 * Note: This handles the fact that objects become arrays when serialized and deserialized through JSON
 	 */
 	private function assertWordPressOptions( array $expected_options ) {
-		$result = $this->runtime->evalPhpInSubProcess(
+		$result = $this->runtime->evalPhpCodeInSubProcess(
 			<<<'PHP'
 <?php
 require_once getenv('DOCROOT') . '/wp-load.php';
@@ -103,7 +103,7 @@ PHP
 	 */
 	public function testUpdateExistingWordPressOptions() {
 		// First, set some initial values
-		$this->runtime->evalPhpInSubProcess(
+		$this->runtime->evalPhpCodeInSubProcess(
 			<<<'PHP'
 <?php
 require_once getenv('DOCROOT') . '/wp-load.php';

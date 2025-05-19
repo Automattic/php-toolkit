@@ -35,7 +35,7 @@ class RunSqlStep implements StepInterface {
 			throw new InvalidArgumentException( 'The provided resource is not a file.' );
 		}
 
-		$runtime->evalPhpInSubProcess(
+		$runtime->evalPhpCodeInSubProcess(
 			<<<'CODE'
 <?php
 		require_once getenv("DOCROOT") . '/wp-load.php';

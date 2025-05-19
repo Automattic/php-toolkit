@@ -27,7 +27,7 @@ class ActivateThemeStep implements StepInterface {
 	 */
 	public function run( Runtime $runtime, Tracker $tracker ) {
 		$tracker->setCaption( 'Activating theme ' . $this->themeFolderName );
-		$runtime->evalPhpInSubProcess(
+		$runtime->evalPhpCodeInSubProcess(
 			file_get_contents( __DIR__ . '/scripts/ActivateTheme/wp_activate_theme.php' ),
 			[
 				'THEME_FOLDER_NAME' => $this->themeFolderName,

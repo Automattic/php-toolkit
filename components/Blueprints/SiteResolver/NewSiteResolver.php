@@ -97,7 +97,7 @@ class NewSiteResolver {
 		//    Technically, this is a "new site" resolver, but it's entirely possible
 		//    the developer-provided WordPress zip already has a sqlite database with the
 		//    a WordPress site installed..
-		$installCheck = $runtime->evalPhpInSubProcess(
+		$installCheck = $runtime->evalPhpCodeInSubProcess(
 			<<<'PHP'
 $wp_load = getenv('DOCROOT') . '/wp-load.php';
 if (!file_exists($wp_load)) {

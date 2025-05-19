@@ -28,7 +28,7 @@ class ActivatePluginStep implements StepInterface {
 	 */
 	public function run( Runtime $runtime, Tracker $tracker ) {
 		$tracker->setCaption( 'Activating plugin ' . ( $this->pluginPath ?? '' ) );
-		$runtime->evalPhpInSubProcess(
+		$runtime->evalPhpCodeInSubProcess(
 			file_get_contents( __DIR__ . '/scripts/ActivatePlugin/wp_activate_plugin.php' ),
 			[
 				'PLUGIN_PATH' => $this->pluginPath,

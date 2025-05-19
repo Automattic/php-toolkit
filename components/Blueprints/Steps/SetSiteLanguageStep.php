@@ -54,7 +54,7 @@ class SetSiteLanguageStep implements StepInterface {
 		}
 
 		// Get core translation package URL
-		$wp_version = trim( $runtime->evalPhpInSubProcess(
+		$wp_version = trim( $runtime->evalPhpCodeInSubProcess(
 			'<?php
             require getenv("DOCROOT") . "/wp-includes/version.php";
             append_output( $wp_version );
@@ -62,7 +62,7 @@ class SetSiteLanguageStep implements StepInterface {
 		)->outputFileContent );
 
 		// Get plugin translations
-		$plugins_data = json_decode( $runtime->evalPhpInSubProcess(
+		$plugins_data = json_decode( $runtime->evalPhpCodeInSubProcess(
 			"<?php
             require_once(getenv('DOCROOT') . '/wp-load.php');
             require_once(getenv('DOCROOT') . '/wp-admin/includes/plugin.php');
@@ -89,7 +89,7 @@ class SetSiteLanguageStep implements StepInterface {
 		)->outputFileContent, true );
 
 		// Get theme translations
-		$themes_data = json_decode( $runtime->evalPhpInSubProcess(
+		$themes_data = json_decode( $runtime->evalPhpCodeInSubProcess(
 			"<?php
             require_once(getenv('DOCROOT') . '/wp-load.php');
             require_once(getenv('DOCROOT') . '/wp-admin/includes/theme.php');

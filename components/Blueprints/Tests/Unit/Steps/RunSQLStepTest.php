@@ -17,7 +17,7 @@ class RunSQLStepTest extends StepTestCase {
 		$step = new RunSqlStep( DataReference::create( './test.sql' ) );
 		$step->run( $this->runtime, new Tracker() );
 
-		$table_exists = $this->runtime->evalPhpInSubProcess(
+		$table_exists = $this->runtime->evalPhpCodeInSubProcess(
 			<<<'PHP'
 <?php
 require_once getenv('DOCROOT') . '/wp-load.php';
@@ -47,7 +47,7 @@ SQL;
 		$step = new RunSqlStep( DataReference::create( './test.sql' ) );
 		$step->run( $this->runtime, new Tracker() );
 
-		$result = $this->runtime->evalPhpInSubProcess(
+		$result = $this->runtime->evalPhpCodeInSubProcess(
 			<<<'PHP'
 <?php
 require_once getenv('DOCROOT') . '/wp-load.php';
@@ -82,7 +82,7 @@ SQL;
 		$step = new RunSqlStep( DataReference::create( './test.sql' ) );
 		$step->run( $this->runtime, new Tracker() );
 
-		$option_value = $this->runtime->evalPhpInSubProcess(
+		$option_value = $this->runtime->evalPhpCodeInSubProcess(
 			<<<'PHP'
 <?php
 require_once getenv('DOCROOT') . '/wp-load.php';
@@ -109,7 +109,7 @@ SQL;
 		$step = new RunSqlStep( DataReference::create( './test.sql' ) );
 		$step->run( $this->runtime, new Tracker() );
 
-		$result = $this->runtime->evalPhpInSubProcess(
+		$result = $this->runtime->evalPhpCodeInSubProcess(
 			<<<'PHP'
 <?php
 require_once getenv('DOCROOT') . '/wp-load.php';
@@ -141,7 +141,7 @@ PHP
 		$step = new RunSqlStep( DataReference::create( './test.sql' ) );
 		$step->run( $this->runtime, new Tracker() );
 
-		$table_exists = $this->runtime->evalPhpInSubProcess(
+		$table_exists = $this->runtime->evalPhpCodeInSubProcess(
 			<<<'PHP'
 <?php
 require_once getenv('DOCROOT') . '/wp-load.php';
