@@ -106,9 +106,6 @@ class ChrootLayer extends Layer {
 	}
 
 	public function get_meta(): array {
-		return [
-			'chroot' => $this->chroot,
-			...$this->fs->get_meta(),
-		];
+		return array_merge(['chroot' => $this->chroot], $this->fs->get_meta());
 	}
 }

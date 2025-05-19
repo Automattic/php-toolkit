@@ -15,7 +15,10 @@ class ProgressObserver {
 	 */
 	private $logCallback;
 
-	private ?Runtime $runtime = null;
+	/**
+     * @var \WordPress\Blueprints\Runtime|null
+     */
+    private $runtime;
 
 	/**
 	 * Create a new progress logger with the given logging function

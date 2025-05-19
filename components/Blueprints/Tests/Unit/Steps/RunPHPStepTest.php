@@ -73,10 +73,11 @@ PHP
 		// Verify the option was actually set in WordPress
 		$option_value = $this->runtime->evalPhpInSubProcess(
 			<<<'PHP'
-            <?php
-            require_once getenv('DOCROOT') . '/wp-load.php';
-            append_output( get_option('test_option') );
-            PHP
+<?php
+require_once getenv('DOCROOT') . '/wp-load.php';
+append_output( get_option('test_option') );
+PHP
+
 		)->outputFileContent;
 
 		$this->assertEquals( 'test_value', $option_value );

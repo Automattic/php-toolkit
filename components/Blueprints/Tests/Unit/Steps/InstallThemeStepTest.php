@@ -10,34 +10,36 @@ use function WordPress\Filesystem\wp_join_paths;
 
 class InstallThemeStepTest extends StepTestCase {
 	const THEME_STYLE_CSS_CONTENT = <<<'CSS'
-    /*
-    Theme Name: Test Theme
-    Theme URI: https://example.com
-    Author: Test
-    Author URI: https://example.com
-    Description: A test theme for InstallThemeStep test
-    Version: 1.0.0
-    */
-    body {
-        font-family: sans-serif;
-    }
-    CSS;
+/*
+Theme Name: Test Theme
+Theme URI: https://example.com
+Author: Test
+Author URI: https://example.com
+Description: A test theme for InstallThemeStep test
+Version: 1.0.0
+*/
+body {
+font-family: sans-serif;
+}
+CSS
+;
 
 	const THEME_INDEX_PHP_CONTENT = <<<'PHP'
-    <?php
-    /**
-     * Main theme file
-     * 
-     * @package Test_Theme
-     */
+<?php
+/**
+* Main theme file
+* 
+* @package Test_Theme
+*/
 
-    // Simple theme initialization
-    function test_theme_setup() {
-        add_theme_support( 'title-tag' );
-        add_theme_support( 'post-thumbnails' );
-    }
-    add_action( 'after_setup_theme', 'test_theme_setup' );
-    PHP;
+// Simple theme initialization
+function test_theme_setup() {
+add_theme_support( 'title-tag' );
+add_theme_support( 'post-thumbnails' );
+}
+add_action( 'after_setup_theme', 'test_theme_setup' );
+PHP
+;
 
 	public function testInstallThemeWithActivation() {
 		$this->execution_context->mkdir(
@@ -67,10 +69,11 @@ class InstallThemeStepTest extends StepTestCase {
 
 		$active_theme = $this->runtime->evalPhpInSubProcess(
 			<<<'PHP'
-            <?php
-            require_once getenv('DOCROOT') . '/wp-load.php';
-            append_output( get_option('stylesheet') );
-            PHP
+<?php
+require_once getenv('DOCROOT') . '/wp-load.php';
+append_output( get_option('stylesheet') );
+PHP
+
 		)->outputFileContent;
 
 		$this->assertEquals( 'test-theme', trim( $active_theme ) );
@@ -104,10 +107,11 @@ class InstallThemeStepTest extends StepTestCase {
 
 		$active_theme = $this->runtime->evalPhpInSubProcess(
 			<<<'PHP'
-            <?php
-            require_once getenv('DOCROOT') . '/wp-load.php';
-            append_output( get_option('stylesheet') );
-            PHP
+<?php
+require_once getenv('DOCROOT') . '/wp-load.php';
+append_output( get_option('stylesheet') );
+PHP
+
 		)->outputFileContent;
 
 		$this->assertNotEquals( 'test-theme', trim( $active_theme ) );
@@ -137,10 +141,11 @@ class InstallThemeStepTest extends StepTestCase {
 
 		$active_theme = $this->runtime->evalPhpInSubProcess(
 			<<<'PHP'
-            <?php
-            require_once getenv('DOCROOT') . '/wp-load.php';
-            append_output( get_option('stylesheet') );
-            PHP
+<?php
+require_once getenv('DOCROOT') . '/wp-load.php';
+append_output( get_option('stylesheet') );
+PHP
+
 		)->outputFileContent;
 
 		$this->assertEquals( 'test-theme', trim( $active_theme ) );

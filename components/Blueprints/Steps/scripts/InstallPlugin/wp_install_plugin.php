@@ -218,9 +218,11 @@ if ( empty( $plugins_in_folder ) ) {
 	error_log( "Could not find any plugin files in the installed folder: " . $plugin_folder_name );
 	exit( 1 );
 }
+// The key of the first plugin entry is the relative path needed for activation.
+reset($plugins_in_folder);
 
 // The key of the first plugin entry is the relative path needed for activation.
-$plugin_file_relative_path = array_key_first( $plugins_in_folder );
+$plugin_file_relative_path = key( $plugins_in_folder );
 
 // Output the relative path of the main plugin file.
 $output = $plugin_folder_name . '/' . $plugin_file_relative_path;

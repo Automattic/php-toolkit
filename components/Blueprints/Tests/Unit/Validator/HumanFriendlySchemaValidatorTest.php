@@ -1362,7 +1362,7 @@ class HumanFriendlySchemaValidatorTest extends TestCase {
 		$result2 = $validator->validate(['pet' => ['breed' => 'Labrador', 'age' => 3]]);
 		$this->assertInstanceOf(ValidationError::class, $result2);
 		// Check for message about missing type field
-		$this->assertEquals('Property "type" must be one of [dog, cat], but it was missing.', $result2->message, );
+		$this->assertEquals('Property "type" must be one of [dog, cat], but it was missing.', $result2->message );
 		
 		// Invalid: correct discriminator but missing required property
 		$result3 = $validator->validate(['pet' => ['type' => 'dog', 'age' => 3]]);

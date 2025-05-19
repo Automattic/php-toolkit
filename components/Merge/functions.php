@@ -42,7 +42,7 @@ function mb_wordwrap( string $text, int $width, string $break = "\n", bool $cut 
 
 	for ( $i = 0; $i < count( $words ); $i++ ) {
 		$word = $words[ $i ];
-		if ( str_contains( $word, "\n" ) ) {
+		if ( strpos($word, "\n") !== false ) {
 			$offset = strpos( $word, "\n" );
 			// Slice until the newline character while keeping the number of
 			// characters the same.

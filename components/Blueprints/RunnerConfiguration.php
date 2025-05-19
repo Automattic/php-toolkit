@@ -16,21 +16,45 @@ class RunnerConfiguration {
 		self::PERMISSION_LOCAL_FILESYSTEM_ACCESS,
 	];
 	
-	private DataReference|array $blueprintRef;
-	private string $mode = 'create-new-site';    // or apply-to-existing-site
-	private string $rootDir = '';
-	private string $siteUrl = '';
-	private string $databaseEngine = 'mysql';
-	private array $databaseCredentials = [];
+	/**
+     * @var \WordPress\Blueprints\DataReference\DataReference|mixed[]
+     */
+    private $blueprintRef;
+	/**
+     * @var string
+     */
+    private $mode = 'create-new-site';    // or apply-to-existing-site
+    /**
+     * @var string
+     */
+    private $rootDir = '';
+	/**
+     * @var string
+     */
+    private $siteUrl = '';
+	/**
+     * @var string
+     */
+    private $databaseEngine = 'mysql';
+	/**
+     * @var mixed[]
+     */
+    private $databaseCredentials = [];
 	private $progressObserver = null;
-	private LoggerInterface $logger;
-	private array $permissions;
+	/**
+     * @var \Psr\Log\LoggerInterface
+     */
+    private $logger;
+	/**
+     * @var mixed[]
+     */
+    private $permissions;
 
 	/**
 	 * @var DataReference|null
 	 * Reference to the sqlite-database-integration plugin zip, if configured.
 	 */
-	private ?DataReference $sqliteIntegrationPlugin = null;
+	private $sqliteIntegrationPlugin;
 
 	public function __construct() {
 		$this->sqliteIntegrationPlugin = DataReference::create( 'https://downloads.wordpress.org/plugin/sqlite-database-integration.zip' );
@@ -40,13 +64,19 @@ class RunnerConfiguration {
 		];
 	}
 
-	public function setBlueprint( DataReference|array $r ): self {
+	/**
+     * @param \WordPress\Blueprints\DataReference\DataReference|mixed[] $r
+     */
+    public function setBlueprint( $r ): self {
 		$this->blueprintRef = $r;
 
 		return $this;
 	}
 
-	public function getBlueprint(): DataReference|array {
+	/**
+     * @return \WordPress\Blueprints\DataReference\DataReference|mixed[]
+     */
+    public function getBlueprint() {
 		return $this->blueprintRef;
 	}
 

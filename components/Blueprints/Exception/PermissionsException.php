@@ -3,8 +3,14 @@
 namespace WordPress\Blueprints\Exception;
 
 class PermissionsException extends BlueprintExecutionException {
-    private string $permission;
-    private string $php_api_tip;
+    /**
+     * @var string
+     */
+    private $permission;
+    /**
+     * @var string
+     */
+    private $php_api_tip;
 	
     public function __construct(string $permission, string $message = "", string $php_api_tip = "", int $code = 0, ?\Throwable $previous = null) {
         parent::__construct($message, $code, $previous);

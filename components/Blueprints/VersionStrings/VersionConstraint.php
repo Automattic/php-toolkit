@@ -3,14 +3,23 @@
 namespace WordPress\Blueprints\VersionStrings;
 
 class VersionConstraint {
-	private ?Version $min;
-	private ?Version $max;
-	private ?Version $recommended;
+	/**
+     * @var \WordPress\Blueprints\VersionStrings\Version|null
+     */
+    private $min;
+	/**
+     * @var \WordPress\Blueprints\VersionStrings\Version|null
+     */
+    private $max;
+	/**
+     * @var \WordPress\Blueprints\VersionStrings\Version|null
+     */
+    private $recommended;
 
 	public function __construct(
 		?object $min = null,
 		?object $max = null,
-		?object $recommended = null,
+		?object $recommended = null
 	) {
 		$this->min = $min;
 		$this->max = $max;

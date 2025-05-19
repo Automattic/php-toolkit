@@ -166,7 +166,7 @@ class ProxyFunctionsTests extends TestCase {
 			filter_headers_by_name(
 				$original_headers,
 				$strictly_disallowed_headers,
-				$headers_requiring_opt_in,
+				$headers_requiring_opt_in
 			)
 		);
 	}
@@ -202,7 +202,7 @@ class ProxyFunctionsTests extends TestCase {
 			filter_headers_by_name(
 				$original_headers,
 				$strictly_disallowed_headers,
-				$headers_requiring_opt_in,
+				$headers_requiring_opt_in
 			)
 		);
 	}

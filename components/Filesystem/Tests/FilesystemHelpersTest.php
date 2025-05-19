@@ -7,7 +7,10 @@ use WordPress\Filesystem\InMemoryFilesystem;
 
 class FilesystemHelpersTest extends TestCase {
 	
-	protected Filesystem $fs;
+	/**
+     * @var \WordPress\Filesystem\Filesystem
+     */
+    protected $fs;
 	
 	protected function setUp(): void {
 		$this->fs = InMemoryFilesystem::create();

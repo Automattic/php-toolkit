@@ -257,7 +257,7 @@ BODY;
 	}
 
 	private function make_api_request( $endpoint, $method = 'GET', $params = array(), $data = null ) {
-		if ( str_starts_with( $endpoint, 'https://' ) ) {
+		if ( strncmp($endpoint, 'https://', strlen('https://')) === 0 ) {
 			$url = $endpoint;
 		} else {
 			$url = 'https://www.googleapis.com/drive/v3/' . $endpoint;

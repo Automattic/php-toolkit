@@ -10,7 +10,10 @@ use WordPress\Blueprints\Runtime;
  * Represents the 'mkdir' (make directory) step.
  */
 class MkdirStep implements StepInterface {
-	public string $path;
+	/**
+     * @var string
+     */
+    public $path;
 
 	/**
 	 * @param  string  $path  The directory path to create.

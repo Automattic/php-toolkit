@@ -18,25 +18,28 @@ use function WordPress\Zip\is_zip_file_stream;
 
 class InstallPluginStep implements StepInterface {
 	/**
-	 * Plugin source reference.
-	 */
-	public DataReference $source;
+     * Plugin source reference.
+     * @var \WordPress\Blueprints\DataReference\DataReference
+     */
+    public $source;
 
 	/**
-	 * Whether to activate the plugin after installation. Defaults to true.
-	 */
-	public bool $active;
+     * Whether to activate the plugin after installation. Defaults to true.
+     * @var bool
+     */
+    public $active;
 
 	/**
 	 * Optional key-value pairs passed to the plugin during activation.
 	 * @var array<string, mixed>|null
 	 */
-	public ?array $activationOptions;
+	public $activationOptions;
 
 	/**
-	 * Behavior on installation error. Defaults to THROW_ERROR.
-	 */
-	public string $onError;
+     * Behavior on installation error. Defaults to THROW_ERROR.
+     * @var string
+     */
+    public $onError;
 
 	/**
 	 * @param  DataReference  $source  Plugin source reference.

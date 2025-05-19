@@ -38,11 +38,7 @@ $requests   = array(
 		$target_url,
 		array(
 			'method' => $_SERVER['REQUEST_METHOD'],
-			'headers' => array(
-				...getallheaders(),
-				'Accept-Encoding' => 'gzip, deflate',
-				'Host' => $host,
-			),
+			'headers' => array_merge(getallheaders(), ['Accept-Encoding' => 'gzip, deflate', 'Host' => $host]),
 			'body_stream' => $_SERVER['REQUEST_METHOD'] === 'POST' ? fopen( 'php://input', 'r' ) : null,
 		)
 	),

@@ -10,7 +10,10 @@ use WordPress\Filesystem\FilesystemException;
  * Represents the 'rm' (remove file) step.
  */
 class RmStep implements StepInterface {
-	public string $path;
+	/**
+     * @var string
+     */
+    public $path;
 
 	/**
 	 * @param  string  $path  The file path to remove.

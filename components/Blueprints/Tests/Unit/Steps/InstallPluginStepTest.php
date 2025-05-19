@@ -10,20 +10,21 @@ use function WordPress\Filesystem\wp_join_paths;
 
 class InstallPluginStepTest extends StepTestCase {
 	const PLUGIN_FILE_CONTENT = <<<'PHP'
-	<?php
-	/**
-	 * Plugin Name: Test Plugin
-	 * Description: A test plugin for InstallPluginStepRunner test
-	 * Version: 1.0.0
-	 * Author: Test
-	 */
-	
-	// Simple plugin that does nothing
-	function test_plugin_init() {
-		// This function is just for testing
-	}
-	add_action('init', 'test_plugin_init');
-	PHP;
+<?php
+/**
+* Plugin Name: Test Plugin
+* Description: A test plugin for InstallPluginStepRunner test
+* Version: 1.0.0
+* Author: Test
+*/
+
+// Simple plugin that does nothing
+function test_plugin_init() {
+// This function is just for testing
+}
+add_action('init', 'test_plugin_init');
+PHP
+;
 
 	public function testInstallPluginWithActivation() {
 		$this->execution_context->mkdir(
@@ -50,10 +51,11 @@ class InstallPluginStepTest extends StepTestCase {
 		// Check if plugin is activated
 		$active_plugins = $this->runtime->evalPhpInSubProcess(
 			<<<'PHP'
-            <?php
-            require_once getenv('DOCROOT') . '/wp-load.php';
-            append_output( json_encode(get_option('active_plugins')) );
-            PHP
+<?php
+require_once getenv('DOCROOT') . '/wp-load.php';
+append_output( json_encode(get_option('active_plugins')) );
+PHP
+
 		)->outputFileContent;
 
 		$active_plugins = json_decode( $active_plugins, true );
@@ -83,17 +85,18 @@ class InstallPluginStepTest extends StepTestCase {
 		$this->assertTrue( $fs->exists( 'wp-content/plugins/test-plugin/test-plugin.php' ) );
 		$inactive_plugins = $this->runtime->evalPhpInSubProcess(
 			<<<'PHP'
-			<?php
-			require_once getenv('DOCROOT') . '/wp-load.php';
+<?php
+require_once getenv('DOCROOT') . '/wp-load.php';
 
-			// Get all installed plugins
-			$all_plugins = get_plugins();
-			// Get active plugins
-			$active_plugins = get_option('active_plugins');
-			// Filter to get only inactive plugins
-			$inactive_plugins = array_diff(array_keys($all_plugins), $active_plugins);
-			append_output( json_encode($inactive_plugins) );
-			PHP
+// Get all installed plugins
+$all_plugins = get_plugins();
+// Get active plugins
+$active_plugins = get_option('active_plugins');
+// Filter to get only inactive plugins
+$inactive_plugins = array_diff(array_keys($all_plugins), $active_plugins);
+append_output( json_encode($inactive_plugins) );
+PHP
+
 		)->outputFileContent;
 		$inactive_plugins = json_decode( $inactive_plugins, true );
 		$this->assertContains( 'test-plugin/test-plugin.php', $inactive_plugins );
@@ -101,10 +104,11 @@ class InstallPluginStepTest extends StepTestCase {
 		// Check if plugin is activated
 		$active_plugins = $this->runtime->evalPhpInSubProcess(
 			<<<'PHP'
-            <?php
-            require_once getenv('DOCROOT') . '/wp-load.php';
-            append_output( json_encode(get_option('active_plugins')) );
-            PHP
+<?php
+require_once getenv('DOCROOT') . '/wp-load.php';
+append_output( json_encode(get_option('active_plugins')) );
+PHP
+
 		)->outputFileContent;
 
 		$active_plugins = json_decode( $active_plugins, true );
@@ -135,10 +139,11 @@ class InstallPluginStepTest extends StepTestCase {
 		// Check if plugin is activated
 		$active_plugins = $this->runtime->evalPhpInSubProcess(
 			<<<'PHP'
-            <?php
-            require_once getenv('DOCROOT') . '/wp-load.php';
-            append_output( json_encode(get_option('active_plugins')) );
-            PHP
+<?php
+require_once getenv('DOCROOT') . '/wp-load.php';
+append_output( json_encode(get_option('active_plugins')) );
+PHP
+
 		)->outputFileContent;
 
 		$active_plugins = json_decode( $active_plugins, true );
@@ -169,10 +174,11 @@ class InstallPluginStepTest extends StepTestCase {
 		// Check if plugin is activated
 		$active_plugins = $this->runtime->evalPhpInSubProcess(
 			<<<'PHP'
-            <?php
-            require_once getenv('DOCROOT') . '/wp-load.php';
-            append_output( json_encode(get_option('active_plugins')) );
-            PHP
+<?php
+require_once getenv('DOCROOT') . '/wp-load.php';
+append_output( json_encode(get_option('active_plugins')) );
+PHP
+
 		)->outputFileContent;
 
 		$active_plugins = json_decode( $active_plugins, true );
@@ -203,10 +209,11 @@ class InstallPluginStepTest extends StepTestCase {
 		// Check if plugin is activated
 		$active_plugins = $this->runtime->evalPhpInSubProcess(
 			<<<'PHP'
-            <?php
-            require_once getenv('DOCROOT') . '/wp-load.php';
-            append_output( json_encode(get_option('active_plugins')) );
-            PHP
+<?php
+require_once getenv('DOCROOT') . '/wp-load.php';
+append_output( json_encode(get_option('active_plugins')) );
+PHP
+
 		)->outputFileContent;
 
 		$active_plugins = json_decode( $active_plugins, true );

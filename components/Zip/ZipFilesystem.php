@@ -73,7 +73,7 @@ class ZipFilesystem implements Filesystem {
 		$children = array();
 		foreach ( $descendants as $entry ) {
 			$suffix = rtrim( substr( $entry->path, strlen( $prefix ) ), '/' );
-			if ( str_contains( $suffix, '/' ) ) {
+			if ( strpos($suffix, '/') !== false ) {
 				continue;
 			}
 			// No need to include the directory itself.
@@ -176,7 +176,7 @@ class ZipFilesystem implements Filesystem {
 			/**
 			 * Only create a file entry if it's not a directory.
 			 */
-			if ( ! str_ends_with( $entry->path, '/' ) ) {
+			if ( substr_compare($entry->path, '/', -strlen('/')) !== 0 ) {
 				$this->central_directory[ $entry->path ] = $entry;
 			}
 		}

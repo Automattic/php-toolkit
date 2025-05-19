@@ -13,19 +13,20 @@ class SetSiteOptionsStepTest extends StepTestCase {
 	private function assertWordPressOptions( array $expected_options ) {
 		$result = $this->runtime->evalPhpInSubProcess(
 			<<<'PHP'
-            <?php
-            require_once getenv('DOCROOT') . '/wp-load.php';
-            
-            $options = json_decode(getenv('OPTIONS'), true);
-            $result = [];
-            
-            foreach ($options as $name => $expected_value) {
-                $actual_value = get_option($name);
-                $result[$name] = $actual_value;
-            }
-            
-            append_output( json_encode($result) );
-            PHP,
+<?php
+require_once getenv('DOCROOT') . '/wp-load.php';
+
+$options = json_decode(getenv('OPTIONS'), true);
+$result = [];
+
+foreach ($options as $name => $expected_value) {
+$actual_value = get_option($name);
+$result[$name] = $actual_value;
+}
+
+append_output( json_encode($result) );
+PHP
+,
 			[
 				'OPTIONS' => json_encode( $expected_options ),
 			]
@@ -104,11 +105,12 @@ class SetSiteOptionsStepTest extends StepTestCase {
 		// First, set some initial values
 		$this->runtime->evalPhpInSubProcess(
 			<<<'PHP'
-            <?php
-            require_once getenv('DOCROOT') . '/wp-load.php';
-            update_option('users_can_register', 0);
-            update_option('default_role', 'subscriber');
-            PHP
+<?php
+require_once getenv('DOCROOT') . '/wp-load.php';
+update_option('users_can_register', 0);
+update_option('default_role', 'subscriber');
+PHP
+
 		)->outputFileContent;
 
 		// Now update them

@@ -153,7 +153,7 @@ $curlHeaders                 = kv_headers_to_curl_format(
 	filter_headers_by_name(
 		getallheaders(),
 		$strictly_disallowed_headers,
-		$headers_requiring_opt_in,
+		$headers_requiring_opt_in
 	)
 );
 curl_setopt(
@@ -169,7 +169,7 @@ curl_setopt(
 			// NOTE: We cannot do this reliably based on X-Forwarded-For unless
 			// we trust the reverse proxy, so it cannot be done unconditionally
 			// in this script because we do not control where others deploy it.
-		),
+		)
 	)
 );
 

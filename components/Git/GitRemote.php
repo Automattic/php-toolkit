@@ -76,7 +76,7 @@ class GitRemote {
 						continue 2;
 					}
 
-					if ( str_starts_with( $ref['ref_name'], 'refs/heads/' ) ) {
+					if ( strncmp($ref['ref_name'], 'refs/heads/', strlen('refs/heads/')) === 0 ) {
 						$branch_name = substr( $ref['ref_name'], strlen( 'refs/heads/' ) );
 						$this->repository->set_branch_tip( 'refs/remotes/' . $this->remote_name . '/' . $branch_name, $ref['hash'] );
 					}
@@ -185,10 +185,10 @@ class GitRemote {
 	}
 
 	private function localize_ref_name( $ref_name ) {
-		if ( str_starts_with( $ref_name, 'ref: ' ) ) {
+		if ( strncmp($ref_name, 'ref: ', strlen('ref: ')) === 0 ) {
 			$ref_name = trim( substr( $ref_name, 5 ) );
 		}
-		if ( str_starts_with( $ref_name, 'refs/heads/' ) ) {
+		if ( strncmp($ref_name, 'refs/heads/', strlen('refs/heads/')) === 0 ) {
 			return substr( $ref_name, strlen( 'refs/heads/' ) );
 		}
 
@@ -224,7 +224,7 @@ class GitRemote {
 					"done\n",
 					"done\n",
 				)
-			),
+			)
 		);
 	}
 

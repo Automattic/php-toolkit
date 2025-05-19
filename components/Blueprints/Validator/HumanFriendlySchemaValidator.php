@@ -6,7 +6,14 @@ namespace WordPress\Blueprints\Validator;
 //        as a unique reference that can't be possibly brought
 //        in with the validated data.
 class Symbol {
-	public function __construct( public string $value,) {}
+	/**
+     * @var string
+     */
+    public $value;
+    public function __construct(string $value)
+    {
+        $this->value = $value;
+    }
 	public function __toString(): string { return $this->value; }
 }
 const MISSING = new Symbol('missing');
@@ -88,16 +95,27 @@ const MISSING = new Symbol('missing');
  */
 final class HumanFriendlySchemaValidator
 {
-    private bool $arrayIsValidObject;
+    /**
+     * @var mixed[]
+     */
+    private $schema;
+    /**
+     * @var bool
+     */
+    private $arrayIsValidObject;
 
     public function __construct(
-        private array $schema,
-        array $options = [],
+        array $schema,
+        array $options = []
     ) {
+        $this->schema = $schema;
         $this->arrayIsValidObject = $options['array_is_valid_object'] ?? true;
     }
 
-    public function validate(mixed $data): null|ValidationError
+    /**
+     * @param mixed $data
+     */
+    public function validate($data): ?\WordPress\Blueprints\Validator\ValidationError
     {
         return $this->validateNode(['root'], $data, $this->schema);
     }
@@ -117,8 +135,10 @@ final class HumanFriendlySchemaValidator
     }
 
     // ─────────────────────────────────────────────────────── helpers ─┐
-
-    private function valueSnippet(mixed $v): string
+    /**
+     * @param mixed $v
+     */
+    private function valueSnippet($v): string
     {
         return substr(json_encode($v, JSON_PARTIAL_OUTPUT_ON_ERROR | JSON_UNESCAPED_SLASHES), 0, 80);
     }
@@ -131,22 +151,12821 @@ final class HumanFriendlySchemaValidator
         return $s['title'] ?? ($s['type'] ?? '<schema>');
     }
 
-    private function typeMatches(mixed $data, ?string $type): bool
+    /**
+     * @param mixed $data
+     */
+    private function typeMatches($data, ?string $type): bool
     {
-        return match ($type) {
-            'object'  => is_object($data) || ($this->arrayIsValidObject && is_array($data) && (!array_is_list($data) || count($data) === 0)),
-            'array'   => is_array($data) && array_is_list($data),
-            'string'  => is_string($data),
-            'integer' => is_int($data),
-            'number'  => is_int($data) || is_float($data),
-            'boolean' => is_bool($data),
-			'null'    => is_null($data),
-            null      => true,
-            default   => throw new UnsupportedSchemaException("Type \"{$type}\" is not supported."),
+        $arrayIsListFunction = function (array $array): bool {
+            if (function_exists('array_is_list')) {
+                return array_is_list($array);
+            }
+            if ($array === []) {
+                return true;
+            }
+            $current_key = 0;
+            foreach ($array as $key => $noop) {
+                if ($key !== $current_key) {
+                    return false;
+                }
+                ++$current_key;
+            }
+            return true;
         };
+        switch ($type) {
+            case 'object':
+                return is_object($data) || ($this->arrayIsValidObject && is_array($data) && (!$arrayIsListFunction($data) || count($data) === 0));
+            case 'array':
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                $arrayIsListFunction = function (array $array): bool {
+                    if (function_exists('array_is_list')) {
+                        return array_is_list($array);
+                    }
+                    if ($array === []) {
+                        return true;
+                    }
+                    $current_key = 0;
+                    foreach ($array as $key => $noop) {
+                        if ($key !== $current_key) {
+                            return false;
+                        }
+                        ++$current_key;
+                    }
+                    return true;
+                };
+                return is_array($data) && $arrayIsListFunction($data);
+            case 'string':
+                return is_string($data);
+            case 'integer':
+                return is_int($data);
+            case 'number':
+                return is_int($data) || is_float($data);
+            case 'boolean':
+                return is_bool($data);
+            case 'null':
+                return is_null($data);
+            case null:
+                return true;
+            default:
+                throw new UnsupportedSchemaException("Type \"{$type}\" is not supported.");
+        }
     }
 
-    private function typeMatchesAny(mixed $data, $type_or_types): bool
+    /**
+     * @param mixed $data
+     */
+    private function typeMatchesAny($data, $type_or_types): bool
     {
 		if(!is_array($type_or_types)) {
 			return $this->typeMatches($data, $type_or_types);
@@ -159,8 +12978,10 @@ final class HumanFriendlySchemaValidator
     }
 
     // ───────────────────────────────────────────────────────── validation ─┐
-
-    private function validateNode(array $path, mixed $data, array $schema): ?ValidationError
+    /**
+     * @param mixed $data
+     */
+    private function validateNode(array $path, $data, array $schema): ?ValidationError
     {
         if (isset($schema['$ref'])) {
             $schema = $this->resolveReference($schema['$ref']);
@@ -179,12 +13000,20 @@ final class HumanFriendlySchemaValidator
             }
         }
 
-        $error = match (true) {
-            isset($schema['anyOf']) => $this->validateAnyOf($path, $data, $schema),
-            isset($schema['oneOf']) => $this->validateOneOf($path, $data, $schema),
-            isset($schema['type'])  => $this->validateType($path, $data, $schema),
-            default                 => null, // Will be caught by the check below
-        };
+        switch (true) {
+            case isset($schema['anyOf']):
+                $error = $this->validateAnyOf($path, $data, $schema);
+                break;
+            case isset($schema['oneOf']):
+                $error = $this->validateOneOf($path, $data, $schema);
+                break;
+            case isset($schema['type']):
+                $error = $this->validateType($path, $data, $schema);
+                break;
+            default:
+                $error = null;
+                break;
+        }
 
 		if ($error === null && !isset($schema['anyOf']) && !isset($schema['oneOf']) && !isset($schema['type']) && !isset($schema['$ref'])) {
             // If $error is null BUT it's because no validation rule was matched (e.g. schema missing type/anyOf/oneOf/ref)
@@ -199,8 +13028,10 @@ final class HumanFriendlySchemaValidator
     }
 
     // ───────────────────────────────────────────── anyOf / oneOf ─┐
-
-    private function narrowBranches(mixed $data, array $branches, array $schema): array
+    /**
+     * @param mixed $data
+     */
+    private function narrowBranches($data, array $branches, array $schema): array
     {
         // 1. filter by declared top‑level type
         $candidates = array_filter($branches, function($spec) use($data){
@@ -235,7 +13066,10 @@ final class HumanFriendlySchemaValidator
         return $candidates ?: $branches; // never empty
     }
 
-    private function validateAnyOf(array $path, mixed $data, array $schema): ?ValidationError
+    /**
+     * @param mixed $data
+     */
+    private function validateAnyOf(array $path, $data, array $schema): ?ValidationError
     {
         $branches = $schema['anyOf'];
         $cands    = $this->narrowBranches($data, $branches, $schema);
@@ -256,7 +13090,10 @@ final class HumanFriendlySchemaValidator
         return $this->explainAggregateMismatch($path, $data, $branches, $schema, 'anyOf', $childErrors);
     }
 
-    private function validateOneOf(array $path, mixed $data, array $schema): ?ValidationError
+    /**
+     * @param mixed $data
+     */
+    private function validateOneOf(array $path, $data, array $schema): ?ValidationError
     {
         $branches = $schema['oneOf'];
         $cands    = $this->narrowBranches($data, $branches, $schema);
@@ -301,10 +13138,11 @@ final class HumanFriendlySchemaValidator
 
     /**
      * Create a parent error for anyOf/oneOf mismatches.
+     * @param mixed $data
      */
     private function explainAggregateMismatch(
         array  $path,
-        mixed  $data,
+        $data,
         array  $branches, // Original branches before narrowing
         array  $parentSchema, // The schema containing anyOf/oneOf
         string $keyword, // 'anyOf' or 'oneOf'
@@ -410,8 +13248,10 @@ final class HumanFriendlySchemaValidator
     }
 
     // ─────────────────────────────────────────── primitives / objects / arrays ─┐
-
-    private function validateType(array $path,mixed $data,array $schema):?ValidationError
+    /**
+     * @param mixed $data
+     */
+    private function validateType(array $path,$data,array $schema):?ValidationError
     {
         $type = $schema['type'];
         if (!$this->typeMatchesAny($data, $type)) {
@@ -485,16 +13325,21 @@ final class HumanFriendlySchemaValidator
 			}
 		}
 
-        return match($type){
-            'object' => $this->validateObject($path,$data,$schema),
-            'array'  => $this->validateArray($path,$data,$schema),
-            default  => null
-        };
+        switch ($type) {
+            case 'object':
+                return $this->validateObject($path,$data,$schema);
+            case 'array':
+                return $this->validateArray($path,$data,$schema);
+            default:
+                return null;
+        }
     }
 
     // ───────────────────────────────────────────────────────────── object ─┐
-
-    private function validateObject(array $path,array|object $data,array $schema):?ValidationError
+    /**
+     * @param mixed[]|object $data
+     */
+    private function validateObject(array $path,$data,array $schema):?ValidationError
     {
         $arr = is_object($data) ? (array)$data : $data;
         $childrenErrors = [];
@@ -518,7 +13363,7 @@ final class HumanFriendlySchemaValidator
         if(!empty($schema['properties'])){
             foreach($schema['properties'] as $name=>$propSpec){
                 if(array_key_exists($name,$arr)){
-                    $error = $this->validateNode([...$path,$name],$arr[$name],$propSpec);
+                    $error = $this->validateNode(array_merge($path, [$name]),$arr[$name],$propSpec);
                     if ($error) $childrenErrors[] = $error;
                 }
             }
@@ -528,7 +13373,7 @@ final class HumanFriendlySchemaValidator
             foreach($arr as $name=>$v){
                 if(isset($schema['properties'][$name])){continue;} // Handled by 'properties' validation
                 
-                $currentPropPath = [...$path, $name];
+                $currentPropPath = array_merge($path, [$name]);
                 if($schema['additionalProperties']===false){
                     $childrenErrors[]= new ValidationError(
                         $this->convertPathToString($currentPropPath),
@@ -571,7 +13416,7 @@ final class HumanFriendlySchemaValidator
         $childrenErrors=[];
         if(isset($schema['items'])){
             foreach($data as $idx=>$item){
-                $error = $this->validateNode([...$path,$idx],$item,$schema['items']);
+                $error = $this->validateNode(array_merge($path, [$idx]),$item,$schema['items']);
                 if ($error) $childrenErrors[] = $error;
             }
         }
@@ -618,7 +13463,7 @@ final class HumanFriendlySchemaValidator
 
     private function resolveReference(string $ref): array
     {
-        if(!str_starts_with($ref,'#/')){
+        if(strncmp($ref, '#/', strlen('#/')) !== 0){
             throw new UnsupportedSchemaException('Only local #/ refs are supported');
         }
         $node=$this->schema;
@@ -670,7 +13515,7 @@ final class HumanFriendlySchemaValidator
             }
             return null; // Explicit discriminator not viable (e.g. not present in all, or not single enum)
         }
-        
+
         // Auto‑guess single‑value enums and consts
         $candidates=[];
 		if(isset($objs[0])){

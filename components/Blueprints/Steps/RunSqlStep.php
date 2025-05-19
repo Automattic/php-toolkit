@@ -12,9 +12,10 @@ use WordPress\Blueprints\Runtime;
  */
 class RunSqlStep implements StepInterface {
 	/**
-	 * SQL source identifier (URL, ./path, /path).
-	 */
-	public DataReference $source;
+     * SQL source identifier (URL, ./path, /path).
+     * @var \WordPress\Blueprints\DataReference\DataReference
+     */
+    public $source;
 
 	/**
 	 * @param  DataReference  $source  SQL source identifier.

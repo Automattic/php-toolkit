@@ -10,10 +10,11 @@ use WordPress\Blueprints\Runtime;
  */
 class ActivatePluginStep implements StepInterface {
 	/**
-	 * Path to the plugin directory or entry file.
-	 * Examples: '/wordpress/wp-content/plugins/plugin-name', 'plugin-name/plugin-name.php'
-	 */
-	public string $pluginPath;
+     * Path to the plugin directory or entry file.
+     * Examples: '/wordpress/wp-content/plugins/plugin-name', 'plugin-name/plugin-name.php'
+     * @var string
+     */
+    public $pluginPath;
 
 	/**
 	 * @param  string  $pluginPath  Path to the plugin directory or entry file.

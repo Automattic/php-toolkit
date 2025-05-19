@@ -33,10 +33,10 @@ class ChunkMerger implements Merger {
 			if (
 				$chunkA['inserted'] !== '' &&
 				$chunkB['inserted'] !== '' &&
-				! str_starts_with( $chunkA['inserted'], $chunkB['inserted'] ) &&
-				! str_starts_with( $chunkB['inserted'], $chunkA['inserted'] ) &&
-				! str_ends_with( $chunkA['inserted'], $chunkB['inserted'] ) &&
-				! str_ends_with( $chunkB['inserted'], $chunkA['inserted'] )
+				strncmp($chunkA['inserted'], $chunkB['inserted'], strlen($chunkB['inserted'])) !== 0 &&
+				strncmp($chunkB['inserted'], $chunkA['inserted'], strlen($chunkA['inserted'])) !== 0 &&
+				substr_compare($chunkA['inserted'], $chunkB['inserted'], -strlen($chunkB['inserted'])) !== 0 &&
+				substr_compare($chunkB['inserted'], $chunkA['inserted'], -strlen($chunkA['inserted'])) !== 0
 			) {
 				$results[] = new MergeConflict(
 					$chunkA['inserted'],
@@ -70,10 +70,10 @@ class ChunkMerger implements Merger {
 
 			if ( $chunkA['deleted'] || $chunkB['deleted'] ) {
 				if ( $chunkA['inserted'] && $chunkB['inserted'] && (
-					str_starts_with( $chunkA['inserted'], $chunkB['inserted'] ) ||
-					str_starts_with( $chunkB['inserted'], $chunkA['inserted'] ) ||
-					str_ends_with( $chunkA['inserted'], $chunkB['inserted'] ) ||
-					str_ends_with( $chunkB['inserted'], $chunkA['inserted'] )
+					strncmp($chunkA['inserted'], $chunkB['inserted'], strlen($chunkB['inserted'])) === 0 ||
+					strncmp($chunkB['inserted'], $chunkA['inserted'], strlen($chunkA['inserted'])) === 0 ||
+					substr_compare($chunkA['inserted'], $chunkB['inserted'], -strlen($chunkB['inserted'])) === 0 ||
+					substr_compare($chunkB['inserted'], $chunkA['inserted'], -strlen($chunkA['inserted'])) === 0
 				) ) {
 					$results[] = strlen( $chunkA['inserted'] ) > strlen( $chunkB['inserted'] ) ? $chunkA['inserted'] : $chunkB['inserted'];
 					continue;

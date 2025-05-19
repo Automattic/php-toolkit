@@ -187,7 +187,7 @@ class AttachmentDownloader {
 				break;
 			case Client::EVENT_BODY_CHUNK_AVAILABLE:
 				$chunk = $this->client->get_response_body_chunk();
-				if ( false === fwrite( $this->fps[ $original_request_id ], $chunk ) ) {
+				if ( !fwrite( $this->fps[ $original_request_id ], $chunk ) ) {
 					// @TODO: Don't echo the error message. Attach it to the import session instead for the user to review later on.
 					_doing_it_wrong( __METHOD__, sprintf( 'Failed to write to file: %s', $this->output_paths[ $original_request_id ] ), '1.0' );
 				}

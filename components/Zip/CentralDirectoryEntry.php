@@ -83,6 +83,6 @@ class CentralDirectoryEntry {
 	}
 
 	public function is_directory() {
-		return str_ends_with( $this->path, '/' );
+		return substr_compare($this->path, '/', -strlen('/')) === 0;
 	}
 }

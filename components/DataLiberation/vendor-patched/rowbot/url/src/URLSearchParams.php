@@ -390,7 +390,7 @@ class URLSearchParams implements Countable, Iterator
      */
     private function isStringable($value): bool
     {
-        return $value instanceof Stringable || is_scalar($value);
+        return is_object($value) && method_exists($value, '__toString') || is_scalar($value);
     }
 
     public function __clone()

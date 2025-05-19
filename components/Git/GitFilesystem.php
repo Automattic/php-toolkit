@@ -243,7 +243,7 @@ class GitFilesystem implements Filesystem {
 		}
 
 		$full_branch_name   = $this->get_repository()->get_current_branch_name();
-		$short_branch_name  = str_starts_with( $full_branch_name, 'refs/heads/' ) ? substr( $full_branch_name, 11 ) : $full_branch_name;
+		$short_branch_name  = strncmp($full_branch_name, 'refs/heads/', strlen('refs/heads/')) === 0 ? substr( $full_branch_name, 11 ) : $full_branch_name;
 		$remote_name        = $this->remote->get_name();
 		$remote_branch_name = "refs/remotes/{$remote_name}/{$short_branch_name}";
 		$remote_branch_hash = $this->get_repository()->get_branch_tip( $remote_branch_name );

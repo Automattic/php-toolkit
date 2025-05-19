@@ -159,14 +159,14 @@ function wp_join_paths( ...$path_segments ) {
 		if ( $path_segment !== '' ) {
 			$paths[] = $path_segment;
 			if ( null === $input_starts_with_slash ) {
-				$input_starts_with_slash = str_starts_with( $path_segment, '/' );
+				$input_starts_with_slash = strncmp($path_segment, '/', strlen('/')) === 0;
 			}
 		}
 	}
 	$path = implode( '/', $paths );
 
 	$result = preg_replace( '#/+#', '/', $path );
-	if ( $input_starts_with_slash && ! str_starts_with( $result, '/' ) ) {
+	if ( $input_starts_with_slash && strncmp($result, '/', strlen('/')) !== 0 ) {
 		$result = '/' . $result;
 	}
 	return $result;
@@ -200,7 +200,7 @@ function wp_join_paths( ...$path_segments ) {
 function wp_resolve_path( ...$path_segments ) {
 	$last_absolute_segment = null;
 	for($i = count($path_segments) - 1; $i >= 0; $i--) {
-		if(str_starts_with($path_segments[$i], '/')) {
+		if(strncmp($path_segments[$i], '/', strlen('/')) === 0) {
 			$last_absolute_segment = $i;
 			break;
 		}
@@ -228,7 +228,7 @@ function wp_resolve_path( ...$path_segments ) {
  */
 function wp_canonicalize_path( $path ) {
 	// Convert to absolute path
-	if ( ! str_starts_with( $path, '/' ) ) {
+	if ( strncmp($path, '/', strlen('/')) !== 0 ) {
 		$path = '/' . $path;
 	}
 

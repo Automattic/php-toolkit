@@ -10,7 +10,7 @@ function get_target_url( $server_data = null ) {
 	}
 
 	$path_info = $server_data['PATH_INFO'] ?? '';
-	if ( str_starts_with( $path_info, '/' ) && strlen( $path_info ) > 1 ) {
+	if ( strncmp($path_info, '/', strlen('/')) === 0 && strlen( $path_info ) > 1 ) {
 		return substr( $path_info, 1 );
 	}
 
@@ -310,7 +310,7 @@ class IpUtils {
 function filter_headers_by_name(
 	$php_headers,
 	$disallowed_headers,
-	$headers_requiring_opt_in = array(),
+	$headers_requiring_opt_in = array()
 ) {
 	$lowercased_php_headers   = array_change_key_case( $php_headers, CASE_LOWER );
 	$disallowed_headers       = array_map( 'strtolower', $disallowed_headers );
@@ -332,7 +332,7 @@ function filter_headers_by_name(
 		) use (
 			$disallowed_headers,
 			$headers_requiring_opt_in,
-			$headers_with_opt_in,
+			$headers_with_opt_in
 		) {
 			$lower_key = strtolower( $key );
 

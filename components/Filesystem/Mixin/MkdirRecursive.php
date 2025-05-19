@@ -32,7 +32,7 @@ trait MkdirRecursive {
 		 */
 		$root = rtrim( $this->get_root(), '/' ) . '/';
 		$path = rtrim( $path, '/' ) . '/';
-		if ( ! str_starts_with( $path, $root ) ) {
+		if ( strncmp($path, $root, strlen($root)) !== 0 ) {
 			throw new FilesystemException( sprintf( 'Path %s is not within the root %s', $path, $root ) );
 		}
 

@@ -9,8 +9,14 @@ use WordPress\Blueprints\Runtime;
  * Represents the 'mv' (move) step.
  */
 class MvStep implements StepInterface {
-	public string $fromPath;
-	public string $toPath;
+	/**
+     * @var string
+     */
+    public $fromPath;
+	/**
+     * @var string
+     */
+    public $toPath;
 
 	/**
 	 * @param  string  $fromPath  The source path to move from.

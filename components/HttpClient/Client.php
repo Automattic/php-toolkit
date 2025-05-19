@@ -110,10 +110,16 @@ class Client {
 	protected $response_body_chunk;
 	protected $timeout;
 	protected $requests_started_at = array();
-	protected ?CacheStorage $cache;
-	protected array $stale_cache_entries = array();
+	/**
+     * @var \WordPress\HttpClient\CacheStorage|null
+     */
+    protected $cache;
+	/**
+     * @var mixed[]
+     */
+    protected $stale_cache_entries = array();
 	/** @var array<int, ByteWriteStream> */
-	protected array $cache_write_streams = array();
+	protected $cache_write_streams = array();
 
 	public function __construct( $options = array() ) {
 		$this->concurrency   = $options['concurrency'] ?? 10;
@@ -132,7 +138,7 @@ class Client {
 	 * @return RequestReadStream
 	 */
 	public function fetch( $request, $options = array() ) {
-		return new RequestReadStream( $request, array( 'client' => $this, ...$options ) );
+		return new RequestReadStream( $request, array_merge(['client' => $this], is_array($options) ? $options : iterator_to_array($options)) );
 	}
 
 	/**
@@ -679,7 +685,7 @@ class Client {
 			}
 
 			$chunk = $request->upload_body_stream->consume( $available_bytes );
-			if ( false === fwrite( $this->connections[ $request->id ]->http_socket, $chunk ) ) {
+			if ( !fwrite( $this->connections[ $request->id ]->http_socket, $chunk ) ) {
 				$this->set_error( $request, new HttpError( 'Failed to write request bytes.' ) );
 				continue;
 			}

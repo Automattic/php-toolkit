@@ -6,14 +6,38 @@ namespace WordPress\Blueprints;
  * Container for Blueprint metadata with defaults.
  */
 class Metadata {
-	public string $name;
-	public string $description;
-	public string $version;
-	public array $authors;
-	public ?string $authorUrl;
-	public ?string $donateLink;
-	public array $tags;
-	public ?string $license;
+	/**
+     * @var string
+     */
+    public $name;
+	/**
+     * @var string
+     */
+    public $description;
+	/**
+     * @var string
+     */
+    public $version;
+	/**
+     * @var mixed[]
+     */
+    public $authors;
+	/**
+     * @var string|null
+     */
+    public $authorUrl;
+	/**
+     * @var string|null
+     */
+    public $donateLink;
+	/**
+     * @var mixed[]
+     */
+    public $tags;
+	/**
+     * @var string|null
+     */
+    public $license;
 
 	/**
 	 * Create a BlueprintMetadata object from an array of data.

@@ -98,15 +98,16 @@ class NewSiteResolver {
 		//    a WordPress site installed..
 		$installCheck = $runtime->evalPhpInSubProcess(
 			<<<'PHP'
-			$wp_load = getenv('DOCROOT') . '/wp-load.php';
-			if (!file_exists($wp_load)) {
-				append_output('0');
-				exit;
-			}
-			require $wp_load;
+$wp_load = getenv('DOCROOT') . '/wp-load.php';
+if (!file_exists($wp_load)) {
+append_output('0');
+exit;
+}
+require $wp_load;
 
-			append_output( function_exists('is_blog_installed') && is_blog_installed() ? '1' : '0' );
-			PHP
+append_output( function_exists('is_blog_installed') && is_blog_installed() ? '1' : '0' );
+PHP
+
 		)->outputFileContent;
 
 		if ( trim( $installCheck ) !== '1' ) {
@@ -154,8 +155,8 @@ class NewSiteResolver {
 		}
 
 		if (
-			str_starts_with( $version_string, 'https://' ) ||
-			str_starts_with( $version_string, 'http://' )
+			strncmp($version_string, 'https://', strlen('https://')) === 0 ||
+			strncmp($version_string, 'http://', strlen('http://')) === 0
 		) {
 			return $version_string;
 		}

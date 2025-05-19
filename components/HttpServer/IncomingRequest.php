@@ -91,9 +91,18 @@ class IncomingRequest extends Request {
 		return $request;
 	}
 
-	public ByteReadStream $body_stream;
-	private array $wrapped_streams;
-	private ?URL $parsed_url = null;
+	/**
+     * @var \WordPress\ByteStream\ReadStream\ByteReadStream
+     */
+    public $body_stream;
+	/**
+     * @var mixed[]
+     */
+    private $wrapped_streams;
+	/**
+     * @var \Rowbot\URL\URL|null
+     */
+    private $parsed_url;
 
 	// @TODO: Bake this into the body stream instance
 	public function close_body_stream()

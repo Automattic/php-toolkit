@@ -118,7 +118,7 @@ class SQLiteFilesystem implements Filesystem {
 	public function get_contents( $path ) {
 		if ( ! $this->is_file( $path ) ) {
 			throw new FilesystemException(
-				sprintf( 'File not found: %s', $path ),
+				sprintf( 'File not found: %s', $path )
 			);
 		}
 		$stmt = $this->db->prepare( 'SELECT contents FROM files WHERE path = ?' );
@@ -131,14 +131,14 @@ class SQLiteFilesystem implements Filesystem {
 	public function rename( $from_path, $to_path, $options = array() ) {
 		if ( ! $this->exists( $from_path ) ) {
 			throw new FilesystemException(
-				sprintf( 'File not found: %s', $from_path ),
+				sprintf( 'File not found: %s', $from_path )
 			);
 		}
 
 		$parent = wp_dirname( $to_path );
 		if ( ! $this->is_dir( $parent ) ) {
 			throw new FilesystemException(
-				sprintf( 'Parent directory not found: %s', $parent ),
+				sprintf( 'Parent directory not found: %s', $parent )
 			);
 		}
 
@@ -189,14 +189,14 @@ class SQLiteFilesystem implements Filesystem {
 	public function mkdir_single( $path, $options = array() ) {
 		if ( $this->exists( $path ) ) {
 			throw new FilesystemException(
-				sprintf( 'Directory already exists: %s', $path ),
+				sprintf( 'Directory already exists: %s', $path )
 			);
 		}
 
 		$parent = wp_dirname( $path );
 		if ( ! $this->is_dir( $parent ) ) {
 			throw new FilesystemException(
-				sprintf( 'Parent directory not found: %s', $parent ),
+				sprintf( 'Parent directory not found: %s', $parent )
 			);
 		}
 
@@ -239,7 +239,7 @@ class SQLiteFilesystem implements Filesystem {
 	public function rm( $path ) {
 		if ( ! $this->is_file( $path ) ) {
 			throw new FilesystemException(
-				sprintf( 'File not found: %s', $path ),
+				sprintf( 'File not found: %s', $path )
 			);
 		}
 
@@ -276,7 +276,7 @@ class SQLiteFilesystem implements Filesystem {
 		$recursive = $options['recursive'] ?? false;
 		if ( ! $this->is_dir( $path ) ) {
 			throw new FilesystemException(
-				sprintf( 'Directory not found: %s', $path ),
+				sprintf( 'Directory not found: %s', $path )
 			);
 		}
 
@@ -325,7 +325,7 @@ class SQLiteFilesystem implements Filesystem {
 		$parent = wp_dirname( $path );
 		if ( ! $this->is_dir( $parent ) ) {
 			throw new FilesystemException(
-				sprintf( 'Parent directory not found: %s', $parent ),
+				sprintf( 'Parent directory not found: %s', $parent )
 			);
 		}
 

@@ -31,7 +31,7 @@ class GitPath extends DataReference {
 	public function __construct(
 		string $git_repository,
 		?string $ref = null,
-		?string $path = null,
+		?string $path = null
 	) {
 		$this->git_repository = $git_repository;
 		$this->ref            = $ref;

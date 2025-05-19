@@ -194,7 +194,7 @@ if ( ! function_exists( 'get_comment_delimited_block_content' ) ) {
 
 if ( ! function_exists( 'strip_core_block_namespace' ) ) {
 	function strip_core_block_namespace( $block_name = null ) {
-		if ( is_string( $block_name ) && str_starts_with( $block_name, 'core/' ) ) {
+		if ( is_string( $block_name ) && strncmp($block_name, 'core/', strlen('core/')) === 0 ) {
 			return substr( $block_name, 5 );
 		}
 

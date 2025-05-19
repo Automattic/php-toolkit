@@ -69,7 +69,7 @@ class FileWriteStream implements ByteWriteStream {
 	 * @throws ByteStreamException If the write operation fails.
 	 */
 	public function append_bytes( string $bytes ): void {
-		if ( fwrite( $this->fileHandle, $bytes ) === false ) {
+		if ( !fwrite( $this->fileHandle, $bytes ) ) {
 			throw new ByteStreamException( 'Failed to write bytes to file.' );
 		}
 	}

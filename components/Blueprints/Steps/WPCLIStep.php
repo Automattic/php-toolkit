@@ -10,14 +10,16 @@ use WordPress\Blueprints\Runtime;
  */
 class WPCLIStep implements StepInterface {
 	/**
-	 * The WP-CLI command arguments string (e.g., "plugin install woocommerce --activate").
-	 */
-	public string $command;
+     * The WP-CLI command arguments string (e.g., "plugin install woocommerce --activate").
+     * @var string
+     */
+    public $command;
 
 	/**
-	 * Optional path to the WP-CLI executable.
-	 */
-	public ?string $wpCliPath;
+     * Optional path to the WP-CLI executable.
+     * @var string|null
+     */
+    public $wpCliPath;
 
 	/**
 	 * @param  string  $command  The WP-CLI command string.

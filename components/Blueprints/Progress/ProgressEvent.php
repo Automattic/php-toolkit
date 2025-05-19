@@ -8,8 +8,14 @@ use Symfony\Component\EventDispatcher\Event;
  * Event class for tracking progress updates
  */
 class ProgressEvent extends Event {
-	public float $progress;
-	public string $caption;
+	/**
+     * @var float
+     */
+    public $progress;
+	/**
+     * @var string
+     */
+    public $caption;
 
 	/**
 	 * Create a new progress event

@@ -10,9 +10,10 @@ use WordPress\Blueprints\Runtime;
  */
 class ActivateThemeStep implements StepInterface {
 	/**
-	 * The name of the theme folder inside wp-content/themes/.
-	 */
-	public string $themeFolderName;
+     * The name of the theme folder inside wp-content/themes/.
+     * @var string
+     */
+    public $themeFolderName;
 
 	/**
 	 * @param  string  $themeFolderName  The name of the theme folder.

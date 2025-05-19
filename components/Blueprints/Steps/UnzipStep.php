@@ -15,14 +15,16 @@ use function WordPress\Filesystem\copy_between_filesystems;
  */
 class UnzipStep implements StepInterface {
 	/**
-	 * Zip file source identifier (URL, ./path, /path).
-	 */
-	public DataReference $zipFile;
+     * Zip file source identifier (URL, ./path, /path).
+     * @var \WordPress\Blueprints\DataReference\DataReference
+     */
+    public $zipFile;
 
 	/**
-	 * The path to extract the zip file to.
-	 */
-	public string $extractToPath;
+     * The path to extract the zip file to.
+     * @var string
+     */
+    public $extractToPath;
 
 	/**
 	 * @param  DataReference  $zipFile  Zip file source identifier.

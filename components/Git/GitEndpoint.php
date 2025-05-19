@@ -162,7 +162,8 @@ class GitEndpoint {
 		$capabilities_to_advertise = $options['capabilities'];
 
 		$refs      = $this->repository->list_refs( $ref_prefixes );
-		$first_ref = array_key_first( $refs );
+        reset($refs);
+		$first_ref = key( $refs );
 		foreach ( $refs as $ref_name => $ref_hash ) {
 			$line = $ref_hash . ' ' . $ref_name;
 			if ( $ref_name === $first_ref ) {
@@ -228,7 +229,7 @@ class GitEndpoint {
 			$packet = $packet_parser->get_body_chunk();
 			switch ( $mode ) {
 				case 'capabilities':
-					if ( str_contains( $packet, '=' ) ) {
+					if ( strpos($packet, '=') !== false ) {
 						list( $key, $value )  = explode( '=', $packet );
 						$capabilities[ $key ] = $value;
 					} else {
@@ -502,7 +503,7 @@ class GitEndpoint {
 				'type'   => 'blob',
 				'filter' => 'none',
 			);
-		} elseif ( str_starts_with( $filter, 'blob:limit=' ) ) {
+		} elseif ( strncmp($filter, 'blob:limit=', strlen('blob:limit=')) === 0 ) {
 			$limit = substr( $filter, strlen( 'blob:limit=' ) );
 
 			return array(
@@ -534,7 +535,7 @@ class GitEndpoint {
 			default:
 				$length  = intval( $packet_length_bytes, 16 ) - 4;
 				$payload = substr( $pack_bytes, $offset, $length );
-				if ( str_ends_with( $payload, "\n" ) ) {
+				if ( substr_compare($payload, "\n", -strlen("\n")) === 0 ) {
 					$payload = substr( $payload, 0, - 1 );
 				}
 				$offset += $length;

@@ -30,7 +30,7 @@ class StepTestCase extends TestCase {
 	/**
 	 * @var Runtime
 	 */
-	public ?Runtime $runtime;
+	public $runtime;
 
 	/**
 	 * @before

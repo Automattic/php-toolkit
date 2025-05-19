@@ -16,7 +16,10 @@ class RetryFrontloadingIterator implements \Iterator {
 		$this->import_post_id = $import_post_id;
 	}
 
-	public function current(): mixed {
+	/**
+     * @return mixed
+     */
+    public function current() {
 		if ( ! $this->current ) {
 			return null;
 		}
@@ -37,7 +40,10 @@ class RetryFrontloadingIterator implements \Iterator {
 		$this->rewound = false;
 	}
 
-	public function key(): mixed {
+	/**
+     * @return mixed
+     */
+    public function key() {
 		if ( ! $this->current ) {
 			return null;
 		}

@@ -9,8 +9,14 @@ use WordPress\Blueprints\Runtime;
  * Represents the 'cp' (copy) step.
  */
 class CpStep implements StepInterface {
-	public string $fromPath;
-	public string $toPath;
+	/**
+     * @var string
+     */
+    public $fromPath;
+	/**
+     * @var string
+     */
+    public $toPath;
 
 	/**
 	 * @param  string  $fromPath  The source path to copy from.

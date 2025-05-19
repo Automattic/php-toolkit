@@ -56,20 +56,55 @@ use function WordPress\Encoding\utf8_is_valid_byte_stream;
 use function WordPress\Zip\is_zip_file_stream;
 
 class Runner {
-	// TODO: Rename httpClient
-	private Client $client;
-	private DataReferenceResolver $assets;
-	private Filesystem $blueprintExecutionContext;
-	private array $blueprintArray;
-	private array $dataReferences = [];
-	private ?VersionConstraint $phpVersionConstraint = null;
-	private ?VersionConstraint $wpVersionConstraint = null;
-	private Tracker $mainTracker;
-	private ProgressObserver $progressObserver;
-	public ?Runtime $runtime;
+	/**
+     * @var \WordPress\Blueprints\RunnerConfiguration
+     */
+    private $configuration;
+    // TODO: Rename httpClient
+    /**
+     * @var \WordPress\HttpClient\Client
+     */
+    private $client;
+	/**
+     * @var \WordPress\Blueprints\DataReference\DataReferenceResolver
+     */
+    private $assets;
+	/**
+     * @var \WordPress\Filesystem\Filesystem
+     */
+    private $blueprintExecutionContext;
+	/**
+     * @var mixed[]
+     */
+    private $blueprintArray;
+	/**
+     * @var mixed[]
+     */
+    private $dataReferences = [];
+	/**
+     * @var \WordPress\Blueprints\VersionStrings\VersionConstraint|null
+     */
+    private $phpVersionConstraint;
+	/**
+     * @var \WordPress\Blueprints\VersionStrings\VersionConstraint|null
+     */
+    private $wpVersionConstraint;
+	/**
+     * @var \WordPress\Blueprints\Progress\Tracker
+     */
+    private $mainTracker;
+	/**
+     * @var \WordPress\Blueprints\ProgressObserver
+     */
+    private $progressObserver;
+	/**
+     * @var \WordPress\Blueprints\Runtime|null
+     */
+    public $runtime;
 
-	public function __construct( private RunnerConfiguration $configuration ) {
-		$this->validateConfiguration( $configuration );
+	public function __construct( RunnerConfiguration $configuration ) {
+		$this->configuration = $configuration;
+        $this->validateConfiguration( $configuration );
 
 		$this->client = new Client( [
 			/**
@@ -599,7 +634,7 @@ class Runner {
 	 * @return mixed A Step object instance.
 	 * @throws InvalidArgumentException If the step type is unknown or data is invalid.
 	 */
-	private function createStepObject( string $stepType, array $data ): mixed {
+	private function createStepObject( string $stepType, array $data ) {
 		switch ( $stepType ) {
 			case 'activatePlugin':
 				return new ActivatePluginStep( $data['pluginPath'] );
@@ -612,10 +647,7 @@ class Runner {
 			case 'importContent':
 				$content = [];
 				foreach($data['content'] as $item) {
-					$content[] = [
-						...$item,
-						'source' => $this->createDataReference($item['source'], [ExecutionContextPath::class]),
-					];
+					$content[] = array_merge(is_array($item) ? $item : iterator_to_array($item), ['source' => $this->createDataReference($item['source'], [ExecutionContextPath::class])]);
 				}
 				return new ImportContentStep( $content );
 			case 'importThemeStarterContent':
@@ -793,22 +825,23 @@ class Runner {
 					// Compose the plugin source.
 					$pluginCode = sprintf(
 						<<<'PHP'
-						<?php
-						/**
-						 * Blueprint-generated Custom Post Type: %1$s
-						 * This file is auto-generated – do not edit directly.
-						 */
+<?php
+/**
+* Blueprint-generated Custom Post Type: %1$s
+* This file is auto-generated – do not edit directly.
+*/
 
-						add_action(
-							'init',
-							static function () {
-								register_post_type(%1$s, %2$s);
-							},
-							0
-						);
-						PHP,
+add_action(
+'init',
+static function () {
+register_post_type(%1$s, %2$s);
+},
+0
+);
+PHP
+,
 						var_export( $slug, true ),
-						var_export( $args, true ),
+						var_export( $args, true )
 					);
 
 					$files[ $pluginPath ] = $this->createDataReference( [
@@ -831,7 +864,9 @@ class Runner {
 				$inlinePosts = array_values(
 					array_filter(
 						$data['posts'],
-						static fn( $item ) => is_array( $item )
+						static function ($item) {
+                            return is_array( $item );
+                        }
 					)
 				);
 
@@ -841,25 +876,26 @@ class Runner {
 
 				$postsArray = var_export( $inlinePosts, true );
 				$code       = <<<PHP
-				<?php
-				require_once(getenv("DOCROOT") . "/wp-load.php");
+<?php
+require_once(getenv("DOCROOT") . "/wp-load.php");
 
-				// Blueprint Content Import – inline posts.
-				\$__bp_posts = {$postsArray};
+// Blueprint Content Import – inline posts.
+\$__bp_posts = {$postsArray};
 
-				foreach (\$__bp_posts as \$__bp_post) {
-					// Ensure minimum required fields.
-					\$defaults = [
-						'post_type'   => \$__bp_post['post_type']   ?? 'post',
-						'post_status' => \$__bp_post['post_status'] ?? 'publish',
-					];
-					\$postData = array_merge(\$defaults, \$__bp_post);
+foreach (\$__bp_posts as \$__bp_post) {
+\t// Ensure minimum required fields.
+\t\$defaults = [
+\t\t'post_type'   => \$__bp_post['post_type']   ?? 'post',
+\t\t'post_status' => \$__bp_post['post_status'] ?? 'publish',
+\t];
+\t\$postData = array_merge(\$defaults, \$__bp_post);
 
-					// Insert the post. Errors are silently ignored to keep the import moving.
-					wp_insert_post(wp_slash(\$postData));
-				}
-				unset(\$__bp_posts, \$__bp_post, \$postData);
-				PHP;
+\t// Insert the post. Errors are silently ignored to keep the import moving.
+\twp_insert_post(wp_slash(\$postData));
+}
+unset(\$__bp_posts, \$__bp_post, \$postData);
+PHP
+;
 
 				return new RunPHPStep(
 					$this->createDataReference( [
@@ -915,7 +951,10 @@ class Runner {
 		}
 	}
 
-	private function createDataReference( mixed $data, array $additional_reference_classes = [] ): DataReference {
+	/**
+     * @param mixed $data
+     */
+    private function createDataReference( $data, array $additional_reference_classes = [] ): DataReference {
 		$reference = $data instanceof DataReference ? $data : DataReference::create( $data, $additional_reference_classes );
 
 		/**

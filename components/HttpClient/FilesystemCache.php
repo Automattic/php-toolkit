@@ -7,9 +7,12 @@ use WordPress\ByteStream\WriteStream\ByteWriteStream;
 use WordPress\Filesystem\FilesystemException;
 
 final class FilesystemCache implements CacheStorage {
-	private Filesystem $fs;
+	/**
+     * @var \WordPress\Filesystem\Filesystem
+     */
+    private $fs;
 	/** @var array<string, string> Maps URL to temporary body file path during streaming */
-	private array $body_paths = [];
+	private $body_paths = [];
 
 	public function __construct( Filesystem $fs ) {
 		$this->fs  = $fs;
@@ -77,7 +80,10 @@ final class FilesystemCache implements CacheStorage {
 	public function store( CacheEntry $e ) : void {
 		$meta_path = $this->get_meta_path( $e->url );
 
-		$jsonData = json_encode( $e, JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT );
+		$jsonData = json_encode( $e, JSON_PRETTY_PRINT );
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            throw new \Exception(json_last_error_msg());
+        }
 		$this->fs->put_contents( $meta_path, $jsonData );
 	}
 

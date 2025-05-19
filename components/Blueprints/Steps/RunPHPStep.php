@@ -12,12 +12,18 @@ use WordPress\Blueprints\Runtime;
  * Represents the 'runPHP' step.
  */
 class RunPHPStep implements StepInterface {
-	public DataReference $code;
-	public ?string $scriptPath;
+	/**
+     * @var \WordPress\Blueprints\DataReference\DataReference
+     */
+    public $code;
+	/**
+     * @var string|null
+     */
+    public $scriptPath;
 	/** @var array<string, string>|null */
-	public ?array $env;
+	public $env;
 	/** @var array<string, string>|null */
-	public ?array $__SERVER; // Renamed from $__SERVER to avoid PHP superglobal conflict
+	public $__SERVER; // Renamed from $__SERVER to avoid PHP superglobal conflict
 
 	public function __construct( DataReference $code, ?array $env = null ) {
 		$this->code = $code;

@@ -19,7 +19,7 @@ class ImportMediaStep implements StepInterface {
 	 * An associative array of media files to import.
 	 * @var array<string, DataReference|string>
 	 */
-	private array $media;
+	private $media;
 
 	/**
 	 * @param  array<string, DataReference|string>  $media  Media files to import.
@@ -82,7 +82,9 @@ class ImportMediaStep implements StepInterface {
 		}
 
 		$resolved = $runtime->getDataReferenceResolver()->startEagerResolution(
-			array_map( fn( $media ) => $media->source, $medias ),
+			array_map( function ($media) {
+                return $media->source;
+            }, $medias ),
 			$progress['download']
 		);
 
@@ -119,38 +121,39 @@ class ImportMediaStep implements StepInterface {
 				// Add to WordPress media library
 				$attachment_id = $runtime->evalPhpInSubProcess(
 					<<<'CODE'
-                    <?php
-                    require_once(getenv("DOCROOT") . "/wp-load.php");
-                    require_once(getenv("DOCROOT") . "/wp-admin/includes/image.php");
-                    
-                    $file_path = getenv("MEDIA_FILE_PATH");
-                    $attachment_meta = json_decode(getenv("ATTACHMENT_META"), true);
-                    $attachment_data = [
-                        'post_title' => $attachment_meta['title'] ?? preg_replace('/\.[^.]+$/', '', basename($file_path)),
-                        'post_mime_type' => wp_check_filetype(basename($file_path), null)['type'] ?? 'application/octet-stream',
-                        'post_content' => $attachment_meta['description'] ?? '',
-                        'post_status' => 'inherit',
-                        'post_excerpt' => $attachment_meta['caption'] ?? '',
-                        'meta_input' => [
-                            '_wp_attachment_image_alt' => $attachment_meta['alt'] ?? '',
-                        ],
-                    ];                    
-                    $attachment_id = wp_insert_attachment($attachment_data, $file_path);
-                    
-                    if (is_wp_error($attachment_id)) {
-                        echo "0";
-                        exit(1);
-                    }
-                    
-                    // Generate metadata and create thumbnails if needed
-                    $mime_type = $attachment_data['post_mime_type'];
-                    if (strpos($mime_type, 'image/') === 0) {
-                        $attachment_metadata = wp_generate_attachment_metadata($attachment_id, $file_path);
-                        wp_update_attachment_metadata($attachment_id, $attachment_metadata);
-                    }
-                    
-                    echo $attachment_id;
-                    CODE,
+<?php
+require_once(getenv("DOCROOT") . "/wp-load.php");
+require_once(getenv("DOCROOT") . "/wp-admin/includes/image.php");
+
+$file_path = getenv("MEDIA_FILE_PATH");
+$attachment_meta = json_decode(getenv("ATTACHMENT_META"), true);
+$attachment_data = [
+'post_title' => $attachment_meta['title'] ?? preg_replace('/\.[^.]+$/', '', basename($file_path)),
+'post_mime_type' => wp_check_filetype(basename($file_path), null)['type'] ?? 'application/octet-stream',
+'post_content' => $attachment_meta['description'] ?? '',
+'post_status' => 'inherit',
+'post_excerpt' => $attachment_meta['caption'] ?? '',
+'meta_input' => [
+'_wp_attachment_image_alt' => $attachment_meta['alt'] ?? '',
+],
+];                    
+$attachment_id = wp_insert_attachment($attachment_data, $file_path);
+
+if (is_wp_error($attachment_id)) {
+echo "0";
+exit(1);
+}
+
+// Generate metadata and create thumbnails if needed
+$mime_type = $attachment_data['post_mime_type'];
+if (strpos($mime_type, 'image/') === 0) {
+$attachment_metadata = wp_generate_attachment_metadata($attachment_id, $file_path);
+wp_update_attachment_metadata($attachment_id, $attachment_metadata);
+}
+
+echo $attachment_id;
+CODE
+,
 					[
 						'MEDIA_FILE_PATH' => $target_path,
 						'ATTACHMENT_META' => json_encode( [

@@ -18,15 +18,38 @@ use WordPress\HttpClient\Client;
 use function WordPress\Filesystem\wp_join_paths;
 
 class DataReferenceResolver {
-	private array $subTrackers;
-	private array $dataReferences;
-	private array $resolvedDataReferences;
-	private Tracker $dataResolutionTracker;
-	private ?Filesystem $executionContext;
-	private string $tmpRoot;
+	/**
+     * @var \WordPress\HttpClient\Client
+     */
+    private $client;
+    /**
+     * @var mixed[]
+     */
+    private $subTrackers;
+	/**
+     * @var mixed[]
+     */
+    private $dataReferences;
+	/**
+     * @var mixed[]
+     */
+    private $resolvedDataReferences;
+	/**
+     * @var \WordPress\Blueprints\Progress\Tracker
+     */
+    private $dataResolutionTracker;
+	/**
+     * @var \WordPress\Filesystem\Filesystem|null
+     */
+    private $executionContext;
+	/**
+     * @var string
+     */
+    private $tmpRoot;
 	
-	public function __construct(private Client $client, ?string $tmpRoot = null) {
-		$this->tmpRoot = $tmpRoot ?: sys_get_temp_dir();
+	public function __construct(Client $client, ?string $tmpRoot = null) {
+		$this->client = $client;
+        $this->tmpRoot = $tmpRoot ?: sys_get_temp_dir();
 	}
 
 	public function setExecutionContext( Filesystem $executionContext ) {
@@ -46,8 +69,9 @@ class DataReferenceResolver {
 		}
 	}
 
-	/** Core service method shared by runner, target resolvers and steps */
-	public function resolve( DataReference $reference ): File|Directory {
+	/** Core service method shared by runner, target resolvers and steps
+     * @return \WordPress\Blueprints\DataReference\File|\WordPress\Blueprints\DataReference\Directory */
+    public function resolve( DataReference $reference ) {
 		// TODO: Comment this. Make semantics clearer.
 		if ( isset( $this->resolvedDataReferences[ $reference->id ] ) ) {
 			return $this->resolvedDataReferences[ $reference->id ];

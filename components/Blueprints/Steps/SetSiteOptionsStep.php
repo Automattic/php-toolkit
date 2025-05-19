@@ -13,7 +13,7 @@ class SetSiteOptionsStep implements StepInterface {
 	 * An associative array of option names to their JSON-compatible values.
 	 * @var array<string, mixed>
 	 */
-	public array $options;
+	public $options;
 
 	/**
 	 * @param  array<string, mixed>  $options  Site options to set.

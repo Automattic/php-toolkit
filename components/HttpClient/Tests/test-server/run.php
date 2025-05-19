@@ -29,15 +29,30 @@ $server->set_handler(function (IncomingRequest $request, TcpResponseWriteStream 
             $status = (int)basename($path);
             $response->send_http_code($status);
             $response->send_header('Content-Type', 'text/plain');
-            $body = match ($status) {
-                200 => 'OK',
-                204 => '',
-                301, 302 => 'Redirect',
-                400 => 'Bad Request',
-                404 => 'Not Found',
-                500 => 'Internal Server Error',
-                default => 'Status',
-            };
+            switch ($status) {
+                case 200:
+                    $body = 'OK';
+                    break;
+                case 204:
+                    $body = '';
+                    break;
+                case 301:
+                case 302:
+                    $body = 'Redirect';
+                    break;
+                case 400:
+                    $body = 'Bad Request';
+                    break;
+                case 404:
+                    $body = 'Not Found';
+                    break;
+                case 500:
+                    $body = 'Internal Server Error';
+                    break;
+                default:
+                    $body = 'Status';
+                    break;
+            }
             $response->append_bytes($body);
             break;
         case 'encoding':

@@ -18,24 +18,60 @@ use function WordPress\Filesystem\pipe_stream;
 use function WordPress\Filesystem\wp_join_paths;
 
 class EvalResult {
-	public function __construct(
-		public string $outputFileContent,
-		public Process $process
-	) {
-	}
+	/**
+     * @var string
+     */
+    public $outputFileContent;
+    /**
+     * @var \Symfony\Component\Process\Process
+     */
+    public $process;
+    public function __construct(string $outputFileContent, Process $process)
+    {
+        $this->outputFileContent = $outputFileContent;
+        $this->process = $process;
+    }
 }
 
 class Runtime {
-	public function __construct(
-		private Filesystem $targetFs,
-		private RunnerConfiguration $configuration,
-		private DataReferenceResolver $assets,
-		private Client $client,
-		private array $blueprint,
-		private string $tempRoot,
-		private DataReference $wpCliReference
-	) {
-	}
+	/**
+     * @var \WordPress\Filesystem\Filesystem
+     */
+    private $targetFs;
+    /**
+     * @var \WordPress\Blueprints\RunnerConfiguration
+     */
+    private $configuration;
+    /**
+     * @var \WordPress\Blueprints\DataReference\DataReferenceResolver
+     */
+    private $assets;
+    /**
+     * @var \WordPress\HttpClient\Client
+     */
+    private $client;
+    /**
+     * @var mixed[]
+     */
+    private $blueprint;
+    /**
+     * @var string
+     */
+    private $tempRoot;
+    /**
+     * @var \WordPress\Blueprints\DataReference\DataReference
+     */
+    private $wpCliReference;
+    public function __construct(Filesystem $targetFs, RunnerConfiguration $configuration, DataReferenceResolver $assets, Client $client, array $blueprint, string $tempRoot, DataReference $wpCliReference)
+    {
+        $this->targetFs = $targetFs;
+        $this->configuration = $configuration;
+        $this->assets = $assets;
+        $this->client = $client;
+        $this->blueprint = $blueprint;
+        $this->tempRoot = $tempRoot;
+        $this->wpCliReference = $wpCliReference;
+    }
 
 	public function getHttpClient(): Client {
 		return $this->client;
@@ -61,7 +97,10 @@ class Runtime {
 		return $this->assets;
 	}
 
-	public function resolve( DataReference $r ): File|Directory {
+	/**
+     * @return \WordPress\Blueprints\DataReference\File|\WordPress\Blueprints\DataReference\Directory
+     */
+    public function resolve( DataReference $r ) {
 		return $this->assets->resolve( $r );
 	}
 

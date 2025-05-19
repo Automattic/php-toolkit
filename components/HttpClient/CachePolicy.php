@@ -50,7 +50,7 @@ final class CachePolicy {
 	}
 
 	public static function is_fresh( CacheEntry $e, ?int $now = null ) : bool {
-		$now ??= time();
+		$now = $now ?? time();
 		$age_hdr  = (int) ( $e->headers['age'] ?? 0 );
 		$current_age = $age_hdr + ( $now - $e->stored_at );
 		return $current_age < self::freshness_lifetime( $e );
@@ -64,7 +64,7 @@ final class CachePolicy {
 	public static function parse_max_age( string $cc ) : ?int {
 		foreach ( explode( ',', $cc ) as $d ) {
 			$d = trim( $d );
-			if ( str_starts_with( $d, 'max-age=' ) ) return (int) substr( $d, 8 );
+			if ( strncmp($d, 'max-age=', strlen('max-age=')) === 0 ) return (int) substr( $d, 8 );
 		}
 		return null;
 	}

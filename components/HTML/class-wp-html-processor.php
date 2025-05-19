@@ -1170,14 +1170,14 @@ class WP_HTML_Processor extends WP_HTML_Tag_Processor {
 				}
 
 				if ( null !== $doctype->public_identifier ) {
-					$quote = str_contains( $doctype->public_identifier, '"' ) ? "'" : '"';
+					$quote = strpos($doctype->public_identifier, '"') !== false ? "'" : '"';
 					$html .= " PUBLIC {$quote}{$doctype->public_identifier}{$quote}";
 				}
 				if ( null !== $doctype->system_identifier ) {
 					if ( null === $doctype->public_identifier ) {
 						$html .= ' SYSTEM';
 					}
-					$quote = str_contains( $doctype->system_identifier, '"' ) ? "'" : '"';
+					$quote = strpos($doctype->system_identifier, '"') !== false ? "'" : '"';
 					$html .= " {$quote}{$doctype->system_identifier}{$quote}";
 				}
 

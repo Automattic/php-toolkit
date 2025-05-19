@@ -15,9 +15,10 @@ use function WordPress\Filesystem\copy_between_filesystems;
  */
 class SetSiteLanguageStep implements StepInterface {
 	/**
-	 * The language code (e.g., 'en_US', 'de_DE').
-	 */
-	public string $language;
+     * The language code (e.g., 'en_US', 'de_DE').
+     * @var string
+     */
+    public $language;
 
 	/**
 	 * @param  string  $language  The language code.
@@ -217,12 +218,13 @@ class SetSiteLanguageStep implements StepInterface {
 	}
 
 	/**
-	 * Get the translation package URL for a given WordPress version and language.
-	 *
-	 * @param  string  $wpVersion  WordPress version
-	 * @param  string  $language  Language code
-	 */
-	private function getWordPressTranslationUrl( Runtime $runtime, string $wpVersion, string $language, Client $client ): string|false {
+     * Get the translation package URL for a given WordPress version and language.
+     *
+     * @param  string  $wpVersion  WordPress version
+     * @param  string  $language  Language code
+     * @return string|false
+     */
+    private function getWordPressTranslationUrl( Runtime $runtime, string $wpVersion, string $language, Client $client ) {
 		try {
 			$api_url           = "https://api.wordpress.org/translations/core/1.0/?version={$wpVersion}";
 			$translations_data = $client->fetch( $api_url )->json();

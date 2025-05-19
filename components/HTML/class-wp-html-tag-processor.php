@@ -2773,7 +2773,7 @@ class WP_HTML_Tag_Processor {
 
 		$matches = array();
 		foreach ( array_keys( $this->attributes ) as $attr_name ) {
-			if ( str_starts_with( $attr_name, $comparable ) ) {
+			if ( strncmp($attr_name, $comparable, strlen($comparable)) === 0 ) {
 				$matches[] = $attr_name;
 			}
 		}

@@ -182,7 +182,7 @@ class PacketParser {
 		$this->body_chunk         = $chunk;
 
 		if ( $this->packet_bytes_read === $this->expected_length ) {
-			if ( str_ends_with( $this->body_chunk, "\n" ) ) {
+			if ( substr_compare($this->body_chunk, "\n", -strlen("\n")) === 0 ) {
 				$this->body_chunk = substr( $this->body_chunk, 0, - 1 );
 			}
 		}

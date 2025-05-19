@@ -129,20 +129,21 @@ PHP;
 	private function assertWordPressConstants( array $expected_constants ) {
 		$result = $this->runtime->evalPhpInSubProcess(
 			<<<'PHP'
-            <?php
-            // Load WordPress environment
-            require_once getenv('DOCROOT') . '/wp-load.php';
-            
-            // Check if constants are defined
-            $results = [];
-            $constants = json_decode(getenv('CONSTANTS'), true);
-            
-            foreach ($constants as $name => $expected_value) {
-                $results[$name] = defined($name) ? constant($name) : null;
-            }
-            
-            append_output( json_encode($results) );
-            PHP,
+<?php
+// Load WordPress environment
+require_once getenv('DOCROOT') . '/wp-load.php';
+
+// Check if constants are defined
+$results = [];
+$constants = json_decode(getenv('CONSTANTS'), true);
+
+foreach ($constants as $name => $expected_value) {
+$results[$name] = defined($name) ? constant($name) : null;
+}
+
+append_output( json_encode($results) );
+PHP
+,
 			[
 				'CONSTANTS' => json_encode( $expected_constants ),
 			]

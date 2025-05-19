@@ -3,15 +3,39 @@
 namespace WordPress\Blueprints\VersionStrings;
 
 class WordPressVersion implements Version {
-    private string $raw;
-    private int $major;
-    private int $minor;
-    private int $patch;
-    private bool $patchSpecified;
-    private int $stageRank;
-    private int $stageIndex;
+    /**
+     * @var string
+     */
+    private $raw;
+    /**
+     * @var int
+     */
+    private $major;
+    /**
+     * @var int
+     */
+    private $minor;
+    /**
+     * @var int
+     */
+    private $patch;
+    /**
+     * @var bool
+     */
+    private $patchSpecified;
+    /**
+     * @var int
+     */
+    private $stageRank;
+    /**
+     * @var int
+     */
+    private $stageIndex;
 
-    static public function fromString(string $raw): self|false {
+    /**
+     * @return $this|false
+     */
+    static public function fromString(string $raw) {
         $pattern = '/^\s*
             (?P<major>\d+)
             (?:\.(?P<minor>\d+))?

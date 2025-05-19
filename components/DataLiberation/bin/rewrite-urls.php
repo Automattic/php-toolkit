@@ -14,7 +14,7 @@ $command = $argv[1];
 $options = array();
 
 for ( $i = 2; $i < $argc; $i++ ) {
-	if ( str_starts_with( $argv[ $i ], '--' ) && isset( $argv[ $i + 1 ] ) ) {
+	if ( strncmp($argv[ $i ], '--', strlen('--')) === 0 && isset( $argv[ $i + 1 ] ) ) {
 		$options[ substr( $argv[ $i ], 2 ) ] = $argv[ $i + 1 ];
 		++$i;
 	}

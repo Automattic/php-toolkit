@@ -155,7 +155,7 @@ function cliArgsToRunnerConfiguration(array $positionals, array $options): Runne
     // The first positional is the blueprint reference
 	try {
 		$blueprint_reference = $positionals[0];
-		if(str_starts_with($blueprint_reference, './')) {
+		if(strncmp($blueprint_reference, './', strlen('./')) === 0) {
 			$blueprint_reference = realpath($blueprint_reference);
 		}
 		$config->setBlueprint(DataReference::create($blueprint_reference));

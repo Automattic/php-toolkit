@@ -340,7 +340,7 @@ class GitRepository {
 				throw new GitException( 'Branch file not found: ' . $path );
 			}
 			$branch_name = trim( $this->fs->get_contents( $path ) );
-			if ( str_starts_with( $branch_name, 'ref: ' ) && ( $options['follow_symrefs'] ?? true ) ) {
+			if ( strncmp($branch_name, 'ref: ', strlen('ref: ')) === 0 && ( $options['follow_symrefs'] ?? true ) ) {
 				continue;
 			}
 
@@ -350,19 +350,19 @@ class GitRepository {
 
 	private function resolve_branch_file_path( $branch_name ) {
 		$branch_name = trim( $branch_name );
-		if ( str_starts_with( $branch_name, 'ref: ' ) ) {
+		if ( strncmp($branch_name, 'ref: ', strlen('ref: ')) === 0 ) {
 			$branch_name = trim( substr( $branch_name, 5 ) );
 		}
 		if (
-			str_contains( $branch_name, '/' ) &&
-			! str_starts_with( $branch_name, 'refs/heads/' ) &&
-			! str_starts_with( $branch_name, 'refs/remotes/' )
+			strpos($branch_name, '/') !== false &&
+			strncmp($branch_name, 'refs/heads/', strlen('refs/heads/')) !== 0 &&
+			strncmp($branch_name, 'refs/remotes/', strlen('refs/remotes/')) !== 0
 		) {
 			_doing_it_wrong( __METHOD__, 'Invalid ref name: ' . $branch_name, '1.0.0' );
 
 			return false;
 		}
-		if ( str_contains( $branch_name, '../' ) ) {
+		if ( strpos($branch_name, '../') !== false ) {
 			_doing_it_wrong( __METHOD__, 'Invalid ref name: ' . $branch_name, '1.0.0' );
 
 			return false;
@@ -1035,7 +1035,7 @@ class GitRepository {
 		foreach ( $prefixes as $prefix ) {
 			$path       = ltrim( wp_canonicalize_path( $prefix ), '/' );
 			$first_path = $this->fs->is_dir( $path ) ? $path : wp_dirname( $path );
-			if ( str_starts_with( $first_path, 'refs/' ) ) {
+			if ( strncmp($first_path, 'refs/', strlen('refs/')) === 0 ) {
 				$stack[] = $first_path;
 			}
 		}
@@ -1051,7 +1051,7 @@ class GitRepository {
 			} elseif ( $this->fs->is_file( $path ) ) {
 				// Check if path matches any of the prefixes
 				foreach ( $prefixes as $prefix ) {
-					if ( str_starts_with( $path, $prefix ) ) {
+					if ( strncmp($path, $prefix, strlen($prefix)) === 0 ) {
 						$hash = trim( $this->fs->get_contents( $path ) );
 						if ( $hash ) {
 							$ref_name          = trim( $path, '/' );
@@ -1065,7 +1065,7 @@ class GitRepository {
 
 		// Check if we should include HEAD
 		foreach ( $prefixes as $prefix ) {
-			if ( $prefix === '' || str_starts_with( 'HEAD', $prefix ) ) {
+			if ( $prefix === '' || strncmp('HEAD', $prefix, strlen($prefix)) === 0 ) {
 				$refs['HEAD'] = $this->get_branch_tip( 'HEAD' );
 				break;
 			}

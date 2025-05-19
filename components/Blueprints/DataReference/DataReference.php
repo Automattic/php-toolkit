@@ -6,22 +6,21 @@ use Nette\NotImplementedException;
 
 class DataReference {
 
-	public int $id;
-	private static int $instanceCounter = 0;
+	/**
+     * @var int
+     */
+    public $id;
+	/**
+     * @var int
+     */
+    private static $instanceCounter = 0;
 
 	public function __construct() {
 		$this->id = self::$instanceCounter ++;
 	}
 
 	static public function create( $reference, array $additional_reference_classes = [] ) {
-		$classes = array(
-			URLReference::class,
-			GitPath::class,
-			InlineDirectory::class,
-			InlineFile::class,
-			ExecutionContextPath::class,
-			...$additional_reference_classes,
-		);
+		$classes = array_merge([URLReference::class, GitPath::class, InlineDirectory::class, InlineFile::class, ExecutionContextPath::class], $additional_reference_classes);
 		foreach ( $classes as $class ) {
 			if ( $class::is_valid( $reference ) ) {
 				if ( method_exists( $class, 'from_blueprint_data' ) ) {

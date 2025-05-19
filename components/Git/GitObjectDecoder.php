@@ -11,17 +11,29 @@ use WordPress\Git\Protocol\Parser\TreeParser;
 
 class GitObjectDecoder extends BaseByteReadStream {
 
-    private ?string $object_header         = null;
-    private ?string $object_type_name      = null;
-    private ?int    $uncompressed_length   = null;
-    private int     $header_length         = 0; // Uncompressed header length (in bytes, incl. trailing NUL)
+    /**
+     * @var string|null
+     */
+    private $object_header;
+    /**
+     * @var string|null
+     */
+    private $object_type_name;
+    /**
+     * @var int|null
+     */
+    private $uncompressed_length;
+    /**
+     * @var int
+     */
+    private $header_length         = 0; // Uncompressed header length (in bytes, incl. trailing NUL)
+    /** Decompressed view of the full object (header+body).
+     * @var \WordPress\ByteStream\ReadStream\InflateReadStream */
+    private $inflated_reader;
 
-
-    /** Decompressed view of the full object (header+body). */
-    private InflateReadStream $inflated_reader;
-
-    /** Points to the body inside $inflated_reader; seek(0) == body start. */
-    private ByteReadStream $body_source;
+    /** Points to the body inside $inflated_reader; seek(0) == body start.
+     * @var \WordPress\ByteStream\ReadStream\ByteReadStream */
+    private $body_source;
 
     public function __construct( ByteReadStream $upstream ) {
         $this->inflated_reader = new InflateReadStream( $upstream );

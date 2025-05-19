@@ -19,24 +19,28 @@ use function WordPress\Zip\is_zip_file_stream;
  */
 class InstallThemeStep implements StepInterface {
 	/**
-	 * Theme source identifier (slug, slug@version, URL, ./path, /path).
-	 */
-	public DataReference $source;
+     * Theme source identifier (slug, slug@version, URL, ./path, /path).
+     * @var \WordPress\Blueprints\DataReference\DataReference
+     */
+    public $source;
 
 	/**
-	 * Whether to activate the theme after installing it. Defaults to false.
-	 */
-	public bool $activate;
+     * Whether to activate the theme after installing it. Defaults to false.
+     * @var bool
+     */
+    public $activate;
 
 	/**
-	 * Whether to import the theme's starter content after installing it. Defaults to false.
-	 */
-	public bool $importStarterContent;
+     * Whether to import the theme's starter content after installing it. Defaults to false.
+     * @var bool
+     */
+    public $importStarterContent;
 
 	/**
-	 * Optional target folder name. Defaults based on source.
-	 */
-	public ?string $targetFolderName;
+     * Optional target folder name. Defaults based on source.
+     * @var string|null
+     */
+    public $targetFolderName;
 
 	/**
 	 * @param  DataReference  $source  Theme source identifier.

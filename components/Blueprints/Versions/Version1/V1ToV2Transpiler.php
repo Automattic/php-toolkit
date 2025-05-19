@@ -15,7 +15,10 @@ use function WordPress\Filesystem\wp_join_paths;
  */
 class V1ToV2Transpiler {
 
-	private LoggerInterface $logger;
+	/**
+     * @var \Psr\Log\LoggerInterface
+     */
+    private $logger;
 
 	static public function validate_v1_blueprint(array $v1): ?ValidationError {
 		$v = new HumanFriendlySchemaValidator(
@@ -311,21 +314,22 @@ class V1ToV2Transpiler {
 							'code' => [
 								"filename" => "script.php",
 								"content" => <<<'PHP'
-								<?php
-								require getenv('DOCROOT') . '/wp-load.php';
+<?php
+require getenv('DOCROOT') . '/wp-load.php';
 
-								$GLOBALS['@pdo']->query('DELETE FROM wp_posts WHERE id > 0');
-								$GLOBALS['@pdo']->query("UPDATE SQLITE_SEQUENCE SET SEQ=0 WHERE NAME='wp_posts'");
+$GLOBALS['@pdo']->query('DELETE FROM wp_posts WHERE id > 0');
+$GLOBALS['@pdo']->query("UPDATE SQLITE_SEQUENCE SET SEQ=0 WHERE NAME='wp_posts'");
 
-								$GLOBALS['@pdo']->query('DELETE FROM wp_postmeta WHERE post_id > 1');
-								$GLOBALS['@pdo']->query("UPDATE SQLITE_SEQUENCE SET SEQ=20 WHERE NAME='wp_postmeta'");
+$GLOBALS['@pdo']->query('DELETE FROM wp_postmeta WHERE post_id > 1');
+$GLOBALS['@pdo']->query("UPDATE SQLITE_SEQUENCE SET SEQ=20 WHERE NAME='wp_postmeta'");
 
-								$GLOBALS['@pdo']->query('DELETE FROM wp_comments');
-								$GLOBALS['@pdo']->query("UPDATE SQLITE_SEQUENCE SET SEQ=0 WHERE NAME='wp_comments'");
+$GLOBALS['@pdo']->query('DELETE FROM wp_comments');
+$GLOBALS['@pdo']->query("UPDATE SQLITE_SEQUENCE SET SEQ=0 WHERE NAME='wp_comments'");
 
-								$GLOBALS['@pdo']->query('DELETE FROM wp_commentmeta');
-								$GLOBALS['@pdo']->query("UPDATE SQLITE_SEQUENCE SET SEQ=0 WHERE NAME='wp_commentmeta'");
-								PHP
+$GLOBALS['@pdo']->query('DELETE FROM wp_commentmeta');
+$GLOBALS['@pdo']->query("UPDATE SQLITE_SEQUENCE SET SEQ=0 WHERE NAME='wp_commentmeta'");
+PHP
+
 							]
 						];
 						break;
@@ -411,14 +415,15 @@ class V1ToV2Transpiler {
 							'code' => [
 								"filename" => "script.php",
 								"content" => <<<'PHP'
-								<?php
-								include getenv("DOCROOT") . '/wp-load.php';
-								$meta = json_decode(getenv("META"), true);
-								foreach($meta as $name => $value) {
-									update_user_meta(getenv("USER_ID"), $name, $value);
-								}
-								?>
-								PHP
+<?php
+include getenv("DOCROOT") . '/wp-load.php';
+$meta = json_decode(getenv("META"), true);
+foreach($meta as $name => $value) {
+update_user_meta(getenv("USER_ID"), $name, $value);
+}
+?>
+PHP
+
 							],
 							'env' => [
 								'USER_ID' => $v1step['userId']."",
@@ -508,7 +513,7 @@ class V1ToV2Transpiler {
 					// BundledReference – must start with
 					// ./ or /
 					$path = $resource['path'];
-					if(!str_starts_with($path, './') && !str_starts_with($path, '/')) {
+					if(strncmp($path, './', strlen('./')) !== 0 && strncmp($path, '/', strlen('/')) !== 0) {
 						$path = './'.$path;
 					}
 					return $path;
@@ -533,7 +538,7 @@ class V1ToV2Transpiler {
 
 	protected static function translatePath($path) {
 		// V1 Blueprint paths are absolute
-		if(str_starts_with($path, '/wordpress/')) {
+		if(strncmp($path, '/wordpress/', strlen('/wordpress/')) === 0) {
 			return substr($path, strlen('/wordpress/'));
 		}
 		return $path;
@@ -545,7 +550,7 @@ class V1ToV2Transpiler {
 		foreach ($tokens as $token) {
 			if (is_array($token)) {
 				[$id, $text] = $token;
-				if ($id === T_CONSTANT_ENCAPSED_STRING && str_starts_with(trim($text, '\'"'), '/wordpress/')) {
+				if ($id === T_CONSTANT_ENCAPSED_STRING && strncmp(trim($text, '\'"'), '/wordpress/', strlen('/wordpress/')) === 0) {
 					$convertedCode .= 'getenv(\'DOCROOT\') . ' . var_export(substr(trim($text, '\'"'), strlen('/wordpress/')), true);
 				} else {
 					$convertedCode .= $text;

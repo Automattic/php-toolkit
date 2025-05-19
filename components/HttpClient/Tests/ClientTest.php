@@ -26,7 +26,7 @@ class ClientTest extends TestCase {
 			$attempts = 0;
 			while ($server->isRunning()) {
 				$output = $server->getIncrementalOutput();
-				if (str_starts_with($output, 'Server started on http://')) {
+				if (strncmp($output, 'Server started on http://', strlen('Server started on http://')) === 0) {
 					break;
 				}
 				usleep(40000);

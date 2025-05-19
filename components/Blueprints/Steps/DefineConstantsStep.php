@@ -13,7 +13,7 @@ class DefineConstantsStep implements StepInterface {
 	 * An associative array of constant names to their values (string, bool, int, float).
 	 * @var array<string, scalar>
 	 */
-	public array $constants;
+	public $constants;
 
 	/**
 	 * @param  array<string, scalar>  $constants  Constants to define.

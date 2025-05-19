@@ -17,7 +17,7 @@ class WriteFilesStep implements StepInterface {
 	 * An associative array where keys are file paths and values are their contents.
 	 * @var array<string, DataReference>
 	 */
-	public array $files;
+	public $files;
 
 	/**
 	 * @param  array<string, string|DataReference>  $files  Files to write (path => content).

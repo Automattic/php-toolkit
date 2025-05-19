@@ -527,7 +527,7 @@ class FilesystemEntityReader implements EntityReader {
 			array(
 				'post_id' => $post_id,
 			),
-			$options,
+			$options
 		);
 		++$this->fs_nodes_emited_so_far;
 		return $post_id;

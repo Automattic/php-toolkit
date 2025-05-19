@@ -166,7 +166,7 @@ class Tracker implements \ArrayAccess {
 		if ($this->splitPerformed) {
 			throw new LogicException('stage() is not allowed after split().');
 		}
-		$weight ??= $this->selfWeight;
+		$weight = $weight ?? $this->selfWeight;
 		return $this->createSubTracker(count($this->subTrackers), $weight, $caption);
 	}
 
@@ -179,12 +179,16 @@ class Tracker implements \ArrayAccess {
 
 	public function offsetGet($offset): Tracker {
 		if (\is_string($offset)) {
-			return $this->subTrackers[$offset]
-				?? throw new OutOfBoundsException("Unknown tracker slug '$offset'.");
-		}
+            if (!isset($this->subTrackers[$offset])) {
+                throw new OutOfBoundsException("Unknown tracker slug '$offset'.");
+            }
+            return $this->subTrackers[$offset];
+        }
 		$list = \array_values($this->subTrackers);
-		return $list[$offset]
-			?? throw new OutOfBoundsException("No sub-tracker at index $offset.");
+        if (!isset($list[$offset])) {
+            throw new OutOfBoundsException("No sub-tracker at index $offset.");
+        }
+        return $list[$offset];
 	}
 
 	public function offsetSet($o,$v):void { throw new LogicException('read-only'); }

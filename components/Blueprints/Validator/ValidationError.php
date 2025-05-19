@@ -7,19 +7,40 @@ namespace WordPress\Blueprints\Validator;
  */
 class ValidationError {
     /**
+     * @var string
+     */
+    public $pointer;
+    /**
+     * @var string
+     */
+    public $code;
+    /**
+     * @var string
+     */
+    public $message;
+    /**
+     * @var array
+     */
+    public $context = [];
+    /**
+     * @var ValidationError[]
+     */
+    public $children = [];
+    /**
      * @param string $pointer JSON Pointer like /steps/0/data/url
      * @param string $code short, stable key: required, type-mismatch …
      * @param string $message human sentence
      * @param array $context expected/actual/allowed, always associative
      * @param ValidationError[] $children nested causes
      */
-    public function __construct(
-        public string  $pointer,
-        public string  $code,
-        public string  $message,
-        public array   $context = [],
-        public array   $children = []
-    ) {}
+    public function __construct(string  $pointer, string  $code, string  $message, array   $context = [], array   $children = [])
+    {
+        $this->pointer = $pointer;
+        $this->code = $code;
+        $this->message = $message;
+        $this->context = $context;
+        $this->children = $children;
+    }
 
 	public function getPath(): array {
 		$path_string = substr($this->pointer, 2);
