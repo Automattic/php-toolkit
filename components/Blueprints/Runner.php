@@ -533,14 +533,14 @@ class Runner {
 				if ( is_string( $themeRef ) ) {
 					$plan[] = $this->createStepObject( 'installTheme', [
 						'source'               => $themeRef,
-						'activate'             => false,
+						'active'               => false,
 						'importStarterContent' => false,
 					] );
 				} elseif ( is_array( $themeRef ) && isset( $themeRef['source'] ) && is_string( $themeRef['source'] ) ) {
 					// Pass through the raw definition for extensibility.
 					$plan[] = $this->createStepObject( 'installTheme', [
 						'source'               => $themeRef['source'],
-						'activate'             => $themeRef['activate'] ?? false,
+						'active'               => $themeRef['active'] ?? false,
 						'importStarterContent' => $themeRef['importStarterContent'] ?? false,
 						'targetDirectoryName'  => $themeRef['targetDirectoryName'] ?? null,
 					] );
@@ -556,13 +556,13 @@ class Runner {
 			if ( is_string( $themeRef ) ) {
 				$plan[] = $this->createStepObject( 'installTheme', [
 					'source'               => $themeRef,
-					'activate'             => true,
+					'active'               => true,
 					'importStarterContent' => false,
 				] );
 			} elseif ( is_array( $themeRef ) && isset( $themeRef['source'] ) && is_string( $themeRef['source'] ) ) {
 				$plan[] = $this->createStepObject( 'installTheme', [
 					'source'               => $themeRef['source'],
-					'activate'             => true,
+					'active'               => true,
 					'importStarterContent' => $themeRef['importStarterContent'] ?? false,
 					'targetDirectoryName'  => $themeRef['targetDirectoryName'] ?? null,
 				] );
@@ -718,7 +718,7 @@ class Runner {
 
 				return new InstallThemeStep(
 					$source,
-					$data['activate'] ?? false,
+					$data['active'] ?? false,
 					$data['importStarterContent'] ?? false,
 					$data['targetDirectoryName'] ?? null
 				);

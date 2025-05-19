@@ -26,10 +26,10 @@ class InstallThemeStep implements StepInterface {
 	public $source;
 
 	/**
-	 * Whether to activate the theme after installing it. Defaults to false.
+	 * Whether to active the theme after installing it. Defaults to false.
 	 * @var bool
 	 */
-	public $activate;
+	public $active;
 
 	/**
 	 * Whether to import the theme's starter content after installing it. Defaults to false.
@@ -45,18 +45,18 @@ class InstallThemeStep implements StepInterface {
 
 	/**
 	 * @param  DataReference  $source  Theme source identifier.
-	 * @param  bool  $activate  Activate after install?
+	 * @param  bool  $active  active after install?
 	 * @param  bool  $importStarterContent  Import starter content?
 	 * @param  string|null  $targetFolderName  Optional target folder name.
 	 */
 	public function __construct(
 		DataReference $source,
-		bool $activate = false,
+		bool $active = false,
 		bool $importStarterContent = false,
 		?string $targetFolderName = null
 	) {
 		$this->source               = $source;
-		$this->activate             = $activate;
+		$this->active               = $active;
 		$this->importStarterContent = $importStarterContent;
 		$this->targetFolderName     = $targetFolderName;
 	}
@@ -100,7 +100,7 @@ class InstallThemeStep implements StepInterface {
 				);
 			}
 
-			if ( $this->activate ) {
+			if ( $this->active ) {
 				$tracker->set( 75, 'Activating theme ' . $theme_folder_name );
 				$runtime->evalPhpFileInSubProcess(
 					wp_join_paths( __DIR__, 'scripts/ActivateTheme/wp_activate_theme.php' ),
