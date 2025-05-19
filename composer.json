@@ -1,5 +1,5 @@
 {
-    "name": "wordpress/php-libraries",
+    "name": "wordpress/components",
     "type": "library",
     "description": "WordPress Components",
     "keywords": [
@@ -14,21 +14,25 @@
             "email": "adam@adamziel.com"
         },
         {
-            "name": "WordPress Team",
-            "email": "wordpress@wordpress.org"
+            "name": "Automattic Contributors"
         }
     ],
     "require": {
         "php": ">=7.2",
         "ext-json": "*",
-        "psr/log": "3.x-dev"
+        "psr/log": "3.x-dev",
+        "yetanotherape/diff-match-patch": "^1.0",
+        "wordpress/data-liberation": "*",
+        "ext-mbstring": "*"
     },
     "require-dev": {
         "yoast/phpunit-polyfills": "2.0.0",
-        "squizlabs/php_codesniffer": "3.10.0",
+        "squizlabs/php_codesniffer": "^3.6",
         "phpcompatibility/php-compatibility": "10.x-dev",
-        "wp-coding-standards/wpcs": "^3.0",
-        "rector/rector": "dev-main"
+        "wp-coding-standards/wpcs": "^2.3",
+        "rector/rector": "dev-main",
+        "phpunit/phpunit": "^9.5",
+        "phpstan/phpstan": "^1.0"
     },
     "autoload": {
         "exclude-from-classmap": [
@@ -39,32 +43,24 @@
         "classmap": [
             "components/DataLiberation/vendor-patched/",
             "components/Markdown/vendor-patched",
-            "components/Merge/vendor-patched",
-            "components/HTML/./",
-            "components/BlockParser/"
+            "components/HTML/./"
         ],
         "files": [
             "components/DataLiberation/URL/functions.php",
             "components/Encoding/utf8_decoder.php",
             "components/Filesystem/functions.php",
-            "components/Polyfill/php_functions.php",
+            "components/Zip/src/functions.php",
             "components/Polyfill/wordpress.php",
             "components/Polyfill/mbstring.php",
-            "components/Git/functions.php",
-            "components/Merge/functions.php",
-            "components/Zip/functions.php"
+            "components/Git/functions.php"
         ],
         "psr-4": {
             "WordPress\\DataLiberation\\": "components/DataLiberation/",
-            "WordPress\\Blueprints\\": "components/Blueprints/",
             "Rowbot\\": "components/DataLiberation/vendor-patched/",
             "Brick\\": "components/DataLiberation/vendor-patched/",
             "WordPress\\HttpClient\\": "components/HttpClient/",
-            "WordPress\\": "components/Blueprints/src/WordPress",
-            "Psr\\Container\\": "components/Blueprints/src/psr/container",
-            "Psr\\SimpleCache\\": "components/Blueprints/src/psr/simple-cache",
-            "Symfony\\Component\\Process\\": "components/Blueprints/vendor-patched/symfony/process",
-            "Symfony\\Component\\EventDispatcher\\": "components/Blueprints/vendor-patched/symfony/event-dispatcher",
+            "WordPress\\Merge\\": "components/Merge/",
+            "WordPress\\BlockParser\\": "components/BlockParser/",
             "WordPress\\Markdown\\": "components/Markdown/",
             "WordPress\\Filesystem\\": "components/Filesystem/",
             "WordPress\\XML\\": "components/XML/",
@@ -72,8 +68,7 @@
             "WordPress\\Zip\\": "components/Zip/",
             "WordPress\\HttpServer\\": "components/HttpServer/",
             "WordPress\\CORSProxy\\": "components/CORSProxy/",
-            "WordPress\\Git\\": "components/Git/",
-            "WordPress\\Merge\\": "components/Merge/"
+            "WordPress\\Git\\": "components/Git/"
         }
     },
     "scripts": {
@@ -93,11 +88,5 @@
             }
         }
     ],
-    "minimum-stability": "dev",
-    "config": {
-        "allow-plugins": {
-            "wikimedia/composer-merge-plugin": false,
-            "dealerdirect/phpcodesniffer-composer-installer": true
-        }
-    }
+    "minimum-stability": "dev"
 }

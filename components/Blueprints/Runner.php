@@ -113,11 +113,11 @@ class Runner {
 			 * Store cached HTTP responses in a temporary directory with a stable path
 			 * to reuse across multiple runs.
 			 */
-			'cache' => new FilesystemCache(
-				LocalFilesystem::create(
-					sys_get_temp_dir() . '/wp-blueprints'
-				)
-			),
+			// 'cache' => new FilesystemCache(
+			// 	LocalFilesystem::create(
+			// 		sys_get_temp_dir() . '/wp-blueprints'
+			// 	)
+			// ),
 		] );
 		$this->mainTracker = new Tracker();
 
@@ -390,7 +390,7 @@ class Runner {
 				if ( ! $parsed_version ) {
 					throw new BlueprintExecutionException( 'Invalid PHP version string in phpVersion: ' . $php_version );
 				}
-				$min = $max = $recommended = $parsed_version;
+				$recommended = $parsed_version;
 			} else {
 				if ( isset( $php_version['min'] ) ) {
 					$min = PHPVersion::fromString( $php_version['min'] );
@@ -433,10 +433,10 @@ class Runner {
 		// WordPress Version Constraint
 		if ( isset( $this->blueprintArray['wordpressVersion'] ) ) {
 			$wp_version = $this->blueprintArray['wordpressVersion'];
-			$min        = $max = $recommended = null;
+			$recommended = null;
 			if ( is_string( $wp_version ) ) {
-				$min = $max = $recommended = WordPressVersion::fromString( $wp_version );
-				if ( ! $min ) {
+				$recommended = WordPressVersion::fromString( $wp_version );
+				if ( ! $recommended ) {
 					throw new BlueprintExecutionException( 'Invalid WordPress version string in wordpressVersion: ' . $wp_version );
 				}
 			} else {

@@ -153,6 +153,7 @@ PHP
 		$recommended = $constraint->getRecommended();
 
 		$version_string = $recommended ?? $max ?? $min;
+		$version_string = $version_string->__toString();
 
 		if ( $version_string === 'latest' ) {
 			return 'https://wordpress.org/latest.zip';
@@ -171,7 +172,8 @@ PHP
 
 		// @TODO Support version numbers like 6.5.1 that don't show up in the default API response.
 		//       Use query params for filtering somehow?
-		$latestVersions = $client->fetch( 'https://api.wordpress.org/core/version-check/1.7/?channel=beta' )->json();
+		$latestVersions = $client->fetch( 'https://api.wordpress.org/core/version-check/1.7/?channel=beta&version=' . $version_string )->json();
+
 		$latestVersions = array_filter( $latestVersions['offers'], function ( $v ) {
 			return $v['response'] === 'autoupdate';
 		} );
@@ -190,9 +192,18 @@ PHP
 				$version_string
 			) {
 				return $apiVersion['download'];
+			} elseif (
+				preg_match( '/^\d+\.\d+$/', $version_string ) &&
+				$version_string === $apiVersion['partial_version']
+			) {
+				// When the Blueprint provides a version like 6.6, we must match on the partial
+				// version, e.g. "6.6"
+				return $apiVersion['download'];
 			}
 		}
 
-		throw new Exception( 'Invalid WordPress version constraint' );
+		throw new BlueprintExecutionException(
+			sprintf( 'Invalid WordPress version constraint: %s', $version_string )
+		);
 	}
 }

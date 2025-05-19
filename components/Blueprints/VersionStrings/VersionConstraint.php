@@ -45,8 +45,8 @@ class VersionConstraint {
 	public function validate(): array {
 		$errors = [];
 		if ( $this->min !== null && $this->max !== null ) {
-			if ( ! $this->min->is( '<', $this->max ) ) {
-				$errors[] = sprintf( 'min (%s) is not smaller than max (%s)', $this->min, $this->max );
+			if ( $this->min->is( '>', $this->max ) ) {
+				$errors[] = sprintf( 'min (%s) is greater than max (%s)', $this->min, $this->max );
 			}
 		}
 		if ( $this->recommended !== null ) {

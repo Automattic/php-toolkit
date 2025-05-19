@@ -337,11 +337,22 @@ class Process implements IteratorAggregate {
 			$ptsWorkaround = fopen( __FILE__, 'r' );
 		}
 
-		$this->process = proc_open( is_array( is_array( $commandline ) ? implode( ' ',
-			array_map( 'escapeshellarg', $commandline ) ) : $commandline )
-			? implode( ' ', array_map( 'escapeshellarg', is_array( $commandline ) ? implode( ' ',
-				array_map( 'escapeshellarg', $commandline ) ) : $commandline ) )
-			: is_array( $commandline ) ? implode( ' ', array_map( 'escapeshellarg', $commandline ) ) : $commandline, $descriptors,
+		$this->process = proc_open(
+			is_array(
+				is_array( $commandline )
+					? implode( ' ', array_map( 'escapeshellarg', $commandline ) )
+					: $commandline
+			)
+				? implode( ' ', array_map(
+					'escapeshellarg',
+					is_array( $commandline )
+						? implode( ' ', array_map( 'escapeshellarg', $commandline ) )
+						: $commandline )
+				)
+				: (is_array( $commandline )
+					? implode( ' ', array_map( 'escapeshellarg', $commandline ) )
+					: $commandline),
+			$descriptors,
 			$this->processPipes->pipes, $this->cwd, $env, $this->options );
 
 		foreach ( $envBackup as $k => $v ) {
