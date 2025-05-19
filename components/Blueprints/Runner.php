@@ -904,54 +904,6 @@ PHP
 
 				return new WriteFilesStep( $files );
 
-			case 'importPosts':
-				if ( empty( $data['posts'] ) || ! is_array( $data['posts'] ) ) {
-					throw new InvalidArgumentException( 'Invalid posts data: must be a non-empty array.' );
-				}
-
-				$inlinePosts = array_values(
-					array_filter(
-						$data['posts'],
-						static function ( $item ) {
-							return is_array( $item );
-						}
-					)
-				);
-
-				if ( empty( $inlinePosts ) ) {
-					throw new InvalidArgumentException( 'No inline posts to import.' );
-				}
-
-				$postsArray = var_export( $inlinePosts, true );
-				$code       = <<<PHP
-<?php
-require_once(getenv("DOCROOT") . "/wp-load.php");
-
-// Blueprint Content Import – inline posts.
-\$__bp_posts = {$postsArray};
-
-foreach (\$__bp_posts as \$__bp_post) {
-\t// Ensure minimum required fields.
-\t\$defaults = [
-\t\t'post_type'   => \$__bp_post['post_type']   ?? 'post',
-\t\t'post_status' => \$__bp_post['post_status'] ?? 'publish',
-\t];
-\t\$postData = array_merge(\$defaults, \$__bp_post);
-
-\t// Insert the post. Errors are silently ignored to keep the import moving.
-\twp_insert_post(wp_slash(\$postData));
-}
-unset(\$__bp_posts, \$__bp_post, \$postData);
-PHP;
-
-				return new RunPHPStep(
-					$this->createDataReference( [
-						'filename' => 'import-posts.php',
-						'content'  => $code,
-					] ),
-					[ 'POSTS' => $data['posts'] ]
-				);
-
 			case 'runPHP':
 				return new RunPHPStep(
 					$this->createDataReference( [
