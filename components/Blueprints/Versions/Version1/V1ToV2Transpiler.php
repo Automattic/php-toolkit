@@ -28,28 +28,23 @@ class V1ToV2Transpiler {
 		// For every steps[] entry with step === "installPlugin" and "pluginZipFile", remove that key and rewrite it as "pluginData"
 		if (isset($v1['steps']) && is_array($v1['steps'])) {
 			foreach ($v1['steps'] as &$step) {
-				if (
-					is_array($step)
-					&& isset($step['step'])
-					&& $step['step'] === 'installPlugin'
-					&& array_key_exists('pluginZipFile', $step)
-				) {
+				if(!is_array($step) || !isset($step['step'])) {
+					continue;
+				}
+				if ($step['step'] === 'installPlugin' && array_key_exists('pluginZipFile', $step)) {
 					// If pluginData is not already set, move pluginZipFile to pluginData
 					if (!array_key_exists('pluginData', $step)) {
 						$step['pluginData'] = $step['pluginZipFile'];
 					}
 					unset($step['pluginZipFile']);
-				} else if (
-					is_array($step)
-					&& isset($step['step'])
-					&& $step['step'] === 'installTheme'
-					&& array_key_exists('themeZipFile', $step)
-				) {
+				} else if ($step['step'] === 'installTheme' && array_key_exists('themeZipFile', $step)) {
 					// If themeData is not already set, move themeZipFile to themeData
 					if (!array_key_exists('themeData', $step)) {
 						$step['themeData'] = $step['themeZipFile'];
 					}
 					unset($step['themeZipFile']);
+				} else if($step['step'] === 'importFile') {
+					$step['step'] = 'importWxr';
 				}
 			}
 			unset($step); // break reference
@@ -105,7 +100,7 @@ class V1ToV2Transpiler {
 			if ( isset( $versions['wp'] ) && $versions['wp'] !== 'latest' ) {
 				$v2['wordpressVersion'] = $versions['wp'];
 			}
-			if ( isset( $versions['php'] ) ) {
+			if ( isset( $versions['php'] ) && $versions['php'] !== 'latest' ) {
 				$v2['phpVersion'] = $versions['php'];
 			}
 		}
@@ -207,8 +202,8 @@ class V1ToV2Transpiler {
 							$this->logger->warning( 'The `virtualize` option is not supported on defineWpConfigConsts step and will be ignored: %s. This option is deprecated and will be removed in a future version.' );
 						}
 						$v2steps[] = [
-							'step'      => 'defineWpConfigConsts',
-							'constants' => $v1step['constants'],
+							'step'      => 'defineConstants',
+							'constants' => $v1step['consts'],
 						];
 						break;
 					case 'defineSiteUrl':
@@ -617,10 +612,9 @@ PHP
 	}
 
 	protected static function convertPhpCode( $code ) {
-		$had_php_tag = false;
-		if(substr($code, 0, 6) !== '<?php ') {
+		$had_php_tag = substr($code, 0, 5) === '<?php';
+		if(!$had_php_tag) {
 			$code = '<?php ' . $code;
-			$had_php_tag = true;
 		}
 		$tokens        = token_get_all( $code );
 		$convertedCode = '';
@@ -658,8 +652,8 @@ PHP
 			}
 		}
 		$convertedCode = trim($convertedCode);
-		if(!$had_php_tag && substr($convertedCode, 0, 6) === '<?php ') {
-			$convertedCode = substr( $convertedCode, 6 ); // Remove the initial '<?php ' added for tokenization
+		if(!$had_php_tag && substr($convertedCode, 0, 5) === '<?php') {
+			$convertedCode = substr( $convertedCode, 5); // Remove the initial '<?php' added for tokenization
 		}
 		return $convertedCode;
 	}

@@ -136,13 +136,7 @@ export type Blueprint = {
 	 *
 	 * @see https://github.com/WordPress/blueprints-library/issues/118
 	 */
-	constants?: Record<string, boolean | string | number> &
-		Partial<{
-			WP_DEBUG: boolean;
-			WP_DEBUG_LOG: boolean;
-			WP_DEBUG_DISPLAY: boolean;
-			SCRIPT_DEBUG: boolean;
-		}>;
+	constants?: WordPressConstants;
 
 	/**
 	 * WordPress version to install.
@@ -545,7 +539,7 @@ type PluginDefinition =
 	| PluginObjectDefinition;
 
 // Separated from PluginDefinition to avoid duplicate step entries in the generated JSON schema
-type PluginObjectDefinition ={
+type PluginObjectDefinition = {
 	source: DataReference | PluginDirectoryReference;
 
 	/**
@@ -652,41 +646,41 @@ type PluginObjectDefinition ={
 type ThemeDefinition =
 	| ThemeDirectoryReference
 	| DataReference
-	| ThemeObjectDefinition
+	| ThemeObjectDefinition;
 
 // Separated from ThemeDefinition to avoid duplicate step entries in the generated JSON schema
 type ThemeObjectDefinition = {
-		source: ThemeDirectoryReference | DataReference;
-		/**
-		 * Whether to import the theme's starter content after installing it.
-		 */
-		importStarterContent?: boolean;
-		/**
-		 * An explicit directory name within wp-content/themes to install the theme at.
-		 * If not provided, it will be inferred from the theme source.
-		 */
-		targetDirectoryName?: string;
-		/**
-		 * Human-readable name of the theme for the progress bar.
-		 *
-		 * For example, with the following Blueprint:
-		 *
-		 * ```json
-		 * {
-		 *     "themes": [
-		 *         {
-		 *             "source": "https://github.com/Automattic/adventurer/archive/refs/heads/beta.zip",
-		 *             "humanReadableName": "Adventurer"
-		 *         }
-		 *     ]
-		 * }
-		 * ```
-		 *
-		 * The progress bar will show "Installing Adventurer theme" instead of
-		 * "Installing https://github.com/Automattic/adventurer/archive/refs/heads/beta.zip".
-		 */
-		humanReadableName?: string;
-	};
+	source: ThemeDirectoryReference | DataReference;
+	/**
+	 * Whether to import the theme's starter content after installing it.
+	 */
+	importStarterContent?: boolean;
+	/**
+	 * An explicit directory name within wp-content/themes to install the theme at.
+	 * If not provided, it will be inferred from the theme source.
+	 */
+	targetDirectoryName?: string;
+	/**
+	 * Human-readable name of the theme for the progress bar.
+	 *
+	 * For example, with the following Blueprint:
+	 *
+	 * ```json
+	 * {
+	 *     "themes": [
+	 *         {
+	 *             "source": "https://github.com/Automattic/adventurer/archive/refs/heads/beta.zip",
+	 *             "humanReadableName": "Adventurer"
+	 *         }
+	 *     ]
+	 * }
+	 * ```
+	 *
+	 * The progress bar will show "Installing Adventurer theme" instead of
+	 * "Installing https://github.com/Automattic/adventurer/archive/refs/heads/beta.zip".
+	 */
+	humanReadableName?: string;
+};
 
 type RemoteUsername = 'string';
 type LocalUsername = 'string';
@@ -1442,9 +1436,17 @@ type CpStep = {
 	toPath: string;
 };
 
+type WordPressConstants = Record<string, boolean | string | number> &
+	Partial<{
+		WP_DEBUG: boolean;
+		WP_DEBUG_LOG: boolean;
+		WP_DEBUG_DISPLAY: boolean;
+		SCRIPT_DEBUG: boolean;
+	}>;
+
 type DefineConstantsStep = {
 	step: 'defineConstants';
-	constants: Record<string, string>;
+	constants: WordPressConstants;
 };
 
 type ImportContentStep = {
@@ -1562,7 +1564,7 @@ type ThemeStep = {
 	 * This is not a part of the theme definition. Only the step
 	 * can explicitly provide this option. The default value is `true`.
 	 */
-	activate?: boolean;
+	active?: boolean;
 } & ThemeObjectDefinition;
 
 type Step =

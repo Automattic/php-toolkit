@@ -35,9 +35,24 @@ class WordPressVersion implements Version {
 	private $stageIndex;
 
 	/**
-	 * @return $this|false
+	 * Parses a WordPress version string.
+	 * 
+	 * Return values:
+	 * 
+	 * * WordPressVersion
+	 * * false – invalid version string
+	 * * null – non-comparable version strings like beta, trunk, etc.
+	 * 
+	 * @return $this|false|null
 	 */
 	static public function fromString( string $raw ) {
+		if(in_array($raw, ['beta','trunk'], true)) {
+			return null;
+		}
+		if(substr($raw, 0, 8) === 'https://') {
+			return null;
+		}
+
 		$pattern = '/^\s*
             (?P<major>\d+)
             (?:\.(?P<minor>\d+))?

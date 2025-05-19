@@ -16,7 +16,7 @@ use function WordPress\Filesystem\copy_between_filesystems;
 use function WordPress\Filesystem\wp_join_paths;
 
 class NewSiteResolver {
-	static public function resolve( Runtime $runtime, Tracker $progress, ?VersionConstraint $wpVersionConstraint = null ) {
+	static public function resolve( Runtime $runtime, Tracker $progress, ?VersionConstraint $wpVersionConstraint = null, ?string $recommendedWpVersion = 'latest' ) {
 		$progress->split( [
 			'resolve_assets'    => 2,
 			'install_wordpress' => 1,
@@ -29,7 +29,7 @@ class NewSiteResolver {
 		}
 
 		// Unzip WordPress core into document root
-		$wpZip = self::resolveWordPressZipUrl( $runtime->getHttpClient(), $wpVersionConstraint );
+		$wpZip = self::resolveWordPressZipUrl( $runtime->getHttpClient(), $recommendedWpVersion );
 
 		$assets = [
 			'wordpress' => DataReference::create( $wpZip ),
@@ -143,18 +143,7 @@ PHP
 		$progress->finish();
 	}
 
-	static private function resolveWordPressZipUrl( Client $client, ?VersionConstraint $constraint ): string {
-		if ( $constraint === null ) {
-			return 'https://wordpress.org/latest.zip';
-		}
-
-		$min         = $constraint->getMin();
-		$max         = $constraint->getMax();
-		$recommended = $constraint->getRecommended();
-
-		$version = $recommended ?? $max ?? $min;
-		$version_string = $version ? $version->__toString() : 'latest';
-
+	static private function resolveWordPressZipUrl( Client $client, string $version_string ): string {
 		if ( $version_string === 'latest' ) {
 			return 'https://wordpress.org/latest.zip';
 		}
@@ -170,9 +159,7 @@ PHP
 			return 'https://wordpress.org/nightly-builds/wordpress-latest.zip';
 		}
 
-		// @TODO Support version numbers like 6.5.1 that don't show up in the default API response.
-		//       Use query params for filtering somehow?
-		$latestVersions = $client->fetch( 'https://api.wordpress.org/core/version-check/1.7/?channel=beta&version=' . $version_string )->json();
+		$latestVersions = $client->fetch( 'https://api.wordpress.org/core/version-check/1.7/?channel=beta' )->json();
 
 		$latestVersions = array_filter( $latestVersions['offers'], function ( $v ) {
 			return $v['response'] === 'autoupdate';
@@ -200,6 +187,15 @@ PHP
 				// version, e.g. "6.6"
 				return $apiVersion['download'];
 			}
+		}
+
+		/**
+		 * If we didn't get a useful match in the API response, it could be version that's not
+		 * the latest in its channel. Let's assume that if the versioning scheme seems to fit
+		 * that hypothesis.
+		 */
+		if(preg_match('/^\d+\.\d+\.\d+$/', $version_string)) {
+			return 'https://downloads.wordpress.org/release/wordpress-' . $version_string . '.zip';
 		}
 
 		throw new BlueprintExecutionException(

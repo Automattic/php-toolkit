@@ -92,6 +92,10 @@ class Runner {
 	 */
 	private $wpVersionConstraint;
 	/**
+	 * @var string
+	 */
+	private $recommendedWpVersion = 'latest';
+	/**
 	 * @var Tracker
 	 */
 	private $mainTracker;
@@ -245,7 +249,7 @@ class Runner {
 			if ( $this->configuration->getExecutionMode() === 'apply-to-existing-site' ) {
 				ExistingSiteResolver::resolve( $this->runtime, $progress['targetResolution'], $this->wpVersionConstraint );
 			} else {
-				NewSiteResolver::resolve( $this->runtime, $progress['targetResolution'], $this->wpVersionConstraint );
+				NewSiteResolver::resolve( $this->runtime, $progress['targetResolution'], $this->wpVersionConstraint, $this->recommendedWpVersion );
 			}
 			$progress['targetResolution']->finish();
 
@@ -435,12 +439,10 @@ class Runner {
 			$wp_version = $this->blueprintArray['wordpressVersion'];
 			$recommended = null;
 			if ( is_string( $wp_version ) ) {
-				// @TODO: How to handle beta versions?
-				if('beta' !== $wp_version) {
-					$recommended = WordPressVersion::fromString( $wp_version );
-					if ( ! $recommended ) {
-						throw new BlueprintExecutionException( 'Invalid WordPress version string in wordpressVersion: ' . $wp_version );
-					}
+				$this->recommendedWpVersion = $wp_version;
+				$recommended = WordPressVersion::fromString( $wp_version );
+				if ( false === $recommended ) {
+					throw new BlueprintExecutionException( 'Invalid WordPress version string in wordpressVersion: ' . $wp_version );
 				}
 			} else {
 				if ( isset( $wp_version['min'] ) ) {
@@ -459,14 +461,16 @@ class Runner {
 				// existing sites and VersionConstraint doesn't support it. It doesn't have
 				// enough information anyway – the meaning of "latest" changes over time.
 				if ( isset( $wp_version['max'] ) && $wp_version['max'] !== 'latest' ) {
+					$this->recommendedWpVersion = $wp_version['max'];
 					$max = WordPressVersion::fromString( $wp_version['max'] );
 					if ( ! $max ) {
 						throw new BlueprintExecutionException( 'Invalid WordPress version string in wordpressVersion.max: ' . $wp_version['max'] );
 					}
 				}
 				if ( isset( $wp_version['recommended'] ) && $wp_version['recommended'] !== 'latest' ) {
+					$this->recommendedWpVersion = $wp_version['recommended'];
 					$recommended = WordPressVersion::fromString( $wp_version['recommended'] );
-					if ( ! $recommended ) {
+					if ( false === $recommended ) {
 						throw new BlueprintExecutionException( 'Invalid WordPress version string in wordpressVersion.recommended: ' . $wp_version['recommended'] );
 					}
 				}

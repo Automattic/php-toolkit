@@ -314,13 +314,13 @@
                         {
                           "type": "array",
                           "items": {
-                            "$ref": "#/definitions/alias-1068919986-42690-42787-1068919986-0-42788"
+                            "$ref": "#/definitions/alias-1068919986-42696-42793-1068919986-0-42794"
                           }
                         },
                         {
                           "type": "object",
                           "additionalProperties": {
-                            "$ref": "#/definitions/alias-1068919986-42690-42787-1068919986-0-42788"
+                            "$ref": "#/definitions/alias-1068919986-42696-42793-1068919986-0-42794"
                           }
                         }
                       ]
@@ -747,13 +747,13 @@
                               {
                                 "type": "array",
                                 "items": {
-                                  "$ref": "#/definitions/alias-1068919986-42690-42787-1068919986-0-42788"
+                                  "$ref": "#/definitions/alias-1068919986-42696-42793-1068919986-0-42794"
                                 }
                               },
                               {
                                 "type": "object",
                                 "additionalProperties": {
-                                  "$ref": "#/definitions/alias-1068919986-42690-42787-1068919986-0-42788"
+                                  "$ref": "#/definitions/alias-1068919986-42696-42793-1068919986-0-42794"
                                 }
                               }
                             ]
@@ -1190,13 +1190,13 @@
                                 {
                                   "type": "array",
                                   "items": {
-                                    "$ref": "#/definitions/alias-1068919986-42690-42787-1068919986-0-42788"
+                                    "$ref": "#/definitions/alias-1068919986-42696-42793-1068919986-0-42794"
                                   }
                                 },
                                 {
                                   "type": "object",
                                   "additionalProperties": {
-                                    "$ref": "#/definitions/alias-1068919986-42690-42787-1068919986-0-42788"
+                                    "$ref": "#/definitions/alias-1068919986-42696-42793-1068919986-0-42794"
                                   }
                                 }
                               ]
@@ -1333,13 +1333,13 @@
                                   {
                                     "type": "array",
                                     "items": {
-                                      "$ref": "#/definitions/alias-1068919986-42690-42787-1068919986-0-42788"
+                                      "$ref": "#/definitions/alias-1068919986-42696-42793-1068919986-0-42794"
                                     }
                                   },
                                   {
                                     "type": "object",
                                     "additionalProperties": {
-                                      "$ref": "#/definitions/alias-1068919986-42690-42787-1068919986-0-42788"
+                                      "$ref": "#/definitions/alias-1068919986-42696-42793-1068919986-0-42794"
                                     }
                                   }
                                 ]
@@ -1589,7 +1589,25 @@
                   "constants": {
                     "type": "object",
                     "additionalProperties": {
-                      "type": "string"
+                      "type": [
+                        "boolean",
+                        "string",
+                        "number"
+                      ]
+                    },
+                    "properties": {
+                      "WP_DEBUG": {
+                        "type": "boolean"
+                      },
+                      "WP_DEBUG_LOG": {
+                        "type": "boolean"
+                      },
+                      "WP_DEBUG_DISPLAY": {
+                        "type": "boolean"
+                      },
+                      "SCRIPT_DEBUG": {
+                        "type": "boolean"
+                      }
                     }
                   }
                 },
@@ -1804,13 +1822,13 @@
                                           {
                                             "type": "array",
                                             "items": {
-                                              "$ref": "#/definitions/alias-1068919986-42690-42787-1068919986-0-42788"
+                                              "$ref": "#/definitions/alias-1068919986-42696-42793-1068919986-0-42794"
                                             }
                                           },
                                           {
                                             "type": "object",
                                             "additionalProperties": {
-                                              "$ref": "#/definitions/alias-1068919986-42690-42787-1068919986-0-42788"
+                                              "$ref": "#/definitions/alias-1068919986-42696-42793-1068919986-0-42794"
                                             }
                                           }
                                         ]
@@ -1947,13 +1965,13 @@
                                             {
                                               "type": "array",
                                               "items": {
-                                                "$ref": "#/definitions/alias-1068919986-42690-42787-1068919986-0-42788"
+                                                "$ref": "#/definitions/alias-1068919986-42696-42793-1068919986-0-42794"
                                               }
                                             },
                                             {
                                               "type": "object",
                                               "additionalProperties": {
-                                                "$ref": "#/definitions/alias-1068919986-42690-42787-1068919986-0-42788"
+                                                "$ref": "#/definitions/alias-1068919986-42696-42793-1068919986-0-42794"
                                               }
                                             }
                                           ]
@@ -2178,13 +2196,13 @@
                         {
                           "type": "array",
                           "items": {
-                            "$ref": "#/definitions/alias-1068919986-42690-42787-1068919986-0-42788"
+                            "$ref": "#/definitions/alias-1068919986-42696-42793-1068919986-0-42794"
                           }
                         },
                         {
                           "type": "object",
                           "additionalProperties": {
-                            "$ref": "#/definitions/alias-1068919986-42690-42787-1068919986-0-42788"
+                            "$ref": "#/definitions/alias-1068919986-42696-42793-1068919986-0-42794"
                           }
                         }
                       ]
@@ -2248,7 +2266,7 @@
                     "type": "string",
                     "const": "installTheme"
                   },
-                  "activate": {
+                  "active": {
                     "type": "boolean",
                     "description": "Whether to activate the theme after installing it.\n\nThis is not a part of the theme definition. Only the step can explicitly provide this option. The default value is `true`."
                   }
@@ -2414,13 +2432,13 @@
                         {
                           "type": "array",
                           "items": {
-                            "$ref": "#/definitions/alias-1068919986-42690-42787-1068919986-0-42788"
+                            "$ref": "#/definitions/alias-1068919986-42696-42793-1068919986-0-42794"
                           }
                         },
                         {
                           "type": "object",
                           "additionalProperties": {
-                            "$ref": "#/definitions/alias-1068919986-42690-42787-1068919986-0-42788"
+                            "$ref": "#/definitions/alias-1068919986-42696-42793-1068919986-0-42794"
                           }
                         }
                       ]
@@ -2648,7 +2666,7 @@
       ],
       "description": "Plugin directory reference, e.g. \"jetpack\", \"jetpack@6.4\", or \"akismet@6.4.3\".\n\nThese refer to a specific plugin slugs in the WordPress.org plugin repository.\n\nFor example, a reference to \"wordpress-seo\" means the Yoast SEO plugin as seen on https://wordpress.org/plugins/wordpress-seo/.\n\nThe Plugin Directory Reference are only meaningful in:\n\n* The top-level `plugins` array\n* The `installPlugin` imperative step"
     },
-    "alias-1068919986-42690-42787-1068919986-0-42788": {
+    "alias-1068919986-42696-42793-1068919986-0-42794": {
       "anyOf": [
         {
           "type": "string"
@@ -2662,13 +2680,13 @@
         {
           "type": "array",
           "items": {
-            "$ref": "#/definitions/alias-1068919986-42690-42787-1068919986-0-42788"
+            "$ref": "#/definitions/alias-1068919986-42696-42793-1068919986-0-42794"
           }
         },
         {
           "type": "object",
           "additionalProperties": {
-            "$ref": "#/definitions/alias-1068919986-42690-42787-1068919986-0-42788"
+            "$ref": "#/definitions/alias-1068919986-42696-42793-1068919986-0-42794"
           }
         }
       ]
