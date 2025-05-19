@@ -334,6 +334,10 @@ try {
 	echo PHP_EOL . PHP_EOL;
 	if(!$ex->schemaError) {
 		echo sprintf("\033[31mError:\033[0m %s\n", $ex->getMessage());
+		while($ex->getPrevious()) {
+			$ex = $ex->getPrevious();
+			echo sprintf("\033[31mCaused by:\033[0m %s\n", $ex->getMessage());
+		}
 		exit(1);
 	}
 

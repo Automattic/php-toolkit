@@ -2,6 +2,7 @@
 
 namespace WordPress\Blueprints\DataReference;
 
+use WordPress\Blueprints\Exception\DataResolutionException;
 use WordPress\Blueprints\Progress\ProgressTrackedReadStream;
 use WordPress\Blueprints\Progress\Tracker;
 use WordPress\ByteStream\MemoryPipe;
@@ -96,7 +97,7 @@ class DataReferenceResolver {
 		} elseif ( $reference instanceof ExecutionContextPath ) {
 			$path = $reference->get_path();
 			if ( ! $this->executionContext->exists( $path ) ) {
-				throw new \RuntimeException( 'File not found: ' . $path );
+				throw new DataResolutionException( 'File not found: ' . $path );
 			}
 			if ( $this->executionContext->is_file( $path ) ) {
 				$stream         = $this->executionContext->open_read_stream( $path );
@@ -112,7 +113,7 @@ class DataReferenceResolver {
 					basename( $path )
 				);
 			} else {
-				throw new \RuntimeException( 'Path is not a file or directory: ' . $path );
+				throw new DataResolutionException( 'Path is not a file or directory: ' . $path );
 			}
 		// TODO: Lovely name.
 		} elseif ( $reference instanceof InlineFile ) {
@@ -156,6 +157,6 @@ class DataReferenceResolver {
 			);
 		}
 
-		throw new \Exception( 'Unsupported reference type ' . get_class( $reference ) );
+		throw new DataResolutionException( 'Unsupported reference type ' . get_class( $reference ) );
 	}
 }

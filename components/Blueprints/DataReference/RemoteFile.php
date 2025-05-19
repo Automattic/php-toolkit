@@ -2,7 +2,7 @@
 
 namespace WordPress\Blueprints\DataReference;
 
-use WordPress\Blueprints\Exception\BlueprintExecutionException;
+use WordPress\Blueprints\Exception\DataResolutionException;
 use WordPress\ByteStream\ReadStream\ByteReadStream;
 
 /**
@@ -15,7 +15,7 @@ class RemoteFile extends File {
  		// @TODO: Only accept streams with await_response() and get_url() methods.
 		$response = $this->stream->await_response();
 		if(!$response->ok()) {
-			throw new BlueprintExecutionException(
+			throw new DataResolutionException(
 				sprintf(
 					'Failed to load the URL from %s. Server responded with %d %s.',
 					$response->request->url,

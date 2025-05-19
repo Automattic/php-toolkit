@@ -7,8 +7,8 @@ use WordPress\Blueprints\Validator\ValidationError;
 class BlueprintExecutionException extends \Exception {
 	public ?ValidationError $schemaError;
 
-	public function __construct( string $message, ?ValidationError $schemaError = null, ?\Throwable $previous = null ) {
-		parent::__construct( $message, 0, $previous );
+	public function __construct( string $message, $code = 0, ?\Throwable $previous = null, ?ValidationError $schemaError = null ) {
+		parent::__construct( $message, $code, $previous );
 		$this->schemaError = $schemaError;
 	}
 }

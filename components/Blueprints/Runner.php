@@ -319,7 +319,7 @@ class Runner {
 		if( !isset($this->blueprintArray['version']) ) {
 			$error = V1ToV2Transpiler::validate_v1_blueprint($this->blueprintArray);
 			if($error) {
-				throw new BlueprintExecutionException('Invalid Blueprint v1 provided.', $error);
+				throw new BlueprintExecutionException('Invalid Blueprint v1 provided.', 0, null, $error);
 			}
 			$this->configuration->getLogger()->debug('Blueprint v1 detected. Transpiling to v2...');
 
@@ -335,7 +335,7 @@ class Runner {
 		);
 		$error = $v->validate( $this->blueprintArray );
 		if ( $error ) {
-			throw new BlueprintExecutionException( 'Blueprint does not conform to the schema.', $error );
+			throw new BlueprintExecutionException( 'Blueprint does not conform to the schema.', 0, null, $error );
 		}
 
 		// PHP Version Constraint
@@ -954,20 +954,27 @@ class Runner {
 				}
 			} catch ( \Exception $e ) {
 				$results[ $i ] = $e;
+				// Determine if we should continue or stop execution
+				$continueOnError = $this->continueOnError ?? false;
+				if ( ! $continueOnError ) {
+					// @TODO: Correlate this message with the original Blueprint,
+					//        as in – was the step created because of "installPlugin" or not?
+					//  	  Which entry of it? etc.
+					throw new BlueprintExecutionException(
+						sprintf( "Error when executing step #d %s (#%d in the execution plan)",
+							get_class( $step ),
+							$i + 1
+						),
+						0,
+						$e
+					);
+				}
+
 				$stepTracker->setCaption( sprintf( "%s (FAILED: %s)",
 					$stepTracker->getCaption(),
 					$e->getMessage()
 				) );
-
-				// Mark as done but not 100% to indicate error
-				$stepTracker->set( 99.9 );
 				$stepTracker->finish();
-
-				// Determine if we should continue or stop execution
-				$continueOnError = $this->continueOnError ?? false;
-				if ( ! $continueOnError ) {
-					throw $e;
-				}
 			}
 		}
 
