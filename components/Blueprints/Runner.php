@@ -435,9 +435,12 @@ class Runner {
 			$wp_version = $this->blueprintArray['wordpressVersion'];
 			$recommended = null;
 			if ( is_string( $wp_version ) ) {
-				$recommended = WordPressVersion::fromString( $wp_version );
-				if ( ! $recommended ) {
-					throw new BlueprintExecutionException( 'Invalid WordPress version string in wordpressVersion: ' . $wp_version );
+				// @TODO: How to handle beta versions?
+				if('beta' !== $wp_version) {
+					$recommended = WordPressVersion::fromString( $wp_version );
+					if ( ! $recommended ) {
+						throw new BlueprintExecutionException( 'Invalid WordPress version string in wordpressVersion: ' . $wp_version );
+					}
 				}
 			} else {
 				if ( isset( $wp_version['min'] ) ) {

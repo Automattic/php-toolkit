@@ -3,6 +3,7 @@
  * blueprint.php – the main entry point to the WordPress Blueprint Runner CLI.
  *
  * @TODO: Get the tests to pass
+ * @TODO: Support "wordPressVersion": "beta"
  * @TODO: Support commands: "exec", "validate", "to-execution-plan" etc. See the Blueprints v2 spec for more commands ideas.
  * @TODO: Add a verbose mode
  * @TODO: A large test suite.

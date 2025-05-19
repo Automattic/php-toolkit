@@ -72,7 +72,7 @@ class V1ToV2Transpiler {
 		// Map preferredVersions
 		if ( isset( $v1['preferredVersions'] ) ) {
 			$versions = $v1['preferredVersions'];
-			if ( isset( $versions['wp'] ) ) {
+			if ( isset( $versions['wp'] ) && $versions['wp'] !== 'latest' ) {
 				$v2['wordpressVersion'] = $versions['wp'];
 			}
 			if ( isset( $versions['php'] ) ) {
@@ -449,7 +449,9 @@ PHP
 								$path => is_string( $v1step['data'] )
 									? [
 										'filename' => basename( $path ),
-										'content'  => $v1step['data'],
+										'content'  => str_ends_with($path, '.php') 
+											? self::convertPhpCode($v1step['data']) 
+											: $v1step['data'],
 									]
 									: self::convertV1ResourceToV2Reference(
 										$v1step['data']
@@ -476,7 +478,9 @@ PHP
 								$v2step['files'][ $joined_path ] = is_string( $data )
 								? [
 									'filename' => basename( $path ),
-									'content'  => $data,
+									'content'  => str_ends_with($path, '.php') 
+										? self::convertPhpCode($data) 
+										: $data,
 								]
 								: self::convertV1ResourceToV2Reference(
 									$data
@@ -571,32 +575,59 @@ PHP
 		if ( strncmp( $path, '/wordpress/', strlen( '/wordpress/' ) ) === 0 ) {
 			return substr( $path, strlen( '/wordpress/' ) );
 		}
+		if ( strncmp( $path, 'wordpress/', strlen( 'wordpress/' ) ) === 0 ) {
+			return substr( $path, strlen( 'wordpress/' ) );
+		}
 
 		return $path;
 	}
 
 	protected static function convertPhpCode( $code ) {
-		$tokens        = token_get_all( '<?php ' . $code );
+		$had_php_tag = false;
+		if(substr($code, 0, 6) !== '<?php ') {
+			$code = '<?php ' . $code;
+			$had_php_tag = true;
+		}
+		$tokens        = token_get_all( $code );
 		$convertedCode = '';
 		foreach ( $tokens as $token ) {
-			if ( is_array( $token ) ) {
-				[ $id, $text ] = $token;
-				if ( $id === T_CONSTANT_ENCAPSED_STRING && strncmp( trim( $text, '\'"' ), '/wordpress/', strlen( '/wordpress/' ) ) === 0 ) {
-					$convertedCode .= 'getenv(\'DOCROOT\') . ' . var_export( substr( trim( $text, '\'"' ), strlen( '/wordpress/' ) ),
-							true );
-				} else if ( $id === T_CONSTANT_ENCAPSED_STRING && strncmp( trim( $text, '\'"' ), 'wordpress/', strlen( 'wordpress/' ) ) === 0 ) {
-					$convertedCode .= 'getenv(\'DOCROOT\') . ' . var_export( substr( trim( $text, '\'"' ), strlen( 'wordpress/' ) ),
-							true );
-				} else {
-					$convertedCode .= $text;
-				}
-			} else {
+			if ( !is_array( $token ) ) {
 				$convertedCode .= $token;
 			}
+			[ $id, $text ] = $token;
+			switch ( $id ) {
+				case T_CONSTANT_ENCAPSED_STRING:
+					// Support both single and double quoted strings
+					$quote = $text[0];
+					$unquoted = substr($text, 1, -1);
+					if (
+						(
+							($quote === "'" || $quote === '"')
+							&& strncmp($unquoted, '/wordpress/', strlen('/wordpress/')) === 0
+						)
+					) {
+						$convertedCode .= 'getenv(\'DOCROOT\') . ' . var_export(substr($unquoted, strlen('/wordpress')), true);
+					} else if (
+						(
+							($quote === "'" || $quote === '"')
+							&& strncmp($unquoted, 'wordpress/', strlen('wordpress/')) === 0
+						)
+					) {
+						$convertedCode .= 'getenv(\'DOCROOT\') . ' . var_export(substr($unquoted, strlen('wordpress')), true);
+					} else {
+						$convertedCode .= $text;
+					}
+					break;
+				default:
+					$convertedCode .= $text;
+					break;
+			}
 		}
-		$code = substr( $convertedCode, 6 ); // Remove the initial '<?php ' added for tokenization
-
-		return $code;
+		$convertedCode = trim($convertedCode);
+		if(!$had_php_tag && substr($convertedCode, 0, 6) === '<?php ') {
+			$convertedCode = substr( $convertedCode, 6 ); // Remove the initial '<?php ' added for tokenization
+		}
+		return $convertedCode;
 	}
 
 

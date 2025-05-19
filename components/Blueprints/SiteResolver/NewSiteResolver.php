@@ -152,8 +152,8 @@ PHP
 		$max         = $constraint->getMax();
 		$recommended = $constraint->getRecommended();
 
-		$version_string = $recommended ?? $max ?? $min;
-		$version_string = $version_string->__toString();
+		$version = $recommended ?? $max ?? $min;
+		$version_string = $version ? $version->__toString() : 'latest';
 
 		if ( $version_string === 'latest' ) {
 			return 'https://wordpress.org/latest.zip';
