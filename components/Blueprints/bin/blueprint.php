@@ -65,7 +65,6 @@ $optionDefs           = [
 	'db-name'                     => [ null, true, 'wordpress', 'MySQL database' ],
 	'db-path'                     => [ 'p', true, 'wp.db', 'SQLite file path' ],
 	'truncate-new-site-directory' => [ 't', false, false, 'Delete target directory if it exists before execution' ],
-	'dry-run'                     => [ null, false, false, "Don't change anything, just validate" ],
 	'allow'                       => [ null, true, null, 'Allowed permissions. One of: ' . implode( ', ', $supportedPermissions ) ],
 	'help'                        => [ 'h', false, false, 'Show full help' ],
 	'version'                     => [ 'V', false, false, 'Show version' ],
@@ -326,7 +325,7 @@ try {
 			exit( 0 );
 		}
 		if ( $options['version'] ) {
-			echo "WordPress Blueprint Runner CLI v1.2.0\n";
+			echo "WordPress Blueprint Runner CLI v0.0.1-alpha\n";
 			exit( 0 );
 		}
 
@@ -338,11 +337,6 @@ try {
 
 		// Convert CLI arguments to RunnerConfiguration
 		$config = cliArgsToRunnerConfiguration( $positionals, $options );
-
-		if ( $options['dry-run'] ) {
-			echo "\033[32mArguments valid – dry‑run mode, exiting without changes.\033[0m\n";
-			exit( 0 );
-		}
 		$config
 			->setProgressObserver( new ProgressObserver( function ( $progress, $caption ) {
 				reportProgress( $progress, $caption );
