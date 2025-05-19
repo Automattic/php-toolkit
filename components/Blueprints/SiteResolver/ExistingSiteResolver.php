@@ -6,9 +6,10 @@ use WordPress\Blueprints\Exception\BlueprintExecutionException;
 use WordPress\Blueprints\Progress\Tracker;
 use WordPress\Blueprints\Runtime;
 use WordPress\Blueprints\VersionStrings\VersionConstraint;
+use WordPress\Blueprints\VersionStrings\WordPressVersion;
 
 class ExistingSiteResolver {
-	static public function resolve( Runtime $runtime, Tracker $progress ) {
+	static public function resolve( Runtime $runtime, Tracker $progress, ?VersionConstraint $wpVersionConstraint = null ) {
 		$progress->split([
 			'verify_installation' => 3,
 			'check_compatibility' => 3,
@@ -52,23 +53,25 @@ class ExistingSiteResolver {
 
 		// 2. Check WordPress version compatibility
 		$progress['check_compatibility']->setCaption( 'Checking WordPress version compatibility' );
-		if ( isset( $blueprint['wordpressVersion'] ) ) {
-			$wpVersionConstraint = VersionConstraint::fromMixed( $blueprint['wordpressVersion'] );
-
+		if ( $wpVersionConstraint ) {
 			// Get current WordPress version
-			$currentWordPressVersion = $runtime->evalPhpInSubProcess(
-				'<?php
-				require_once(getenv("DOCROOT") . "/wp-includes/version.php");
-				append_output( $wp_version );
-				'
-			)->outputFileContent;
+			$currentWordPressVersion = WordPressVersion::fromString(
+				trim(
+					$runtime->evalPhpInSubProcess(
+						'<?php
+						require_once(getenv("DOCROOT") . "/wp-includes/version.php");
+						append_output( $wp_version );
+						'
+					)->outputFileContent
+				)
+			);
 
-			if ( ! $wpVersionConstraint->satisfiedBy( trim( $currentWordPressVersion ) ) ) {
+			if ( ! $wpVersionConstraint->satisfiedBy( $currentWordPressVersion ) ) {
 				throw new BlueprintExecutionException(
 					sprintf(
 						'WordPress version incompatible. Blueprint requires %s, but the site has version %s',
 						$wpVersionConstraint->__toString(),
-						trim( $currentWordPressVersion )
+						$currentWordPressVersion->__toString()
 					)
 				);
 			}

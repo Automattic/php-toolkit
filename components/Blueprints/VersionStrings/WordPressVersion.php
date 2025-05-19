@@ -3,6 +3,7 @@
 namespace WordPress\Blueprints\VersionStrings;
 
 class WordPressVersion implements Version {
+    private string $raw;
     private int $major;
     private int $minor;
     private int $patch;
@@ -34,6 +35,7 @@ class WordPressVersion implements Version {
         ];
 
         return new self(
+			$raw,
             (int) $m['major'],
             (int) ($m['minor'] ?? 0),
             (int) ($m['patch'] ?? 0),
@@ -43,7 +45,8 @@ class WordPressVersion implements Version {
         );
     }
 
-    private function __construct($major, $minor, $patch, $patchSpecified, $stageRank, $stageIndex) {
+    private function __construct($raw, $major, $minor, $patch, $patchSpecified, $stageRank, $stageIndex) {
+        $this->raw = $raw;
         $this->major = $major;
         $this->minor = $minor;
         $this->patch = $patch;
@@ -94,7 +97,7 @@ class WordPressVersion implements Version {
 	}
 
     public function __toString(): string {
-        return "{$this->major}.{$this->minor}.{$this->patch}";
+        return $this->raw;
     }
 
 }

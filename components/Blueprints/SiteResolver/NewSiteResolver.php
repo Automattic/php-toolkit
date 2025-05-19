@@ -15,13 +15,11 @@ use function WordPress\Filesystem\copy_between_filesystems;
 use function WordPress\Filesystem\wp_join_paths;
 
 class NewSiteResolver {
-	static public function resolve( Runtime $runtime, Tracker $progress ) {
+	static public function resolve( Runtime $runtime, Tracker $progress, ?VersionConstraint $wpVersionConstraint = null ) {
 		$progress->split([
 			'resolve_assets'    => 2,
 			'install_wordpress' => 1,
 		]);
-
-		$blueprint = $runtime->getBlueprint();
 
 		// Ensure document root directory exists (LocalFilesystem::create creates it)
 		$targetFs = $runtime->getTargetFilesystem();
@@ -30,10 +28,6 @@ class NewSiteResolver {
 		}
 
 		// Unzip WordPress core into document root
-		$wpVersionConstraint = isset( $blueprint['wordpressVersion'] )
-			? VersionConstraint::fromMixed( $blueprint['wordpressVersion'] )
-			: null;
-
 		$wpZip = self::resolveWordPressZipUrl( $runtime->getHttpClient(), $wpVersionConstraint );
 
 		$assets = [

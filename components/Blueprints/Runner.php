@@ -9,10 +9,11 @@ use WordPress\Blueprints\DataReference\Directory;
 use WordPress\Blueprints\DataReference\ExecutionContextPath;
 use WordPress\Blueprints\DataReference\File;
 use WordPress\Blueprints\DataReference\InlineFile;
-use WordPress\Blueprints\DataReference\URLReference;
 use WordPress\Blueprints\DataReference\WordPressOrgPlugin;
 use WordPress\Blueprints\DataReference\WordPressOrgTheme;
+use WordPress\Blueprints\DataReference\URLReference;
 use WordPress\Blueprints\Exception\BlueprintExecutionException;
+use WordPress\Blueprints\Exception\PermissionsException;
 use WordPress\Blueprints\Progress\Tracker;
 use WordPress\Blueprints\SiteResolver\ExistingSiteResolver;
 use WordPress\Blueprints\SiteResolver\NewSiteResolver;
@@ -32,7 +33,6 @@ use WordPress\Blueprints\Steps\RmDirStep;
 use WordPress\Blueprints\Steps\RmStep;
 use WordPress\Blueprints\Steps\RunPHPStep;
 use WordPress\Blueprints\Steps\RunSqlStep;
-use WordPress\Blueprints\Steps\RuntimeException;
 use WordPress\Blueprints\Steps\SetSiteLanguageStep;
 use WordPress\Blueprints\Steps\SetSiteOptionsStep;
 use WordPress\Blueprints\Steps\UnzipStep;
@@ -62,8 +62,8 @@ class Runner {
 	private Filesystem $blueprintExecutionContext;
 	private array $blueprintArray;
 	private array $dataReferences = [];
-	private ?VersionConstraint $phpVersionConstraint;
-	private ?VersionConstraint $wpVersionConstraint;
+	private ?VersionConstraint $phpVersionConstraint = null;
+	private ?VersionConstraint $wpVersionConstraint = null;
 	private Tracker $mainTracker;
 	private ProgressObserver $progressObserver;
 	public ?Runtime $runtime;
@@ -174,6 +174,9 @@ class Runner {
 			$this->loadBlueprint();
 			$this->validateBlueprint();
 			$this->assets->setExecutionContext( $this->blueprintExecutionContext );
+			// Create the execution plan early on to surface any errors before
+			// making the user wait for any downloads or site resolution.
+			$plan = $this->createExecutionPlan();
 			$progress['blueprint']->finish();
 
 			$progress['targetResolution']->setCaption('Resolving target site');
@@ -196,14 +199,13 @@ class Runner {
 
 			$progress['targetResolution']->setCaption('Resolving target site');
 			if ( $this->configuration->getExecutionMode() === 'apply-to-existing-site' ) {
-				ExistingSiteResolver::resolve( $this->runtime, $progress['targetResolution'] );
+				ExistingSiteResolver::resolve( $this->runtime, $progress['targetResolution'], $this->wpVersionConstraint );
 			} else {
-				NewSiteResolver::resolve( $this->runtime, $progress['targetResolution'] );
+				NewSiteResolver::resolve( $this->runtime, $progress['targetResolution'], $this->wpVersionConstraint );
 			}
 			$progress['targetResolution']->finish();
 
 			$progress['data']->setCaption('Resolving data references');
-			$plan = $this->createExecutionPlan();
 			$this->assets->startEagerResolution( $this->dataReferences, $progress['data'] );
 			$this->executePlan( $progress['execution'], $plan, $this->runtime );
 			$progress->finish();
@@ -221,7 +223,7 @@ class Runner {
 
 		if ( is_array( $reference ) ) {
 			$this->blueprintArray   = $reference;
-			$this->blueprintExecutionContext = $this->configuration->getExecutionContext() ?? InMemoryFilesystem::create();
+			$this->blueprintExecutionContext = InMemoryFilesystem::create();
 
 			return;
 		}
@@ -249,7 +251,7 @@ class Runner {
 					throw new BlueprintExecutionException(
 						sprintf(
 							'Failed to load blueprint from %s. Server responded with %d %s.',
-							$reference->get_url(),
+							$reference instanceof URLReference ? $reference->get_url() : $reference,
 							$response->status_code,
 							$response->get_reason_phrase()
 						)
@@ -259,33 +261,29 @@ class Runner {
 
 			if ( is_zip_file_stream( $stream ) ) {
 				$blueprintString        = $this->blueprintExecutionContext->get_contents( '/blueprint.json' );
-				$this->blueprintExecutionContext = $this->configuration->getExecutionContext() ?? new ZipFilesystem( $stream );
+				$this->blueprintExecutionContext = new ZipFilesystem( $stream );
 			} else {
 				// JSON file
 				$blueprintString = $stream->consume_all();
 				if ( $reference instanceof URLReference ) {
-					if($this->configuration->getExecutionContext()) {
-						$this->blueprintExecutionContext = $this->configuration->getExecutionContext();
-					} else {
-						// @TODO: Only display this if the Blueprint references any bundled files. And in that case,
-						//        make it a fatal error.
-						$this->configuration->getLogger()->warning( 'Blueprints loaded from remote URLs have no execution context.' );
-						$this->blueprintExecutionContext = InMemoryFilesystem::create();
-					}
+					// @TODO: Only display this if the Blueprint references any bundled files. And in that case,
+					//        make it a fatal error.
+					$this->configuration->getLogger()->warning( 'Blueprints loaded from remote URLs have no execution context.' );
+					$this->blueprintExecutionContext = InMemoryFilesystem::create();
 				} elseif ( $reference instanceof ExecutionContextPath ) {
 					// It was resolved as an ExecutionContextPath, but it's actually a local
 					// filesystem path at this point.
 					// The execution context is the directory containing the blueprint.json file.
-					$this->blueprintExecutionContext = $this->configuration->getExecutionContext() ?? LocalFilesystem::create( dirname( $reference->get_path() ) );
+					$this->blueprintExecutionContext = LocalFilesystem::create( dirname( $reference->get_path() ) );
 				} elseif ( $reference instanceof InlineFile ) {
-					$this->blueprintExecutionContext = $this->configuration->getExecutionContext() ?? InMemoryFilesystem::create();
+					$this->blueprintExecutionContext = InMemoryFilesystem::create();
 				} else {
 					throw new BlueprintExecutionException( 'Unsupported blueprint reference type: ' . get_class( $reference ) );
 				}
 			}
 		} elseif ( $resolved instanceof Directory ) {
 			$blueprintString = $resolved->filesystem->get_contents( '/blueprint.json' );
-			$this->blueprintExecutionContext = $this->configuration->getExecutionContext() ?? $resolved->filesystem;
+			$this->blueprintExecutionContext = $resolved->filesystem;
 		} else {
 			throw new BlueprintExecutionException( 'Invalid blueprint reference type: ' . get_class( $reference ) );
 		}
@@ -339,7 +337,6 @@ class Runner {
 		}
 
 		// PHP Version Constraint
-		$this->phpVersionConstraint = new VersionConstraint();
 		if ( isset( $this->blueprintArray['phpVersion'] ) ) {
 			$min = $max = $recommended = null;
 			
@@ -390,7 +387,6 @@ class Runner {
 		}
 
 		// WordPress Version Constraint
-		$this->wpVersionConstraint = new VersionConstraint();
 		if ( isset( $this->blueprintArray['wordpressVersion'] ) ) {
 			$wp_version = $this->blueprintArray['wordpressVersion'];
 			$min = $max = $recommended = null;
@@ -577,7 +573,9 @@ class Runner {
 		foreach($plan as $step) {
 			// @TODO: Make sure this doesn't get included twice in the execution plan.
 			if($step instanceof ImportContentStep) {
-				array_unshift($plan, $this->createStepObject('installPlugin', [ 'source' => $this->createDataReference('https://playground.wordpress.net/wordpress-importer.zip') ]));
+				array_unshift($plan, $this->createStepObject('installPlugin', [ 
+					'source' => $this->createDataReference('https://playground.wordpress.net/wordpress-importer.zip')
+				]));
 				break;
 			}
 		}
@@ -609,7 +607,7 @@ class Runner {
 				foreach($data['content'] as $item) {
 					$content[] = [
 						...$item,
-						'source' => $this->createDataReference($item['source']),
+						'source' => $this->createDataReference($item['source'], [ExecutionContextPath::class]),
 					];
 				}
 				return new ImportContentStep( $content );
@@ -617,6 +615,7 @@ class Runner {
 				return new ImportThemeStarterContentStep( $data['themeSlug'] ?? null );
 			case 'installPlugin':
 				$source  = $this->createDataReference( $data['source'], [
+					ExecutionContextPath::class,
 					WordPressOrgPlugin::class,
 				] );
 				$active  = $data['active'] ?? true;
@@ -626,6 +625,7 @@ class Runner {
 				return new InstallPluginStep( $source, $active, $options, $onError );
 			case 'installTheme':
 				$source = $this->createDataReference( $data['source'], [
+					ExecutionContextPath::class,
 					WordPressOrgTheme::class,
 				] );
 
@@ -645,11 +645,11 @@ class Runner {
 				return new RmDirStep( $data['path'] );
 			case 'runPHP':
 				return new RunPHPStep(
-					$this->createDataReference( $data['code'] ),
+					$this->createDataReference( $data['code'], [ ExecutionContextPath::class ] ),
 					$data['env'] ?? []
 				);
 			case 'runSql':
-				$source = $this->createDataReference( $data['source'] );
+				$source = $this->createDataReference( $data['source'], [ ExecutionContextPath::class ] );
 				return new RunSqlStep( $source );
 			case 'setSiteLanguage':
 				return new SetSiteLanguageStep( $data['language'] );
@@ -871,7 +871,7 @@ class Runner {
 					$data['env'] ?? []
 				);
 			case 'unzip':
-				$zipFile = $this->createDataReference( $data['zipFile'] );
+				$zipFile = $this->createDataReference( $data['zipFile'], [ ExecutionContextPath::class ] );
 
 				return new UnzipStep( $zipFile, $data['extractToPath'] );
 			case 'wp-cli':
@@ -879,7 +879,7 @@ class Runner {
 			case 'writeFiles':
 				$files = [];
 				foreach ( $data['files'] as $path => $content ) {
-					$files[ $path ] = $this->createDataReference( $content );
+					$files[ $path ] = $this->createDataReference( $content, [ ExecutionContextPath::class ] );
 				}
 
 				return new WriteFilesStep( $files );
@@ -888,13 +888,13 @@ class Runner {
 				foreach ( $data['media'] as $path => $content ) {
 					if ( is_string( $content ) ) {
 						$media[ $path ] = MediaFileDefinition::fromArray( [
-							'source' => $this->createDataReference( $content ),
+							'source' => $this->createDataReference( $content, [ ExecutionContextPath::class ] ),
 						] );
 						continue;
 					}
 
 					$media[ $path ] = MediaFileDefinition::fromArray( [
-						'source'      => $this->createDataReference( $content['source'] ),
+						'source'      => $this->createDataReference( $content['source'], [ ExecutionContextPath::class ] ),
 						'title'       => $content['title'] ?? null,
 						'description' => $content['description'] ?? null,
 						'alt'         => $content['alt'] ?? null,
@@ -909,15 +909,35 @@ class Runner {
 	}
 
 	private function createDataReference( mixed $data, array $additional_reference_classes = [] ): DataReference {
-		$reference                              = $data instanceof DataReference ? $data
-			: DataReference::create( $data, $additional_reference_classes );
-		// @TODO: If referencing a ExecutionContextPath, ensure we have the user consent
-		//        to load data from the local filesystem.
+		$reference = $data instanceof DataReference ? $data : DataReference::create( $data, $additional_reference_classes );
+
+		/**
+		 * A Blueprint sourced from an ExecutionContextPath is always local.
+		 * We don't have a separate reference type for a "local path". We just assume that,
+		 * at the Blueprint resolution stage, execution context is the entire filesystem. Only
+		 * then we narrow it down to the Blueprint parent directory.
+		 */
+		$executionContextIsLocal = $this->configuration->getBlueprint() instanceof ExecutionContextPath;
+		if(
+			$executionContextIsLocal && 
+			!$this->configuration->isAllowedLocalFilesystemAccess() && 
+			$reference instanceof ExecutionContextPath
+		) {
+			throw new PermissionsException(
+				RunnerConfiguration::PERMISSION_LOCAL_FILESYSTEM_ACCESS,
+				sprintf(
+					'The Blueprint references a local file (%s).',
+					$data
+				),
+				'You\'ll need to allow local filesystem access via $configuration->setAllowedLocalFilesystemAccess(true) to run it.'
+			);
+		}
+
+		// @TODO: Ensure we're not creating an ExecutionContextPath based on contents of a remote resource file.
 		$this->dataReferences[ $reference->id ] = $reference;
 
 		return $reference;
 	}
-
 
 	/**
 	 * Run the steps in the execution plan with progress tracking

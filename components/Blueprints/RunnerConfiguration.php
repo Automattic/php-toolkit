@@ -8,15 +8,23 @@ use WordPress\Blueprints\Logger\NoopLogger;
 use WordPress\Filesystem\Filesystem;
 
 class RunnerConfiguration {
+	// Permission constants
+	public const PERMISSION_LOCAL_FILESYSTEM_ACCESS = 'read-local-fs';
+	
+	// Array of all available permissions
+	public const ALL_PERMISSIONS = [
+		self::PERMISSION_LOCAL_FILESYSTEM_ACCESS,
+	];
+	
 	private DataReference|array $blueprintRef;
 	private string $mode = 'create-new-site';    // or apply-to-existing-site
 	private string $rootDir = '';
 	private string $siteUrl = '';
-	private ?Filesystem $executionContext = null;
 	private string $databaseEngine = 'mysql';
 	private array $databaseCredentials = [];
 	private $progressObserver = null;
 	private LoggerInterface $logger;
+	private array $permissions;
 
 	/**
 	 * @var DataReference|null
@@ -27,6 +35,9 @@ class RunnerConfiguration {
 	public function __construct() {
 		$this->sqliteIntegrationPlugin = DataReference::create( 'https://downloads.wordpress.org/plugin/sqlite-database-integration.zip' );
 		$this->logger = new NoopLogger();
+		$this->permissions = [
+			self::PERMISSION_LOCAL_FILESYSTEM_ACCESS => false,
+		];
 	}
 
 	public function setBlueprint( DataReference|array $r ): self {
@@ -76,16 +87,6 @@ class RunnerConfiguration {
 
 	public function getTargetSiteUrl(): string {
 		return $this->siteUrl;
-	}
-
-	public function setExecutionContext( Filesystem $fs ): self {
-		$this->executionContext = $fs;
-
-		return $this;
-	}
-
-	public function getExecutionContext(): Filesystem|null {
-		return $this->executionContext;
 	}
 
 	/**
@@ -167,5 +168,35 @@ class RunnerConfiguration {
 	 */
 	public function getSqliteIntegrationPlugin(): ?DataReference {
 		return $this->sqliteIntegrationPlugin;
+	}
+
+	/**
+	 * Enables the runner to source the execution context files from the local filesystem.
+	 *
+	 * @param  bool  $allow  True to allow filesystem access, false to deny.
+	 * @return self
+	 */
+	public function setAllowLocalFilesystemAccess( bool $allow ): self {
+		$this->permissions[self::PERMISSION_LOCAL_FILESYSTEM_ACCESS] = $allow;
+		return $this;
+	}
+
+	/**
+	 * Checks if general access to the local filesystem is allowed.
+	 *
+	 * @return bool True if filesystem access is allowed, false otherwise.
+	 */
+	public function isAllowedLocalFilesystemAccess(): bool {
+		return $this->permissions[self::PERMISSION_LOCAL_FILESYSTEM_ACCESS];
+	}
+	
+	/**
+	 * Gets the CLI flag that corresponds to a permission constant.
+	 *
+	 * @param string $permission One of the PERMISSION_* constants
+	 * @return string The CLI flag name
+	 */
+	public static function getPermissionCliFlag(string $permission): string {
+		return $permission;
 	}
 }

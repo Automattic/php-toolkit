@@ -9,6 +9,24 @@
  * @TODO: Get explicit user consent before using paths from a local directory
  * @TODO: Add a flag that allows user-defined runPHP steps?
  * @TODO: Add a verbose mode
+ * @TODO: A large test suite.
+ * @TODO: Client HTTP queue deadlock when we enqueued a lot of requests and need to fetch a small
+ *        ad-hoc resource such as a JSON list of translations.
+ * @TODO [_spec_]: How to handle the default WordPress theme? Should it be preserved for new sites?
+ *        What if we want to remove it? And what should be the semantics for existing sites?
+ *        -> how to handle conflicts in general? pre-existing themes conflicting with new themes?
+ *           pre-existing plugins conflicting with new plugins? refuse to execute? tell the user what
+ *           to do? As in change the Blueprint? What if I don't want to change it? maybe interact with the user
+ *           and ask whether they want to bale or override the theme/plugin?
+ * @TODO (low priority): Production-grade HTTP Cache support for remote files. Not the stopgap we have now.
+ *                       We can ship Blueprints without http cache support, but do not ship the stopgap solution 
+ *                       in production.
+ * @TODO (low priority): Exception structure?
+ * @TODO (low priority): Range header-based HTTP stream for fast partial parsing of large remote zip files.
+ *                       Needs to support servers lying about their Range support.
+ * @TODO (low priority): Restrictions on supported step types, media files types, SQL queries types, etc.
+ * @TODO (low priority): Fast unzipping of remote Zip Files by iterating over the entries
+ *        instead of skipping over to the end central directory index entry.
  */
 
 require __DIR__ . '/../../../vendor/autoload.php';
@@ -17,9 +35,9 @@ use WordPress\Blueprints\Logger\CLILogger;
 use WordPress\Blueprints\RunnerConfiguration;
 use WordPress\Blueprints\DataReference\DataReference;
 use WordPress\Blueprints\Exception\BlueprintExecutionException;
+use WordPress\Blueprints\Exception\PermissionsException;
 use WordPress\Blueprints\ProgressObserver;
 use WordPress\Blueprints\Runner;
-use WordPress\Filesystem\LocalFilesystem;
 
 // Enable colours on Windows 10+ (safe‑no‑op elsewhere)
 if (\PHP_OS_FAMILY === 'Windows' && \function_exists('sapi_windows_vt100_support')) {
@@ -29,6 +47,7 @@ if (\PHP_OS_FAMILY === 'Windows' && \function_exists('sapi_windows_vt100_support
 // -----------------------------------------------------------------------------
 //   Option definition – tweak this block to add / modify CLI options
 // -----------------------------------------------------------------------------
+$supportedPermissions = RunnerConfiguration::ALL_PERMISSIONS;
 $optionDefs = [
     /* long               short hasVal default        description */
     'site-url'          => ['u', true , null        , 'Public site URL (https://example.com)'],
@@ -41,7 +60,8 @@ $optionDefs = [
     'db-pass'           => [null,true , ''          , 'MySQL password'],
     'db-name'           => [null,true , 'wordpress' , 'MySQL database'],
     'db-path'           => ['p', true , 'wp.db'     , 'SQLite file path'],
-    'dry-run'           => [null, false, false      , 'Don’t change anything, just validate'],
+    'dry-run'           => [null, false, false      , "Don't change anything, just validate"],
+    'allow'             => [null, true , null       , 'Allowed permissions. One of: '.implode(', ', $supportedPermissions)],
     'help'              => ['h', false, false       , 'Show full help'],
     'version'           => ['V', false, false       , 'Show version'],
 ];
@@ -118,6 +138,8 @@ function parseArguments(array $argv, array $optionDefs): array
 
 function cliArgsToRunnerConfiguration(array $positionals, array $options): RunnerConfiguration
 {
+	global $supportedPermissions;
+
     $config = new RunnerConfiguration();
 
     // Map positional arguments
@@ -135,16 +157,6 @@ function cliArgsToRunnerConfiguration(array $positionals, array $options): Runne
 	} catch (InvalidArgumentException $e) {
 		throw new InvalidArgumentException("Invalid Blueprint reference: " . $positionals[0]);
 	}
-
-    // Set site root (target directory) if provided via --execution-context, else default to cwd
-    if (!empty($options['execution-context'])) {
-        $executionContext = $options['execution-context'];
-        $absoluteExecutionContext = realpath($executionContext);
-        if ($absoluteExecutionContext === false) {
-            throw new InvalidArgumentException("The execution context path does not exist: {$executionContext}");
-        }
-        $config->setExecutionContext(LocalFilesystem::create($absoluteExecutionContext));
-    }
 
     if (empty($options['site-path'])) {
         throw new InvalidArgumentException("--site-path option is required.");
@@ -194,13 +206,18 @@ function cliArgsToRunnerConfiguration(array $positionals, array $options): Runne
     }
     $config->setDatabaseCredentials($dbCreds);
 
-    // Set execution context (Filesystem) if provided
-    if (!empty($options['execution-context'])) {
-        // Only set if Filesystem class is available and directory exists
-        if (class_exists('\WordPress\Filesystem\Filesystem') && is_dir($options['execution-context'])) {
-            $fs = new \WordPress\Filesystem\Filesystem($options['execution-context']);
-            $config->setExecutionContext($fs);
-        }
+    // Set allow options
+    if (!empty($options['allow'])) {
+		$allow = explode(',', $options['allow']);
+		foreach($allow as $permission) {
+			switch($permission) {
+				case 'read-local-fs':
+					$config->setAllowLocalFilesystemAccess(true);
+					break;
+				default:
+					throw new InvalidArgumentException("Unknown --allow permission: $permission. Allowed permissions: ".implode(', ', $supportedPermissions));
+			}
+		}
     }
 
 	$config->setLogger(
@@ -330,6 +347,14 @@ try {
 	$runner->run();
 	echo PHP_EOL;
 	echo sprintf("\033[32m✔ Blueprint successfully executed.\033[0m\n");
+} catch (PermissionsException $ex) {
+	echo PHP_EOL . PHP_EOL;
+	$permission = $ex->getPermission();
+	$flag = RunnerConfiguration::getPermissionCliFlag($permission);
+	
+	echo sprintf("\033[31mPermission Error:\033[0m %s\n", $ex->getMessage());
+	echo sprintf("\033[33mTip:\033[0m Run with \033[1m--allow=%s\033[0m to grant this permission.\n", $flag);
+	exit(1);
 } catch (BlueprintExecutionException $ex) {
 	echo PHP_EOL . PHP_EOL;
 	if(!$ex->schemaError) {

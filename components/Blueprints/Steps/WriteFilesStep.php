@@ -2,6 +2,7 @@
 
 namespace WordPress\Blueprints\Steps;
 
+use WordPress\Blueprints\DataReference\DataReference;
 use WordPress\Blueprints\DataReference\Directory;
 use WordPress\Blueprints\Progress\Tracker;
 use WordPress\Blueprints\Runtime;
@@ -14,7 +15,7 @@ use function WordPress\Filesystem\copy_between_filesystems;
 class WriteFilesStep implements StepInterface {
 	/**
 	 * An associative array where keys are file paths and values are their contents.
-	 * @var array<string, string|DataReference>
+	 * @var array<string, DataReference>
 	 */
 	public array $files;
 
