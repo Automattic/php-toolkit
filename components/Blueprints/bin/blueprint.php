@@ -57,7 +57,7 @@ $optionDefs = [
     'site-url'          => ['u', true , null        , 'Public site URL (https://example.com)'],
     'site-path'         => [null, true, null        , 'Target directory with WordPress install context)'],
     'execution-context' => ['x', true , null        , 'Source directory with Blueprint context files'],
-    'mode'              => ['m', true , 'create'    , 'Execution mode (create|apply)'],
+    'mode'              => ['m', true , 'create-new-site'    , 'Execution mode (create|apply)'],
     'db-engine'         => ['d', true , 'mysql'     , 'Database engine (mysql|sqlite)'],
     'db-host'           => [null,true , 'localhost' , 'MySQL host'],
     'db-user'           => [null,true , 'root'      , 'MySQL user'],
@@ -167,11 +167,23 @@ function cliArgsToRunnerConfiguration(array $positionals, array $options): Runne
         throw new InvalidArgumentException("--site-path option is required.");
     }
 
+    if (!empty($options['mode'])) {
+        // Accept 'create-new-site' or 'apply-to-existing-site' as CLI values, map to internal values
+        $mode = $options['mode'];
+        if ($mode === 'create-new-site') {
+            $config->setExecutionMode('create-new-site');
+        } elseif ($mode === 'apply-to-existing-site') {
+            $config->setExecutionMode('apply-to-existing-site');
+        } else {
+            throw new InvalidArgumentException("Invalid execution mode: {$mode}. Supported modes are: create-new-site, apply-to-existing-site");
+        }
+    }
+
 	$targetSiteRoot = $options['site-path'];
     $absoluteTargetSiteRoot = wp_canonicalize_path(wp_resolve_path($targetSiteRoot));
     
     if ($options['truncate-new-site-directory']) {
-		if($options['mode'] !== 'create') {
+		if($options['mode'] !== 'create-new-site') {
 			throw new InvalidArgumentException("--truncate-new-site-directory can only be used with --mode=create");
 		}
 		$fs = LocalFilesystem::create($absoluteTargetSiteRoot);
@@ -185,18 +197,6 @@ function cliArgsToRunnerConfiguration(array $positionals, array $options): Runne
     $config->setTargetSiteRoot($absoluteTargetSiteRoot);
 	$config->setTargetSiteUrl($options['site-url']);
 
-    // Set execution mode
-    if (!empty($options['mode'])) {
-        // Accept 'create' or 'apply' as CLI values, map to internal values
-        $mode = $options['mode'];
-        if ($mode === 'create') {
-            $config->setExecutionMode('create-new-site');
-        } elseif ($mode === 'apply') {
-            $config->setExecutionMode('apply-to-existing-site');
-        } else {
-            $config->setExecutionMode($mode);
-        }
-    }
 
     // Set database engine
     if (!empty($options['db-engine'])) {
