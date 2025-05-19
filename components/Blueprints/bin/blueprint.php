@@ -354,9 +354,4 @@ try {
 		$lastPrettyPath = $prettyPath;
 	}
 	exit(1);
-// } catch (\Throwable $ex) {
-// 	var_dump($ex instanceof BlueprintExecutionException);
-// 	var_dump(get_class($ex));
-// 	echo "\033[31mUnexpected error:\033[0m ".$ex->getMessage().PHP_EOL;
-// 	exit(1);
 }
