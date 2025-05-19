@@ -279,9 +279,9 @@ function showHelp( array $optionDefs ): void {
 		printf( "%-34s %s\n", $flags, $desc . $defaultText );
 	}
 	echo "\nExamples:\n";
-	echo "  php $script my-blueprint.yaml --site-url https://mysite.test --site-path /var/www/mysite.com\n";
-	echo "  php $script my-blueprint.yaml --execution-context /var/www --site-url https://mysite.test --mode apply --site-path ./site\n";
-	echo "  php $script my-blueprint.yaml --site-url https://mysite.test --site-path ./mysite --truncate-site-directory\n";
+	echo "  php $script my-blueprint.json --site-url https://mysite.test --site-path /var/www/mysite.com\n";
+	echo "  php $script my-blueprint.json --execution-context /var/www --site-url https://mysite.test --mode apply --site-path ./site\n";
+	echo "  php $script my-blueprint.json --site-url https://mysite.test --site-path ./mysite --truncate-site-directory\n";
 	echo "\n";
 }
 
