@@ -735,9 +735,8 @@ class Runner {
 					$this->createDataReference( $data['code'], [ ExecutionContextPath::class ] ),
 					$data['env'] ?? []
 				);
-			case 'runSql':
+			case 'runSQL':
 				$source = $this->createDataReference( $data['source'], [ ExecutionContextPath::class ] );
-
 				return new RunSqlStep( $source );
 			case 'setSiteLanguage':
 				return new SetSiteLanguageStep( $data['language'] );
