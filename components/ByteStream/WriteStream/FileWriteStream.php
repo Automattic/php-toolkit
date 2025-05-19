@@ -70,7 +70,20 @@ class FileWriteStream implements ByteWriteStream {
 	 * @throws ByteStreamException If the write operation fails.
 	 */
 	public function append_bytes( string $bytes ): void {
-		if ( ! fwrite( $this->fileHandle, $bytes ) ) {
+		$result = fwrite( $this->fileHandle, $bytes );
+		/**
+		 * We cannot just test for `false === $result` if we want to be
+		 * compatible with PHP 7.3.
+		 * 
+		 * The `!fwrite()` check is used for PHP 7.3 compatibility.
+		 * Between PHP 7.3 and 7.4, this change was made:
+		 * 
+		 * > fread() and fwrite() will now return FALSE if the operation failed. Previously an empty
+		 * > string or 0 was returned. EAGAIN/EWOULDBLOCK are not considered failures.
+		 * 
+		 * https://www.php.net/manual/en/migration74.incompatible.php#migration74.incompatible.core.fread-fwrite
+		 */
+		if ( ! $result && $bytes !== '' ) {
 			throw new ByteStreamException( 'Failed to write bytes to file.' );
 		}
 	}

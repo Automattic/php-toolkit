@@ -129,6 +129,9 @@ PHP
 				$wp_cli_path,
 				'core',
 				'install',
+				// For Docker compatibility. If we got this far, Blueprint runner was already
+				// allowed to run as root.
+				'--allow-root',
 				'--url=' . $runtime->getConfiguration()->getTargetSiteUrl(),
 				'--title=WordPress Site',
 				'--admin_user=admin',

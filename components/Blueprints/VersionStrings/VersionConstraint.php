@@ -45,15 +45,15 @@ class VersionConstraint {
 	public function validate(): array {
 		$errors = [];
 		if ( $this->min !== null && $this->max !== null ) {
-			if ( $this->min->compareTo( $this->max ) > 0 ) {
-				$errors[] = sprintf( 'min (%s) was larger than max (%s)', $this->min, $this->max );
+			if ( ! $this->min->is( '<', $this->max ) ) {
+				$errors[] = sprintf( 'min (%s) is not smaller than max (%s)', $this->min, $this->max );
 			}
 		}
 		if ( $this->recommended !== null ) {
-			if ( $this->min !== null && $this->recommended->compareTo( $this->min ) < 0 ) {
+			if ( $this->min !== null && ! $this->recommended->is( '>=', $this->min ) ) {
 				$errors[] = sprintf( 'recommended (%s) must be between min (%s) and max', $this->recommended, $this->min );
 			}
-			if ( $this->max !== null && $this->recommended->compareTo( $this->max ) > 0 ) {
+			if ( $this->max !== null && ! $this->recommended->is( '<=', $this->max ) ) {
 				$errors[] = sprintf( 'recommended (%s) was not between min (%s) and max (%s)', $this->recommended, $this->min, $this->max );
 			}
 		}
@@ -65,10 +65,10 @@ class VersionConstraint {
 	 * Checks if a version string satisfies the constraint.
 	 */
 	public function satisfiedBy( Version $version ): bool {
-		if ( $this->min !== null && $version->compareTo( $this->min ) < 0 ) {
+		if ( $this->min !== null && ! $version->is( '>=', $this->min ) ) {
 			return false;
 		}
-		if ( $this->max !== null && $version->compareTo( $this->max ) > 0 ) {
+		if ( $this->max !== null && ! $version->is( '<=', $this->max ) ) {
 			return false;
 		}
 

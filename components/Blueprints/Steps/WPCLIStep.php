@@ -37,7 +37,14 @@ class WPCLIStep implements StepInterface {
 		if ( substr( $command, 0, 3 ) !== 'wp ' ) {
 			throw new Exception( 'WP-CLI command must start with "wp ".' );
 		}
-		$command = ( $this->wpCliPath ?? $runtime->getWpCliPath() ) . ' ' . substr( $command, 3 );
+		
+		$command = implode(' ', [
+			$this->wpCliPath ?? $runtime->getWpCliPath(),
+			// For Docker compatibility. If we got this far, the Blueprint runner was already
+			// allowed to run as root.
+			'--allow-root',
+			substr($command, 3),
+		]);
 		$runtime->runShellCommand( $command );
 	}
 }

@@ -333,7 +333,7 @@ try {
 		// Validate positional blueprint
 		if ( count( $positionals ) < 1 ) {
 			showHelp( $optionDefs );
-			exit( 1 );
+			exit( 0 );
 		}
 
 		// Convert CLI arguments to RunnerConfiguration
