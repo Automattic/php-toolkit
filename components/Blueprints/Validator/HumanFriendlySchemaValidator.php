@@ -13823,6 +13823,9 @@ final class HumanFriendlySchemaValidator {
 			case isset( $schema['type'] ):
 				$error = $this->validateType( $path, $data, $schema );
 				break;
+			case isset( $schema['deprecated'] ):
+				// @TODO: Report a warning or so.
+				return null;
 			default:
 				$error = null;
 				break;

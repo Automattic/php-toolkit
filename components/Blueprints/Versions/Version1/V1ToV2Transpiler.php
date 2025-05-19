@@ -25,6 +25,36 @@ class V1ToV2Transpiler {
 			json_decode( file_get_contents( __DIR__ . '/schema-v1.json' ), true )
 		);
 
+		// For every steps[] entry with step === "installPlugin" and "pluginZipFile", remove that key and rewrite it as "pluginData"
+		if (isset($v1['steps']) && is_array($v1['steps'])) {
+			foreach ($v1['steps'] as &$step) {
+				if (
+					is_array($step)
+					&& isset($step['step'])
+					&& $step['step'] === 'installPlugin'
+					&& array_key_exists('pluginZipFile', $step)
+				) {
+					// If pluginData is not already set, move pluginZipFile to pluginData
+					if (!array_key_exists('pluginData', $step)) {
+						$step['pluginData'] = $step['pluginZipFile'];
+					}
+					unset($step['pluginZipFile']);
+				} else if (
+					is_array($step)
+					&& isset($step['step'])
+					&& $step['step'] === 'installTheme'
+					&& array_key_exists('themeZipFile', $step)
+				) {
+					// If themeData is not already set, move themeZipFile to themeData
+					if (!array_key_exists('themeData', $step)) {
+						$step['themeData'] = $step['themeZipFile'];
+					}
+					unset($step['themeZipFile']);
+				}
+			}
+			unset($step); // break reference
+		}
+
 		return $v->validate( $v1 );
 	}
 
@@ -248,7 +278,7 @@ class V1ToV2Transpiler {
 						}
 						// "activate" defaults to true in both v1 and v2.
 						if ( isset( $v1step['options']['activate'] ) ) {
-							$v2step['activate'] = $v1step['options']['activate'];
+							$v2step['active'] = $v1step['options']['activate'];
 						}
 						if ( isset( $v1step['options']['targetFolderName'] ) ) {
 							$v2step['targetDirectoryName'] = $v1step['options']['targetFolderName'];
@@ -278,7 +308,7 @@ class V1ToV2Transpiler {
 						}
 						// "activate" defaults to true in both v1 and v2.
 						if ( isset( $v1step['options']['activate'] ) ) {
-							$v2step['activate'] = $v1step['options']['activate'];
+							$v2step['active'] = $v1step['options']['activate'];
 						}
 						if ( isset( $v1step['options']['targetFolderName'] ) ) {
 							$v2step['targetDirectoryName'] = $v1step['options']['targetFolderName'];
@@ -490,9 +520,13 @@ PHP
 						$v2steps[] = $v2step;
 						break;
 					case 'wp-cli':
+						// @TODO: Don't naively replace on the entire command. Actually parse it and only replace at the beginning
+						//        of each argument value.
+						$cmd = str_replace('/wordpress/', '', $v1step['command']);
+						$cmd = str_replace('wordpress/', '', $cmd);
 						$v2steps[] = [
 							'step'    => 'wp-cli',
-							'command' => $v1step['command'],
+							'command' => $cmd,
 						];
 						break;
 					default:
