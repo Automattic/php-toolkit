@@ -468,9 +468,20 @@ PHP
 						// Prefix paths with "writeToPath".
 						// The rest of the data format is compliant with v2.
 						$base_path = self::translatePath( $v1step['writeToPath'] );
-						foreach ( $v1step['filesTree'] as $path => $data ) {
-							$joined_path                     = wp_join_paths( $base_path, $path );
-							$v2step['files'][ $joined_path ] = $data;
+						if(isset($v1step['filesTree']['resource'])) {
+							$v2step['files']['/'] = self::convertV1ResourceToV2Reference( $v1step['filesTree'], $base_path );
+						} else {
+							foreach ( $v1step['filesTree'] as $path => $data ) {
+								$joined_path                     = wp_join_paths( $base_path, $path );
+								$v2step['files'][ $joined_path ] = is_string( $data )
+								? [
+									'filename' => basename( $path ),
+									'content'  => $data,
+								]
+								: self::convertV1ResourceToV2Reference(
+									$data
+								);
+							}
 						}
 						$v2steps[] = $v2step;
 						break;
@@ -498,7 +509,7 @@ PHP
 			return $resource;
 		} elseif ( is_array( $resource ) ) {
 			if ( ! isset( $resource['resource'] ) ) {
-				throw new BlueprintExecutionException( 'Unknown resource type: ' . $resource['resource'] );
+				throw new BlueprintExecutionException( 'Missing resource type in ' . json_encode( $resource ) );
 			}
 			switch ( $resource['resource'] ) {
 				case 'literal':
@@ -530,9 +541,17 @@ PHP
 					return $path;
 				case "literal:directory":
 					// InlineDirectory
+					$files = [];
+					foreach ( $resource['files'] as $name => $file ) {
+						if ( is_string( $file ) ) {
+							$files[$name] = $file;
+						} else {
+							$files[$name] = self::convertV1ResourceToV2Reference( $file );
+						}
+					}
 					return [
 						'directoryName' => $resource['name'],
-						'files'         => $resource['files'],
+						'files'         => $files,
 					];
 				case "git:directory":
 					// GitDirectoryReference
@@ -564,6 +583,9 @@ PHP
 				[ $id, $text ] = $token;
 				if ( $id === T_CONSTANT_ENCAPSED_STRING && strncmp( trim( $text, '\'"' ), '/wordpress/', strlen( '/wordpress/' ) ) === 0 ) {
 					$convertedCode .= 'getenv(\'DOCROOT\') . ' . var_export( substr( trim( $text, '\'"' ), strlen( '/wordpress/' ) ),
+							true );
+				} else if ( $id === T_CONSTANT_ENCAPSED_STRING && strncmp( trim( $text, '\'"' ), 'wordpress/', strlen( 'wordpress/' ) ) === 0 ) {
+					$convertedCode .= 'getenv(\'DOCROOT\') . ' . var_export( substr( trim( $text, '\'"' ), strlen( 'wordpress/' ) ),
 							true );
 				} else {
 					$convertedCode .= $text;

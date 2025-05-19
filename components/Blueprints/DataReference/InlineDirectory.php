@@ -88,23 +88,23 @@ class InlineDirectory extends DataReference {
 	 *
 	 * @return self The created instance.
 	 */
-	public static function from_array( array $data ): self {
-		if ( ! isset( $data['name'] ) || ! isset( $data['children'] ) || ! is_array( $data['children'] ) ) {
+	public static function from_blueprint_data( array $data ): self {
+		if ( ! isset( $data['directoryName'] ) || ! isset( $data['files'] ) || ! is_array( $data['files'] ) ) {
 			throw new InvalidArgumentException( 'Invalid inline directory data' );
 		}
 
 		$children = [];
-		foreach ( $data['children'] as $child ) {
-			if ( InlineFile::is_valid( $child ) ) {
-				$children[] = InlineFile::from_blueprint_data( $child );
+		foreach ( $data['files'] as $fileName => $child ) {
+			if ( is_string( $child ) ) {
+				$children[$fileName] = new InlineFile( $fileName, $child );
 			} elseif ( self::is_valid( $child ) ) {
-				$children[] = self::from_array( $child );
+				$children[$fileName] = self::from_blueprint_data( $child );
 			} else {
 				throw new InvalidArgumentException( 'Invalid inline directory child' );
 			}
 		}
 
-		return new self( $data['name'], $children );
+		return new self( $data['directoryName'], $children );
 	}
 
 	/**
@@ -115,7 +115,7 @@ class InlineDirectory extends DataReference {
 	 * @return bool Whether the array is valid.
 	 */
 	public static function is_valid( $data ): bool {
-		return is_array( $data ) && isset( $data['name'] ) && isset( $data['children'] ) && is_array( $data['children'] );
+		return is_array( $data ) && isset( $data['directoryName'] ) && isset( $data['files'] ) && is_array( $data['files'] );
 	}
 
 	/**

@@ -113,11 +113,11 @@ class Runner {
 			 * Store cached HTTP responses in a temporary directory with a stable path
 			 * to reuse across multiple runs.
 			 */
-			// 'cache' => new FilesystemCache(
-			// 	LocalFilesystem::create(
-			// 		sys_get_temp_dir() . '/wp-blueprints'
-			// 	)
-			// ),
+			'cache' => new FilesystemCache(
+				LocalFilesystem::create(
+					sys_get_temp_dir() . '/wp-blueprints'
+				)
+			),
 		] );
 		$this->mainTracker = new Tracker();
 

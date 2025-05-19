@@ -19,7 +19,6 @@ class Symbol {
 		return $this->value;
 	}
 }
-$MISSING = new Symbol( 'missing' );
 
 /**
  * A lite JSON schema validator with human-centric error messages.
@@ -106,12 +105,15 @@ final class HumanFriendlySchemaValidator {
 	 */
 	private $arrayIsValidObject;
 
+	private $MISSING;
+
 	public function __construct(
 		array $schema,
 		array $options = []
 	) {
 		$this->schema             = $schema;
 		$this->arrayIsValidObject = $options['array_is_valid_object'] ?? true;
+		$this->MISSING            = new Symbol( 'missing' );
 	}
 
 	/**
@@ -14020,7 +14022,7 @@ final class HumanFriendlySchemaValidator {
 		$disc = $this->inferDiscriminator( $parentSchema['discriminator'] ?? null, $branches );
 		if ( $disc ) {
 			[ $prop, $allowedDiscriminatorValues ] = $disc;
-			$actualValue = $GLOBALS['MISSING']; // Default to missing
+			$actualValue = $this->MISSING; // Default to missing
 			if ( is_array( $data ) && array_key_exists( $prop, $data ) ) {
 				$actualValue = $data[ $prop ];
 			} elseif ( is_object( $data ) && property_exists( $data, $prop ) ) {
@@ -14028,7 +14030,7 @@ final class HumanFriendlySchemaValidator {
 			}
 
 			if ( ! in_array( $actualValue, $allowedDiscriminatorValues, true ) ) {
-				$actual_humanized = ( $actualValue === $GLOBALS['MISSING'] ) ? 'missing' : $this->valueSnippet( $actualValue );
+				$actual_humanized = ( $actualValue === $this->MISSING ) ? 'missing' : $this->valueSnippet( $actualValue );
 
 				return new ValidationError(
 					$pointer,
@@ -14041,7 +14043,7 @@ final class HumanFriendlySchemaValidator {
 					),
 					[
 						'expected' => [ 'property' => $prop, 'allowedValues' => $allowedDiscriminatorValues ],
-						'actual'   => [ 'value'   => ( $actualValue === $GLOBALS['MISSING'] ) ? null : $actualValue,
+						'actual'   => [ 'value'   => ( $actualValue === $this->MISSING ) ? null : $actualValue,
 						                'snippet' => $this->valueSnippet( $actualValue ),
 						],
 					]
@@ -14383,6 +14385,7 @@ final class HumanFriendlySchemaValidator {
 				}
 			}
 		}
+		// print_R($objs);
 
 		if ( count( $candidates ) === 1 ) { // Only one property serves as a unique discriminator
 			return [ key( $candidates ), current( $candidates ) ];

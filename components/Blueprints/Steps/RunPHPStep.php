@@ -22,8 +22,6 @@ class RunPHPStep implements StepInterface {
 	public $scriptPath;
 	/** @var array<string, string>|null */
 	public $env;
-	/** @var array<string, string>|null */
-	public $__SERVER; // Renamed from $__SERVER to avoid PHP superglobal conflict
 
 	public function __construct( DataReference $code, ?array $env = null ) {
 		$this->code = $code;
@@ -34,10 +32,6 @@ class RunPHPStep implements StepInterface {
 		$tracker->setCaption( 'Running custom PHP code' );
 
 		$env = $this->env ?? [];
-		if ( ! empty( $this->__SERVER ?? [] ) ) {
-			$env['$_SERVER'] = $this->__SERVER ?? [];
-		}
-
 		$resolvedCode = $runtime->resolve( $this->code );
 		if ( $resolvedCode instanceof File ) {
 			$code = $resolvedCode->getStream()->consume_all();
