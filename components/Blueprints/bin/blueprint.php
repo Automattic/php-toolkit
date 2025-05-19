@@ -4,8 +4,6 @@
  * 
  * @TODO: Get the tests to pass
  * @TODO: Support commands: "exec", "validate", "to-execution-plan" etc. See the Blueprints v2 spec for more commands ideas.
- * @TODO: Support --truncate-site-directory option for easy development – just re-run the same command to override a previous site.
- * @TODO: Prevent remote resources from using local bundle paths
  * @TODO: Get explicit user consent before using paths from a local directory
  * @TODO: Add a flag that allows user-defined runPHP steps?
  * @TODO: Add a verbose mode
@@ -27,6 +25,8 @@
  * @TODO (low priority): Restrictions on supported step types, media files types, SQL queries types, etc.
  * @TODO (low priority): Fast unzipping of remote Zip Files by iterating over the entries
  *        instead of skipping over to the end central directory index entry.
+ * ✅ @TODO: Support --truncate-new-site-directory option for easy development – just re-run the same command to override a previous site.
+ * ✅ @TODO: Prevent remote resources from using local bundle paths
  */
 
 require __DIR__ . '/../../../vendor/autoload.php';
@@ -38,6 +38,10 @@ use WordPress\Blueprints\Exception\BlueprintExecutionException;
 use WordPress\Blueprints\Exception\PermissionsException;
 use WordPress\Blueprints\ProgressObserver;
 use WordPress\Blueprints\Runner;
+use WordPress\Filesystem\LocalFilesystem;
+
+use function WordPress\Filesystem\wp_canonicalize_path;
+use function WordPress\Filesystem\wp_resolve_path;
 
 // Enable colours on Windows 10+ (safe‑no‑op elsewhere)
 if (\PHP_OS_FAMILY === 'Windows' && \function_exists('sapi_windows_vt100_support')) {
@@ -60,6 +64,7 @@ $optionDefs = [
     'db-pass'           => [null,true , ''          , 'MySQL password'],
     'db-name'           => [null,true , 'wordpress' , 'MySQL database'],
     'db-path'           => ['p', true , 'wp.db'     , 'SQLite file path'],
+    'truncate-new-site-directory' => ['t', false, false, 'Delete target directory if it exists before execution'],
     'dry-run'           => [null, false, false      , "Don't change anything, just validate"],
     'allow'             => [null, true , null       , 'Allowed permissions. One of: '.implode(', ', $supportedPermissions)],
     'help'              => ['h', false, false       , 'Show full help'],
@@ -163,12 +168,21 @@ function cliArgsToRunnerConfiguration(array $positionals, array $options): Runne
     }
 
 	$targetSiteRoot = $options['site-path'];
-    $absoluteTargetSiteRoot = realpath($targetSiteRoot);
-    if ($absoluteTargetSiteRoot === false) {
-        throw new InvalidArgumentException("The target site root path does not exist: {$targetSiteRoot}");
+    $absoluteTargetSiteRoot = wp_canonicalize_path(wp_resolve_path($targetSiteRoot));
+    
+    if ($options['truncate-new-site-directory']) {
+		if($options['mode'] !== 'create') {
+			throw new InvalidArgumentException("--truncate-new-site-directory can only be used with --mode=create");
+		}
+		$fs = LocalFilesystem::create($absoluteTargetSiteRoot);
+		$fs->rmdir('/', ['recursive' => true]);
+		$fs->mkdir('/', ['chmod' => 0755]);
+    }
+    
+    if (!is_dir($absoluteTargetSiteRoot)) {
+        throw new InvalidArgumentException("The --site-path path does not exist: {$targetSiteRoot}");
     }
     $config->setTargetSiteRoot($absoluteTargetSiteRoot);
-
 	$config->setTargetSiteUrl($options['site-url']);
 
     // Set execution mode
@@ -259,6 +273,7 @@ function showHelp(array $optionDefs): void
     echo "\nExamples:\n";
     echo "  php $script my-blueprint.yaml --site-url https://mysite.test --site-path /var/www/mysite.com\n";
     echo "  php $script my-blueprint.yaml --execution-context /var/www --site-url https://mysite.test --mode apply --site-path ./site\n";
+    echo "  php $script my-blueprint.yaml --site-url https://mysite.test --site-path ./mysite --truncate-site-directory\n";
     echo "\n";
 }
 

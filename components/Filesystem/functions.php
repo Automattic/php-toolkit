@@ -173,6 +173,46 @@ function wp_join_paths( ...$path_segments ) {
 }
 
 /**
+ * Resolves a sequence of paths or path segments into an absolute path.
+ * 
+ * The given sequence of paths is processed from right to left, with each
+ * subsequent path prepended until an absolute path is constructed. For instance
+ * given the sequence of path segments: /foo, /bar, baz, calling 
+ * wp_resolve_path('/foo', '/bar', 'baz') would return /bar/baz because 'baz'
+ * is not an absolute path but '/bar' + '/' + 'baz' is.
+ * 
+ * If, after processing all given path segments, an absolute path has not yet been
+ * generated, the current working directory is used.
+ * 
+ * The resulting path is normalized and trailing slashes are removed unless the path is 
+ * resolved to the root directory.
+ * 
+ * Zero-length path segments are ignored.
+ * 
+ * If no path segments are passed, wp_resolve_path() will return the absolute path of the 
+ * current working directory.
+ * 
+ * This docstring is sourced from Node.js path.resolve()
+ * 
+ * @param string[] $path_segments The path segments to resolve.
+ * @return string The resolved path.
+ */
+function wp_resolve_path( ...$path_segments ) {
+	$last_absolute_segment = null;
+	for($i = count($path_segments) - 1; $i >= 0; $i--) {
+		if(str_starts_with($path_segments[$i], '/')) {
+			$last_absolute_segment = $i;
+			break;
+		}
+	}
+	if(null === $last_absolute_segment) {
+		$last_absolute_segment = 0;
+		$path_segments = array_merge(array(getcwd()), $path_segments);
+	}
+	return wp_join_paths( ...array_slice($path_segments, $last_absolute_segment) );
+}
+
+/**
  * Cleans up a file path.
  *
  * - Ensures it starts with a forward slash

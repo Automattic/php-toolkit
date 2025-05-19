@@ -117,6 +117,13 @@ class LocalFilesystem implements Filesystem {
 				sprintf( 'Failed to create directory: %s', $path )
 			);
 		}
+		if(isset($options['chmod'])) {
+			if(false === chmod($path, $options['chmod'])) {
+				throw new FilesystemException(
+					sprintf( 'Failed to chmod directory: %s', $path )
+				);
+			}
+		}
 	}
 
 	public function rm( $path ) {
