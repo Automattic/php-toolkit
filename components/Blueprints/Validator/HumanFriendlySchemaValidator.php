@@ -13795,7 +13795,6 @@ final class HumanFriendlySchemaValidator {
 
 		// Check for unsupported keywords
 		$unsupportedKeywords = [
-			'allOf',
 			'not',
 			'patternProperties',
 			'dependencies',
@@ -13814,34 +13813,20 @@ final class HumanFriendlySchemaValidator {
 		}
 
 		switch ( true ) {
+			case isset( $schema['allOf'] ):
+				return $this->validateAllOf( $path, $data, $schema );
 			case isset( $schema['anyOf'] ):
-				$error = $this->validateAnyOf( $path, $data, $schema );
-				break;
+				return $this->validateAnyOf( $path, $data, $schema );
 			case isset( $schema['oneOf'] ):
-				$error = $this->validateOneOf( $path, $data, $schema );
-				break;
+				return $this->validateOneOf( $path, $data, $schema );
 			case isset( $schema['type'] ):
-				$error = $this->validateType( $path, $data, $schema );
-				break;
-			case isset( $schema['deprecated'] ):
-				// @TODO: Report a warning or so.
-				return null;
+				return $this->validateType( $path, $data, $schema );
 			default:
-				$error = null;
-				break;
+				throw new UnsupportedSchemaException(
+					'Every schema rule must have one of "allOf", "anyOf", "oneOf", "type" or be a "$ref". Rule for path ' . json_encode( $path ) . ' did not. Schema snippet: ' . substr( json_encode( $schema ),
+						0, 100 )
+				);
 		}
-
-		if ( $error === null && ! isset( $schema['anyOf'] ) && ! isset( $schema['oneOf'] ) && ! isset( $schema['type'] ) && ! isset( $schema['$ref'] ) ) {
-			// If $error is null BUT it's because no validation rule was matched (e.g. schema missing type/anyOf/oneOf/ref)
-			// This indicates a malformed schema that this validator cannot process beyond this point.
-			// For $ref, it's resolved at the beginning, so if it was just a $ref, it's now the resolved schema.
-			throw new UnsupportedSchemaException(
-				'Every schema rule must have one of "anyOf", "oneOf", "type" or be a "$ref". Rule for path ' . json_encode( $path ) . ' did not. Schema snippet: ' . substr( json_encode( $schema ),
-					0, 100 )
-			);
-		}
-
-		return $error;
 	}
 
 	// ───────────────────────────────────────────── anyOf / oneOf ─┐
@@ -13883,6 +13868,17 @@ final class HumanFriendlySchemaValidator {
 
 
 		return $candidates ?: $branches; // never empty
+	}
+
+	private function validateAllOf( array $path, $data, array $schema ): ?ValidationError {
+		$branches = $schema['allOf'];
+		foreach ( $branches as $b ) {
+			$error = $this->validateNode( $path, $data, isset( $b['$ref'] ) ? $this->resolveReference( $b['$ref'] ) : $b );
+			if ( $error !== null ) {
+				return $error;
+			}
+		}
+		return null;
 	}
 
 	/**
@@ -14084,10 +14080,11 @@ final class HumanFriendlySchemaValidator {
 	private function validateType( array $path, $data, array $schema ): ?ValidationError {
 		$type = $schema['type'];
 		if ( ! $this->typeMatchesAny( $data, $type ) ) {
+			$error = is_array($type) ? 'Expected one of the following types: ' . implode(', ', $type) . ' but got type "' . gettype($data) . '".' : 'Expected type "' . $type . '" but got type "' . gettype($data) . '".';
 			return new ValidationError(
 				$this->convertPathToString( $path ),
 				'type-mismatch',
-				sprintf( 'Expected type "%s" but got type "%s".', $type, gettype( $data ) ),
+				$error,
 				[
 					'expected' => [ 'type' => $type ],
 					'actual'   => [ 'type' => gettype( $data ), 'snippet' => $this->valueSnippet( $data ) ],

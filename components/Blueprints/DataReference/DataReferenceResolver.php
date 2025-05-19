@@ -80,6 +80,7 @@ class DataReferenceResolver {
 		$progress_tracker = $this->subTrackers[ $reference->id ] ?? new Tracker();
 
 		if ( $reference instanceof WordPressOrgPlugin ) {
+			
 			$reference = new URLReference( 'https://downloads.wordpress.org/plugin/' . $reference->get_slug() . '.latest-stable.zip' );
 		} elseif ( $reference instanceof WordPressOrgTheme ) {
 			$reference = new URLReference( 'https://downloads.wordpress.org/theme/' . $reference->get_slug() . '.latest-stable.zip' );

@@ -114,14 +114,19 @@ class Runner {
 
 		$this->client      = new Client( [
 			/**
+			 * !! DO NOT USE IN PRODUCTION !!
+			 *
 			 * Store cached HTTP responses in a temporary directory with a stable path
 			 * to reuse across multiple runs.
+			 * 
+			 * HTTP cache support is experimental. Sometimes it loses data and
+			 * reuses incomplete cache. Sometimes it gets the fetch stream into an infinite loop.
 			 */
-			'cache' => new FilesystemCache(
-				LocalFilesystem::create(
-					sys_get_temp_dir() . '/wp-blueprints'
-				)
-			),
+			// 'cache' => new FilesystemCache(
+				// LocalFilesystem::create(
+				// 	sys_get_temp_dir() . '/wp-blueprints'
+				// )
+			// ),
 		] );
 		$this->mainTracker = new Tracker();
 
@@ -654,10 +659,42 @@ class Runner {
 			case 'defineConstants':
 				return new DefineConstantsStep( $data['constants'] );
 			case 'importContent':
+				/**
+				 * Flatten the content declaration from
+				 * 
+				 *     "content": [
+				 *         {
+				 *             "type": "posts",
+				 *             "source": [ "post1.html", "post2.html" ]
+				 *         }
+				 *     ]
+				 * 
+				 * into
+				 * 
+				 *     "content": [
+				 *         {
+				 *             "type": "posts",
+				 *             "source": "post1.html"
+				 *         },
+				 *         {
+				 *             "type": "posts",
+				 *             "source": "post2.html"
+				 *         }
+				 *     ]
+				 */
 				$content = [];
-				foreach ( $data['content'] as $item ) {
-					$content[] = array_merge( is_array( $item ) ? $item : iterator_to_array( $item ),
-						[ 'source' => $this->createDataReference( $item['source'], [ ExecutionContextPath::class ] ) ] );
+				foreach($data['content'] as $contentDefinition) {
+					$source = $contentDefinition['source'];
+					$source_is_list = is_array($source) && array_keys($source) === range(0, count($source) - 1);
+					if(!$source_is_list) {
+						$source = [$source];
+					}
+					foreach($source as $source_item) {
+						$content[] = array_merge(
+							$contentDefinition,
+							[ 'source' => $this->createDataReference( $source_item, [ ExecutionContextPath::class ] ) ]
+						);
+					}
 				}
 
 				return new ImportContentStep( $content );
