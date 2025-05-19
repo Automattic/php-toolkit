@@ -95,7 +95,7 @@ class DataReferenceResolver {
 		} elseif ( $reference instanceof ExecutionContextPath ) {
 			$path = $reference->get_path();
 			if ( ! $this->executionContext->exists( $path ) ) {
-				throw new DataResolutionException( 'File not found: ' . $path );
+				throw new DataResolutionException( 'Path referenced in the Blueprint was not found in the execution context: ' . $path );
 			}
 			if ( $this->executionContext->is_file( $path ) ) {
 				$stream         = $this->executionContext->open_read_stream( $path );
@@ -111,7 +111,7 @@ class DataReferenceResolver {
 					basename( $path )
 				);
 			} else {
-				throw new DataResolutionException( 'Path is not a file or directory: ' . $path );
+				throw new DataResolutionException( 'Path referenced in the Blueprint is not a file or directory: ' . $path );
 			}
 		// TODO: Lovely name.
 		} elseif ( $reference instanceof InlineFile ) {
