@@ -59,7 +59,7 @@ $optionDefs = [
     'execution-context' => ['x', true , null        , 'Source directory with Blueprint context files'],
     'mode'              => ['m', true , 'create-new-site'    , 'Execution mode (create|apply)'],
     'db-engine'         => ['d', true , 'mysql'     , 'Database engine (mysql|sqlite)'],
-    'db-host'           => [null,true , 'localhost' , 'MySQL host'],
+    'db-host'           => [null,true , '127.0.0.1' , 'MySQL host'],
     'db-user'           => [null,true , 'root'      , 'MySQL user'],
     'db-pass'           => [null,true , ''          , 'MySQL password'],
     'db-name'           => [null,true , 'wordpress' , 'MySQL database'],
@@ -208,7 +208,7 @@ function cliArgsToRunnerConfiguration(array $positionals, array $options): Runne
     $dbCreds = [];
     if ($dbEngine === 'mysql') {
         $dbCreds = [
-            'host'         => $options['db-host'] ?? 'localhost',
+            'host'         => $options['db-host'] ?? '127.0.0.1',
             'username'     => $options['db-user'] ?? 'root',
             'password'     => $options['db-pass'] ?? '',
             'databaseName' => $options['db-name'] ?? 'wordpress',
@@ -309,69 +309,68 @@ function reportProgress($progress, $caption) {
 //   Main entry
 // -----------------------------------------------------------------------------
 try {
-    [$positionals, $options] = parseArguments($_SERVER['argv'], $optionDefs);
+	try {
+		[$positionals, $options] = parseArguments($_SERVER['argv'], $optionDefs);
 
-    if ($options['help']) {
-        showHelp($optionDefs);
-        exit(0);
-    }
-    if ($options['version']) {
-		echo "WordPress Blueprint Runner CLI v1.2.0\n";
-        exit(0);
-    }
+		if ($options['help']) {
+			showHelp($optionDefs);
+			exit(0);
+		}
+		if ($options['version']) {
+			echo "WordPress Blueprint Runner CLI v1.2.0\n";
+			exit(0);
+		}
 
-    // Validate positional blueprint
-    if (count($positionals) < 1) {
-        showHelp($optionDefs);
+		// Validate positional blueprint
+		if (count($positionals) < 1) {
+			showHelp($optionDefs);
+			exit(1);
+		}
+
+		// Convert CLI arguments to RunnerConfiguration
+		$config = cliArgsToRunnerConfiguration($positionals, $options);
+
+		if ($options['dry-run']) {
+			echo "\033[32mArguments valid – dry‑run mode, exiting without changes.\033[0m\n";
+			exit(0);
+		}
+		$config
+			->setProgressObserver(new ProgressObserver(function ($progress, $caption) {
+				reportProgress($progress, $caption);
+			}));
+		$runner = new Runner($config);
+	} catch (InvalidArgumentException $ex) {
+		echo "\033[31mError:\033[0m ".$ex->getMessage().PHP_EOL;
+		echo "Try '--help' for usage.".PHP_EOL;
 		exit(1);
-    }
-
-    // Convert CLI arguments to RunnerConfiguration
-    $config = cliArgsToRunnerConfiguration($positionals, $options);
-
-    if ($options['dry-run']) {
-        echo "\033[32mArguments valid – dry‑run mode, exiting without changes.\033[0m\n";
-        exit(0);
-    }
-	$config
-		->setProgressObserver(new ProgressObserver(function ($progress, $caption) {
-			reportProgress($progress, $caption);
-		}));
-	$runner = new Runner($config);
-} catch (InvalidArgumentException $ex) {
-    echo "\033[31mError:\033[0m ".$ex->getMessage().PHP_EOL;
-    echo "Try '--help' for usage.".PHP_EOL;
-    exit(1);
-} catch (\Throwable $ex) {
-    echo "\033[31mUnexpected error:\033[0m ".$ex->getMessage().PHP_EOL;
-    exit(1);
-}
-
-try {
-    // Continue with runner execution (not implemented here)
-	if($config->getExecutionMode() === 'create-new-site') {
-		echo "\033[1;32mCreating a new site\033[0m\n";
-	} else {
-		echo "\033[1;32mUpdating an existing site\033[0m\n";
 	}
-	echo sprintf("  Site URL:  %s\n", $config->getTargetSiteUrl());
-	echo sprintf("  Site path: %s\n", $config->getTargetSiteRoot());
-	echo sprintf("  Blueprint: %s\n", $config->getBlueprint()->get_human_readable_name());
-	echo PHP_EOL;
-    // In a real application you might now pass $config to a service class.
-	$runner->run();
-	echo PHP_EOL;
-	echo sprintf("\033[32m✔ Blueprint successfully executed.\033[0m\n");
-} catch (PermissionsException $ex) {
-	echo PHP_EOL . PHP_EOL;
-	$permission = $ex->getPermission();
-	$flag = RunnerConfiguration::getPermissionCliFlag($permission);
-	
-	echo sprintf("\033[31mPermission Error:\033[0m %s\n", $ex->getMessage());
-	echo sprintf("\033[33mTip:\033[0m Run with \033[1m--allow=%s\033[0m to grant this permission.\n", $flag);
-	exit(1);
+
+	try {
+		// Continue with runner execution (not implemented here)
+		if($config->getExecutionMode() === 'create-new-site') {
+			echo "\033[1;32mCreating a new site\033[0m\n";
+		} else {
+			echo "\033[1;32mUpdating an existing site\033[0m\n";
+		}
+		echo sprintf("  Site URL:  %s\n", $config->getTargetSiteUrl());
+		echo sprintf("  Site path: %s\n", $config->getTargetSiteRoot());
+		echo sprintf("  Blueprint: %s\n", $config->getBlueprint()->get_human_readable_name());
+		echo PHP_EOL;
+		// In a real application you might now pass $config to a service class.
+		$runner->run();
+		echo PHP_EOL;
+		echo sprintf("\033[32m✔ Blueprint successfully executed.\033[0m\n");
+	} catch (PermissionsException $ex) {
+		echo PHP_EOL . PHP_EOL;
+		$permission = $ex->getPermission();
+		$flag = RunnerConfiguration::getPermissionCliFlag($permission);
+		
+		echo sprintf("\033[31mPermission Error:\033[0m %s\n", $ex->getMessage());
+		echo sprintf("\033[33mTip:\033[0m Run with \033[1m--allow=%s\033[0m to grant this permission.\n", $flag);
+		exit(1);
+	}
 } catch (BlueprintExecutionException $ex) {
-	echo PHP_EOL . PHP_EOL;
+	echo PHP_EOL;
 	if(!$ex->schemaError) {
 		echo sprintf("\033[31mError:\033[0m %s\n", $ex->getMessage());
 		while($ex->getPrevious()) {

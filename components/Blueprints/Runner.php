@@ -128,7 +128,7 @@ class Runner {
 				throw new BlueprintExecutionException("MySQL credentials are required when database engine is 'mysql'.");
 			}
 			// Check if you can connect to the database
-			$host = $dbCreds['host'] ?? 'localhost';
+			$host = $dbCreds['host'] ?? '127.0.0.1';
 			$port = $dbCreds['port'] ?? 3306;
 			$username = $dbCreds['username'] ?? '';
 			$password = $dbCreds['password'] ?? '';
@@ -140,7 +140,14 @@ class Runner {
 					\PDO::ATTR_TIMEOUT => 3,
 				]);
 			} catch (\PDOException $e) {
-				throw new BlueprintExecutionException("Could not connect to MySQL database: " . $e->getMessage());
+				throw new BlueprintExecutionException(
+					sprintf(
+						"MySQL was selected as the database engine, but the provided credentials are invalid. DSN string: %s",
+						$dsn
+					),
+					0,
+					$e
+				);
 			}
 		} elseif ($dbEngine === 'sqlite') {
 			if (empty($dbCreds['path'])) {
