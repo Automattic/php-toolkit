@@ -2,6 +2,8 @@
 
 namespace WordPress\Git;
 
+use DateMalformedStringException;
+use DateTime;
 use WordPress\ByteStream\ReadStream\ByteReadStream;
 use WordPress\Filesystem\Filesystem;
 use WordPress\Filesystem\FilesystemException;
@@ -71,6 +73,7 @@ class GitFilesystem implements Filesystem {
 	public function is_dir( $path ) {
 		try {
 			$reader = $this->repo->read_object_by_path( $path );
+
 			return $reader->get_object_type_name() === 'tree';
 		} catch ( GitException $e ) {
 			return false;
@@ -80,6 +83,7 @@ class GitFilesystem implements Filesystem {
 	public function is_file( $path ) {
 		try {
 			$reader = $this->repo->read_object_by_path( $path );
+
 			return $reader->get_object_type_name() === 'blob';
 		} catch ( GitException $e ) {
 			return false;
@@ -88,6 +92,7 @@ class GitFilesystem implements Filesystem {
 
 	public function exists( $path ) {
 		$children = $this->ls( dirname( $path ) );
+
 		return in_array( basename( $path ), $children, true );
 	}
 
@@ -176,6 +181,7 @@ class GitFilesystem implements Filesystem {
 	private function commit( $options ) {
 		if ( ! $this->auto_push ) {
 			$this->repo->commit( $options );
+
 			return true;
 		}
 
@@ -183,6 +189,7 @@ class GitFilesystem implements Filesystem {
 		if ( ! $should_amend ) {
 			$this->graceful_push();
 			$this->repo->commit( $options );
+
 			return true;
 		}
 
@@ -233,17 +240,18 @@ class GitFilesystem implements Filesystem {
 
 		try {
 			$head_commit_time = $head_commit->get_author_date_time();
-		} catch ( \DateMalformedStringException $e ) {
+		} catch ( DateMalformedStringException $e ) {
 			return false;
 		}
-		$now               = new \DateTime();
+		$now               = new DateTime();
 		$time_since_commit = (float) $now->format( 'U' ) - (float) $head_commit_time->format( 'U' );
 		if ( $time_since_commit > $this->amend_time_window ) {
 			return false;
 		}
 
 		$full_branch_name   = $this->get_repository()->get_current_branch_name();
-		$short_branch_name  = strncmp($full_branch_name, 'refs/heads/', strlen('refs/heads/')) === 0 ? substr( $full_branch_name, 11 ) : $full_branch_name;
+		$short_branch_name  = strncmp( $full_branch_name, 'refs/heads/', strlen( 'refs/heads/' ) ) === 0 ? substr( $full_branch_name,
+			11 ) : $full_branch_name;
 		$remote_name        = $this->remote->get_name();
 		$remote_branch_name = "refs/remotes/{$remote_name}/{$short_branch_name}";
 		$remote_branch_hash = $this->get_repository()->get_branch_tip( $remote_branch_name );

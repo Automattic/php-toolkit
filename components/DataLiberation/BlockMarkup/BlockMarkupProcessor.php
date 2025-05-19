@@ -2,6 +2,8 @@
 
 namespace WordPress\DataLiberation\BlockMarkup;
 
+use RecursiveArrayIterator;
+use RecursiveIteratorIterator;
 use WP_Block_Parser_Error;
 use WP_HTML_Tag_Processor;
 
@@ -75,7 +77,7 @@ class BlockMarkupProcessor extends WP_HTML_Tag_Processor {
 	/**
 	 * Iterator for traversing nested block attributes
 	 *
-	 * @var \RecursiveIteratorIterator
+	 * @var RecursiveIteratorIterator
 	 */
 	private $block_attributes_iterator;
 
@@ -140,6 +142,7 @@ class BlockMarkupProcessor extends WP_HTML_Tag_Processor {
 
 		if ( false === WP_HTML_Tag_Processor::set_bookmark( 'block-end' ) ) {
 			WP_HTML_Tag_Processor::release_bookmark( 'block-start' );
+
 			return false;
 		}
 
@@ -214,7 +217,8 @@ class BlockMarkupProcessor extends WP_HTML_Tag_Processor {
 	/**
 	 * Gets a specific attribute value from the current block
 	 *
-	 * @param string $attribute_name The name of the attribute to get
+	 * @param  string  $attribute_name  The name of the attribute to get
+	 *
 	 * @return mixed|false The attribute value or false if not found
 	 */
 	public function get_block_attribute( $attribute_name ) {
@@ -229,7 +233,8 @@ class BlockMarkupProcessor extends WP_HTML_Tag_Processor {
 	 * Overwrites all the block attributes of the currently matched block
 	 * opener.
 	 *
-	 * @param array $attributes The new attributes to set
+	 * @param  array  $attributes  The new attributes to set
+	 *
 	 * @return bool Whether the attributes were successfully set
 	 */
 	public function set_block_attributes( $attributes ) {
@@ -241,6 +246,7 @@ class BlockMarkupProcessor extends WP_HTML_Tag_Processor {
 		}
 		$this->block_attributes         = $attributes;
 		$this->block_attributes_updated = true;
+
 		return true;
 	}
 
@@ -324,7 +330,7 @@ class BlockMarkupProcessor extends WP_HTML_Tag_Processor {
 		// Blocks closers start with the solidus character (`/`).
 		if ( '/' === $text[ $at ] ) {
 			$this->block_closer = true;
-			++$at;
+			++ $at;
 		}
 
 		// Blocks start with wp.
@@ -350,10 +356,11 @@ class BlockMarkupProcessor extends WP_HTML_Tag_Processor {
 				sprintf( 'An HTML comment started with "wp:" that was not followed by a valid block name: %s', $text ),
 				WP_Block_Parser_Error::TYPE_SUSPICIOUS_DELIMITER
 			);
+
 			return true;
 		}
 		$name = substr( $text, $name_starts_at, $name_length + 3 );
-		$at  += $name_length;
+		$at   += $name_length;
 
 		// Assume no attributes by default.
 		$attributes = array();
@@ -375,10 +382,10 @@ class BlockMarkupProcessor extends WP_HTML_Tag_Processor {
 
 			// Inspect our potential JSON for the self-closing solidus (`/`) character.
 			$json_maybe = $rest;
-			if ( substr( $json_maybe, -1 ) === '/' ) {
+			if ( substr( $json_maybe, - 1 ) === '/' ) {
 				// Self-closing block (<!-- wp:image /-->)
 				$this->self_closing_flag = true;
-				$json_maybe              = substr( $json_maybe, 0, -1 );
+				$json_maybe              = substr( $json_maybe, 0, - 1 );
 			}
 
 			// Let's try to parse attributes as JSON.
@@ -391,6 +398,7 @@ class BlockMarkupProcessor extends WP_HTML_Tag_Processor {
 						sprintf( '%s could be parsed as a delimiter but JSON attributes were malformed: %s.', $name, $json_maybe ),
 						WP_Block_Parser_Error::TYPE_SUSPICIOUS_DELIMITER
 					);
+
 					return true;
 				}
 			}
@@ -409,6 +417,7 @@ class BlockMarkupProcessor extends WP_HTML_Tag_Processor {
 					sprintf( 'Block closer %s does not match the last opened block %s.', $name, $popped ),
 					WP_Block_Parser_Error::TYPE_MISMATCHED_CLOSER
 				);
+
 				return false;
 			}
 		} elseif ( ! $this->self_closing_flag ) {
@@ -424,6 +433,7 @@ class BlockMarkupProcessor extends WP_HTML_Tag_Processor {
 		if ( ! $this->has_bookmark( 'block-delimiter' ) ) {
 			return false;
 		}
+
 		return $this->bookmarks['block-delimiter'];
 	}
 
@@ -436,6 +446,7 @@ class BlockMarkupProcessor extends WP_HTML_Tag_Processor {
 		if ( $this->get_token_type() !== '#block-comment' ) {
 			return false;
 		}
+
 		return true;
 	}
 
@@ -444,6 +455,7 @@ class BlockMarkupProcessor extends WP_HTML_Tag_Processor {
 	 */
 	public function get_updated_html(): string {
 		$this->block_attribute_updates_to_modifiable_text_updates();
+
 		return parent::get_updated_html();
 	}
 
@@ -495,9 +507,9 @@ class BlockMarkupProcessor extends WP_HTML_Tag_Processor {
 				return false;
 			}
 			// Re-entrant iteration over the block attributes.
-			$this->block_attributes_iterator = new \RecursiveIteratorIterator(
-				new \RecursiveArrayIterator( $block_attributes ),
-				\RecursiveIteratorIterator::SELF_FIRST
+			$this->block_attributes_iterator = new RecursiveIteratorIterator(
+				new RecursiveArrayIterator( $block_attributes ),
+				RecursiveIteratorIterator::SELF_FIRST
 			);
 		}
 
@@ -506,6 +518,7 @@ class BlockMarkupProcessor extends WP_HTML_Tag_Processor {
 			if ( ! $this->block_attributes_iterator->valid() ) {
 				break;
 			}
+
 			return true;
 		}
 
@@ -541,7 +554,8 @@ class BlockMarkupProcessor extends WP_HTML_Tag_Processor {
 	/**
 	 * Sets the value of the currently matched block attribute.
 	 *
-	 * @param mixed $new_value The new value to set
+	 * @param  mixed  $new_value  The new value to set
+	 *
 	 * @return bool Whether the value was successfully set
 	 */
 	public function set_block_attribute_value( $new_value ) {

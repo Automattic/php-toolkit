@@ -2,6 +2,7 @@
 
 namespace WordPress\Blueprints\Steps;
 
+use RuntimeException;
 use WordPress\Blueprints\DataReference\File;
 use WordPress\Blueprints\Exception\BlueprintExecutionException;
 use WordPress\Blueprints\Progress\Tracker;
@@ -12,9 +13,9 @@ use WordPress\Blueprints\Runtime;
  */
 class ImportContentStep implements StepInterface {
 	/**
-     * @var mixed[]
-     */
-    private $content;
+	 * @var mixed[]
+	 */
+	private $content;
 
 	public function __construct( array $content ) {
 		$this->content = $content;
@@ -30,36 +31,36 @@ class ImportContentStep implements StepInterface {
 			return true;
 		}
 
-		$progress->split($total_files);
+		$progress->split( $total_files );
 
 		foreach ( $this->content as $i => $content_definition ) {
-			if ($content_definition['type'] === 'wxr') {
+			if ( $content_definition['type'] === 'wxr' ) {
 				// @TODO: More useful captions – include the url
-				$progress[$i]->setCaption( 'Importing WXR file ' );
-				$this->importWxr($runtime, $content_definition);
-			} elseif ($content_definition['type'] === 'posts') {
-				$progress[$i]->setCaption( 'Importing a post ' );
-				$this->importPosts($runtime, $content_definition);
+				$progress[ $i ]->setCaption( 'Importing WXR file ' );
+				$this->importWxr( $runtime, $content_definition );
+			} elseif ( $content_definition['type'] === 'posts' ) {
+				$progress[ $i ]->setCaption( 'Importing a post ' );
+				$this->importPosts( $runtime, $content_definition );
 			} else {
-				throw new \RuntimeException( 'Unsupported content type: ' . $content_definition['type'] );
+				throw new RuntimeException( 'Unsupported content type: ' . $content_definition['type'] );
 			}
 
-			$progress[$i]->finish();
+			$progress[ $i ]->finish();
 		}
 
 		$progress->finish();
 	}
 
-	private function importWxr(Runtime $runtime, array $content_definition): void {
-		$resolved = $runtime->resolve($content_definition['source']);
-		if (!$resolved instanceof File) {
-			throw new BlueprintExecutionException(sprintf(
+	private function importWxr( Runtime $runtime, array $content_definition ): void {
+		$resolved = $runtime->resolve( $content_definition['source'] );
+		if ( ! $resolved instanceof File ) {
+			throw new BlueprintExecutionException( sprintf(
 				'Imported content reference must be a file, but %s was a Directory.',
 				$content_definition['source']->get_human_readable_name()
-			));
+			) );
 		}
 
-		$wxrPath = $runtime->saveToTemporaryFile($resolved);
+		$wxrPath = $runtime->saveToTemporaryFile( $resolved );
 		$runtime->evalPhpInSubProcess(
 			<<<'PHP'
 <?php
@@ -86,7 +87,7 @@ return wp_slash($data);
 // Ensure that Site Editor templates are associated with the correct taxonomy.
 add_filter( 'wp_import_post_terms', function ( $terms, $post_id ) {
 foreach ( $terms as $post_term ) {
-if ( 'wp_theme' !== $term['taxonomy'] ) continue;
+if ( 'wp_theme' !== $term['taxonomy'] ) {continue;}
 $post_term = get_term_by('slug', $term['slug'], $term['taxonomy'] );
 if ( ! $post_term ) {
 $post_term = wp_insert_term(
@@ -103,17 +104,17 @@ return $terms;
 }, 10, 2 );
 $result = $importer->import( getenv('WXR_PATH') );
 PHP
-,
+			,
 			[
 				'WXR_PATH' => $wxrPath,
 			]
 		);
 	}
 
-	private function importPosts(Runtime $runtime, array $content_definition): void {
+	private function importPosts( Runtime $runtime, array $content_definition ): void {
 		$posts = $content_definition['source'];
-		if (!is_array($posts)) {
-			throw new \RuntimeException('Invalid posts data.');
+		if ( ! is_array( $posts ) ) {
+			throw new RuntimeException( 'Invalid posts data.' );
 		}
 
 		$runtime->evalPhpInSubProcess(
@@ -124,9 +125,9 @@ foreach (json_decode(getenv('POSTS'), true) as $post) {
 wp_insert_post(wp_slash($post));
 }
 PHP
-,
+			,
 			[
-				'POSTS' => json_encode($posts),
+				'POSTS' => json_encode( $posts ),
 			]
 		);
 	}

@@ -52,8 +52,8 @@ class GoogleDriveFilesystem implements Filesystem {
 			'files',
 			'GET',
 			array(
-				'q' => $query,
-				'fields' => 'files(id,name,mimeType)',
+				'q'        => $query,
+				'fields'   => 'files(id,name,mimeType)',
 				'pageSize' => 1000,
 			)
 		);
@@ -68,6 +68,7 @@ class GoogleDriveFilesystem implements Filesystem {
 		foreach ( $response['files'] as $file ) {
 			$result[] = $file['name'];
 		}
+
 		return $result;
 	}
 
@@ -80,6 +81,7 @@ class GoogleDriveFilesystem implements Filesystem {
 
 		if ( $path === '/' ) {
 			$this->path_id_cache[ $path ] = 'root';
+
 			return 'root';
 		}
 
@@ -101,14 +103,15 @@ class GoogleDriveFilesystem implements Filesystem {
 				'files',
 				'GET',
 				array(
-					'q' => $query,
-					'fields' => 'files(id,mimeType)',
+					'q'        => $query,
+					'fields'   => 'files(id,mimeType)',
 					'pageSize' => 1,
 				)
 			);
 
 			if ( ! $response || empty( $response['files'] ) ) {
 				$this->path_id_cache[ $current_path ] = '';
+
 				return '';
 			}
 
@@ -128,6 +131,7 @@ class GoogleDriveFilesystem implements Filesystem {
 				'fields' => 'mimeType',
 			)
 		);
+
 		return $response && $response['mimeType'] === 'application/vnd.google-apps.folder';
 	}
 
@@ -140,6 +144,7 @@ class GoogleDriveFilesystem implements Filesystem {
 				'fields' => 'mimeType',
 			)
 		);
+
 		return $response && $response['mimeType'] !== 'application/vnd.google-apps.folder';
 	}
 
@@ -164,20 +169,22 @@ class GoogleDriveFilesystem implements Filesystem {
 		if ( $this->path_to_id( $path ) ) {
 			return true;
 		}
+
 		return (bool) $this->make_api_request(
 			'files',
 			'POST',
 			array(),
 			array(
-				'name' => basename( $path ),
+				'name'     => basename( $path ),
 				'mimeType' => 'application/vnd.google-apps.folder',
-				'parents' => array( $this->path_to_id( wp_dirname( $path ) ) ),
+				'parents'  => array( $this->path_to_id( wp_dirname( $path ) ) ),
 			)
 		);
 	}
 
 	public function rm( $path ) {
 		$file_id = $this->path_to_id( $path );
+
 		return (bool) $this->make_api_request( "files/$file_id", 'DELETE' );
 	}
 
@@ -194,16 +201,18 @@ class GoogleDriveFilesystem implements Filesystem {
 				}
 			}
 		}
+
 		return (bool) $this->rm( $path );
 	}
 
 	public function rename( $path, $new_path, $options = array() ) {
 		$file_id = $this->path_to_id( $path );
+
 		return (bool) $this->make_api_request(
 			"files/$file_id",
 			'PATCH',
 			array(
-				'addParents' => $this->path_to_id( wp_dirname( $new_path ) ),
+				'addParents'    => $this->path_to_id( wp_dirname( $new_path ) ),
 				'removeParents' => $this->path_to_id( wp_dirname( $path ) ),
 			)
 		);
@@ -221,7 +230,7 @@ class GoogleDriveFilesystem implements Filesystem {
 		}
 		$metadata_json = json_encode(
 			array(
-				'name' => basename( $path ),
+				'name'    => basename( $path ),
 				'parents' => array( $this->path_to_id( wp_dirname( $path ) ) ),
 			)
 		);
@@ -238,6 +247,7 @@ $data
 
 --BOUNDARY_STRING--
 BODY;
+
 		return $this->make_api_request(
 			'https://www.googleapis.com/upload/drive/v3/files',
 			'POST',
@@ -257,7 +267,7 @@ BODY;
 	}
 
 	private function make_api_request( $endpoint, $method = 'GET', $params = array(), $data = null ) {
-		if ( strncmp($endpoint, 'https://', strlen('https://')) === 0 ) {
+		if ( strncmp( $endpoint, 'https://', strlen( 'https://' ) ) === 0 ) {
 			$url = $endpoint;
 		} else {
 			$url = 'https://www.googleapis.com/drive/v3/' . $endpoint;
@@ -266,10 +276,10 @@ BODY;
 			$url .= '?' . http_build_query( $params );
 		}
 		$request_info = array(
-			'method' => $method,
+			'method'  => $method,
 			'headers' => array(
 				'Authorization' => 'Bearer ' . $this->access_token,
-				'Accept' => 'application/json',
+				'Accept'        => 'application/json',
 			),
 		);
 		if ( $data ) {
@@ -312,6 +322,7 @@ BODY;
 				sprintf( 'Google Drive API error: %s', $buffered_response )
 			);
 		}
+
 		return $response_json;
 	}
 }

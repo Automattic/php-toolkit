@@ -3,7 +3,6 @@
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Process\Process;
 use WordPress\ByteStream\ReadStream\FileReadStream;
-use WordPress\HttpClient\ByteStream\RequestReadStream;
 use WordPress\HttpClient\ByteStream\SeekableRequestReadStream;
 use WordPress\HttpClient\Client;
 use WordPress\Zip\ZipFilesystem;
@@ -60,15 +59,15 @@ class ZipFilesystemTest extends TestCase {
 	 * @dataProvider chunkedEncodingProvider
 	 */
 	public function testReadRemoteZip( $chunked ) {
-		$this->withServer( function( $url ) use ( $chunked ) {
+		$this->withServer( function ( $url ) use ( $chunked ) {
 			$zip = ZipFilesystem::create(
-				new SeekableRequestReadStream( 
-					"$url/childrens-literature.zip?chunked=$chunked", 
+				new SeekableRequestReadStream(
+					"$url/childrens-literature.zip?chunked=$chunked",
 					[ 'client' => new Client() ]
 				)
 			);
 			$this->assertEquals(
-				['mimetype', 'EPUB', 'META-INF'],
+				[ 'mimetype', 'EPUB', 'META-INF' ],
 				$zip->ls()
 			);
 		} );
@@ -76,35 +75,35 @@ class ZipFilesystemTest extends TestCase {
 
 	static function chunkedEncodingProvider() {
 		return [
-			['yes'],
-			['no'],
+			[ 'yes' ],
+			[ 'no' ],
 		];
 	}
 
 	private function withServer( callable $callback, $host = '127.0.0.1', $port = 8940 ) {
 		$test_server_root = wp_join_paths( __DIR__, 'test-server' );
-		$server = new Process([
+		$server           = new Process( [
 			'php',
 			wp_join_paths( $test_server_root, 'run.php' ),
 			$host,
-			$port
-		], $test_server_root);
+			$port,
+		], $test_server_root );
 		$server->start();
 		try {
 			$attempts = 0;
-			while($server->isRunning()) {
+			while ( $server->isRunning() ) {
 				$output = $server->getIncrementalOutput();
-				if(strncmp($output, 'Server started on http://', strlen('Server started on http://')) === 0) {
+				if ( strncmp( $output, 'Server started on http://', strlen( 'Server started on http://' ) ) === 0 ) {
 					break;
 				}
-				usleep(40000);
-				if(++$attempts > 10) {
+				usleep( 40000 );
+				if ( ++ $attempts > 10 ) {
 					$this->fail( 'Server did not start' );
 				}
 			}
-			$callback("http://{$host}:{$port}");
+			$callback( "http://{$host}:{$port}" );
 		} finally {
-			$server->stop(0);
+			$server->stop( 0 );
 		}
 	}
 }

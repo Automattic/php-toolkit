@@ -2,10 +2,10 @@
 
 namespace WordPress\DataLiberation\EntityWriter;
 
-use WordPress\DataLiberation\ImportEntity;
-use WordPress\DataLiberation\DataLiberationException;
-use WordPress\Filesystem\Filesystem;
 use WordPress\DataLiberation\DataFormatConsumer\BlocksWithMetadata;
+use WordPress\DataLiberation\DataLiberationException;
+use WordPress\DataLiberation\ImportEntity;
+use WordPress\Filesystem\Filesystem;
 
 use function WordPress\Filesystem\wp_join_paths;
 
@@ -14,18 +14,18 @@ class StaticPostFilesWriter implements EntityWriter {
 	private $filesystem;
 	private $state = self::STATE_WRITING;
 	private $directory_scheme;
-	private $parent_stack        = array();
+	private $parent_stack = array();
 	private $pending_parent_path = '/';
 	private $pending_post;
 	private $pending_metadata;
 	private $static_content_producer_factory;
 	private $file_extension;
 
-	const STATE_WRITING    = 'writing';
+	const STATE_WRITING = 'writing';
 	const STATE_FINALIZING = 'finalizing';
-	const STATE_CLOSED     = 'closed';
+	const STATE_CLOSED = 'closed';
 
-	const SCHEME_DATE         = 'date';
+	const SCHEME_DATE = 'date';
 	const SCHEME_PARENT_TRAIL = 'parent_trail';
 
 	public function __construct( Filesystem $filesystem, $options = array() ) {
@@ -119,11 +119,13 @@ class StaticPostFilesWriter implements EntityWriter {
 		foreach ( $this->parent_stack as $parent_post ) {
 			$base_path_segments[] = $this->slugify( $parent_post['post_title'] );
 		}
+
 		return wp_join_paths( ...$base_path_segments );
 	}
 
 	private function create_date_based_directory( $post_data ) {
 		$base_path_segments = explode( '-', substr( $post_data['post_date'], 0, 10 ) );
+
 		return wp_join_paths( ...$base_path_segments );
 	}
 

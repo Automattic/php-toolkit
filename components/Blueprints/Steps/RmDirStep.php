@@ -10,9 +10,9 @@ use WordPress\Blueprints\Runtime;
  */
 class RmDirStep implements StepInterface {
 	/**
-     * @var string
-     */
-    public $path;
+	 * @var string
+	 */
+	public $path;
 
 	/**
 	 * @param  string  $path  The directory path to remove.

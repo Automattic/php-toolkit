@@ -2,6 +2,7 @@
 
 namespace WordPress\Blueprints\Steps;
 
+use Exception;
 use WordPress\Blueprints\Progress\Tracker;
 use WordPress\Blueprints\Runtime;
 
@@ -10,16 +11,16 @@ use WordPress\Blueprints\Runtime;
  */
 class WPCLIStep implements StepInterface {
 	/**
-     * The WP-CLI command arguments string (e.g., "plugin install woocommerce --activate").
-     * @var string
-     */
-    public $command;
+	 * The WP-CLI command arguments string (e.g., "plugin install woocommerce --activate").
+	 * @var string
+	 */
+	public $command;
 
 	/**
-     * Optional path to the WP-CLI executable.
-     * @var string|null
-     */
-    public $wpCliPath;
+	 * Optional path to the WP-CLI executable.
+	 * @var string|null
+	 */
+	public $wpCliPath;
 
 	/**
 	 * @param  string  $command  The WP-CLI command string.
@@ -33,10 +34,10 @@ class WPCLIStep implements StepInterface {
 	public function run( Runtime $runtime, Tracker $tracker ) {
 		$tracker->setCaption( 'Running WP-CLI command: ' . $this->command );
 		$command = $this->command;
-		if(substr($command, 0, 3) !== 'wp '){
-			throw new \Exception( 'WP-CLI command must start with "wp ".' );
+		if ( substr( $command, 0, 3 ) !== 'wp ' ) {
+			throw new Exception( 'WP-CLI command must start with "wp ".' );
 		}
-		$command = ($this->wpCliPath ?? $runtime->getWpCliPath()) . ' ' . substr( $command, 3 );
+		$command = ( $this->wpCliPath ?? $runtime->getWpCliPath() ) . ' ' . substr( $command, 3 );
 		$runtime->runShellCommand( $command );
 	}
 }

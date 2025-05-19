@@ -8,17 +8,17 @@ use WordPress\ByteStream\ReadStream\ByteStreamException;
 class ProgressTrackedReadStream implements ByteReadStream {
 
 	/**
-     * @var \WordPress\ByteStream\ReadStream\ByteReadStream
-     */
-    private $stream;
+	 * @var ByteReadStream
+	 */
+	private $stream;
 	/**
-     * @var \WordPress\Blueprints\Progress\Tracker
-     */
-    private $tracker;
+	 * @var Tracker
+	 */
+	private $tracker;
 	/**
-     * @var int|null
-     */
-    private $streamLength;
+	 * @var int|null
+	 */
+	private $streamLength;
 
 	public function __construct( ByteReadStream $stream, Tracker $tracker ) {
 		$this->stream       = $stream;

@@ -3,12 +3,13 @@
 
 namespace WordPress\DataLiberation\Importer;
 
+use Iterator;
 use WordPress\DataLiberation\ImportEntity;
 
-class RetryFrontloadingIterator implements \Iterator {
+class RetryFrontloadingIterator implements Iterator {
 	private $import_post_id;
 	private $last_id_on_page = null;
-	private $placeholders    = array();
+	private $placeholders = array();
 	private $current;
 	private $rewound = true;
 
@@ -17,16 +18,17 @@ class RetryFrontloadingIterator implements \Iterator {
 	}
 
 	/**
-     * @return mixed
-     */
-    public function current() {
+	 * @return mixed
+	 */
+	public function current() {
 		if ( ! $this->current ) {
 			return null;
 		}
+
 		return new ImportEntity(
 			'asset_retry',
 			array(
-				'current_url' => $this->current->meta['current_url'],
+				'current_url'  => $this->current->meta['current_url'],
 				'original_url' => $this->current->meta['original_url'],
 			)
 		);
@@ -41,12 +43,13 @@ class RetryFrontloadingIterator implements \Iterator {
 	}
 
 	/**
-     * @return mixed
-     */
-    public function key() {
+	 * @return mixed
+	 */
+	public function key() {
 		if ( ! $this->current ) {
 			return null;
 		}
+
 		return $this->current->ID;
 	}
 
@@ -54,6 +57,7 @@ class RetryFrontloadingIterator implements \Iterator {
 		if ( $this->rewound ) {
 			$this->next();
 		}
+
 		return null !== $this->current;
 	}
 

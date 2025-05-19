@@ -45,13 +45,13 @@ class RequestReadStream extends BaseByteReadStream {
 		}
 		$this->client  = $options['client'];
 		$this->request = $request;
-		if(isset($options['buffer_size'])) {
+		if ( isset( $options['buffer_size'] ) ) {
 			$this->buffer_size = $options['buffer_size'];
 		}
-		if(isset($options['progress_tracker'])) {
+		if ( isset( $options['progress_tracker'] ) ) {
 			$this->progress_tracker = $options['progress_tracker'];
 		}
-		if(isset($options['eagerly_enqueue'])) {
+		if ( isset( $options['eagerly_enqueue'] ) ) {
 			$this->ensure_is_enqueued();
 		}
 	}
@@ -61,7 +61,7 @@ class RequestReadStream extends BaseByteReadStream {
 	}
 
 	public function json() {
-		return json_decode($this->consume_all(), true);
+		return json_decode( $this->consume_all(), true );
 	}
 
 	private function ensure_is_enqueued() {
@@ -72,9 +72,9 @@ class RequestReadStream extends BaseByteReadStream {
 	}
 
 	protected function seek_outside_of_buffer( int $target_offset ): void {
-		if($target_offset > $this->tell()) {
-			$pulled = $this->pull_exactly($target_offset - $this->tell());
-			$this->consume($pulled);
+		if ( $target_offset > $this->tell() ) {
+			$pulled = $this->pull_exactly( $target_offset - $this->tell() );
+			$this->consume( $pulled );
 		} else {
 			throw new ByteStreamException(
 				'RequestReadStream cannot seek() backwards to offset ' . $target_offset . ' outside of the in-memory data buffer. ' .
@@ -87,7 +87,7 @@ class RequestReadStream extends BaseByteReadStream {
 		return $this->pull_until_event(
 			array(
 				'max_bytes' => $max_bytes,
-				'event' => Client::EVENT_BODY_CHUNK_AVAILABLE,
+				'event'     => Client::EVENT_BODY_CHUNK_AVAILABLE,
 			)
 		);
 	}
@@ -120,7 +120,7 @@ class RequestReadStream extends BaseByteReadStream {
 						/**
 						 * Set the content-length based on the header, but make sure it stays null
 						 * when the Content-Length header is not set.
-						 * 
+						 *
 						 * Important: Don't set the content-length to 0 if the header is missing! This
 						 * would tell the streaming machinery there's no body to consume.
 						 */
@@ -134,12 +134,13 @@ class RequestReadStream extends BaseByteReadStream {
 					if ( $stop_at_event === Client::EVENT_BODY_CHUNK_AVAILABLE ) {
 						$body_chunk = $this->client->get_response_body_chunk();
 
-						if($this->progress_tracker) {
-							$bytes_downloaded = $this->bytes_already_forgotten + strlen($this->buffer) + strlen($body_chunk);
+						if ( $this->progress_tracker ) {
+							$bytes_downloaded = $this->bytes_already_forgotten + strlen( $this->buffer ) + strlen( $body_chunk );
 							// Arbitrarily assume 15MB if no length is provided
 							$length = $this->remote_file_length ?: 15 * 1024 * 1024;
-							$this->progress_tracker->set($bytes_downloaded / $length * 100);
+							$this->progress_tracker->set( $bytes_downloaded / $length * 100 );
 						}
+
 						return $body_chunk;
 					}
 					break;
@@ -149,9 +150,10 @@ class RequestReadStream extends BaseByteReadStream {
 					 * backfill the file length with the number of downloaded
 					 * bytes.
 					 */
-					if(null === $this->remote_file_length) {
-						$this->remote_file_length = $this->bytes_already_forgotten + strlen($this->buffer);
+					if ( null === $this->remote_file_length ) {
+						$this->remote_file_length = $this->bytes_already_forgotten + strlen( $this->buffer );
 					}
+
 					return '';
 				case Client::EVENT_FAILED:
 					// TODO: Think through error handling. Errors are expected when working with
@@ -179,6 +181,7 @@ class RequestReadStream extends BaseByteReadStream {
 		if ( ! $this->response ) {
 			throw new ByteStreamException( 'HTTP request failed – never received a response' );
 		}
+
 		return $this->response;
 	}
 

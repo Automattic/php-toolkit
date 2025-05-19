@@ -2659,7 +2659,7 @@ class XMLProcessor {
 
 		$matches = array();
 		foreach ( array_keys( $this->attributes ) as $attr_name ) {
-			if ( strncmp($attr_name, $prefix, strlen($prefix)) === 0 ) {
+			if ( strncmp( $attr_name, $prefix, strlen( $prefix ) ) === 0 ) {
 				$matches[] = $attr_name;
 			}
 		}

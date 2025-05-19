@@ -12,8 +12,8 @@ use WordPress\Merge\Merge\ChunkMerger;
 use WordPress\Merge\MergeStrategy;
 
 use function WordPress\Filesystem\wp_canonicalize_path;
-use function WordPress\Filesystem\wp_join_paths;
 use function WordPress\Filesystem\wp_dirname;
+use function WordPress\Filesystem\wp_join_paths;
 
 class GitRepository {
 
@@ -340,7 +340,7 @@ class GitRepository {
 				throw new GitException( 'Branch file not found: ' . $path );
 			}
 			$branch_name = trim( $this->fs->get_contents( $path ) );
-			if ( strncmp($branch_name, 'ref: ', strlen('ref: ')) === 0 && ( $options['follow_symrefs'] ?? true ) ) {
+			if ( strncmp( $branch_name, 'ref: ', strlen( 'ref: ' ) ) === 0 && ( $options['follow_symrefs'] ?? true ) ) {
 				continue;
 			}
 
@@ -350,19 +350,19 @@ class GitRepository {
 
 	private function resolve_branch_file_path( $branch_name ) {
 		$branch_name = trim( $branch_name );
-		if ( strncmp($branch_name, 'ref: ', strlen('ref: ')) === 0 ) {
+		if ( strncmp( $branch_name, 'ref: ', strlen( 'ref: ' ) ) === 0 ) {
 			$branch_name = trim( substr( $branch_name, 5 ) );
 		}
 		if (
-			strpos($branch_name, '/') !== false &&
-			strncmp($branch_name, 'refs/heads/', strlen('refs/heads/')) !== 0 &&
-			strncmp($branch_name, 'refs/remotes/', strlen('refs/remotes/')) !== 0
+			strpos( $branch_name, '/' ) !== false &&
+			strncmp( $branch_name, 'refs/heads/', strlen( 'refs/heads/' ) ) !== 0 &&
+			strncmp( $branch_name, 'refs/remotes/', strlen( 'refs/remotes/' ) ) !== 0
 		) {
 			_doing_it_wrong( __METHOD__, 'Invalid ref name: ' . $branch_name, '1.0.0' );
 
 			return false;
 		}
-		if ( strpos($branch_name, '../') !== false ) {
+		if ( strpos( $branch_name, '../' ) !== false ) {
 			_doing_it_wrong( __METHOD__, 'Invalid ref name: ' . $branch_name, '1.0.0' );
 
 			return false;
@@ -406,7 +406,7 @@ class GitRepository {
 	 *        everything into memory and will fail for large merges.
 	 * @TODO: Do not change the HEAD ref.
 	 *
-	 * @param  string $branch_name  The branch to merge.
+	 * @param  string  $branch_name  The branch to merge.
 	 * @param  array  $options  An associative array of options. {
 	 *
 	 * @type string $path The path to merge files at. The other paths will be ignored.
@@ -482,7 +482,7 @@ class GitRepository {
 
 		$new_commit_hash = $this->commit(
 			array(
-				'commit' => array(
+				'commit'  => array(
 					'message' => 'Merge commit ' . $commit_hash2 . ' into ' . $commit_hash1,
 					'parents' => array(
 						$commit_hash1,
@@ -514,8 +514,8 @@ class GitRepository {
 	 *
 	 * TODO: Support commits with multiple parents.
 	 *
-	 * @param  string $commit_hash1  The first reference.
-	 * @param  string $commit_hash2  The second reference.
+	 * @param  string  $commit_hash1  The first reference.
+	 * @param  string  $commit_hash2  The second reference.
 	 *
 	 * @return string The common ancestor hash.
 	 */
@@ -568,7 +568,7 @@ class GitRepository {
 	public function get_nth_ancestor_hash( $n, $commit_hash = null ) {
 		$commit_hash = $options['commit_hash'] ?? $this->get_branch_tip( 'HEAD' );
 
-		for ( $i = 0; $i < $n; $i++ ) {
+		for ( $i = 0; $i < $n; $i ++ ) {
 			$commit_hash = $this->read_object( $commit_hash )->as_commit()->parents[0];
 		}
 
@@ -691,7 +691,7 @@ class GitRepository {
 			$this->mark_tree_path_changed( $changed_trees, wp_dirname( $new_path ) );
 
 			$changed_trees[ wp_dirname( $old_path ) ]->entries[ basename( $old_path ) ] = self::DELETE_PLACEHOLDER;
-			$new_basename = basename( $new_path );
+			$new_basename                                                               = basename( $new_path );
 			if ( $new_basename === '' ) {
 				throw new GitException( 'Cannot rename a file to an empty filename' );
 			}
@@ -892,7 +892,7 @@ class GitRepository {
 		// Rebase $squash_into_commit_oid and its descenrants onto the parent
 		// of the squashed range.
 		$new_parent_oid = $new_base_oid;
-		for ( $i = count( $commits_to_rebase ) - 1; $i >= 0; $i-- ) {
+		for ( $i = count( $commits_to_rebase ) - 1; $i >= 0; $i -- ) {
 			$parsed_old_commit       = $this->read_object( $commits_to_rebase[ $i ] )->as_commit();
 			$updated_commit          = clone $parsed_old_commit;
 			$updated_commit->parents = array( $new_parent_oid );
@@ -943,6 +943,7 @@ class GitRepository {
 		if ( ! $include_ancestor ) {
 			array_pop( $commits );
 		}
+
 		return $commits;
 	}
 
@@ -952,14 +953,15 @@ class GitRepository {
 
 			return false;
 		}
+
 		return new Commit(
 			array_merge(
 				array(
-					'author' => $this->get_config_value( 'user.name' ) . ' <' . $this->get_config_value( 'user.email' ) . '>',
-					'author_date' => null,
-					'committer' => $this->get_config_value( 'user.name' ) . ' <' . $this->get_config_value( 'user.email' ) . '>',
+					'author'         => $this->get_config_value( 'user.name' ) . ' <' . $this->get_config_value( 'user.email' ) . '>',
+					'author_date'    => null,
+					'committer'      => $this->get_config_value( 'user.name' ) . ' <' . $this->get_config_value( 'user.email' ) . '>',
 					'committer_date' => null,
-					'message' => 'Changes',
+					'message'        => 'Changes',
 				),
 				$options
 			)
@@ -1035,7 +1037,7 @@ class GitRepository {
 		foreach ( $prefixes as $prefix ) {
 			$path       = ltrim( wp_canonicalize_path( $prefix ), '/' );
 			$first_path = $this->fs->is_dir( $path ) ? $path : wp_dirname( $path );
-			if ( strncmp($first_path, 'refs/', strlen('refs/')) === 0 ) {
+			if ( strncmp( $first_path, 'refs/', strlen( 'refs/' ) ) === 0 ) {
 				$stack[] = $first_path;
 			}
 		}
@@ -1051,7 +1053,7 @@ class GitRepository {
 			} elseif ( $this->fs->is_file( $path ) ) {
 				// Check if path matches any of the prefixes
 				foreach ( $prefixes as $prefix ) {
-					if ( strncmp($path, $prefix, strlen($prefix)) === 0 ) {
+					if ( strncmp( $path, $prefix, strlen( $prefix ) ) === 0 ) {
 						$hash = trim( $this->fs->get_contents( $path ) );
 						if ( $hash ) {
 							$ref_name          = trim( $path, '/' );
@@ -1065,7 +1067,7 @@ class GitRepository {
 
 		// Check if we should include HEAD
 		foreach ( $prefixes as $prefix ) {
-			if ( $prefix === '' || strncmp('HEAD', $prefix, strlen($prefix)) === 0 ) {
+			if ( $prefix === '' || strncmp( 'HEAD', $prefix, strlen( $prefix ) ) === 0 ) {
 				$refs['HEAD'] = $this->get_branch_tip( 'HEAD' );
 				break;
 			}

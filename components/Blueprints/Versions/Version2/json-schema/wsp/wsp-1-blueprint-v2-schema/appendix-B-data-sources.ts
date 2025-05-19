@@ -44,8 +44,8 @@ export type ExecutionContextPath = `/${string}` | `./${string}`;
  * ```
  */
 export type InlineFile = {
-	filename: string;
-	content: InlineFileContent;
+  filename: string;
+  content: InlineFileContent;
 };
 type InlineFileContent = string;
 
@@ -69,43 +69,43 @@ type InlineFileContent = string;
  * ```
  */
 export type InlineDirectory = {
-	directoryName: string;
-	files: Record<string, InlineFileContent | InlineDirectory>;
+  directoryName: string;
+  files: Record<string, InlineFileContent | InlineDirectory>;
 };
 
 /**
  * A reference to a remote git repository.
  */
 export type GitPath = {
-	/**
-	 * A HTTP or HTTPS URL of the remote git repository.
-	 */
-	gitRepository: URLReference;
+  /**
+   * A HTTP or HTTPS URL of the remote git repository.
+   */
+  gitRepository: URLReference;
 
-	/**
-	 * A branch name, commit hash, or tag name.
-	 *
-	 * Defaults to HEAD.
-	 */
-	ref?: string;
+  /**
+   * A branch name, commit hash, or tag name.
+   *
+   * Defaults to HEAD.
+   */
+  ref?: string;
 
-	/**
-	 * A path inside the git repository this data reference points to.
-	 *
-	 * Defaults to the root of the repository.
-	 */
-	pathInRepository?: string;
+  /**
+   * A path inside the git repository this data reference points to.
+   *
+   * Defaults to the root of the repository.
+   */
+  pathInRepository?: string;
 };
 
 /**
  * A union of all general data reference types.
  */
 export type DataReference =
-	| URLReference
-	| ExecutionContextPath
-	| InlineFile
-	| InlineDirectory
-	| GitPath;
+  | URLReference
+  | ExecutionContextPath
+  | InlineFile
+  | InlineDirectory
+  | GitPath;
 
 /**
  * }}}
@@ -133,9 +133,9 @@ export type DataReference =
  */
 export type Slug = string;
 export type SimpleVersionExpression =
-	| 'latest'
-	| `${number}.${number}`
-	| `${number}.${number}.${number}`;
+  | 'latest'
+  | `${number}.${number}`
+  | `${number}.${number}.${number}`;
 export type WordPressVersionSuffix = `beta${number}` | `rc${number}`;
 /** }}} Helper types */
 
@@ -153,8 +153,8 @@ export type WordPressVersionSuffix = `beta${number}` | `rc${number}`;
  * * The `installPlugin` imperative step
  */
 export type PluginDirectoryReference =
-	| Slug
-	| `${Slug}@${SimpleVersionExpression}`;
+  | Slug
+  | `${Slug}@${SimpleVersionExpression}`;
 
 /**
  * Theme directory reference, e.g. "twentytwentythree", "adventurer@4.6.0", or "twentytwentyfour@latest".
@@ -170,8 +170,8 @@ export type PluginDirectoryReference =
  * * The `installTheme` imperative step
  */
 export type ThemeDirectoryReference =
-	| Slug
-	| `${Slug}@${SimpleVersionExpression}`;
+  | Slug
+  | `${Slug}@${SimpleVersionExpression}`;
 
 /**
  * WordPress version, e.g. "6.4", "6.4.3", "6.8-RC1", or "6.7-beta2".
@@ -183,8 +183,8 @@ export type ThemeDirectoryReference =
  * `wordpressVersion` property.
  */
 export type WordPressVersion =
-	| SimpleVersionExpression
-	| `${SimpleVersionExpression}-${WordPressVersionSuffix}`;
+  | SimpleVersionExpression
+  | `${SimpleVersionExpression}-${WordPressVersionSuffix}`;
 
 /**
  * PHP version, e.g. "8.1" or "8.1.3".

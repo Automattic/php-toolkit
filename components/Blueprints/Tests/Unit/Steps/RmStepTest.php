@@ -4,6 +4,7 @@ namespace WordPress\Blueprints\Tests\Unit\Steps;
 
 use WordPress\Blueprints\Progress\Tracker;
 use WordPress\Blueprints\Steps\RmStep;
+use WordPress\Filesystem\FilesystemException;
 
 class RmStepTest extends StepTestCase {
 
@@ -84,7 +85,7 @@ class RmStepTest extends StepTestCase {
 		);
 
 		$tracker = new Tracker();
-		$this->expectException( \WordPress\Filesystem\FilesystemException::class );
+		$this->expectException( FilesystemException::class );
 		$this->expectExceptionMessageMatches( '/Path does not exist:/' );
 
 		$step->run( $this->runtime, $tracker );
@@ -96,7 +97,7 @@ class RmStepTest extends StepTestCase {
 		);
 
 		$tracker = new Tracker();
-		$this->expectException( \WordPress\Filesystem\FilesystemException::class );
+		$this->expectException( FilesystemException::class );
 		$this->expectExceptionMessageMatches( '/Path does not exist:/' );
 
 		$step->run( $this->runtime, $tracker );

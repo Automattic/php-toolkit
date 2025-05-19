@@ -6,25 +6,25 @@ use WordPress\Blueprints\DataReference\DataReference;
 
 class MediaFileDefinition {
 	/**
-     * @var \WordPress\Blueprints\DataReference\DataReference
-     */
-    public $source;
+	 * @var DataReference
+	 */
+	public $source;
 	/**
-     * @var string|null
-     */
-    public $title;
+	 * @var string|null
+	 */
+	public $title;
 	/**
-     * @var string|null
-     */
-    public $description;
+	 * @var string|null
+	 */
+	public $description;
 	/**
-     * @var string|null
-     */
-    public $alt;
+	 * @var string|null
+	 */
+	public $alt;
 	/**
-     * @var string|null
-     */
-    public $caption;
+	 * @var string|null
+	 */
+	public $caption;
 
 	static public function fromArray( array $data ): self {
 		$instance              = new self();

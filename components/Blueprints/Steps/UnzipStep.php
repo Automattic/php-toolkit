@@ -2,6 +2,7 @@
 
 namespace WordPress\Blueprints\Steps;
 
+use InvalidArgumentException;
 use WordPress\Blueprints\DataReference\DataReference;
 use WordPress\Blueprints\DataReference\File;
 use WordPress\Blueprints\Progress\Tracker;
@@ -15,16 +16,16 @@ use function WordPress\Filesystem\copy_between_filesystems;
  */
 class UnzipStep implements StepInterface {
 	/**
-     * Zip file source identifier (URL, ./path, /path).
-     * @var \WordPress\Blueprints\DataReference\DataReference
-     */
-    public $zipFile;
+	 * Zip file source identifier (URL, ./path, /path).
+	 * @var DataReference
+	 */
+	public $zipFile;
 
 	/**
-     * The path to extract the zip file to.
-     * @var string
-     */
-    public $extractToPath;
+	 * The path to extract the zip file to.
+	 * @var string
+	 */
+	public $extractToPath;
 
 	/**
 	 * @param  DataReference  $zipFile  Zip file source identifier.
@@ -44,7 +45,7 @@ class UnzipStep implements StepInterface {
 		$zip_stream = $runtime->resolve( $this->zipFile );
 
 		if ( ! $zip_stream instanceof File ) {
-			throw new \InvalidArgumentException( 'The provided resource is not a zip file.' );
+			throw new InvalidArgumentException( 'The provided resource is not a zip file.' );
 		}
 
 		$zip_fs = ZipFilesystem::create( $zip_stream->getStream() );

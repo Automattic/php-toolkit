@@ -26,7 +26,7 @@ $result[$name] = $actual_value;
 
 append_output( json_encode($result) );
 PHP
-,
+			,
 			[
 				'OPTIONS' => json_encode( $expected_options ),
 			]
@@ -65,12 +65,12 @@ PHP
 			'admin_email'     => 'test@example.com',
 		];
 
-		$step = new SetSiteOptionsStep($options);
+		$step    = new SetSiteOptionsStep( $options );
 		$tracker = new Tracker();
-		$step->run($this->runtime, $tracker);
+		$step->run( $this->runtime, $tracker );
 
 		// Verify options were set correctly
-		$this->assertWordPressOptions($options);
+		$this->assertWordPressOptions( $options );
 	}
 
 	/**
@@ -90,12 +90,12 @@ PHP
 			],
 		];
 
-		$step = new SetSiteOptionsStep($options);
+		$step    = new SetSiteOptionsStep( $options );
 		$tracker = new Tracker();
-		$step->run($this->runtime, $tracker);
+		$step->run( $this->runtime, $tracker );
 
 		// Verify options were set correctly
-		$this->assertWordPressOptions($options);
+		$this->assertWordPressOptions( $options );
 	}
 
 	/**
@@ -119,12 +119,12 @@ PHP
 			'default_role'       => 'author',
 		];
 
-		$step = new SetSiteOptionsStep($options);
+		$step    = new SetSiteOptionsStep( $options );
 		$tracker = new Tracker();
-		$step->run($this->runtime, $tracker);
+		$step->run( $this->runtime, $tracker );
 
 		// Verify options were updated
-		$this->assertWordPressOptions($options);
+		$this->assertWordPressOptions( $options );
 	}
 
 	/**
@@ -133,13 +133,13 @@ PHP
 	public function testSetLargeNumberOfOptions() {
 		// Create a large number of options
 		$options = [];
-		for ($i = 1; $i <= 50; $i++) {
+		for ( $i = 1; $i <= 50; $i ++ ) {
 			$options["test_option_$i"] = "value_$i";
 		}
 
-		$step = new SetSiteOptionsStep($options);
+		$step    = new SetSiteOptionsStep( $options );
 		$tracker = new Tracker();
-		$step->run($this->runtime, $tracker);
+		$step->run( $this->runtime, $tracker );
 
 		// Verify a sample of the options
 		$sample_options = [
@@ -149,7 +149,7 @@ PHP
 			'test_option_50' => 'value_50',
 		];
 
-		$this->assertWordPressOptions($sample_options);
+		$this->assertWordPressOptions( $sample_options );
 	}
 
 	/**
@@ -167,12 +167,12 @@ PHP
 			'page_for_posts'      => 3,
 		];
 
-		$step = new SetSiteOptionsStep($options);
+		$step    = new SetSiteOptionsStep( $options );
 		$tracker = new Tracker();
-		$step->run($this->runtime, $tracker);
+		$step->run( $this->runtime, $tracker );
 
 		// Verify the core settings were applied
-		$this->assertWordPressOptions($options);
+		$this->assertWordPressOptions( $options );
 	}
 
 	/**
@@ -195,11 +195,11 @@ PHP
 			],
 		];
 
-		$step = new SetSiteOptionsStep($options);
+		$step    = new SetSiteOptionsStep( $options );
 		$tracker = new Tracker();
-		$step->run($this->runtime, $tracker);
+		$step->run( $this->runtime, $tracker );
 
 		// Verify the complex option was stored and can be retrieved correctly
-		$this->assertWordPressOptions($options);
+		$this->assertWordPressOptions( $options );
 	}
 }

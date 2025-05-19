@@ -32,7 +32,9 @@ function importThemeStarterContent_plugins_loaded() {
 	$_GET = $_REQUEST;
 }
 
-$wp_filter['plugins_loaded'][0]['importThemeStarterContent_plugins_loaded'] = array( 'function' => 'importThemeStarterContent_plugins_loaded', 'accepted_args' => 0 );
+$wp_filter['plugins_loaded'][0]['importThemeStarterContent_plugins_loaded'] = array( 'function'      => 'importThemeStarterContent_plugins_loaded',
+                                                                                     'accepted_args' => 0,
+);
 
 require getenv( "DOCROOT" ) . '/wp-load.php';
 

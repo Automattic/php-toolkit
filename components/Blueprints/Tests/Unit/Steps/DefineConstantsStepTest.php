@@ -2,6 +2,7 @@
 
 namespace WordPress\Blueprints\Tests\Unit\Steps;
 
+use Exception;
 use WordPress\Blueprints\Progress\Tracker;
 use WordPress\Blueprints\Steps\DefineConstantsStep;
 
@@ -53,9 +54,9 @@ PHP;
 			'WP_DEBUG' => true,
 			'DB_NAME'  => 'updated_db',
 		];
-		$step = new DefineConstantsStep($constants);
-		$step->run($this->runtime, new Tracker());
-		$this->assertWordPressConstants($constants);
+		$step      = new DefineConstantsStep( $constants );
+		$step->run( $this->runtime, new Tracker() );
+		$this->assertWordPressConstants( $constants );
 	}
 
 	/**
@@ -66,9 +67,9 @@ PHP;
 			'WP_MEMORY_LIMIT'            => '256M',
 			'AUTOMATIC_UPDATER_DISABLED' => true,
 		];
-		$step = new DefineConstantsStep($constants);
-		$step->run($this->runtime, new Tracker());
-		$this->assertWordPressConstants($constants);
+		$step      = new DefineConstantsStep( $constants );
+		$step->run( $this->runtime, new Tracker() );
+		$this->assertWordPressConstants( $constants );
 	}
 
 	/**
@@ -83,19 +84,19 @@ PHP;
 			'ARRAY_CONST'  => [ 'one', 'two', 'three' ],
 			'NULL_CONST'   => null,
 		];
-		$step = new DefineConstantsStep($constants);
-		$step->run($this->runtime, new Tracker());
-		$this->assertWordPressConstants($constants);
+		$step      = new DefineConstantsStep( $constants );
+		$step->run( $this->runtime, new Tracker() );
+		$this->assertWordPressConstants( $constants );
 	}
 
 	/**
 	 * Test error handling when wp-config.php does not exist
 	 */
 	public function testErrorHandlingWhenWpConfigNotExists() {
-		$this->runtime->getTargetFilesystem()->rm('wp-config.php');
-		$step = new DefineConstantsStep(['WP_DEBUG' => true]);
-		$this->expectException(\Exception::class);
-		$step->run($this->runtime, new Tracker());
+		$this->runtime->getTargetFilesystem()->rm( 'wp-config.php' );
+		$step = new DefineConstantsStep( [ 'WP_DEBUG' => true ] );
+		$this->expectException( Exception::class );
+		$step->run( $this->runtime, new Tracker() );
 	}
 
 	/**
@@ -114,9 +115,9 @@ PHP;
 			'COMPRESS_CSS'        => false,
 			'ENFORCE_GZIP'        => false,
 		];
-		$step = new DefineConstantsStep($constants);
-		$step->run($this->runtime, new Tracker());
-		$this->assertWordPressConstants($constants);
+		$step      = new DefineConstantsStep( $constants );
+		$step->run( $this->runtime, new Tracker() );
+		$this->assertWordPressConstants( $constants );
 	}
 
 	/**
@@ -143,7 +144,7 @@ $results[$name] = defined($name) ? constant($name) : null;
 
 append_output( json_encode($results) );
 PHP
-,
+			,
 			[
 				'CONSTANTS' => json_encode( $expected_constants ),
 			]

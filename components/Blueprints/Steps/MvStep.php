@@ -10,13 +10,13 @@ use WordPress\Blueprints\Runtime;
  */
 class MvStep implements StepInterface {
 	/**
-     * @var string
-     */
-    public $fromPath;
+	 * @var string
+	 */
+	public $fromPath;
 	/**
-     * @var string
-     */
-    public $toPath;
+	 * @var string
+	 */
+	public $toPath;
 
 	/**
 	 * @param  string  $fromPath  The source path to move from.

@@ -19,59 +19,67 @@ use function WordPress\Filesystem\wp_join_paths;
 
 class EvalResult {
 	/**
-     * @var string
-     */
-    public $outputFileContent;
-    /**
-     * @var \Symfony\Component\Process\Process
-     */
-    public $process;
-    public function __construct(string $outputFileContent, Process $process)
-    {
-        $this->outputFileContent = $outputFileContent;
-        $this->process = $process;
-    }
+	 * @var string
+	 */
+	public $outputFileContent;
+	/**
+	 * @var Process
+	 */
+	public $process;
+
+	public function __construct( string $outputFileContent, Process $process ) {
+		$this->outputFileContent = $outputFileContent;
+		$this->process           = $process;
+	}
 }
 
 class Runtime {
 	/**
-     * @var \WordPress\Filesystem\Filesystem
-     */
-    private $targetFs;
-    /**
-     * @var \WordPress\Blueprints\RunnerConfiguration
-     */
-    private $configuration;
-    /**
-     * @var \WordPress\Blueprints\DataReference\DataReferenceResolver
-     */
-    private $assets;
-    /**
-     * @var \WordPress\HttpClient\Client
-     */
-    private $client;
-    /**
-     * @var mixed[]
-     */
-    private $blueprint;
-    /**
-     * @var string
-     */
-    private $tempRoot;
-    /**
-     * @var \WordPress\Blueprints\DataReference\DataReference
-     */
-    private $wpCliReference;
-    public function __construct(Filesystem $targetFs, RunnerConfiguration $configuration, DataReferenceResolver $assets, Client $client, array $blueprint, string $tempRoot, DataReference $wpCliReference)
-    {
-        $this->targetFs = $targetFs;
-        $this->configuration = $configuration;
-        $this->assets = $assets;
-        $this->client = $client;
-        $this->blueprint = $blueprint;
-        $this->tempRoot = $tempRoot;
-        $this->wpCliReference = $wpCliReference;
-    }
+	 * @var Filesystem
+	 */
+	private $targetFs;
+	/**
+	 * @var RunnerConfiguration
+	 */
+	private $configuration;
+	/**
+	 * @var DataReferenceResolver
+	 */
+	private $assets;
+	/**
+	 * @var Client
+	 */
+	private $client;
+	/**
+	 * @var mixed[]
+	 */
+	private $blueprint;
+	/**
+	 * @var string
+	 */
+	private $tempRoot;
+	/**
+	 * @var DataReference
+	 */
+	private $wpCliReference;
+
+	public function __construct(
+		Filesystem $targetFs,
+		RunnerConfiguration $configuration,
+		DataReferenceResolver $assets,
+		Client $client,
+		array $blueprint,
+		string $tempRoot,
+		DataReference $wpCliReference
+	) {
+		$this->targetFs       = $targetFs;
+		$this->configuration  = $configuration;
+		$this->assets         = $assets;
+		$this->client         = $client;
+		$this->blueprint      = $blueprint;
+		$this->tempRoot       = $tempRoot;
+		$this->wpCliReference = $wpCliReference;
+	}
 
 	public function getHttpClient(): Client {
 		return $this->client;
@@ -98,23 +106,24 @@ class Runtime {
 	}
 
 	/**
-     * @return \WordPress\Blueprints\DataReference\File|\WordPress\Blueprints\DataReference\Directory
-     */
-    public function resolve( DataReference $r ) {
+	 * @return File|Directory
+	 */
+	public function resolve( DataReference $r ) {
 		return $this->assets->resolve( $r );
 	}
 
 	public function saveToTemporaryFile( File $file ) {
-		$tempFile = $this->createTemporaryFile();
+		$tempFile     = $this->createTemporaryFile();
 		$write_stream = FileWriteStream::from_path( $tempFile );
 		pipe_stream( $file->getStream(), $write_stream );
 		$write_stream->close_writing();
+
 		return $tempFile;
 	}
 
 	public function getWpCliPath(): string {
 		$wp_cli_path = wp_join_paths( $this->getTempRoot(), 'wp-cli.phar' );
-		if(!file_exists( $wp_cli_path )){
+		if ( ! file_exists( $wp_cli_path ) ) {
 			$resolved = $this->resolve( $this->wpCliReference );
 			if ( ! $resolved instanceof File ) {
 				throw new BlueprintExecutionException( 'Error downloading WP-CLI' );
@@ -124,6 +133,7 @@ class Runtime {
 			$write_stream->close_writing();
 			chmod( $wp_cli_path, 0755 );
 		}
+
 		return $wp_cli_path;
 	}
 
@@ -146,6 +156,7 @@ class Runtime {
 		} while ( file_exists( $dirname ) );
 
 		mkdir( $dirname, 0777, true );
+
 		return $dirname;
 	}
 
@@ -164,37 +175,38 @@ class Runtime {
 		} while ( file_exists( $filename ) );
 
 		touch( $filename );
+
 		return $filename;
 	}
 
 	/**
 	 * Runs the given PHP code in a sub-process. The code has access to:
-	 * 
+	 *
 	 * * append_output( $output ): A function that appends a given string to the output file. Useful for
 	 *                             separating the returned structured data from PHP warnings and echos.
 	 * * DOCROOT environment variable: The path to the WordPress root directory.
 	 * * OUTPUT_FILE environment variable: The path to a file where the output of the code will be appended.
-	 * 
+	 *
 	 * @TODO: Useful error messages on process failure. Right now we get this mouthful error message:
-	 * 
+	 *
 	 * FAILED: The command "'php' '/var/folders/sb/cywb...
-     * Fatal error: Uncaught Symfony\Component\Process\Exception\ProcessFailedException: The command "'php' '/var/folders/sb/cywb762129g3f0jzq1_p2q5h0000gp/T/wp-blueprints-runtime-68290ca22b771/tmp_68290cac6bea8'" failed.
-     * 
-     * Exit Code: 255(Unknown error)
-     * 
-     * Working directory: /Users/cloudnik/www/Automattic/core/plugins/wordpress-components/untracked/newsite
-     * 
-     * Output:
-     * =================
-     * 
-     * Fatal error: Uncaught Error: Call to a member function info() on null in /Users/cloudnik/www/Automattic/core/plugins/wordpress-components/untracked/newsite/wp-content/plugins/WordPress-Importer-master/class-wxr-importer.php on line 1561
-	 * 
+	 * Fatal error: Uncaught Symfony\Component\Process\Exception\ProcessFailedException: The command "'php' '/var/folders/sb/cywb762129g3f0jzq1_p2q5h0000gp/T/wp-blueprints-runtime-68290ca22b771/tmp_68290cac6bea8'" failed.
+	 *
+	 * Exit Code: 255(Unknown error)
+	 *
+	 * Working directory: /Users/cloudnik/www/Automattic/core/plugins/wordpress-components/untracked/newsite
+	 *
+	 * Output:
+	 * =================
+	 *
+	 * Fatal error: Uncaught Error: Call to a member function info() on null in /Users/cloudnik/www/Automattic/core/plugins/wordpress-components/untracked/newsite/wp-content/plugins/WordPress-Importer-master/class-wxr-importer.php on line 1561
+	 *
 	 * It could be simpler, e.g.:
-	 * 
+	 *
 	 * The command "php /var/folders/..." failed with exit code 255.
-	 * 
+	 *
 	 * Stdout:
-	 * 
+	 *
 	 * Stderr:
 	 *
 	 * @param  mixed[]|null  $env
@@ -226,7 +238,7 @@ class Runtime {
 					$this->configuration->getTargetSiteRoot(),
 					array_merge(
 						array(
-							'DOCROOT' => $this->configuration->getTargetSiteRoot(),
+							'DOCROOT'     => $this->configuration->getTargetSiteRoot(),
 							'OUTPUT_FILE' => $outputFile,
 						),
 						$env ?? array()
@@ -234,6 +246,7 @@ class Runtime {
 					$input,
 					$timeout
 				);
+
 				return new EvalResult(
 					file_get_contents( $outputFile ),
 					$process
@@ -265,6 +278,7 @@ class Runtime {
 			$timeout
 		);
 		$process->mustRun();
+
 		return $process;
 	}
 }

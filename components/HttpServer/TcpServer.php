@@ -2,6 +2,8 @@
 
 namespace WordPress\HttpServer;
 
+use Exception;
+use RuntimeException;
 use WordPress\ByteStream\WriteStream\FileWriteStream;
 use WordPress\HttpServer\Response\TcpResponseWriteStream;
 
@@ -16,8 +18,8 @@ class TcpServer {
 	private $port;
 
 	/**
-	 * @param string $host
-	 * @param int    $port
+	 * @param  string  $host
+	 * @param  int  $port
 	 */
 	public function __construct( $host = '127.0.0.1', $port = 8080 ) {
 		$this->host = $host;
@@ -30,7 +32,7 @@ class TcpServer {
 
 	public function serve( ?callable $on_accept = null ) {
 		if ( ! is_callable( $this->handler ) ) {
-			throw new \RuntimeException( "No request handler set. Call set_handler() before serve()." );
+			throw new RuntimeException( "No request handler set. Call set_handler() before serve()." );
 		}
 
 		$socket = stream_socket_server(
@@ -40,11 +42,11 @@ class TcpServer {
 		);
 
 		if ( ! $socket ) {
-			throw new \RuntimeException( "Failed to bind to {$this->host}:{$this->port} - $errstr ($errno)" );
+			throw new RuntimeException( "Failed to bind to {$this->host}:{$this->port} - $errstr ($errno)" );
 		}
 
-		if($on_accept) {
-			$on_accept($this->host, $this->port);
+		if ( $on_accept ) {
+			$on_accept( $this->host, $this->port );
 		}
 
 		while ( true ) {
@@ -64,25 +66,25 @@ class TcpServer {
 				$socket_write_stream = FileWriteStream::from_resource_handle(
 					$client
 				);
-				$response_writer = new TcpResponseWriteStream( $socket_write_stream );
+				$response_writer     = new TcpResponseWriteStream( $socket_write_stream );
 				call_user_func( $this->handler, $request, $response_writer, $client );
-			} catch( \Exception $e ) {
-				error_log("Error: " . $e->getMessage());
+			} catch ( Exception $e ) {
+				error_log( "Error: " . $e->getMessage() );
 			} finally {
 				try {
-					if( ! $response_writer->is_writing_closed() ) {
+					if ( ! $response_writer->is_writing_closed() ) {
 						$response_writer->close_writing();
 					}
-				} catch( \Exception $e ) {
-					error_log("Error closing response writer: " . $e->getMessage());
+				} catch ( Exception $e ) {
+					error_log( "Error closing response writer: " . $e->getMessage() );
 				}
 
 				try {
 					$socket_write_stream->close_writing();
-				} catch( \Exception $e ) {
-					error_log("Error closing socket write stream: " . $e->getMessage());
+				} catch ( Exception $e ) {
+					error_log( "Error closing socket write stream: " . $e->getMessage() );
 				}
-				echo "[".date('Y-m-d H:i:s')."] " . $response_writer->http_code . ' ' . $request->method . ' ' . $request->get_parsed_url()->pathname . "\n";				
+				echo "[" . date( 'Y-m-d H:i:s' ) . "] " . $response_writer->http_code . ' ' . $request->method . ' ' . $request->get_parsed_url()->pathname . "\n";
 			}
 		}
 	}

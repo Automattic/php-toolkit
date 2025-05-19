@@ -2,6 +2,7 @@
 
 namespace WordPress\Blueprints\DataReference;
 
+use InvalidArgumentException;
 use WordPress\Filesystem\Filesystem;
 use WordPress\Filesystem\InMemoryFilesystem;
 
@@ -60,10 +61,10 @@ class InlineDirectory extends DataReference {
 
 		$add_to_fs = function ( $children, $base_path = '' ) use ( &$add_to_fs, $fs ) {
 			foreach ( $children as $child ) {
-				if ( $child instanceof \WordPress\Blueprints\DataReference\InlineFile ) {
+				if ( $child instanceof InlineFile ) {
 					$path = wp_join_paths( $base_path, $child->get_filename() );
 					$fs->put_contents( $path, $child->get_content() );
-				} elseif ( $child instanceof \WordPress\Blueprints\DataReference\InlineDirectory ) {
+				} elseif ( $child instanceof InlineDirectory ) {
 					$dir_path = wp_join_paths( $base_path, $child->get_name() );
 					$fs->mkdir( $dir_path, [ 'recursive' => true ] );
 					$add_to_fs( $child->get_children(), $dir_path );
@@ -89,7 +90,7 @@ class InlineDirectory extends DataReference {
 	 */
 	public static function from_array( array $data ): self {
 		if ( ! isset( $data['name'] ) || ! isset( $data['children'] ) || ! is_array( $data['children'] ) ) {
-			throw new \InvalidArgumentException( 'Invalid inline directory data' );
+			throw new InvalidArgumentException( 'Invalid inline directory data' );
 		}
 
 		$children = [];
@@ -99,7 +100,7 @@ class InlineDirectory extends DataReference {
 			} elseif ( self::is_valid( $child ) ) {
 				$children[] = self::from_array( $child );
 			} else {
-				throw new \InvalidArgumentException( 'Invalid inline directory child' );
+				throw new InvalidArgumentException( 'Invalid inline directory child' );
 			}
 		}
 

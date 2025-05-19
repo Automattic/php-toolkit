@@ -2,6 +2,8 @@
 
 namespace WordPress\Blueprints\Validator;
 
-class UnsupportedSchemaException extends \RuntimeException {
-	
+use RuntimeException;
+
+class UnsupportedSchemaException extends RuntimeException {
+
 }

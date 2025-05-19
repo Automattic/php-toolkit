@@ -1,8 +1,10 @@
 <?php
 
 use WordPress\Filesystem\Filesystem;
-use WordPress\Filesystem\OverlayFilesystem;
+use WordPress\Filesystem\FilesystemException;
 use WordPress\Filesystem\InMemoryFilesystem;
+use WordPress\Filesystem\OverlayFilesystem;
+use WordPress\Filesystem\Visitor\FilesystemVisitor;
 
 require_once __DIR__ . '/FilesystemTestCase.php';
 
@@ -14,6 +16,7 @@ class OverlayFilesystemTest extends FilesystemTestCase {
 
 	protected function create_fs(): Filesystem {
 		$this->mounted_fs = InMemoryFilesystem::create();
+
 		return new OverlayFilesystem();
 	}
 
@@ -40,7 +43,7 @@ class OverlayFilesystemTest extends FilesystemTestCase {
 			)
 		);
 
-		$visitor = new \WordPress\Filesystem\Visitor\FilesystemVisitor( $fs );
+		$visitor = new FilesystemVisitor( $fs );
 
 		// First event should be entering root
 		$this->assertTrue( $visitor->next() );
@@ -100,7 +103,7 @@ class OverlayFilesystemTest extends FilesystemTestCase {
 		$event = $visitor->get_event();
 		$this->assertTrue( $event->is_exiting() );
 		$this->assertEquals( '/', $event->dir );
-		$this->assertEquals( -1, $visitor->get_current_depth() );
+		$this->assertEquals( - 1, $visitor->get_current_depth() );
 
 		// No more events
 		$this->assertFalse( $visitor->next() );
@@ -134,12 +137,12 @@ class OverlayFilesystemTest extends FilesystemTestCase {
 	}
 
 	public function testUnmountedPathsUseMemoryFs() {
-		$this->expectException( \WordPress\Filesystem\FilesystemException::class );
+		$this->expectException( FilesystemException::class );
 		$this->fs->put_contents( '/unmounted/test.txt', 'memory content' );
 	}
 
 	public function testCopyBetweenFilesystems() {
-		$this->expectException( \WordPress\Filesystem\FilesystemException::class );
+		$this->expectException( FilesystemException::class );
 		$this->mounted_fs->put_contents( '/source.txt', 'test content' );
 		$fs = new OverlayFilesystem(
 			array(

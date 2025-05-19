@@ -27,6 +27,7 @@ class LocalFilesystem implements Filesystem {
 				throw new FilesystemException( sprintf( 'Root directory did not exist and could not be created: %s', $root ) );
 			}
 		}
+
 		return new ChrootLayer(
 			new LocalFilesystem( $root ),
 			$root
@@ -95,6 +96,7 @@ class LocalFilesystem implements Filesystem {
 				sprintf( 'Failed to rename: %s to %s', $old_path, $new_path )
 			);
 		}
+
 		return true;
 	}
 
@@ -117,8 +119,8 @@ class LocalFilesystem implements Filesystem {
 				sprintf( 'Failed to create directory: %s', $path )
 			);
 		}
-		if(isset($options['chmod'])) {
-			if(false === chmod($path, $options['chmod'])) {
+		if ( isset( $options['chmod'] ) ) {
+			if ( false === chmod( $path, $options['chmod'] ) ) {
 				throw new FilesystemException(
 					sprintf( 'Failed to chmod directory: %s', $path )
 				);
@@ -144,9 +146,9 @@ class LocalFilesystem implements Filesystem {
 
 	public function put_contents( $path, $data, $options = array() ) {
 		if ( false === file_put_contents(
-			$path,
-			$data
-		) ) {
+				$path,
+				$data
+			) ) {
 			throw new FilesystemException(
 				sprintf( 'Failed to write to file: %s', $path )
 			);

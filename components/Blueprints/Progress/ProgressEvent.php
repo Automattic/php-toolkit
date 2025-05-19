@@ -9,13 +9,13 @@ use Symfony\Component\EventDispatcher\Event;
  */
 class ProgressEvent extends Event {
 	/**
-     * @var float
-     */
-    public $progress;
+	 * @var float
+	 */
+	public $progress;
 	/**
-     * @var string
-     */
-    public $caption;
+	 * @var string
+	 */
+	public $caption;
 
 	/**
 	 * Create a new progress event

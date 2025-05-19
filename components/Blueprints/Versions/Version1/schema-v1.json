@@ -37,7 +37,10 @@
 							"description": "Relevant categories to help users find your Blueprint in the future Blueprints section on WordPress.org."
 						}
 					},
-					"required": ["title", "author"],
+					"required": [
+						"title",
+						"author"
+					],
 					"additionalProperties": false,
 					"description": "Optional metadata. Used by the Blueprints gallery at https://github.com/WordPress/blueprints"
 				},
@@ -61,7 +64,10 @@
 							"description": "The preferred WordPress version to use. If not specified, the latest supported version will be used"
 						}
 					},
-					"required": ["php", "wp"],
+					"required": [
+						"php",
+						"wp"
+					],
 					"additionalProperties": false,
 					"description": "The preferred PHP and WordPress versions to use."
 				},
@@ -128,7 +134,10 @@
 									"type": "string"
 								}
 							},
-							"required": ["username", "password"],
+							"required": [
+								"username",
+								"password"
+							],
 							"additionalProperties": false
 						}
 					],
@@ -167,7 +176,16 @@
 		},
 		"SupportedPHPVersion": {
 			"type": "string",
-			"enum": ["8.4", "8.3", "8.2", "8.1", "8.0", "7.4", "7.3", "7.2"]
+			"enum": [
+				"8.4",
+				"8.3",
+				"8.2",
+				"8.1",
+				"8.0",
+				"7.4",
+				"7.3",
+				"7.2"
+			]
 		},
 		"ExtraLibrary": {
 			"type": "string",
@@ -176,7 +194,11 @@
 		"PHPConstants": {
 			"type": "object",
 			"additionalProperties": {
-				"type": ["string", "boolean", "number"]
+				"type": [
+					"string",
+					"boolean",
+					"number"
+				]
 			}
 		},
 		"FileReference": {
@@ -214,7 +236,10 @@
 					"description": "The path to the file in the VFS"
 				}
 			},
-			"required": ["resource", "path"],
+			"required": [
+				"resource",
+				"path"
+			],
 			"additionalProperties": false
 		},
 		"LiteralReference": {
@@ -247,7 +272,9 @@
 											"type": "number"
 										}
 									},
-									"required": ["byteLength"],
+									"required": [
+										"byteLength"
+									],
 									"additionalProperties": false
 								},
 								"byteLength": {
@@ -275,7 +302,11 @@
 					"description": "The contents of the file"
 				}
 			},
-			"required": ["resource", "name", "contents"],
+			"required": [
+				"resource",
+				"name",
+				"contents"
+			],
 			"additionalProperties": false
 		},
 		"CoreThemeReference": {
@@ -291,7 +322,10 @@
 					"description": "The slug of the WordPress Core theme"
 				}
 			},
-			"required": ["resource", "slug"],
+			"required": [
+				"resource",
+				"slug"
+			],
 			"additionalProperties": false
 		},
 		"CorePluginReference": {
@@ -307,7 +341,10 @@
 					"description": "The slug of the WordPress Core plugin"
 				}
 			},
-			"required": ["resource", "slug"],
+			"required": [
+				"resource",
+				"slug"
+			],
 			"additionalProperties": false
 		},
 		"UrlReference": {
@@ -327,7 +364,10 @@
 					"description": "Optional caption for displaying a progress message"
 				}
 			},
-			"required": ["resource", "url"],
+			"required": [
+				"resource",
+				"url"
+			],
 			"additionalProperties": false
 		},
 		"BundledReference": {
@@ -343,7 +383,10 @@
 					"description": "The path to the file in the Blueprint"
 				}
 			},
-			"required": ["resource", "path"],
+			"required": [
+				"resource",
+				"path"
+			],
 			"additionalProperties": false
 		},
 		"StepDefinition": {
@@ -351,7 +394,9 @@
 			"discriminator": {
 				"propertyName": "step"
 			},
-			"required": ["step"],
+			"required": [
+				"step"
+			],
 			"oneOf": [
 				{
 					"type": "object",
@@ -382,7 +427,10 @@
 							"description": "Optional. Plugin name to display in the progress bar."
 						}
 					},
-					"required": ["pluginPath", "step"]
+					"required": [
+						"pluginPath",
+						"step"
+					]
 				},
 				{
 					"type": "object",
@@ -409,7 +457,10 @@
 							"description": "The name of the theme folder inside wp-content/themes/"
 						}
 					},
-					"required": ["step", "themeFolderName"]
+					"required": [
+						"step",
+						"themeFolderName"
+					]
 				},
 				{
 					"type": "object",
@@ -440,7 +491,11 @@
 							"description": "Target path"
 						}
 					},
-					"required": ["fromPath", "step", "toPath"]
+					"required": [
+						"fromPath",
+						"step",
+						"toPath"
+					]
 				},
 				{
 					"type": "object",
@@ -469,7 +524,10 @@
 						},
 						"method": {
 							"type": "string",
-							"enum": ["rewrite-wp-config", "define-before-run"],
+							"enum": [
+								"rewrite-wp-config",
+								"define-before-run"
+							],
 							"description": "The method of defining the constants in wp-config.php. Possible values are:\n\n- rewrite-wp-config: Default. Rewrites the wp-config.php file to                      explicitly call define() with the requested                      name and value. This method alters the file                      on the disk, but it doesn't conflict with                      existing define() calls in wp-config.php.\n\n- define-before-run: Defines the constant before running the requested                      script. It doesn't alter any files on the disk, but                      constants defined this way may conflict with existing                      define() calls in wp-config.php."
 						},
 						"virtualize": {
@@ -477,7 +535,10 @@
 							"deprecated": "This option is noop and will be removed in a future version.\nThis option is only kept in here to avoid breaking Blueprint schema validation\nfor existing apps using this option."
 						}
 					},
-					"required": ["consts", "step"]
+					"required": [
+						"consts",
+						"step"
+					]
 				},
 				{
 					"type": "object",
@@ -504,7 +565,10 @@
 							"description": "The URL"
 						}
 					},
-					"required": ["siteUrl", "step"]
+					"required": [
+						"siteUrl",
+						"step"
+					]
 				},
 				{
 					"type": "object",
@@ -531,7 +595,9 @@
 							"description": "wp-cli.phar path"
 						}
 					},
-					"required": ["step"]
+					"required": [
+						"step"
+					]
 				},
 				{
 					"type": "object",
@@ -559,12 +625,17 @@
 						},
 						"importer": {
 							"type": "string",
-							"enum": ["default"],
+							"enum": [
+								"default"
+							],
 							"description": "The importer to use. Possible values:\n\n- `default`: The importer from https://github.com/humanmade/WordPress-Importer\n- `data-liberation`: The experimental Data Liberation WXR importer developed at                      https://github.com/WordPress/wordpress-playground/issues/1894\n\nThis option is deprecated. The syntax will not be removed, but once the Data Liberation importer matures, it will become the only supported importer and the `importer` option will be ignored.",
 							"deprecated": true
 						}
 					},
-					"required": ["file", "step"]
+					"required": [
+						"file",
+						"step"
+					]
 				},
 				{
 					"type": "object",
@@ -592,7 +663,9 @@
 							"description": "The name of the theme to import content from."
 						}
 					},
-					"required": ["step"]
+					"required": [
+						"step"
+					]
 				},
 				{
 					"type": "object",
@@ -623,7 +696,10 @@
 							"description": "The path inside the zip file where the WordPress files are."
 						}
 					},
-					"required": ["step", "wordPressFilesZip"]
+					"required": [
+						"step",
+						"wordPressFilesZip"
+					]
 				},
 				{
 					"type": "object",
@@ -643,7 +719,11 @@
 						},
 						"ifAlreadyInstalled": {
 							"type": "string",
-							"enum": ["overwrite", "skip", "error"],
+							"enum": [
+								"overwrite",
+								"skip",
+								"error"
+							],
 							"description": "What to do if the asset already exists."
 						},
 						"step": {
@@ -671,7 +751,10 @@
 							"description": "Optional installation options."
 						}
 					},
-					"required": ["pluginData", "step"]
+					"required": [
+						"pluginData",
+						"step"
+					]
 				},
 				{
 					"type": "object",
@@ -691,7 +774,11 @@
 						},
 						"ifAlreadyInstalled": {
 							"type": "string",
-							"enum": ["overwrite", "skip", "error"],
+							"enum": [
+								"overwrite",
+								"skip",
+								"error"
+							],
 							"description": "What to do if the asset already exists."
 						},
 						"step": {
@@ -719,7 +806,10 @@
 							"description": "Optional installation options."
 						}
 					},
-					"required": ["step", "themeData"]
+					"required": [
+						"step",
+						"themeData"
+					]
 				},
 				{
 					"type": "object",
@@ -750,7 +840,9 @@
 							"deprecated": "The password field is deprecated and will be removed in a future version.\nOnly the username field is required for user authentication."
 						}
 					},
-					"required": ["step"]
+					"required": [
+						"step"
+					]
 				},
 				{
 					"type": "object",
@@ -777,7 +869,10 @@
 							"description": "The path of the directory you want to create"
 						}
 					},
-					"required": ["path", "step"]
+					"required": [
+						"path",
+						"step"
+					]
 				},
 				{
 					"type": "object",
@@ -808,7 +903,11 @@
 							"description": "Target path"
 						}
 					},
-					"required": ["fromPath", "step", "toPath"]
+					"required": [
+						"fromPath",
+						"step",
+						"toPath"
+					]
 				},
 				{
 					"type": "object",
@@ -831,7 +930,9 @@
 							"const": "resetData"
 						}
 					},
-					"required": ["step"]
+					"required": [
+						"step"
+					]
 				},
 				{
 					"type": "object",
@@ -858,7 +959,10 @@
 							"description": "Request details (See /wordpress-playground/api/universal/interface/PHPRequest)"
 						}
 					},
-					"required": ["request", "step"]
+					"required": [
+						"request",
+						"step"
+					]
 				},
 				{
 					"type": "object",
@@ -885,7 +989,10 @@
 							"description": "The path to remove"
 						}
 					},
-					"required": ["path", "step"]
+					"required": [
+						"path",
+						"step"
+					]
 				},
 				{
 					"type": "object",
@@ -912,7 +1019,10 @@
 							"description": "The path to remove"
 						}
 					},
-					"required": ["path", "step"]
+					"required": [
+						"path",
+						"step"
+					]
 				},
 				{
 					"type": "object",
@@ -940,7 +1050,10 @@
 							"description": "The PHP code to run."
 						}
 					},
-					"required": ["code", "step"]
+					"required": [
+						"code",
+						"step"
+					]
 				},
 				{
 					"type": "object",
@@ -967,7 +1080,10 @@
 							"description": "Run options (See /wordpress-playground/api/universal/interface/PHPRunOptions/))"
 						}
 					},
-					"required": ["options", "step"]
+					"required": [
+						"options",
+						"step"
+					]
 				},
 				{
 					"type": "object",
@@ -993,7 +1109,10 @@
 							"$ref": "#/definitions/WordPressInstallationOptions"
 						}
 					},
-					"required": ["options", "step"]
+					"required": [
+						"options",
+						"step"
+					]
 				},
 				{
 					"type": "object",
@@ -1021,7 +1140,10 @@
 							"description": "The SQL to run. Each non-empty line must contain a valid SQL query."
 						}
 					},
-					"required": ["sql", "step"]
+					"required": [
+						"sql",
+						"step"
+					]
 				},
 				{
 					"type": "object",
@@ -1050,7 +1172,10 @@
 							"description": "The options to set on the site."
 						}
 					},
-					"required": ["options", "step"]
+					"required": [
+						"options",
+						"step"
+					]
 				},
 				{
 					"type": "object",
@@ -1086,7 +1211,10 @@
 							"description": "The path to extract the zip file to"
 						}
 					},
-					"required": ["extractToPath", "step"]
+					"required": [
+						"extractToPath",
+						"step"
+					]
 				},
 				{
 					"type": "object",
@@ -1118,7 +1246,11 @@
 							"description": "User ID"
 						}
 					},
-					"required": ["meta", "step", "userId"]
+					"required": [
+						"meta",
+						"step",
+						"userId"
+					]
 				},
 				{
 					"type": "object",
@@ -1165,7 +1297,9 @@
 													"type": "number"
 												}
 											},
-											"required": ["byteLength"],
+											"required": [
+												"byteLength"
+											],
 											"additionalProperties": false
 										},
 										"byteLength": {
@@ -1193,7 +1327,11 @@
 							"description": "The data to write"
 						}
 					},
-					"required": ["data", "path", "step"]
+					"required": [
+						"data",
+						"path",
+						"step"
+					]
 				},
 				{
 					"type": "object",
@@ -1224,7 +1362,11 @@
 							"description": "The data to write"
 						}
 					},
-					"required": ["filesTree", "step", "writeToPath"]
+					"required": [
+						"filesTree",
+						"step",
+						"writeToPath"
+					]
 				},
 				{
 					"type": "object",
@@ -1266,7 +1408,10 @@
 							"description": "wp-cli.phar path"
 						}
 					},
-					"required": ["command", "step"]
+					"required": [
+						"command",
+						"step"
+					]
 				},
 				{
 					"type": "object",
@@ -1293,7 +1438,10 @@
 							"description": "The language to set, e.g. 'en_US'"
 						}
 					},
-					"required": ["language", "step"]
+					"required": [
+						"language",
+						"step"
+					]
 				}
 			]
 		},
@@ -1328,7 +1476,12 @@
 					"description": "The path to the directory in the git repository"
 				}
 			},
-			"required": ["resource", "url", "ref", "path"],
+			"required": [
+				"resource",
+				"url",
+				"ref",
+				"path"
+			],
 			"additionalProperties": false
 		},
 		"DirectoryLiteralReference": {
@@ -1347,7 +1500,11 @@
 					"type": "string"
 				}
 			},
-			"required": ["files", "name", "resource"]
+			"required": [
+				"files",
+				"name",
+				"resource"
+			]
 		},
 		"FileTree": {
 			"type": "object",
@@ -1357,7 +1514,10 @@
 						"$ref": "#/definitions/FileTree"
 					},
 					{
-						"type": ["object", "string"]
+						"type": [
+							"object",
+							"string"
+						]
 					}
 				]
 			},
@@ -1428,7 +1588,9 @@
 											"type": "number"
 										}
 									},
-									"required": ["byteLength"],
+									"required": [
+										"byteLength"
+									],
 									"additionalProperties": false
 								},
 								"byteLength": {
@@ -1472,7 +1634,9 @@
 														"type": "number"
 													}
 												},
-												"required": ["byteLength"],
+												"required": [
+													"byteLength"
+												],
 												"additionalProperties": false
 											},
 											"byteLength": {
@@ -1531,12 +1695,22 @@
 					"description": "Request body. If an object is given, the request will be encoded as multipart and sent with a `multipart/form-data` header."
 				}
 			},
-			"required": ["url"],
+			"required": [
+				"url"
+			],
 			"additionalProperties": false
 		},
 		"HTTPMethod": {
 			"type": "string",
-			"enum": ["GET", "POST", "HEAD", "OPTIONS", "PATCH", "PUT", "DELETE"]
+			"enum": [
+				"GET",
+				"POST",
+				"HEAD",
+				"OPTIONS",
+				"PATCH",
+				"PUT",
+				"DELETE"
+			]
 		},
 		"PHPRequestHeaders": {
 			"type": "object",
@@ -1585,7 +1759,9 @@
 											"type": "number"
 										}
 									},
-									"required": ["byteLength"],
+									"required": [
+										"byteLength"
+									],
 									"additionalProperties": false
 								},
 								"byteLength": {

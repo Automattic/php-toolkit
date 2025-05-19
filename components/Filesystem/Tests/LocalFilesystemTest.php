@@ -94,7 +94,7 @@ class LocalFilesystemTest extends TestCase {
 		 */
 		try {
 			$this->fs->rm( '/nonexistent.txt' );
-		} catch ( \Exception $e ) {
+		} catch ( Exception $e ) {
 			throw new FilesystemException( 'Failed to remove file', 0, $e );
 		}
 	}
@@ -119,7 +119,7 @@ class LocalFilesystemTest extends TestCase {
 		 */
 		try {
 			$this->fs->rmdir( '/nonexistent.txt' );
-		} catch ( \Exception $e ) {
+		} catch ( Exception $e ) {
 			throw new FilesystemException( 'Failed to remove file', 0, $e );
 		}
 	}

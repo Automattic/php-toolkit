@@ -5,14 +5,13 @@ namespace WordPress\HttpClient\ByteStream;
 use WordPress\ByteStream\FileReadWriteStream;
 use WordPress\ByteStream\ReadStream\BaseByteReadStream;
 use WordPress\ByteStream\ReadStream\ByteReadStream;
-use WordPress\HttpClient\ByteStream\RequestReadStream;
 use WordPress\HttpClient\Request;
 
 /**
  * HTTP reader that can seek() within the stream.
- * 
+ *
  * Downloaded bytes are stored in a temporary file. All the read operations are delegated to that file.
- * 
+ *
  * – Seek()-ing forward is done by fetching all the bytes up to the target offset.
  * – Seek()-ing backwards is done by seeking within the temporary file.
  */
@@ -43,17 +42,17 @@ class SeekableRequestReadStream implements ByteReadStream {
 	}
 
 	public function length(): ?int {
-		if( ! $this->length_resolved && null === $this->remote->length() ) {
+		if ( ! $this->length_resolved && null === $this->remote->length() ) {
 			/**
 			 * Wait for the remote headers before returning the length.
-			 * 
+			 *
 			 * This is an inconsistency between RequestReadStream::length():
-			 * 
+			 *
 			 * * RequestReadStream returns null until the remote headers are known.
 			 * * SeekableRequestReadStream proactively waits for the remote headers.
-			 * 
+			 *
 			 * That's because:
-			 * 
+			 *
 			 * * RequestReadStream class is a lower-level utility where we simply
 			 *   expose what's available at the moment. The developer is responsible
 			 *   for awaiting the response headers.
@@ -61,7 +60,7 @@ class SeekableRequestReadStream implements ByteReadStream {
 			 *   when knowing the length is vital, e.g. reading from a remote ZIP file.
 			 */
 			$this->remote->await_response();
-			if( null === $this->remote->length() ) {
+			if ( null === $this->remote->length() ) {
 				// The server did not send the Content-Length header.
 				// We need to consume the entire stream to infer the length.
 				$position = $this->tell();
@@ -70,6 +69,7 @@ class SeekableRequestReadStream implements ByteReadStream {
 			}
 			$this->length_resolved = true;
 		}
+
 		return $this->remote->length();
 	}
 
@@ -88,11 +88,13 @@ class SeekableRequestReadStream implements ByteReadStream {
 
 	public function pull( $n, $mode = self::PULL_NO_MORE_THAN ): int {
 		$this->pipe_until( $this->tell() + $n );
+
 		return $this->cache->pull( $n, $mode );
 	}
 
 	public function peek( $n ): string {
 		$this->pipe_until( $this->tell() + $n );
+
 		return $this->cache->peek( $n );
 	}
 
@@ -109,6 +111,7 @@ class SeekableRequestReadStream implements ByteReadStream {
 			$this->cache->append_bytes( $this->remote->consume( $pulled ) );
 		}
 		$this->cache->close_writing();
+
 		return $this->cache->consume_all();
 	}
 

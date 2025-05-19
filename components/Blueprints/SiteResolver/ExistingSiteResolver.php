@@ -2,6 +2,7 @@
 
 namespace WordPress\Blueprints\SiteResolver;
 
+use Exception;
 use WordPress\Blueprints\Exception\BlueprintExecutionException;
 use WordPress\Blueprints\Progress\Tracker;
 use WordPress\Blueprints\Runtime;
@@ -10,11 +11,11 @@ use WordPress\Blueprints\VersionStrings\WordPressVersion;
 
 class ExistingSiteResolver {
 	static public function resolve( Runtime $runtime, Tracker $progress, ?VersionConstraint $wpVersionConstraint = null ) {
-		$progress->split([
+		$progress->split( [
 			'verify_installation' => 3,
 			'check_compatibility' => 3,
 			'verify_database'     => 4,
-		]);
+		] );
 
 		$blueprint = $runtime->getBlueprint();
 		$config    = $runtime->getConfiguration();
@@ -43,7 +44,7 @@ class ExistingSiteResolver {
 					'The target site exists but WordPress is not properly installed or configured'
 				);
 			}
-		} catch ( \Exception $e ) {
+		} catch ( Exception $e ) {
 			throw new BlueprintExecutionException(
 				'Failed to load WordPress installation: ' . $e->getMessage()
 			);

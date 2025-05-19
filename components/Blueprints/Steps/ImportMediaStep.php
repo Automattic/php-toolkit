@@ -2,6 +2,7 @@
 
 namespace WordPress\Blueprints\Steps;
 
+use Exception;
 use RuntimeException;
 use WordPress\Blueprints\DataReference\DataReference;
 use WordPress\Blueprints\DataReference\File;
@@ -48,14 +49,15 @@ class ImportMediaStep implements StepInterface {
 		$total_files = count( $medias );
 		if ( $total_files === 0 ) {
 			$progress->finish();
+
 			return true;
 		}
 
 		$progress->setCaption( 'Importing media files' );
-		$progress->split([
+		$progress->split( [
 			'download' => 0.5,
 			'import'   => 0.5,
-		]);
+		] );
 
 		$files_imported = 0;
 		$fs             = $runtime->getTargetFilesystem();
@@ -66,7 +68,7 @@ class ImportMediaStep implements StepInterface {
 			append_output( json_encode($upload_dir) );
 			'
 		)->outputFileContent;
-		
+
 		$upload_dir = json_decode( $wp_upload_dir, true );
 		if ( ! $upload_dir || ! isset( $upload_dir['path'] ) ) {
 			throw new RuntimeException( 'Failed to get WordPress upload directory' );
@@ -82,16 +84,16 @@ class ImportMediaStep implements StepInterface {
 		}
 
 		$resolved = $runtime->getDataReferenceResolver()->startEagerResolution(
-			array_map( function ($media) {
-                return $media->source;
-            }, $medias ),
+			array_map( function ( $media ) {
+				return $media->source;
+			}, $medias ),
 			$progress['download']
 		);
 
-		$progress['import']->split($$total_files);
+		$progress['import']->split( $$total_files );
 		foreach ( $medias as $i => $media_definition ) {
 			$human_readable_name = $media_definition->source->get_human_readable_name();
-			$progress['import'][$i]->setCaption( "Importing media file {$i}/{$total_files}: {$human_readable_name}" );
+			$progress['import'][ $i ]->setCaption( "Importing media file {$i}/{$total_files}: {$human_readable_name}" );
 
 			try {
 				$resolved = $runtime->resolve( $media_definition->source );
@@ -103,7 +105,7 @@ class ImportMediaStep implements StepInterface {
 					// would we have to check anyway?
 					// Would there be any value in the runtime having specific methods like resolveFile()
 					// and resolveDirectory() that throw if they cannot resolve the requested type?
-					throw new \RuntimeException( "Failed to resolve media file: $human_readable_name" );
+					throw new RuntimeException( "Failed to resolve media file: $human_readable_name" );
 				}
 
 				// Create a new file in the uploads directory
@@ -153,7 +155,7 @@ wp_update_attachment_metadata($attachment_id, $attachment_metadata);
 
 echo $attachment_id;
 CODE
-,
+					,
 					[
 						'MEDIA_FILE_PATH' => $target_path,
 						'ATTACHMENT_META' => json_encode( [
@@ -166,11 +168,11 @@ CODE
 				);
 
 				if ( ! $attachment_id ) {
-					throw new \RuntimeException( "Failed to import media file: $human_readable_name" );
+					throw new RuntimeException( "Failed to import media file: $human_readable_name" );
 				}
 
-				$progress['import'][$i]->finish();
-			} catch ( \Exception $e ) {
+				$progress['import'][ $i ]->finish();
+			} catch ( Exception $e ) {
 				// Log error but continue with other media files
 				// @TODO: Think through exception handling here.
 				$runtime->getLogger()->warning( "Failed to import media file {$target_path}: " . $e->getMessage() );
@@ -191,7 +193,7 @@ CODE
 
 		$filename = $source->get_filename();
 		if ( ! $filename ) {
-			throw new \RuntimeException( sprintf(
+			throw new RuntimeException( sprintf(
 				'Failed to get filename for media file: %s. We can\'t infer the extension.',
 				$source->get_human_readable_name()
 			) );

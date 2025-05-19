@@ -2,7 +2,6 @@
 
 namespace WordPress\Blueprints\Steps;
 
-use WordPress\Blueprints\Exception\BlueprintExecutionException;
 use WordPress\Blueprints\Progress\Tracker;
 use WordPress\Blueprints\Runtime;
 
@@ -11,9 +10,9 @@ use WordPress\Blueprints\Runtime;
  */
 class MkdirStep implements StepInterface {
 	/**
-     * @var string
-     */
-    public $path;
+	 * @var string
+	 */
+	public $path;
 
 	/**
 	 * @param  string  $path  The directory path to create.

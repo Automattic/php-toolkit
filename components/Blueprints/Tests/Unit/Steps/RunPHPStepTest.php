@@ -2,6 +2,7 @@
 
 namespace WordPress\Blueprints\Tests\Unit\Steps;
 
+use Exception;
 use WordPress\Blueprints\Progress\Tracker;
 use WordPress\Blueprints\Steps\RunPHPStep;
 
@@ -18,7 +19,7 @@ class RunPHPStepTest extends StepTestCase {
 		);
 
 		$tracker = new Tracker();
-		$result = $step->run( $this->runtime, $tracker );
+		$result  = $step->run( $this->runtime, $tracker );
 
 		$this->assertEquals( 'Hello World', $result );
 	}
@@ -125,7 +126,7 @@ PHP
 		$tracker = new Tracker();
 
 		// The code contains a syntax error, so we expect an exception
-		$this->expectException( \Exception::class );
+		$this->expectException( Exception::class );
 		$step->run( $this->runtime, $tracker );
 	}
 }

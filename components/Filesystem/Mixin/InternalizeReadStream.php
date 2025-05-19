@@ -20,7 +20,7 @@ trait InternalizeReadStream {
 	/**
 	 * Start streaming a file.
 	 *
-	 * @param string $path The path to the file.
+	 * @param  string  $path  The path to the file.
 	 *
 	 * @return ByteReadStream The stream.
 	 * @throws FilesystemException If the stream cannot be opened.
@@ -36,6 +36,7 @@ trait InternalizeReadStream {
 	public function open_read_stream( $path ): ByteReadStream {
 		$stream_id                        = $this->read_stream_internal_open( $path );
 		$this->read_streams[ $stream_id ] = new FilesystemReadStream( $this, $stream_id );
+
 		return $this->read_streams[ $stream_id ];
 	}
 

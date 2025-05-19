@@ -2,6 +2,7 @@
 
 namespace WordPress\Blueprints\Steps;
 
+use InvalidArgumentException;
 use WordPress\Blueprints\DataReference\DataReference;
 use WordPress\Blueprints\DataReference\File;
 use WordPress\Blueprints\Progress\Tracker;
@@ -12,10 +13,10 @@ use WordPress\Blueprints\Runtime;
  */
 class RunSqlStep implements StepInterface {
 	/**
-     * SQL source identifier (URL, ./path, /path).
-     * @var \WordPress\Blueprints\DataReference\DataReference
-     */
-    public $source;
+	 * SQL source identifier (URL, ./path, /path).
+	 * @var DataReference
+	 */
+	public $source;
 
 	/**
 	 * @param  DataReference  $source  SQL source identifier.
@@ -31,7 +32,7 @@ class RunSqlStep implements StepInterface {
 		$sql = $runtime->resolve( $this->source );
 
 		if ( ! $sql instanceof File ) {
-			throw new \InvalidArgumentException( 'The provided resource is not a file.' );
+			throw new InvalidArgumentException( 'The provided resource is not a file.' );
 		}
 
 		$runtime->evalPhpInSubProcess(

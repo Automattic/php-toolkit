@@ -18,16 +18,16 @@ use function WordPress\Zip\is_zip_file_stream;
 
 class InstallPluginStep implements StepInterface {
 	/**
-     * Plugin source reference.
-     * @var \WordPress\Blueprints\DataReference\DataReference
-     */
-    public $source;
+	 * Plugin source reference.
+	 * @var DataReference
+	 */
+	public $source;
 
 	/**
-     * Whether to activate the plugin after installation. Defaults to true.
-     * @var bool
-     */
-    public $active;
+	 * Whether to activate the plugin after installation. Defaults to true.
+	 * @var bool
+	 */
+	public $active;
 
 	/**
 	 * Optional key-value pairs passed to the plugin during activation.
@@ -36,10 +36,10 @@ class InstallPluginStep implements StepInterface {
 	public $activationOptions;
 
 	/**
-     * Behavior on installation error. Defaults to THROW_ERROR.
-     * @var string
-     */
-    public $onError;
+	 * Behavior on installation error. Defaults to THROW_ERROR.
+	 * @var string
+	 */
+	public $onError;
 
 	/**
 	 * @param  DataReference  $source  Plugin source reference.
@@ -65,16 +65,16 @@ class InstallPluginStep implements StepInterface {
 		$runtime->withTemporaryDirectory( function ( $temp_dir ) use ( $runtime, $tracker, $plugin_data ) {
 			$tracker->setCaption( 'Installing plugin ' . $plugin_data->get_human_readable_name() );
 			if ( $plugin_data instanceof Directory ) {
-				$zip_filename = $plugin_data->dirname . '.zip';
+				$zip_filename      = $plugin_data->dirname . '.zip';
 				$zip_absolute_path = wp_join_paths( $temp_dir, $zip_filename );
-				$zip_stream   = FileWriteStream::from_path( $zip_absolute_path, 'truncate' );
-				$zip_encoder  = new ZipEncoder( $zip_stream );
+				$zip_stream        = FileWriteStream::from_path( $zip_absolute_path, 'truncate' );
+				$zip_encoder       = new ZipEncoder( $zip_stream );
 				$zip_encoder->append_from_filesystem( $plugin_data->filesystem );
 				$zip_encoder->close();
 			} elseif ( $plugin_data instanceof File ) {
-				$zip_filename = preg_replace( '/\.(zip|php)$/', '', $plugin_data->filename ) . '.zip';
+				$zip_filename      = preg_replace( '/\.(zip|php)$/', '', $plugin_data->filename ) . '.zip';
 				$zip_absolute_path = wp_join_paths( $temp_dir, $zip_filename );
-				$zip_stream   = FileWriteStream::from_path( $zip_absolute_path, 'truncate' );
+				$zip_stream        = FileWriteStream::from_path( $zip_absolute_path, 'truncate' );
 
 				if ( is_zip_file_stream( $plugin_data->getStream() ) ) {
 					pipe_stream( $plugin_data->getStream(), $zip_stream );

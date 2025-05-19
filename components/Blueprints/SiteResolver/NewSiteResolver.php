@@ -2,6 +2,7 @@
 
 namespace WordPress\Blueprints\SiteResolver;
 
+use Exception;
 use WordPress\Blueprints\DataReference\DataReference;
 use WordPress\Blueprints\DataReference\File;
 use WordPress\Blueprints\Exception\BlueprintExecutionException;
@@ -16,10 +17,10 @@ use function WordPress\Filesystem\wp_join_paths;
 
 class NewSiteResolver {
 	static public function resolve( Runtime $runtime, Tracker $progress, ?VersionConstraint $wpVersionConstraint = null ) {
-		$progress->split([
+		$progress->split( [
 			'resolve_assets'    => 2,
 			'install_wordpress' => 1,
-		]);
+		] );
 
 		// Ensure document root directory exists (LocalFilesystem::create creates it)
 		$targetFs = $runtime->getTargetFilesystem();
@@ -155,8 +156,8 @@ PHP
 		}
 
 		if (
-			strncmp($version_string, 'https://', strlen('https://')) === 0 ||
-			strncmp($version_string, 'http://', strlen('http://')) === 0
+			strncmp( $version_string, 'https://', strlen( 'https://' ) ) === 0 ||
+			strncmp( $version_string, 'http://', strlen( 'http://' ) ) === 0
 		) {
 			return $version_string;
 		}
@@ -189,6 +190,6 @@ PHP
 			}
 		}
 
-		throw new \Exception( 'Invalid WordPress version constraint' );
+		throw new Exception( 'Invalid WordPress version constraint' );
 	}
 }

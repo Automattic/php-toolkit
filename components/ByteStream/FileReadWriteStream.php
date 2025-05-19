@@ -2,8 +2,6 @@
 
 namespace WordPress\ByteStream;
 
-use WordPress\ByteStream\BytePipe;
-use WordPress\ByteStream\ByteStreamException;
 use WordPress\ByteStream\ReadStream\BaseByteReadStream;
 
 class FileReadWriteStream extends BaseByteReadStream implements BytePipe {
@@ -12,14 +10,15 @@ class FileReadWriteStream extends BaseByteReadStream implements BytePipe {
 	private $file_pointer;
 
 	private $is_write_closed = false;
-	private $is_read_closed  = false;
+	private $is_read_closed = false;
 
 	public static function from_path( string $path, bool $truncate = false ): self {
-		$mode = $truncate ? 'w+b' : 'a+b';
-		$file_pointer   = fopen( $path, $mode );
+		$mode         = $truncate ? 'w+b' : 'a+b';
+		$file_pointer = fopen( $path, $mode );
 		if ( ! $file_pointer ) {
 			throw new ByteStreamException( "Cannot open $path" );
 		}
+
 		return new self( $file_pointer, filesize( $path ) );
 	}
 
@@ -27,6 +26,7 @@ class FileReadWriteStream extends BaseByteReadStream implements BytePipe {
 		if ( ! is_resource( $file_pointer ) ) {
 			throw new ByteStreamException( 'Invalid resource' );
 		}
+
 		return new self( $file_pointer, fstat( $file_pointer )['size'] );
 	}
 

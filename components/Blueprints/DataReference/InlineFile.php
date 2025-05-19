@@ -2,6 +2,8 @@
 
 namespace WordPress\Blueprints\DataReference;
 
+use InvalidArgumentException;
+
 /**
  * Represents a file that is inlined within the Blueprint JSON document.
  */
@@ -55,7 +57,7 @@ class InlineFile extends DataReference {
 	 */
 	public static function from_blueprint_data( array $data ): self {
 		if ( ! isset( $data['filename'] ) || ! isset( $data['content'] ) ) {
-			throw new \InvalidArgumentException( 'Invalid inline file data' );
+			throw new InvalidArgumentException( 'Invalid inline file data' );
 		}
 
 		return new self( $data['filename'], $data['content'] );

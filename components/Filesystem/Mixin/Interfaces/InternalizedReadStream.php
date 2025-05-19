@@ -9,7 +9,8 @@ interface InternalizedReadStream {
 	/**
 	 * Get the next chunk of a file.
 	 *
-	 * @param int $stream_id The stream identifier.
+	 * @param  int  $stream_id  The stream identifier.
+	 *
 	 * @return bool True if the next chunk was retrieved, false otherwise.
 	 * @throws FilesystemException If the next chunk cannot be retrieved.
 	 */
@@ -33,8 +34,9 @@ interface InternalizedReadStream {
 	/**
 	 * Seek to a specific position in the file.
 	 *
-	 * @param int $stream_id The stream identifier.
-	 * @param int $offset The offset to seek to.
+	 * @param  int  $stream_id  The stream identifier.
+	 * @param  int  $offset  The offset to seek to.
+	 *
 	 * @throws FilesystemException If the seek operation fails.
 	 */
 	public function read_stream_seek( int $stream_id, int $offset ): void;
@@ -42,7 +44,8 @@ interface InternalizedReadStream {
 	/**
 	 * Check if the read stream is finished.
 	 *
-	 * @param int $stream_id The stream identifier.
+	 * @param  int  $stream_id  The stream identifier.
+	 *
 	 * @return bool True if the read stream is finished, false otherwise.
 	 */
 	public function read_stream_is_finished( int $stream_id ): bool;

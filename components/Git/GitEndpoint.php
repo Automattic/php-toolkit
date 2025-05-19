@@ -138,7 +138,7 @@ class GitEndpoint {
 	 *
 	 * @see https://git-scm.com/docs/protocol-v2#_ls_refs
 	 *
-	 * @param  array $request_bytes  The parsed request data
+	 * @param  array  $request_bytes  The parsed request data
 	 *
 	 * @return string The response in Git protocol v2 format
 	 */
@@ -161,8 +161,8 @@ class GitEndpoint {
 		$ref_prefixes              = $options['ref-prefix'] ?? array( '' );
 		$capabilities_to_advertise = $options['capabilities'];
 
-		$refs      = $this->repository->list_refs( $ref_prefixes );
-        reset($refs);
+		$refs = $this->repository->list_refs( $ref_prefixes );
+		reset( $refs );
 		$first_ref = key( $refs );
 		foreach ( $refs as $ref_name => $ref_hash ) {
 			$line = $ref_hash . ' ' . $ref_name;
@@ -205,8 +205,8 @@ class GitEndpoint {
 	 */
 	public function capability_advertise() {
 		return "version 2\n" .
-				"agent=git/2.37.3\n" .
-				'0000';
+		       "agent=git/2.37.3\n" .
+		       '0000';
 	}
 
 	public function parse_message( $request_bytes_bytes ) {
@@ -229,8 +229,8 @@ class GitEndpoint {
 			$packet = $packet_parser->get_body_chunk();
 			switch ( $mode ) {
 				case 'capabilities':
-					if ( strpos($packet, '=') !== false ) {
-						list( $key, $value )  = explode( '=', $packet );
+					if ( strpos( $packet, '=' ) !== false ) {
+						list( $key, $value ) = explode( '=', $packet );
 						$capabilities[ $key ] = $value;
 					} else {
 						$capabilities[ $packet ] = true;
@@ -265,7 +265,7 @@ class GitEndpoint {
 	/**
 	 * Handle Git protocol v2 fetch command with "want" packets
 	 *
-	 * @param  array $request_bytes  The parsed request data
+	 * @param  array  $request_bytes  The parsed request data
 	 *
 	 * @return string The response in Git protocol v2 format containing the pack data
 	 */
@@ -391,8 +391,8 @@ class GitEndpoint {
 	/**
 	 * Handle Git protocol v2 push command
 	 *
-	 * @param  string              $request_bytes  Raw request bytes
-	 * @param  ResponseWriteStream $response  Response writer
+	 * @param  string  $request_bytes  Raw request bytes
+	 * @param  ResponseWriteStream  $response  Response writer
 	 *
 	 * @return bool Success status
 	 */
@@ -472,7 +472,7 @@ class GitEndpoint {
 	/**
 	 * Parse a push request according to Git protocol v2
 	 *
-	 * @param  string $request_bytes  Raw request bytes
+	 * @param  string  $request_bytes  Raw request bytes
 	 *
 	 * @return array|false Parsed request data or false on error
 	 */
@@ -503,7 +503,7 @@ class GitEndpoint {
 				'type'   => 'blob',
 				'filter' => 'none',
 			);
-		} elseif ( strncmp($filter, 'blob:limit=', strlen('blob:limit=')) === 0 ) {
+		} elseif ( strncmp( $filter, 'blob:limit=', strlen( 'blob:limit=' ) ) === 0 ) {
 			$limit = substr( $filter, strlen( 'blob:limit=' ) );
 
 			return array(
@@ -518,7 +518,7 @@ class GitEndpoint {
 
 	public static function decode_next_packet_line( $pack_bytes, &$offset ) {
 		$packet_length_bytes = substr( $pack_bytes, $offset, 4 );
-		$offset             += 4;
+		$offset              += 4;
 		if (
 			strlen( $packet_length_bytes ) !== 4 ||
 			! preg_match( '/^[0-9a-f]{4}$/', $packet_length_bytes )
@@ -535,7 +535,7 @@ class GitEndpoint {
 			default:
 				$length  = intval( $packet_length_bytes, 16 ) - 4;
 				$payload = substr( $pack_bytes, $offset, $length );
-				if ( substr_compare($payload, "\n", -strlen("\n")) === 0 ) {
+				if ( substr_compare( $payload, "\n", - strlen( "\n" ) ) === 0 ) {
 					$payload = substr( $payload, 0, - 1 );
 				}
 				$offset += $length;

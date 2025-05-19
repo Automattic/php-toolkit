@@ -3,15 +3,17 @@
 namespace WordPress\Blueprints;
 
 use InvalidArgumentException;
+use PDO;
+use PDOException;
 use WordPress\Blueprints\DataReference\DataReference;
 use WordPress\Blueprints\DataReference\DataReferenceResolver;
 use WordPress\Blueprints\DataReference\Directory;
 use WordPress\Blueprints\DataReference\ExecutionContextPath;
 use WordPress\Blueprints\DataReference\File;
 use WordPress\Blueprints\DataReference\InlineFile;
+use WordPress\Blueprints\DataReference\URLReference;
 use WordPress\Blueprints\DataReference\WordPressOrgPlugin;
 use WordPress\Blueprints\DataReference\WordPressOrgTheme;
-use WordPress\Blueprints\DataReference\URLReference;
 use WordPress\Blueprints\Exception\BlueprintExecutionException;
 use WordPress\Blueprints\Exception\PermissionsException;
 use WordPress\Blueprints\Progress\Tracker;
@@ -57,56 +59,56 @@ use function WordPress\Zip\is_zip_file_stream;
 
 class Runner {
 	/**
-     * @var \WordPress\Blueprints\RunnerConfiguration
-     */
-    private $configuration;
-    // TODO: Rename httpClient
-    /**
-     * @var \WordPress\HttpClient\Client
-     */
-    private $client;
+	 * @var RunnerConfiguration
+	 */
+	private $configuration;
+	// TODO: Rename httpClient
 	/**
-     * @var \WordPress\Blueprints\DataReference\DataReferenceResolver
-     */
-    private $assets;
+	 * @var Client
+	 */
+	private $client;
 	/**
-     * @var \WordPress\Filesystem\Filesystem
-     */
-    private $blueprintExecutionContext;
+	 * @var DataReferenceResolver
+	 */
+	private $assets;
 	/**
-     * @var mixed[]
-     */
-    private $blueprintArray;
+	 * @var Filesystem
+	 */
+	private $blueprintExecutionContext;
 	/**
-     * @var mixed[]
-     */
-    private $dataReferences = [];
+	 * @var mixed[]
+	 */
+	private $blueprintArray;
 	/**
-     * @var \WordPress\Blueprints\VersionStrings\VersionConstraint|null
-     */
-    private $phpVersionConstraint;
+	 * @var mixed[]
+	 */
+	private $dataReferences = [];
 	/**
-     * @var \WordPress\Blueprints\VersionStrings\VersionConstraint|null
-     */
-    private $wpVersionConstraint;
+	 * @var VersionConstraint|null
+	 */
+	private $phpVersionConstraint;
 	/**
-     * @var \WordPress\Blueprints\Progress\Tracker
-     */
-    private $mainTracker;
+	 * @var VersionConstraint|null
+	 */
+	private $wpVersionConstraint;
 	/**
-     * @var \WordPress\Blueprints\ProgressObserver
-     */
-    private $progressObserver;
+	 * @var Tracker
+	 */
+	private $mainTracker;
 	/**
-     * @var \WordPress\Blueprints\Runtime|null
-     */
-    public $runtime;
+	 * @var ProgressObserver
+	 */
+	private $progressObserver;
+	/**
+	 * @var Runtime|null
+	 */
+	public $runtime;
 
 	public function __construct( RunnerConfiguration $configuration ) {
 		$this->configuration = $configuration;
-        $this->validateConfiguration( $configuration );
+		$this->validateConfiguration( $configuration );
 
-		$this->client = new Client( [
+		$this->client      = new Client( [
 			/**
 			 * Store cached HTTP responses in a temporary directory with a stable path
 			 * to reuse across multiple runs.
@@ -115,7 +117,7 @@ class Runner {
 				LocalFilesystem::create(
 					sys_get_temp_dir() . '/wp-blueprints'
 				)
-			)
+			),
 		] );
 		$this->mainTracker = new Tracker();
 
@@ -124,57 +126,57 @@ class Runner {
 		$this->progressObserver->attachTo( $this->mainTracker );
 	}
 
-	private function validateConfiguration(RunnerConfiguration $config): void {
+	private function validateConfiguration( RunnerConfiguration $config ): void {
 		// Validate blueprint reference
 		$blueprint = $config->getBlueprint();
-		if (empty($blueprint)) {
-			throw new BlueprintExecutionException("A Blueprint reference is required.");
+		if ( empty( $blueprint ) ) {
+			throw new BlueprintExecutionException( "A Blueprint reference is required." );
 		}
 
 		// Validate execution mode
 		$mode = $config->getExecutionMode();
-		if (!in_array($mode, ['create-new-site', 'apply-to-existing-site'], true)) {
-			throw new BlueprintExecutionException("Execution mode must be either 'create-new-site' or 'apply-to-existing-site'.");
+		if ( ! in_array( $mode, [ 'create-new-site', 'apply-to-existing-site' ], true ) ) {
+			throw new BlueprintExecutionException( "Execution mode must be either 'create-new-site' or 'apply-to-existing-site'." );
 		}
 
 		// Validate site URL
 		// Note: $options is not defined in this context, so we skip this block.
 		// If you want to validate the site URL, you should use $config->getTargetSiteUrl().
 		$siteUrl = $config->getTargetSiteUrl();
-		if ($mode === 'create-new-site') {
-			if (empty($siteUrl)) {
-				throw new BlueprintExecutionException("Site URL is required when the execution mode is 'create-new-site'.");
+		if ( $mode === 'create-new-site' ) {
+			if ( empty( $siteUrl ) ) {
+				throw new BlueprintExecutionException( "Site URL is required when the execution mode is 'create-new-site'." );
 			}
 		}
-		if (!empty($siteUrl) && !filter_var($siteUrl, FILTER_VALIDATE_URL)) {
-			throw new BlueprintExecutionException("Site URL is not a valid URL.");
+		if ( ! empty( $siteUrl ) && ! filter_var( $siteUrl, FILTER_VALIDATE_URL ) ) {
+			throw new BlueprintExecutionException( "Site URL is not a valid URL." );
 		}
 
 		// Validate database engine
 		$dbEngine = $config->getDatabaseEngine();
-		if (!in_array($dbEngine, ['mysql', 'sqlite'], true)) {
-			throw new BlueprintExecutionException("Database engine must be either 'mysql' or 'sqlite'.");
+		if ( ! in_array( $dbEngine, [ 'mysql', 'sqlite' ], true ) ) {
+			throw new BlueprintExecutionException( "Database engine must be either 'mysql' or 'sqlite'." );
 		}
 
 		// Validate database credentials
 		$dbCreds = $config->getDatabaseCredentials();
-		if ($dbEngine === 'mysql') {
-			if (empty($dbCreds['username']) || empty($dbCreds['databaseName'])) {
-				throw new BlueprintExecutionException("MySQL credentials are required when database engine is 'mysql'.");
+		if ( $dbEngine === 'mysql' ) {
+			if ( empty( $dbCreds['username'] ) || empty( $dbCreds['databaseName'] ) ) {
+				throw new BlueprintExecutionException( "MySQL credentials are required when database engine is 'mysql'." );
 			}
 			// Check if you can connect to the database
-			$host = $dbCreds['host'] ?? '127.0.0.1';
-			$port = $dbCreds['port'] ?? 3306;
+			$host     = $dbCreds['host'] ?? '127.0.0.1';
+			$port     = $dbCreds['port'] ?? 3306;
 			$username = $dbCreds['username'] ?? '';
 			$password = $dbCreds['password'] ?? '';
 			$database = $dbCreds['databaseName'] ?? '';
-			$dsn = "mysql:host=$host;port=$port;dbname=$database;charset=utf8mb4";
+			$dsn      = "mysql:host=$host;port=$port;dbname=$database;charset=utf8mb4";
 			try {
-				new \PDO($dsn, $username, $password, [
-					\PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION,
-					\PDO::ATTR_TIMEOUT => 3,
-				]);
-			} catch (\PDOException $e) {
+				new PDO( $dsn, $username, $password, [
+					PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+					PDO::ATTR_TIMEOUT => 3,
+				] );
+			} catch ( PDOException $e ) {
 				throw new BlueprintExecutionException(
 					sprintf(
 						"MySQL was selected as the database engine, but the provided credentials are invalid. DSN string: %s",
@@ -184,9 +186,9 @@ class Runner {
 					$e
 				);
 			}
-		} elseif ($dbEngine === 'sqlite') {
-			if (empty($dbCreds['path'])) {
-				throw new BlueprintExecutionException("SQLite file path is required when database engine is 'sqlite'.");
+		} elseif ( $dbEngine === 'sqlite' ) {
+			if ( empty( $dbCreds['path'] ) ) {
+				throw new BlueprintExecutionException( "SQLite file path is required when database engine is 'sqlite'." );
 			}
 		}
 	}
@@ -200,19 +202,19 @@ class Runner {
 			$progress = $this->mainTracker;
 			// Create all top-level progress stages upfront so the tracker knows what %
 			// of the total work is being done with every progress update.
-			$progress->split([
-				'blueprint' => 5,
+			$progress->split( [
+				'blueprint'        => 5,
 				'targetResolution' => 20,
 				// @TODO: Put this inside dataResolutionStage
-				'wpCli' => 1,
-				'data' => 24,
-				'execution' => 50,
-			]);
+				'wpCli'            => 1,
+				'data'             => 24,
+				'execution'        => 50,
+			] );
 
 			// TODO: What's the client?
 			$this->assets = new DataReferenceResolver( $this->client );
 
-			$progress['blueprint']->setCaption('Loading Blueprint data');
+			$progress['blueprint']->setCaption( 'Loading Blueprint data' );
 			$this->loadBlueprint();
 			$this->validateBlueprint();
 			$this->assets->setExecutionContext( $this->blueprintExecutionContext );
@@ -221,10 +223,10 @@ class Runner {
 			$plan = $this->createExecutionPlan();
 			$progress['blueprint']->finish();
 
-			$progress['targetResolution']->setCaption('Resolving target site');
-			$targetSiteFs = LocalFilesystem::create( $this->configuration->getTargetSiteRoot() );
+			$progress['targetResolution']->setCaption( 'Resolving target site' );
+			$targetSiteFs   = LocalFilesystem::create( $this->configuration->getTargetSiteRoot() );
 			$wpCliReference = DataReference::create( 'https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar' );
-			$this->runtime      = new Runtime(
+			$this->runtime  = new Runtime(
 				$targetSiteFs,
 				$this->configuration,
 				$this->assets,
@@ -233,13 +235,13 @@ class Runner {
 				$tempRoot,
 				$wpCliReference
 			);
-			$this->progressObserver->setRuntime($this->runtime);
-			$progress['wpCli']->setCaption('Downloading WP-CLI');
+			$this->progressObserver->setRuntime( $this->runtime );
+			$progress['wpCli']->setCaption( 'Downloading WP-CLI' );
 			$this->assets->startEagerResolution( [
-				'wp-cli' => $wpCliReference
+				'wp-cli' => $wpCliReference,
 			], $progress['wpCli'] );
 
-			$progress['targetResolution']->setCaption('Resolving target site');
+			$progress['targetResolution']->setCaption( 'Resolving target site' );
 			if ( $this->configuration->getExecutionMode() === 'apply-to-existing-site' ) {
 				ExistingSiteResolver::resolve( $this->runtime, $progress['targetResolution'], $this->wpVersionConstraint );
 			} else {
@@ -247,7 +249,7 @@ class Runner {
 			}
 			$progress['targetResolution']->finish();
 
-			$progress['data']->setCaption('Resolving data references');
+			$progress['data']->setCaption( 'Resolving data references' );
 			$this->assets->startEagerResolution( $this->dataReferences, $progress['data'] );
 			$this->executePlan( $progress['execution'], $plan, $this->runtime );
 			$progress->finish();
@@ -255,7 +257,7 @@ class Runner {
 			// TODO: Optionally preserve workspace in case of error? Support resuming after error?
 			LocalFilesystem::create( $tempRoot )->rmdir( '/', [
 				'recursive' => true,
-			]);
+			] );
 		}
 	}
 
@@ -264,7 +266,7 @@ class Runner {
 		$reference = $this->configuration->getBlueprint();
 
 		if ( is_array( $reference ) ) {
-			$this->blueprintArray   = $reference;
+			$this->blueprintArray            = $reference;
 			$this->blueprintExecutionContext = InMemoryFilesystem::create();
 
 			return;
@@ -287,9 +289,9 @@ class Runner {
 			$stream = $resolved->getStream();
 
 			// @TODO: A general http error checking solution for all resources
-			if($stream instanceof RequestReadStream) {
+			if ( $stream instanceof RequestReadStream ) {
 				$response = $stream->await_response();
-				if(!$response->ok()) {
+				if ( ! $response->ok() ) {
 					throw new BlueprintExecutionException(
 						sprintf(
 							'Failed to load blueprint from %s. Server responded with %d %s.',
@@ -302,7 +304,7 @@ class Runner {
 			}
 
 			if ( is_zip_file_stream( $stream ) ) {
-				$blueprintString        = $this->blueprintExecutionContext->get_contents( '/blueprint.json' );
+				$blueprintString                 = $this->blueprintExecutionContext->get_contents( '/blueprint.json' );
 				$this->blueprintExecutionContext = new ZipFilesystem( $stream );
 			} else {
 				// JSON file
@@ -324,7 +326,7 @@ class Runner {
 				}
 			}
 		} elseif ( $resolved instanceof Directory ) {
-			$blueprintString = $resolved->filesystem->get_contents( '/blueprint.json' );
+			$blueprintString                 = $resolved->filesystem->get_contents( '/blueprint.json' );
 			$this->blueprintExecutionContext = $resolved->filesystem;
 		} else {
 			throw new BlueprintExecutionException( 'Invalid blueprint reference type: ' . get_class( $reference ) );
@@ -350,27 +352,27 @@ class Runner {
 			throw new BlueprintExecutionException( 'Blueprint must be a valid JSON document.' );
 		}
 
-		if(!is_array($this->blueprintArray)) {
-			throw new BlueprintExecutionException('Blueprint must be an array.');
+		if ( ! is_array( $this->blueprintArray ) ) {
+			throw new BlueprintExecutionException( 'Blueprint must be an array.' );
 		}
 	}
 
 	private function validateBlueprint(): void {
-		if( !isset($this->blueprintArray['version']) ) {
-			$error = V1ToV2Transpiler::validate_v1_blueprint($this->blueprintArray);
-			if($error) {
-				throw new BlueprintExecutionException('Invalid Blueprint v1 provided.', 0, null, $error);
+		if ( ! isset( $this->blueprintArray['version'] ) ) {
+			$error = V1ToV2Transpiler::validate_v1_blueprint( $this->blueprintArray );
+			if ( $error ) {
+				throw new BlueprintExecutionException( 'Invalid Blueprint v1 provided.', 0, null, $error );
 			}
-			$this->configuration->getLogger()->debug('Blueprint v1 detected. Transpiling to v2...');
+			$this->configuration->getLogger()->debug( 'Blueprint v1 detected. Transpiling to v2...' );
 
-			$transpiler = new V1ToV2Transpiler($this->configuration->getLogger());
-			$this->blueprintArray = $transpiler->upgrade($this->blueprintArray);
+			$transpiler           = new V1ToV2Transpiler( $this->configuration->getLogger() );
+			$this->blueprintArray = $transpiler->upgrade( $this->blueprintArray );
 		}
 
-		$this->configuration->getLogger()->debug('Final resolved Blueprint: ' . json_encode($this->blueprintArray, JSON_PRETTY_PRINT));
+		$this->configuration->getLogger()->debug( 'Final resolved Blueprint: ' . json_encode( $this->blueprintArray, JSON_PRETTY_PRINT ) );
 
 		// Assert the Blueprint conforms to the latest JSON schema.
-		$v = new HumanFriendlySchemaValidator(
+		$v     = new HumanFriendlySchemaValidator(
 			json_decode( file_get_contents( __DIR__ . '/Versions/Version2/json-schema/schema-v2.json' ), true )
 		);
 		$error = $v->validate( $this->blueprintArray );
@@ -381,43 +383,43 @@ class Runner {
 		// PHP Version Constraint
 		if ( isset( $this->blueprintArray['phpVersion'] ) ) {
 			$min = $max = $recommended = null;
-			
+
 			$php_version = $this->blueprintArray['phpVersion'];
-			if(is_string($php_version)) {
-				$parsed_version = PHPVersion::fromString($php_version);
-				if(!$parsed_version) {
-					throw new BlueprintExecutionException('Invalid PHP version string in phpVersion: ' . $php_version);
+			if ( is_string( $php_version ) ) {
+				$parsed_version = PHPVersion::fromString( $php_version );
+				if ( ! $parsed_version ) {
+					throw new BlueprintExecutionException( 'Invalid PHP version string in phpVersion: ' . $php_version );
 				}
 				$min = $max = $recommended = $parsed_version;
 			} else {
-				if(isset($php_version['min'])) {
-					$min = PHPVersion::fromString($php_version['min']);
-					if(!$min) {
-						throw new BlueprintExecutionException('Invalid PHP version string in phpVersion.min: ' . $php_version['min']);
+				if ( isset( $php_version['min'] ) ) {
+					$min = PHPVersion::fromString( $php_version['min'] );
+					if ( ! $min ) {
+						throw new BlueprintExecutionException( 'Invalid PHP version string in phpVersion.min: ' . $php_version['min'] );
 					}
 				}
-				if(isset($php_version['max'])) {
-					$max = PHPVersion::fromString($php_version['max']);
-					if(!$max) {
-						throw new BlueprintExecutionException('Invalid PHP version string in phpVersion.max: ' . $php_version['max']);
+				if ( isset( $php_version['max'] ) ) {
+					$max = PHPVersion::fromString( $php_version['max'] );
+					if ( ! $max ) {
+						throw new BlueprintExecutionException( 'Invalid PHP version string in phpVersion.max: ' . $php_version['max'] );
 					}
 				}
-				if(isset($php_version['recommended'])) {
-					$recommended = PHPVersion::fromString($php_version['recommended']);
-					if(!$recommended) {
-						throw new BlueprintExecutionException('Invalid PHP version string in phpVersion.recommended: ' . $php_version['recommended']);
+				if ( isset( $php_version['recommended'] ) ) {
+					$recommended = PHPVersion::fromString( $php_version['recommended'] );
+					if ( ! $recommended ) {
+						throw new BlueprintExecutionException( 'Invalid PHP version string in phpVersion.recommended: ' . $php_version['recommended'] );
 					}
 				}
 			}
-			$this->phpVersionConstraint = new VersionConstraint($min, $max, $recommended);
-			$phpConstraintErrors = $this->phpVersionConstraint->validate();
-			if (!empty($phpConstraintErrors)) {
-				throw new BlueprintExecutionException('Invalid PHP version constraint: ' . implode('; ', $phpConstraintErrors));
+			$this->phpVersionConstraint = new VersionConstraint( $min, $max, $recommended );
+			$phpConstraintErrors        = $this->phpVersionConstraint->validate();
+			if ( ! empty( $phpConstraintErrors ) ) {
+				throw new BlueprintExecutionException( 'Invalid PHP version constraint: ' . implode( '; ', $phpConstraintErrors ) );
 			}
 
 			// Confirm the environment satisfies the PHP version constraint.
-			$currentPhpVersion = PHPVersion::fromString(PHP_VERSION);
-			if ( !$this->phpVersionConstraint->satisfiedBy( $currentPhpVersion ) ) {
+			$currentPhpVersion = PHPVersion::fromString( PHP_VERSION );
+			if ( ! $this->phpVersionConstraint->satisfiedBy( $currentPhpVersion ) ) {
 				throw new BlueprintExecutionException(
 					sprintf(
 						'PHP version requirement not satisfied. Blueprint requires %s, but current version is %s',
@@ -431,46 +433,46 @@ class Runner {
 		// WordPress Version Constraint
 		if ( isset( $this->blueprintArray['wordpressVersion'] ) ) {
 			$wp_version = $this->blueprintArray['wordpressVersion'];
-			$min = $max = $recommended = null;
-			if(is_string($wp_version)) {
-				$min = $max = $recommended = WordPressVersion::fromString($wp_version);
-				if(!$min) {
-					throw new BlueprintExecutionException('Invalid WordPress version string in wordpressVersion: ' . $wp_version);
+			$min        = $max = $recommended = null;
+			if ( is_string( $wp_version ) ) {
+				$min = $max = $recommended = WordPressVersion::fromString( $wp_version );
+				if ( ! $min ) {
+					throw new BlueprintExecutionException( 'Invalid WordPress version string in wordpressVersion: ' . $wp_version );
 				}
 			} else {
-				if(isset($wp_version['min'])) {
-					if($wp_version['min'] === 'latest') {
+				if ( isset( $wp_version['min'] ) ) {
+					if ( $wp_version['min'] === 'latest' ) {
 						throw new BlueprintExecutionException(
 							'Setting wordpressVersion.min to "latest" is not allowed and probably not what you want. Either set wordPressVersion.recommended to "latest" or set wordPressVersion.min to a specific version string instead.'
 						);
 					}
-					$min = WordPressVersion::fromString($wp_version['min']);
-					if(!$min) {
-						throw new BlueprintExecutionException('Invalid WordPress version string in wordpressVersion.min: ' . $wp_version['min']);
+					$min = WordPressVersion::fromString( $wp_version['min'] );
+					if ( ! $min ) {
+						throw new BlueprintExecutionException( 'Invalid WordPress version string in wordpressVersion.min: ' . $wp_version['min'] );
 					}
 				}
 				// Latest version is implicitly the default and it's only for resolving
 				// the WordPress version to install. It's not used for version checks on
 				// existing sites and VersionConstraint doesn't support it. It doesn't have
 				// enough information anyway – the meaning of "latest" changes over time.
-				if(isset($wp_version['max']) && $wp_version['max'] !== 'latest') {
-					$max = WordPressVersion::fromString($wp_version['max']);
-					if(!$max) {
-						throw new BlueprintExecutionException('Invalid WordPress version string in wordpressVersion.max: ' . $wp_version['max']);
+				if ( isset( $wp_version['max'] ) && $wp_version['max'] !== 'latest' ) {
+					$max = WordPressVersion::fromString( $wp_version['max'] );
+					if ( ! $max ) {
+						throw new BlueprintExecutionException( 'Invalid WordPress version string in wordpressVersion.max: ' . $wp_version['max'] );
 					}
 				}
-				if(isset($wp_version['recommended']) && $wp_version['recommended'] !== 'latest') {
-					$recommended = WordPressVersion::fromString($wp_version['recommended']);
-					if(!$recommended) {
-						throw new BlueprintExecutionException('Invalid WordPress version string in wordpressVersion.recommended: ' . $wp_version['recommended']);
+				if ( isset( $wp_version['recommended'] ) && $wp_version['recommended'] !== 'latest' ) {
+					$recommended = WordPressVersion::fromString( $wp_version['recommended'] );
+					if ( ! $recommended ) {
+						throw new BlueprintExecutionException( 'Invalid WordPress version string in wordpressVersion.recommended: ' . $wp_version['recommended'] );
 					}
 				}
 			}
 
-			$this->wpVersionConstraint = new VersionConstraint($min, $max, $recommended);
-			$wpConstraintErrors = $this->wpVersionConstraint->validate();
-			if (!empty($wpConstraintErrors)) {
-				throw new BlueprintExecutionException('Invalid WordPress version constraint: ' . implode('; ', $wpConstraintErrors));
+			$this->wpVersionConstraint = new VersionConstraint( $min, $max, $recommended );
+			$wpConstraintErrors        = $this->wpVersionConstraint->validate();
+			if ( ! empty( $wpConstraintErrors ) ) {
+				throw new BlueprintExecutionException( 'Invalid WordPress version constraint: ' . implode( '; ', $wpConstraintErrors ) );
 			}
 			// Note: In here's we're only checking if the version constraint is defined
 			// correctly. The actual version check for WordPress is done in
@@ -528,7 +530,7 @@ class Runner {
 						'source'               => $themeRef['source'],
 						'activate'             => $themeRef['activate'] ?? false,
 						'importStarterContent' => $themeRef['importStarterContent'] ?? false,
-						'targetDirectoryName'     => $themeRef['targetDirectoryName'] ?? null,
+						'targetDirectoryName'  => $themeRef['targetDirectoryName'] ?? null,
 					] );
 				} else {
 					throw new InvalidArgumentException( 'Invalid theme reference format in "themes" array.' );
@@ -550,7 +552,7 @@ class Runner {
 					'source'               => $themeRef['source'],
 					'activate'             => true,
 					'importStarterContent' => $themeRef['importStarterContent'] ?? false,
-					'targetDirectoryName'     => $themeRef['targetDirectoryName'] ?? null,
+					'targetDirectoryName'  => $themeRef['targetDirectoryName'] ?? null,
 				] );
 			} else {
 				throw new InvalidArgumentException( 'Invalid theme reference format for "activeTheme".' );
@@ -560,7 +562,7 @@ class Runner {
 		// 6. plugins
 		if ( ! empty( $validated_array['plugins'] ) && is_array( $validated_array['plugins'] ) ) {
 			foreach ( $validated_array['plugins'] as $pluginDef ) {
-				if(is_string($pluginDef)) {
+				if ( is_string( $pluginDef ) ) {
 					$pluginDef = [
 						'source' => $pluginDef,
 					];
@@ -612,12 +614,12 @@ class Runner {
 			}
 		}
 
-		foreach($plan as $step) {
+		foreach ( $plan as $step ) {
 			// @TODO: Make sure this doesn't get included twice in the execution plan.
-			if($step instanceof ImportContentStep) {
-				array_unshift($plan, $this->createStepObject('installPlugin', [ 
-					'source' => $this->createDataReference('https://playground.wordpress.net/wordpress-importer.zip')
-				]));
+			if ( $step instanceof ImportContentStep ) {
+				array_unshift( $plan, $this->createStepObject( 'installPlugin', [
+					'source' => $this->createDataReference( 'https://playground.wordpress.net/wordpress-importer.zip' ),
+				] ) );
 				break;
 			}
 		}
@@ -646,9 +648,11 @@ class Runner {
 				return new DefineConstantsStep( $data['constants'] );
 			case 'importContent':
 				$content = [];
-				foreach($data['content'] as $item) {
-					$content[] = array_merge(is_array($item) ? $item : iterator_to_array($item), ['source' => $this->createDataReference($item['source'], [ExecutionContextPath::class])]);
+				foreach ( $data['content'] as $item ) {
+					$content[] = array_merge( is_array( $item ) ? $item : iterator_to_array( $item ),
+						[ 'source' => $this->createDataReference( $item['source'], [ ExecutionContextPath::class ] ) ] );
 				}
+
 				return new ImportContentStep( $content );
 			case 'importThemeStarterContent':
 				return new ImportThemeStarterContentStep( $data['themeSlug'] ?? null );
@@ -689,6 +693,7 @@ class Runner {
 				);
 			case 'runSql':
 				$source = $this->createDataReference( $data['source'], [ ExecutionContextPath::class ] );
+
 				return new RunSqlStep( $source );
 			case 'setSiteLanguage':
 				return new SetSiteLanguageStep( $data['language'] );
@@ -839,7 +844,7 @@ register_post_type(%1$s, %2$s);
 0
 );
 PHP
-,
+						,
 						var_export( $slug, true ),
 						var_export( $args, true )
 					);
@@ -864,9 +869,9 @@ PHP
 				$inlinePosts = array_values(
 					array_filter(
 						$data['posts'],
-						static function ($item) {
-                            return is_array( $item );
-                        }
+						static function ( $item ) {
+							return is_array( $item );
+						}
 					)
 				);
 
@@ -894,8 +899,7 @@ foreach (\$__bp_posts as \$__bp_post) {
 \twp_insert_post(wp_slash(\$postData));
 }
 unset(\$__bp_posts, \$__bp_post, \$postData);
-PHP
-;
+PHP;
 
 				return new RunPHPStep(
 					$this->createDataReference( [
@@ -952,9 +956,9 @@ PHP
 	}
 
 	/**
-     * @param mixed $data
-     */
-    private function createDataReference( $data, array $additional_reference_classes = [] ): DataReference {
+	 * @param  mixed  $data
+	 */
+	private function createDataReference( $data, array $additional_reference_classes = [] ): DataReference {
 		$reference = $data instanceof DataReference ? $data : DataReference::create( $data, $additional_reference_classes );
 
 		/**
@@ -964,9 +968,9 @@ PHP
 		 * then we narrow it down to the Blueprint parent directory.
 		 */
 		$executionContextIsLocal = $this->configuration->getBlueprint() instanceof ExecutionContextPath;
-		if(
-			$executionContextIsLocal && 
-			!$this->configuration->isAllowedLocalFilesystemAccess() && 
+		if (
+			$executionContextIsLocal &&
+			! $this->configuration->isAllowedLocalFilesystemAccess() &&
 			$reference instanceof ExecutionContextPath
 		) {
 			throw new PermissionsException(
@@ -1006,7 +1010,7 @@ PHP
 		}
 
 		// Create progress trackers for each step upfront
-		$progress->split(range(0, $stepCount));
+		$progress->split( range( 0, $stepCount ) );
 		for ( $i = 0; $i < $stepCount; $i ++ ) {
 			$step        = $steps[ $i ];
 			$stepTracker = $progress[ $i ];

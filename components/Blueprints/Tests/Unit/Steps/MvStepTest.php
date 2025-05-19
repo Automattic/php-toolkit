@@ -4,6 +4,7 @@ namespace WordPress\Blueprints\Tests\Unit\Steps;
 
 use WordPress\Blueprints\Progress\Tracker;
 use WordPress\Blueprints\Steps\MvStep;
+use WordPress\Filesystem\FilesystemException;
 
 class MvStepTest extends StepTestCase {
 
@@ -128,7 +129,7 @@ class MvStepTest extends StepTestCase {
 		);
 
 		$tracker = new Tracker();
-		$this->expectException( \WordPress\Filesystem\FilesystemException::class );
+		$this->expectException( FilesystemException::class );
 		$step->run( $this->runtime, $tracker );
 	}
 }

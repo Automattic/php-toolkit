@@ -2,6 +2,8 @@
 
 namespace WordPress\Blueprints\DataReference;
 
+use InvalidArgumentException;
+
 /**
  * Represents a reference to a remote git repository.
  */
@@ -79,7 +81,7 @@ class GitPath extends DataReference {
 	 */
 	public static function from_blueprint_data( array $data ): self {
 		if ( ! isset( $data['gitRepository'] ) ) {
-			throw new \InvalidArgumentException( 'Invalid git path data' );
+			throw new InvalidArgumentException( 'Invalid git path data' );
 		}
 
 		return new self(

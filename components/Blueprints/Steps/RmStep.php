@@ -11,9 +11,9 @@ use WordPress\Filesystem\FilesystemException;
  */
 class RmStep implements StepInterface {
 	/**
-     * @var string
-     */
-    public $path;
+	 * @var string
+	 */
+	public $path;
 
 	/**
 	 * @param  string  $path  The file path to remove.

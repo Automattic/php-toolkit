@@ -12,10 +12,10 @@ class RunSQLStepTest extends StepTestCase {
 	 */
 	public function testRunSimpleSQLQuery() {
 		$sql = "CREATE TABLE IF NOT EXISTS test_table (id INT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(100));";
-		$this->execution_context->put_contents('test.sql', $sql);
+		$this->execution_context->put_contents( 'test.sql', $sql );
 
-		$step = new RunSqlStep(DataReference::create('./test.sql'));
-		$step->run($this->runtime, new Tracker());
+		$step = new RunSqlStep( DataReference::create( './test.sql' ) );
+		$step->run( $this->runtime, new Tracker() );
 
 		$table_exists = $this->runtime->evalPhpInSubProcess(
 			<<<'PHP'
@@ -29,7 +29,7 @@ PHP
 
 		)->outputFileContent;
 
-		$this->assertEquals('true', $table_exists);
+		$this->assertEquals( 'true', $table_exists );
 	}
 
 	/**
@@ -42,10 +42,10 @@ INSERT INTO test_table (name) VALUES ('Test 1');
 INSERT INTO test_table (name) VALUES ('Test 2');
 INSERT INTO test_table (name) VALUES ('Test 3');
 SQL;
-		$this->execution_context->put_contents('test.sql', $sql);
+		$this->execution_context->put_contents( 'test.sql', $sql );
 
-		$step = new RunSqlStep(DataReference::create('./test.sql'));
-		$step->run($this->runtime, new Tracker());
+		$step = new RunSqlStep( DataReference::create( './test.sql' ) );
+		$step->run( $this->runtime, new Tracker() );
 
 		$result = $this->runtime->evalPhpInSubProcess(
 			<<<'PHP'
@@ -62,11 +62,11 @@ PHP
 
 		)->outputFileContent;
 
-		$data = json_decode($result, true);
-		$this->assertEquals(3, $data['count']);
-		$this->assertEquals('Test 1', $data['rows'][0]['name']);
-		$this->assertEquals('Test 2', $data['rows'][1]['name']);
-		$this->assertEquals('Test 3', $data['rows'][2]['name']);
+		$data = json_decode( $result, true );
+		$this->assertEquals( 3, $data['count'] );
+		$this->assertEquals( 'Test 1', $data['rows'][0]['name'] );
+		$this->assertEquals( 'Test 2', $data['rows'][1]['name'] );
+		$this->assertEquals( 'Test 3', $data['rows'][2]['name'] );
 	}
 
 	/**
@@ -77,10 +77,10 @@ PHP
 INSERT INTO wp_options (option_name, option_value, autoload) VALUES ('sql_test_option', 'sql_test_value', 'yes');
 UPDATE wp_options SET option_value = 'updated_via_sql' WHERE option_name = 'sql_test_option';
 SQL;
-		$this->execution_context->put_contents('test.sql', $sql);
+		$this->execution_context->put_contents( 'test.sql', $sql );
 
-		$step = new RunSqlStep(DataReference::create('./test.sql'));
-		$step->run($this->runtime, new Tracker());
+		$step = new RunSqlStep( DataReference::create( './test.sql' ) );
+		$step->run( $this->runtime, new Tracker() );
 
 		$option_value = $this->runtime->evalPhpInSubProcess(
 			<<<'PHP'
@@ -91,7 +91,7 @@ PHP
 
 		)->outputFileContent;
 
-		$this->assertEquals('updated_via_sql', $option_value);
+		$this->assertEquals( 'updated_via_sql', $option_value );
 	}
 
 	/**
@@ -104,10 +104,10 @@ CREATE TABLE IF NOT EXISTS test_table_2 (id INT AUTO_INCREMENT PRIMARY KEY, valu
 INSERT INTO test_table_1 (value) VALUES ('table_1_data');
 INSERT INTO test_table_2 (value) VALUES ('table_2_data');
 SQL;
-		$this->execution_context->put_contents('test.sql', $sql);
+		$this->execution_context->put_contents( 'test.sql', $sql );
 
-		$step = new RunSqlStep(DataReference::create('./test.sql'));
-		$step->run($this->runtime, new Tracker());
+		$step = new RunSqlStep( DataReference::create( './test.sql' ) );
+		$step->run( $this->runtime, new Tracker() );
 
 		$result = $this->runtime->evalPhpInSubProcess(
 			<<<'PHP'
@@ -126,9 +126,9 @@ PHP
 
 		)->outputFileContent;
 
-		$data = json_decode($result, true);
-		$this->assertEquals('table_1_data', $data['table1']);
-		$this->assertEquals('table_2_data', $data['table2']);
+		$data = json_decode( $result, true );
+		$this->assertEquals( 'table_1_data', $data['table1'] );
+		$this->assertEquals( 'table_2_data', $data['table2'] );
 	}
 
 	/**
@@ -136,10 +136,10 @@ PHP
 	 */
 	public function testHandleSQLErrors() {
 		$sql = "CREATE TABLE test_table (id INT PRIMARY KEY); INSERT INTO nonexistent_table VALUES (1);";
-		$this->execution_context->put_contents('test.sql', $sql);
+		$this->execution_context->put_contents( 'test.sql', $sql );
 
-		$step = new RunSqlStep(DataReference::create('./test.sql'));
-		$step->run($this->runtime, new Tracker());
+		$step = new RunSqlStep( DataReference::create( './test.sql' ) );
+		$step->run( $this->runtime, new Tracker() );
 
 		$table_exists = $this->runtime->evalPhpInSubProcess(
 			<<<'PHP'
@@ -153,6 +153,6 @@ PHP
 
 		)->outputFileContent;
 
-		$this->assertEquals('true', $table_exists);
+		$this->assertEquals( 'true', $table_exists );
 	}
 }

@@ -2,8 +2,8 @@
 
 namespace WordPress\Blueprints\Tests\Unit\Steps;
 
-use WordPress\Blueprints\Steps\CpStep;
 use WordPress\Blueprints\Progress\Tracker;
+use WordPress\Blueprints\Steps\CpStep;
 use WordPress\Filesystem\FilesystemException;
 
 class CpStepTest extends StepTestCase {

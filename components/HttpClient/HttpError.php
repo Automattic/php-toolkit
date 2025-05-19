@@ -2,7 +2,9 @@
 
 namespace WordPress\HttpClient;
 
-class HttpError extends \Exception {
+use Exception;
+
+class HttpError extends Exception {
 	public $message;
 
 	public function __construct( $message ) {

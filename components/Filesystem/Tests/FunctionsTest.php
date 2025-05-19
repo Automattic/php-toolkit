@@ -1,6 +1,7 @@
 <?php
 
 use PHPUnit\Framework\TestCase;
+
 use function WordPress\Filesystem\wp_join_paths;
 
 class FunctionsTest extends TestCase {

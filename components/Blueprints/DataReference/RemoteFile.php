@@ -10,11 +10,10 @@ use WordPress\ByteStream\ReadStream\ByteReadStream;
  */
 class RemoteFile extends File {
 
-	public function getStream(): ByteReadStream
-	{
- 		// @TODO: Only accept streams with await_response() and get_url() methods.
+	public function getStream(): ByteReadStream {
+		// @TODO: Only accept streams with await_response() and get_url() methods.
 		$response = $this->stream->await_response();
-		if(!$response->ok()) {
+		if ( ! $response->ok() ) {
 			throw new DataResolutionException(
 				sprintf(
 					'Failed to load the URL from %s. Server responded with %d %s.',
@@ -24,6 +23,7 @@ class RemoteFile extends File {
 				)
 			);
 		}
+
 		return $this->stream;
 	}
 

@@ -2,6 +2,8 @@
 
 namespace WordPress\Filesystem;
 
+use Exception;
+use SQLite3;
 use WordPress\ByteStream\MemoryPipe;
 use WordPress\ByteStream\ReadStream\ByteReadStream;
 use WordPress\Filesystem\Layer\ChrootLayer;
@@ -33,7 +35,7 @@ class SQLiteFilesystem implements Filesystem {
 	}
 
 	private function __construct( $db_path ) {
-		$this->db = new \SQLite3( $db_path );
+		$this->db = new SQLite3( $db_path );
 		$this->db->exec(
 			'
 			CREATE TABLE IF NOT EXISTS files (
@@ -70,6 +72,7 @@ class SQLiteFilesystem implements Filesystem {
 		while ( $row = $result->fetchArray( SQLITE3_ASSOC ) ) {
 			$entries[] = $row['name'];
 		}
+
 		return $entries;
 	}
 
@@ -83,6 +86,7 @@ class SQLiteFilesystem implements Filesystem {
 		$stmt->bindValue( 1, $path, SQLITE3_TEXT );
 		$stmt->bindValue( 2, 'dir', SQLITE3_TEXT );
 		$result = $stmt->execute();
+
 		return $result->fetchArray() !== false;
 	}
 
@@ -96,6 +100,7 @@ class SQLiteFilesystem implements Filesystem {
 		$stmt->bindValue( 1, $path, SQLITE3_TEXT );
 		$stmt->bindValue( 2, 'file', SQLITE3_TEXT );
 		$result = $stmt->execute();
+
 		return $result->fetchArray() !== false;
 	}
 
@@ -108,6 +113,7 @@ class SQLiteFilesystem implements Filesystem {
 		);
 		$stmt->bindValue( 1, $path, SQLITE3_TEXT );
 		$result = $stmt->execute();
+
 		return $result->fetchArray() !== false;
 	}
 
@@ -125,6 +131,7 @@ class SQLiteFilesystem implements Filesystem {
 		$stmt->bindValue( 1, $path, SQLITE3_TEXT );
 		$result = $stmt->execute();
 		$row    = $result->fetchArray( SQLITE3_ASSOC );
+
 		return $row['contents'];
 	}
 
@@ -176,8 +183,9 @@ class SQLiteFilesystem implements Filesystem {
 					$stmt->execute();
 				}
 			);
+
 			return true;
-		} catch ( \Exception $e ) {
+		} catch ( Exception $e ) {
 			throw new FilesystemException(
 				sprintf( 'Failed to rename file: %s to %s', $from_path, $to_path ),
 				0,
@@ -226,8 +234,9 @@ class SQLiteFilesystem implements Filesystem {
 					$stmt->execute();
 				}
 			);
+
 			return true;
-		} catch ( \Exception $e ) {
+		} catch ( Exception $e ) {
 			throw new FilesystemException(
 				sprintf( 'Failed to create directory: %s', $path ),
 				0,
@@ -263,7 +272,7 @@ class SQLiteFilesystem implements Filesystem {
 					$stmt->execute();
 				}
 			);
-		} catch ( \Exception $e ) {
+		} catch ( Exception $e ) {
 			throw new FilesystemException(
 				sprintf( 'Failed to remove file: %s', $path ),
 				0,
@@ -312,7 +321,7 @@ class SQLiteFilesystem implements Filesystem {
 					$stmt->execute();
 				}
 			);
-		} catch ( \Exception $e ) {
+		} catch ( Exception $e ) {
 			throw new FilesystemException(
 				sprintf( 'Failed to remove directory: %s', $path ),
 				0,
@@ -356,8 +365,9 @@ class SQLiteFilesystem implements Filesystem {
 					$stmt->execute();
 				}
 			);
+
 			return true;
-		} catch ( \Exception $e ) {
+		} catch ( Exception $e ) {
 			throw new FilesystemException(
 				sprintf( 'Failed to put contents: %s', $path ),
 				0,
@@ -367,14 +377,14 @@ class SQLiteFilesystem implements Filesystem {
 	}
 
 	private function in_transaction( $callback ) {
-		$current_level = $this->transaction_level++;
+		$current_level = $this->transaction_level ++;
 		try {
 			if ( $current_level === 0 ) {
 				$this->db->exec( 'BEGIN TRANSACTION' );
 				try {
 					$callback();
 					$this->db->exec( 'COMMIT' );
-				} catch ( \Exception $e ) {
+				} catch ( Exception $e ) {
 					$this->db->exec( 'ROLLBACK' );
 					throw $e;
 				}
@@ -383,13 +393,13 @@ class SQLiteFilesystem implements Filesystem {
 				try {
 					$callback();
 					$this->db->exec( 'RELEASE SAVEPOINT level_' . $current_level );
-				} catch ( \Exception $e ) {
+				} catch ( Exception $e ) {
 					$this->db->exec( 'ROLLBACK TO SAVEPOINT level_' . $current_level );
 					throw $e;
 				}
 			}
 		} finally {
-			--$this->transaction_level;
+			-- $this->transaction_level;
 		}
 	}
 

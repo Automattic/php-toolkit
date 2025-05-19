@@ -2,25 +2,32 @@
 
 namespace WordPress\Blueprints\DataReference;
 
+use InvalidArgumentException;
 use Nette\NotImplementedException;
 
 class DataReference {
 
 	/**
-     * @var int
-     */
-    public $id;
+	 * @var int
+	 */
+	public $id;
 	/**
-     * @var int
-     */
-    private static $instanceCounter = 0;
+	 * @var int
+	 */
+	private static $instanceCounter = 0;
 
 	public function __construct() {
 		$this->id = self::$instanceCounter ++;
 	}
 
 	static public function create( $reference, array $additional_reference_classes = [] ) {
-		$classes = array_merge([URLReference::class, GitPath::class, InlineDirectory::class, InlineFile::class, ExecutionContextPath::class], $additional_reference_classes);
+		$classes = array_merge( [
+			URLReference::class,
+			GitPath::class,
+			InlineDirectory::class,
+			InlineFile::class,
+			ExecutionContextPath::class,
+		], $additional_reference_classes );
 		foreach ( $classes as $class ) {
 			if ( $class::is_valid( $reference ) ) {
 				if ( method_exists( $class, 'from_blueprint_data' ) ) {
@@ -30,7 +37,7 @@ class DataReference {
 				}
 			}
 		}
-		throw new \InvalidArgumentException(
+		throw new InvalidArgumentException(
 			sprintf(
 				'Invalid data reference: %s',
 				is_string( $reference ) ? $reference : json_encode( $reference )

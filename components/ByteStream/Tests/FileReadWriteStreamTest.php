@@ -1,8 +1,8 @@
 <?php
 
 use PHPUnit\Framework\TestCase;
-use WordPress\ByteStream\FileReadWriteStream;
 use WordPress\ByteStream\ByteStreamException;
+use WordPress\ByteStream\FileReadWriteStream;
 
 class FileReadWriteStreamTest extends TestCase {
 	private $testFile = __DIR__ . '/fixtures/test-rw.txt';
@@ -24,17 +24,17 @@ class FileReadWriteStreamTest extends TestCase {
 
 		$stream->seek( 242900 );
 		$stream->pull( 83 );
-		$last_bytes = $stream->consume( 83 );
+		$last_bytes             = $stream->consume( 83 );
 		$expected_last_83_bytes = 'bscribe to our email newsletter to hear about new eBooks.
 </div>
   </body>
 </html>
-'; 
+';
 		$this->assertEquals( $expected_last_83_bytes, $last_bytes );
 
 		$stream->seek( 0 );
 		$stream->pull( 83 );
-		$first_bytes = $stream->consume( 83 );
+		$first_bytes             = $stream->consume( 83 );
 		$expected_first_83_bytes = '
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
    "http://www.w3.org/TR/';
@@ -108,7 +108,7 @@ class FileReadWriteStreamTest extends TestCase {
 		$stream->pull( 3000, FileReadWriteStream::PULL_EXACTLY );
 		$stream->consume( 3000 );
 		// After consuming, buffer should be trimmed to buffer_size (2048)
-		$reflection = new \ReflectionClass( $stream );
+		$reflection = new ReflectionClass( $stream );
 		$bufferProp = $reflection->getProperty( 'buffer' );
 		$bufferProp->setAccessible( true );
 		$this->assertLessThanOrEqual( 2048, strlen( $bufferProp->getValue( $stream ) ) );
@@ -124,4 +124,4 @@ class FileReadWriteStreamTest extends TestCase {
 		$stream->close_writing();
 		$stream->close_reading();
 	}
-} 
+}

@@ -4,6 +4,7 @@ namespace WordPress\Blueprints\Tests\Unit\Steps;
 
 use WordPress\Blueprints\Progress\Tracker;
 use WordPress\Blueprints\Steps\MkdirStep;
+use WordPress\Filesystem\FilesystemException;
 
 class MkdirStepRunnerTest extends StepTestCase {
 
@@ -31,7 +32,7 @@ class MkdirStepRunnerTest extends StepTestCase {
 		$step->run( $this->runtime, $tracker );
 
 		$fs = $this->runtime->getTargetFilesystem();
-		$this->assertTrue( 
+		$this->assertTrue(
 			$fs->exists( $absolute_path ),
 			sprintf( 'Failed to assert that the directory exists: %s', $absolute_path )
 		);
@@ -66,7 +67,7 @@ class MkdirStepRunnerTest extends StepTestCase {
 
 	public function testThrowExceptionWhenCreatingDirectoryAndItAlreadyExists() {
 		$path = 'dir';
-		$fs = $this->runtime->getTargetFilesystem();
+		$fs   = $this->runtime->getTargetFilesystem();
 		$fs->mkdir( $path );
 
 		$step = new MkdirStep(
@@ -74,7 +75,7 @@ class MkdirStepRunnerTest extends StepTestCase {
 		);
 
 		$tracker = new Tracker();
-		$this->expectException( \WordPress\Filesystem\FilesystemException::class );
+		$this->expectException( FilesystemException::class );
 		$this->expectExceptionMessageMatches( "/Path already exists:/" );
 		$step->run( $this->runtime, $tracker );
 	}

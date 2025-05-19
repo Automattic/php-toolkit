@@ -7,37 +7,37 @@ namespace WordPress\Blueprints;
  */
 class Metadata {
 	/**
-     * @var string
-     */
-    public $name;
+	 * @var string
+	 */
+	public $name;
 	/**
-     * @var string
-     */
-    public $description;
+	 * @var string
+	 */
+	public $description;
 	/**
-     * @var string
-     */
-    public $version;
+	 * @var string
+	 */
+	public $version;
 	/**
-     * @var mixed[]
-     */
-    public $authors;
+	 * @var mixed[]
+	 */
+	public $authors;
 	/**
-     * @var string|null
-     */
-    public $authorUrl;
+	 * @var string|null
+	 */
+	public $authorUrl;
 	/**
-     * @var string|null
-     */
-    public $donateLink;
+	 * @var string|null
+	 */
+	public $donateLink;
 	/**
-     * @var mixed[]
-     */
-    public $tags;
+	 * @var mixed[]
+	 */
+	public $tags;
 	/**
-     * @var string|null
-     */
-    public $license;
+	 * @var string|null
+	 */
+	public $license;
 
 	/**
 	 * Create a BlueprintMetadata object from an array of data.

@@ -4,6 +4,7 @@ namespace WordPress\Blueprints\Tests\Unit\Steps;
 
 use WordPress\Blueprints\Progress\Tracker;
 use WordPress\Blueprints\Steps\RmDirStep;
+use WordPress\Filesystem\FilesystemException;
 
 class RmDirStepRunnerTest extends StepTestCase {
 
@@ -56,7 +57,7 @@ class RmDirStepRunnerTest extends StepTestCase {
 		);
 
 		$tracker = new Tracker();
-		$this->expectException( \WordPress\Filesystem\FilesystemException::class );
+		$this->expectException( FilesystemException::class );
 		$step->run( $this->runtime, $tracker );
 	}
 
@@ -91,7 +92,7 @@ class RmDirStepRunnerTest extends StepTestCase {
 		);
 
 		$tracker = new Tracker();
-		$this->expectException( \WordPress\Filesystem\FilesystemException::class );
+		$this->expectException( FilesystemException::class );
 		$step->run( $this->runtime, $tracker );
 	}
 
@@ -105,7 +106,7 @@ class RmDirStepRunnerTest extends StepTestCase {
 		);
 
 		$tracker = new Tracker();
-		$this->expectException( \WordPress\Filesystem\FilesystemException::class );
+		$this->expectException( FilesystemException::class );
 		$step->run( $this->runtime, $tracker );
 	}
 }

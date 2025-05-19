@@ -16,6 +16,7 @@ trait MkdirRecursive {
 		$recursive = $options['recursive'] ?? false;
 		if ( ! $recursive ) {
 			$this->mkdir_single( $path, $options );
+
 			return;
 		}
 
@@ -32,7 +33,7 @@ trait MkdirRecursive {
 		 */
 		$root = rtrim( $this->get_root(), '/' ) . '/';
 		$path = rtrim( $path, '/' ) . '/';
-		if ( strncmp($path, $root, strlen($root)) !== 0 ) {
+		if ( strncmp( $path, $root, strlen( $root ) ) !== 0 ) {
 			throw new FilesystemException( sprintf( 'Path %s is not within the root %s', $path, $root ) );
 		}
 
@@ -40,12 +41,14 @@ trait MkdirRecursive {
 		// to start iterating over the path segment by segment.
 
 		// Start at the root.
-		foreach ( wp_parent_paths(
-			$path,
-			array(
-				'include_self' => true,
-			)
-		) as $parent_path ) {
+		foreach (
+			wp_parent_paths(
+				$path,
+				array(
+					'include_self' => true,
+				)
+			) as $parent_path
+		) {
 			if ( $parent_path === $root ) {
 				continue;
 			}
@@ -56,5 +59,6 @@ trait MkdirRecursive {
 	}
 
 	abstract protected function get_root(): string;
+
 	abstract protected function mkdir_single( $path, $options = array() );
 }

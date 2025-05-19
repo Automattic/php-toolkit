@@ -6,6 +6,8 @@ use WordPress\Blueprints\DataReference\DataReference;
 use WordPress\Blueprints\Progress\Tracker;
 use WordPress\Blueprints\Steps\InstallPluginStep;
 
+use ZipArchive;
+
 use function WordPress\Filesystem\wp_join_paths;
 
 class InstallPluginStepTest extends StepTestCase {
@@ -23,8 +25,7 @@ function test_plugin_init() {
 // This function is just for testing
 }
 add_action('init', 'test_plugin_init');
-PHP
-;
+PHP;
 
 	public function testInstallPluginWithActivation() {
 		$this->execution_context->mkdir(
@@ -117,8 +118,8 @@ PHP
 
 	public function testInstallPluginFromZip() {
 		$zip_file = wp_join_paths( $this->execution_context_path, 'zipped-test-plugin.zip' );
-		$zip      = new \ZipArchive();
-		if ( $zip->open( $zip_file, \ZipArchive::CREATE ) === true ) {
+		$zip      = new ZipArchive();
+		if ( $zip->open( $zip_file, ZipArchive::CREATE ) === true ) {
 			$zip->addFromString( 'test-plugin.php', self::PLUGIN_FILE_CONTENT );
 			$zip->close();
 		}
@@ -152,8 +153,8 @@ PHP
 
 	public function testInstallPluginFromZipWithSubfolder() {
 		$zip_file = wp_join_paths( $this->execution_context_path, 'zipped-test-plugin.zip' );
-		$zip      = new \ZipArchive();
-		if ( $zip->open( $zip_file, \ZipArchive::CREATE ) === true ) {
+		$zip      = new ZipArchive();
+		if ( $zip->open( $zip_file, ZipArchive::CREATE ) === true ) {
 			$zip->addFromString( 'subfolder-name/test-plugin.php', self::PLUGIN_FILE_CONTENT );
 			$zip->close();
 		}

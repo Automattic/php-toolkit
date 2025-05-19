@@ -13,13 +13,13 @@ use WordPress\Blueprints\Runtime;
  */
 class RunPHPStep implements StepInterface {
 	/**
-     * @var \WordPress\Blueprints\DataReference\DataReference
-     */
-    public $code;
+	 * @var DataReference
+	 */
+	public $code;
 	/**
-     * @var string|null
-     */
-    public $scriptPath;
+	 * @var string|null
+	 */
+	public $scriptPath;
 	/** @var array<string, string>|null */
 	public $env;
 	/** @var array<string, string>|null */
@@ -27,22 +27,22 @@ class RunPHPStep implements StepInterface {
 
 	public function __construct( DataReference $code, ?array $env = null ) {
 		$this->code = $code;
-		$this->env = $env;
+		$this->env  = $env;
 	}
 
 	public function run( Runtime $runtime, Tracker $tracker ) {
 		$tracker->setCaption( 'Running custom PHP code' );
-		
+
 		$env = $this->env ?? [];
-		if ( !empty( $this->__SERVER ?? [] ) ) {
+		if ( ! empty( $this->__SERVER ?? [] ) ) {
 			$env['$_SERVER'] = $this->__SERVER ?? [];
 		}
-		
+
 		$resolvedCode = $runtime->resolve( $this->code );
-		if($resolvedCode instanceof File) {
+		if ( $resolvedCode instanceof File ) {
 			$code = $resolvedCode->getStream()->consume_all();
 		} else {
-			throw new BlueprintExecutionException('The code property must be a File reference.');
+			throw new BlueprintExecutionException( 'The code property must be a File reference.' );
 		}
 		$runtime->evalPhpInSubProcess( $code, $env );
 	}

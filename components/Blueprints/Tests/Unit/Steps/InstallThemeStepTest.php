@@ -6,6 +6,8 @@ use WordPress\Blueprints\DataReference\DataReference;
 use WordPress\Blueprints\Progress\Tracker;
 use WordPress\Blueprints\Steps\InstallThemeStep;
 
+use ZipArchive;
+
 use function WordPress\Filesystem\wp_join_paths;
 
 class InstallThemeStepTest extends StepTestCase {
@@ -21,8 +23,7 @@ Version: 1.0.0
 body {
 font-family: sans-serif;
 }
-CSS
-;
+CSS;
 
 	const THEME_INDEX_PHP_CONTENT = <<<'PHP'
 <?php
@@ -38,8 +39,7 @@ add_theme_support( 'title-tag' );
 add_theme_support( 'post-thumbnails' );
 }
 add_action( 'after_setup_theme', 'test_theme_setup' );
-PHP
-;
+PHP;
 
 	public function testInstallThemeWithActivation() {
 		$this->execution_context->mkdir(
@@ -119,8 +119,8 @@ PHP
 
 	public function testInstallThemeFromZip() {
 		$zip_file = wp_join_paths( $this->execution_context_path, 'zipped-test-theme.zip' );
-		$zip      = new \ZipArchive();
-		if ( $zip->open( $zip_file, \ZipArchive::CREATE ) === true ) {
+		$zip      = new ZipArchive();
+		if ( $zip->open( $zip_file, ZipArchive::CREATE ) === true ) {
 			$zip->addFromString( 'test-theme/style.css', self::THEME_STYLE_CSS_CONTENT );
 			$zip->addFromString( 'test-theme/index.php', self::THEME_INDEX_PHP_CONTENT );
 			$zip->close();

@@ -10,8 +10,9 @@ class FilesystemHelpers {
 	/**
 	 * Creates an empty file at the specified path.
 	 *
-	 * @param Filesystem $fs     The filesystem to use.
-	 * @param string     $path   The path where the file should be created.
+	 * @param  Filesystem  $fs  The filesystem to use.
+	 * @param  string  $path  The path where the file should be created.
+	 *
 	 * @throws FilesystemException If the file cannot be created.
 	 */
 	public static function touch( Filesystem $fs, string $path ): void {
@@ -24,6 +25,7 @@ class FilesystemHelpers {
 				$contents = $fs->get_contents( $path );
 			}
 			$fs->put_contents( $path, $contents );
+
 			return;
 		}
 
@@ -31,4 +33,4 @@ class FilesystemHelpers {
 		$fs->put_contents( $path, '' );
 	}
 
-} 
+}

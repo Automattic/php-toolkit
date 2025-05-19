@@ -16,9 +16,9 @@ class ProgressObserver {
 	private $logCallback;
 
 	/**
-     * @var \WordPress\Blueprints\Runtime|null
-     */
-    private $runtime;
+	 * @var Runtime|null
+	 */
+	private $runtime;
 
 	/**
 	 * Create a new progress logger with the given logging function
@@ -26,7 +26,7 @@ class ProgressObserver {
 	 * @param  callable  $logCallback  Function that receives progress updates
 	 */
 	public function __construct( ?callable $logCallback = null ) {
-		$this->logCallback = $logCallback ?? function() {
+		$this->logCallback = $logCallback ?? function () {
 			// noop
 		};
 	}
@@ -52,7 +52,7 @@ class ProgressObserver {
 		);
 	}
 
-	public function setRuntime(Runtime $runtime) {
+	public function setRuntime( Runtime $runtime ) {
 		$this->runtime = $runtime;
 	}
 }

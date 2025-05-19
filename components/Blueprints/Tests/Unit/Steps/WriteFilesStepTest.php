@@ -13,20 +13,20 @@ class WriteFilesStepTest extends StepTestCase {
 	 */
 	public function testWriteFileWithStringData() {
 		// Create and run the step with string data
-		$step = new WriteFilesStep([
+		$step = new WriteFilesStep( [
 			'test_output.txt' => new InlineFile(
 				'test_output.txt',
 				'String content test'
-			)
-		]);
+			),
+		] );
 
 		$tracker = new Tracker();
-		$step->run($this->runtime, $tracker);
+		$step->run( $this->runtime, $tracker );
 
 		// Check if file was created with correct content
 		$fs = $this->runtime->getTargetFilesystem();
-		$this->assertTrue($fs->exists('test_output.txt'));
-		$this->assertEquals('String content test', $fs->get_contents('test_output.txt'));
+		$this->assertTrue( $fs->exists( 'test_output.txt' ) );
+		$this->assertEquals( 'String content test', $fs->get_contents( 'test_output.txt' ) );
 	}
 
 	/**
@@ -40,17 +40,17 @@ class WriteFilesStepTest extends StepTestCase {
 		);
 
 		// Create and run the step with a data reference
-		$step = new WriteFilesStep([
-			'test_output_from_ref.txt' => DataReference::create('./test_source.txt')
-		]);
+		$step = new WriteFilesStep( [
+			'test_output_from_ref.txt' => DataReference::create( './test_source.txt' ),
+		] );
 
 		$tracker = new Tracker();
-		$step->run($this->runtime, $tracker);
+		$step->run( $this->runtime, $tracker );
 
 		// Check if file was created with correct content
 		$fs = $this->runtime->getTargetFilesystem();
-		$this->assertTrue($fs->exists('test_output_from_ref.txt'));
-		$this->assertEquals('Test file content', $fs->get_contents('test_output_from_ref.txt'));
+		$this->assertTrue( $fs->exists( 'test_output_from_ref.txt' ) );
+		$this->assertEquals( 'Test file content', $fs->get_contents( 'test_output_from_ref.txt' ) );
 	}
 
 	/**
@@ -58,19 +58,19 @@ class WriteFilesStepTest extends StepTestCase {
 	 */
 	public function testCreatesDirectoryStructure() {
 		// Create and run the step with a nested path
-		$step = new WriteFilesStep([
+		$step = new WriteFilesStep( [
 			'nested/directory/structure/test.txt' => new InlineFile(
 				'nested/directory/structure/test.txt',
 				'Nested directory test'
-			)
-		]);
+			),
+		] );
 
 		$tracker = new Tracker();
-		$step->run($this->runtime, $tracker);
+		$step->run( $this->runtime, $tracker );
 
 		// Check if nested directories and file were created
 		$fs = $this->runtime->getTargetFilesystem();
-		$this->assertTrue($fs->exists('nested/directory/structure/test.txt'));
-		$this->assertEquals('Nested directory test', $fs->get_contents('nested/directory/structure/test.txt'));
+		$this->assertTrue( $fs->exists( 'nested/directory/structure/test.txt' ) );
+		$this->assertEquals( 'Nested directory test', $fs->get_contents( 'nested/directory/structure/test.txt' ) );
 	}
 }

@@ -91,7 +91,7 @@ if ( ! empty( $theme_slug ) ) {
 }
 
 // Use the Theme_Upgrader class to install the theme
-$upgrader = new \Theme_Upgrader();
+$upgrader = new Theme_Upgrader();
 $result   = $upgrader->install( $theme_zip_path, array(
 	'overwrite_package' => true,
 	'destination'       => $target_directory,

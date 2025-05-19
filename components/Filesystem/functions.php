@@ -7,8 +7,8 @@ function ls_recursive( Filesystem $filesystem, $path = '/' ) {
 	foreach ( $filesystem->ls( $path ) as $item ) {
 		if ( $filesystem->is_dir( $item ) ) {
 			$tree[] = array(
-				'name' => $item,
-				'type' => 'dir',
+				'name'     => $item,
+				'type'     => 'dir',
 				'children' => ls_recursive( $filesystem, $item ),
 			);
 		} else {
@@ -18,6 +18,7 @@ function ls_recursive( Filesystem $filesystem, $path = '/' ) {
 			);
 		}
 	}
+
 	return $tree;
 }
 
@@ -51,7 +52,7 @@ function copy_between_filesystems( array $args ) {
 				while ( ! $from_stream->reached_end_of_data() ) {
 					$available = $from_stream->pull( 65536 );
 					$to_stream->append_bytes( $from_stream->consume( $available ), $to_stream );
-					++$chunks_written;
+					++ $chunks_written;
 				}
 				if ( $chunks_written === 0 ) {
 					// Make sure the file receives at least one chunk
@@ -81,13 +82,13 @@ function copy_between_filesystems( array $args ) {
 			copy_between_filesystems(
 				array(
 					'source_filesystem' => $source,
-					'source_path' => wp_join_paths( $source_path, $item ),
+					'source_path'       => wp_join_paths( $source_path, $item ),
 					'target_filesystem' => $destination,
-					'target_path' => wp_join_paths( $destination_path, $item ),
+					'target_path'       => wp_join_paths( $destination_path, $item ),
 				)
 			);
 		}
-	} else if($source->exists($source_path)) {
+	} elseif ( $source->exists( $source_path ) ) {
 		// For now ignore paths that are neither files nor directories.
 		// For example, in GitFilesystem that could be a submodule.
 	} else {
@@ -99,9 +100,10 @@ function copy_between_filesystems( array $args ) {
 /**
  * Pipes data from one stream to another.
  *
- * @param ByteReadStream $from_stream The stream to read from.
- * @param ByteWriteStream $to_stream The stream to write to.
- * @param int $chunk_size Optional. The size of chunks to read at a time. Default 65536.
+ * @param  ByteReadStream  $from_stream  The stream to read from.
+ * @param  ByteWriteStream  $to_stream  The stream to write to.
+ * @param  int  $chunk_size  Optional. The size of chunks to read at a time. Default 65536.
+ *
  * @return int The number of chunks written.
  * @throws FilesystemException If there's an error during the transfer.
  */
@@ -110,9 +112,9 @@ function pipe_stream( $from_stream, $to_stream, $chunk_size = 65536 ) {
 	while ( ! $from_stream->reached_end_of_data() ) {
 		$available = $from_stream->pull( $chunk_size );
 		$to_stream->append_bytes( $from_stream->consume( $available ) );
-		++$chunks_written;
+		++ $chunks_written;
 	}
-	
+
 	if ( $chunks_written === 0 ) {
 		// Make sure the file receives at least one chunk
 		// so we can be sure it gets created in case the
@@ -120,7 +122,7 @@ function pipe_stream( $from_stream, $to_stream, $chunk_size = 65536 ) {
 		$to_stream->append_bytes( '' );
 		$chunks_written = 1;
 	}
-	
+
 	return $chunks_written;
 }
 
@@ -128,6 +130,7 @@ function pipe_stream( $from_stream, $to_stream, $chunk_size = 65536 ) {
 function wp_path_segments( $path ) {
 	$canonicalized   = wp_canonicalize_path( $path );
 	$without_slashes = trim( $canonicalized, '/' );
+
 	return explode( '/', $without_slashes );
 }
 
@@ -137,7 +140,7 @@ function wp_parent_paths( $path, $options = array() ) {
 	$segments     = wp_path_segments( $path );
 	$paths        = array( '/' );
 	yield '/';
-	for ( $i = 0; $i < count( $segments ) - 1; $i++ ) {
+	for ( $i = 0; $i < count( $segments ) - 1; $i ++ ) {
 		$paths[] = $segments[ $i ];
 		yield wp_join_paths( ...$paths );
 	}
@@ -159,57 +162,60 @@ function wp_join_paths( ...$path_segments ) {
 		if ( $path_segment !== '' ) {
 			$paths[] = $path_segment;
 			if ( null === $input_starts_with_slash ) {
-				$input_starts_with_slash = strncmp($path_segment, '/', strlen('/')) === 0;
+				$input_starts_with_slash = strncmp( $path_segment, '/', strlen( '/' ) ) === 0;
 			}
 		}
 	}
 	$path = implode( '/', $paths );
 
 	$result = preg_replace( '#/+#', '/', $path );
-	if ( $input_starts_with_slash && strncmp($result, '/', strlen('/')) !== 0 ) {
+	if ( $input_starts_with_slash && strncmp( $result, '/', strlen( '/' ) ) !== 0 ) {
 		$result = '/' . $result;
 	}
+
 	return $result;
 }
 
 /**
  * Resolves a sequence of paths or path segments into an absolute path.
- * 
+ *
  * The given sequence of paths is processed from right to left, with each
  * subsequent path prepended until an absolute path is constructed. For instance
- * given the sequence of path segments: /foo, /bar, baz, calling 
+ * given the sequence of path segments: /foo, /bar, baz, calling
  * wp_resolve_path('/foo', '/bar', 'baz') would return /bar/baz because 'baz'
  * is not an absolute path but '/bar' + '/' + 'baz' is.
- * 
+ *
  * If, after processing all given path segments, an absolute path has not yet been
  * generated, the current working directory is used.
- * 
- * The resulting path is normalized and trailing slashes are removed unless the path is 
+ *
+ * The resulting path is normalized and trailing slashes are removed unless the path is
  * resolved to the root directory.
- * 
+ *
  * Zero-length path segments are ignored.
- * 
- * If no path segments are passed, wp_resolve_path() will return the absolute path of the 
+ *
+ * If no path segments are passed, wp_resolve_path() will return the absolute path of the
  * current working directory.
- * 
+ *
  * This docstring is sourced from Node.js path.resolve()
- * 
- * @param string[] $path_segments The path segments to resolve.
+ *
+ * @param  string[]  $path_segments  The path segments to resolve.
+ *
  * @return string The resolved path.
  */
 function wp_resolve_path( ...$path_segments ) {
 	$last_absolute_segment = null;
-	for($i = count($path_segments) - 1; $i >= 0; $i--) {
-		if(strncmp($path_segments[$i], '/', strlen('/')) === 0) {
+	for ( $i = count( $path_segments ) - 1; $i >= 0; $i -- ) {
+		if ( strncmp( $path_segments[ $i ], '/', strlen( '/' ) ) === 0 ) {
 			$last_absolute_segment = $i;
 			break;
 		}
 	}
-	if(null === $last_absolute_segment) {
+	if ( null === $last_absolute_segment ) {
 		$last_absolute_segment = 0;
-		$path_segments = array_merge(array(getcwd()), $path_segments);
+		$path_segments         = array_merge( array( getcwd() ), $path_segments );
 	}
-	return wp_join_paths( ...array_slice($path_segments, $last_absolute_segment) );
+
+	return wp_join_paths( ...array_slice( $path_segments, $last_absolute_segment ) );
 }
 
 /**
@@ -223,12 +229,13 @@ function wp_resolve_path( ...$path_segments ) {
  *
  * wp_canonicalize_path( 'foo/bar/../baz' ) => '/foo/baz'
  *
- * @param string $path The file path that needs cleaning up
+ * @param  string  $path  The file path that needs cleaning up
+ *
  * @return string The cleaned, absolute path
  */
 function wp_canonicalize_path( $path ) {
 	// Convert to absolute path
-	if ( strncmp($path, '/', strlen('/')) !== 0 ) {
+	if ( strncmp( $path, '/', strlen( '/' ) ) !== 0 ) {
 		$path = '/' . $path;
 	}
 
@@ -251,6 +258,7 @@ function wp_canonicalize_path( $path ) {
 	if ( $result === '/.' ) {
 		$result = '/';
 	}
+
 	return $result === '' ? '/' : $result;
 }
 
@@ -259,7 +267,8 @@ function wp_canonicalize_path( $path ) {
  * consistent between different operating systems. wp_dirname("/foo")
  * will return "/" whereas dirname("/foo") would return "\\".
  *
- * @param string $path The path to get the directory name of.
+ * @param  string  $path  The path to get the directory name of.
+ *
  * @return string The directory name of the path.
  */
 function wp_dirname( $path ) {

@@ -2,53 +2,53 @@
 
 namespace WordPress\Blueprints;
 
+use InvalidArgumentException;
 use Psr\Log\LoggerInterface;
 use WordPress\Blueprints\DataReference\DataReference;
 use WordPress\Blueprints\Logger\NoopLogger;
-use WordPress\Filesystem\Filesystem;
 
 class RunnerConfiguration {
 	// Permission constants
 	public const PERMISSION_LOCAL_FILESYSTEM_ACCESS = 'read-local-fs';
-	
+
 	// Array of all available permissions
 	public const ALL_PERMISSIONS = [
 		self::PERMISSION_LOCAL_FILESYSTEM_ACCESS,
 	];
-	
+
 	/**
-     * @var \WordPress\Blueprints\DataReference\DataReference|mixed[]
-     */
-    private $blueprintRef;
+	 * @var DataReference|mixed[]
+	 */
+	private $blueprintRef;
 	/**
-     * @var string
-     */
-    private $mode = 'create-new-site';    // or apply-to-existing-site
-    /**
-     * @var string
-     */
-    private $rootDir = '';
+	 * @var string
+	 */
+	private $mode = 'create-new-site';    // or apply-to-existing-site
 	/**
-     * @var string
-     */
-    private $siteUrl = '';
+	 * @var string
+	 */
+	private $rootDir = '';
 	/**
-     * @var string
-     */
-    private $databaseEngine = 'mysql';
+	 * @var string
+	 */
+	private $siteUrl = '';
 	/**
-     * @var mixed[]
-     */
-    private $databaseCredentials = [];
+	 * @var string
+	 */
+	private $databaseEngine = 'mysql';
+	/**
+	 * @var mixed[]
+	 */
+	private $databaseCredentials = [];
 	private $progressObserver = null;
 	/**
-     * @var \Psr\Log\LoggerInterface
-     */
-    private $logger;
+	 * @var LoggerInterface
+	 */
+	private $logger;
 	/**
-     * @var mixed[]
-     */
-    private $permissions;
+	 * @var mixed[]
+	 */
+	private $permissions;
 
 	/**
 	 * @var DataReference|null
@@ -58,30 +58,31 @@ class RunnerConfiguration {
 
 	public function __construct() {
 		$this->sqliteIntegrationPlugin = DataReference::create( 'https://downloads.wordpress.org/plugin/sqlite-database-integration.zip' );
-		$this->logger = new NoopLogger();
-		$this->permissions = [
+		$this->logger                  = new NoopLogger();
+		$this->permissions             = [
 			self::PERMISSION_LOCAL_FILESYSTEM_ACCESS => false,
 		];
 	}
 
 	/**
-     * @param \WordPress\Blueprints\DataReference\DataReference|mixed[] $r
-     */
-    public function setBlueprint( $r ): self {
+	 * @param  DataReference|mixed[]  $r
+	 */
+	public function setBlueprint( $r ): self {
 		$this->blueprintRef = $r;
 
 		return $this;
 	}
 
 	/**
-     * @return \WordPress\Blueprints\DataReference\DataReference|mixed[]
-     */
-    public function getBlueprint() {
+	 * @return DataReference|mixed[]
+	 */
+	public function getBlueprint() {
 		return $this->blueprintRef;
 	}
 
 	public function setLogger( LoggerInterface $logger ): self {
 		$this->logger = $logger;
+
 		return $this;
 	}
 
@@ -125,11 +126,11 @@ class RunnerConfiguration {
 	 * @param  string  $databaseEngine  Database engine to use ('mysql' or 'sqlite')
 	 *
 	 * @return self
-	 * @throws \InvalidArgumentException If the database engine is invalid
+	 * @throws InvalidArgumentException If the database engine is invalid
 	 */
 	public function setDatabaseEngine( string $databaseEngine ): self {
 		if ( ! in_array( $databaseEngine, [ 'mysql', 'sqlite' ] ) ) {
-			throw new \InvalidArgumentException( "Invalid database engine: {$databaseEngine}" );
+			throw new InvalidArgumentException( "Invalid database engine: {$databaseEngine}" );
 		}
 
 		$this->databaseEngine = $databaseEngine;
@@ -183,11 +184,13 @@ class RunnerConfiguration {
 	/**
 	 * Set a custom DataReference for the sqlite-database-integration plugin.
 	 *
-	 * @param DataReference $ref
+	 * @param  DataReference  $ref
+	 *
 	 * @return self
 	 */
 	public function setSqliteIntegrationPlugin( DataReference $ref ): self {
 		$this->sqliteIntegrationPlugin = $ref;
+
 		return $this;
 	}
 
@@ -204,10 +207,12 @@ class RunnerConfiguration {
 	 * Enables the runner to source the execution context files from the local filesystem.
 	 *
 	 * @param  bool  $allow  True to allow filesystem access, false to deny.
+	 *
 	 * @return self
 	 */
 	public function setAllowLocalFilesystemAccess( bool $allow ): self {
-		$this->permissions[self::PERMISSION_LOCAL_FILESYSTEM_ACCESS] = $allow;
+		$this->permissions[ self::PERMISSION_LOCAL_FILESYSTEM_ACCESS ] = $allow;
+
 		return $this;
 	}
 
@@ -217,16 +222,17 @@ class RunnerConfiguration {
 	 * @return bool True if filesystem access is allowed, false otherwise.
 	 */
 	public function isAllowedLocalFilesystemAccess(): bool {
-		return $this->permissions[self::PERMISSION_LOCAL_FILESYSTEM_ACCESS];
+		return $this->permissions[ self::PERMISSION_LOCAL_FILESYSTEM_ACCESS ];
 	}
-	
+
 	/**
 	 * Gets the CLI flag that corresponds to a permission constant.
 	 *
-	 * @param string $permission One of the PERMISSION_* constants
+	 * @param  string  $permission  One of the PERMISSION_* constants
+	 *
 	 * @return string The CLI flag name
 	 */
-	public static function getPermissionCliFlag(string $permission): string {
+	public static function getPermissionCliFlag( string $permission ): string {
 		return $permission;
 	}
 }

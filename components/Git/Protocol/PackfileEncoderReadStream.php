@@ -2,10 +2,10 @@
 
 namespace WordPress\Git\Protocol;
 
-use WordPress\ByteStream\ReadStream\BaseByteReadStream;
-use WordPress\ByteStream\ReadStream\TransformedReadStream;
 use WordPress\ByteStream\ByteTransformer\ChecksumTransformer;
+use WordPress\ByteStream\ReadStream\BaseByteReadStream;
 use WordPress\ByteStream\ReadStream\DeflateReadStream;
+use WordPress\ByteStream\ReadStream\TransformedReadStream;
 use WordPress\Git\GitRepository;
 use WordPress\Git\Protocol\Parser\PackParser;
 
@@ -48,7 +48,7 @@ class PackfileEncoderReadStream extends BaseByteReadStream {
 		}
 
 		if ( ! $this->object_reader_base ) {
-			$this->object_reader_base = $this->objects_source->read_object( $this->oids[ $this->objects_written ] );
+			$this->object_reader_base    = $this->objects_source->read_object( $this->oids[ $this->objects_written ] );
 			$this->object_reader_deflate = new DeflateReadStream(
 				$this->object_reader_base
 			);
@@ -71,7 +71,7 @@ class PackfileEncoderReadStream extends BaseByteReadStream {
 			$this->object_reader_base->close_reading();
 			$this->object_reader_base = null;
 
-			++$this->objects_written;
+			++ $this->objects_written;
 		}
 
 		return $this->internal_pull( $n );
@@ -82,7 +82,7 @@ class PackfileEncoderReadStream extends BaseByteReadStream {
 		$object_type = $types[ $object_type_name ];
 
 		// First byte: type in bits 4-6, size bits 0-3
-		$firstByte  = $uncompressed_size & 0b1111;
+		$firstByte = $uncompressed_size & 0b1111;
 		$firstByte |= ( $object_type & 0b111 ) << 4;
 
 		// Continuation bit 7 if needed
@@ -98,7 +98,7 @@ class PackfileEncoderReadStream extends BaseByteReadStream {
 		// Add continuation bytes if needed
 		while ( $remainingSize > 0 ) {
 			// Set continuation bit if we have more bytes
-			$byte            = $remainingSize & 0b01111111;
+			$byte          = $remainingSize & 0b01111111;
 			$remainingSize >>= 7;
 			if ( $remainingSize > 0 ) {
 				$byte |= 0b10000000;

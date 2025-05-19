@@ -29,8 +29,8 @@ class GitObjectEncoder implements ByteWriteStream {
 				);
 		}
 
-		$this->repository = $repository;
-		$this->downstream = new TransformedWriteStream(
+		$this->repository            = $repository;
+		$this->downstream            = new TransformedWriteStream(
 			$repository->get_object_storage_filesystem()->open_write_stream( 'objects/.tmp' ),
 			array(
 				'checksum' => new ChecksumTransformer( 'sha1' ),

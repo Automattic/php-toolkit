@@ -13,7 +13,7 @@ class Response {
 	public $request;
 
 	public $received_bytes = 0;
-	public $total_bytes    = null;
+	public $total_bytes = null;
 
 	public function __construct( Request $request ) {
 		$this->request = $request;

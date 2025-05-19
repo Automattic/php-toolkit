@@ -7,7 +7,6 @@ use WordPress\Blueprints\Progress\ProgressTrackedReadStream;
 use WordPress\Blueprints\Progress\Tracker;
 use WordPress\ByteStream\MemoryPipe;
 use WordPress\Filesystem\Filesystem;
-use WordPress\Filesystem\InMemoryFilesystem;
 use WordPress\Filesystem\Layer\ChrootLayer;
 use WordPress\Filesystem\LocalFilesystem;
 use WordPress\Git\GitFilesystem;
@@ -19,37 +18,37 @@ use function WordPress\Filesystem\wp_join_paths;
 
 class DataReferenceResolver {
 	/**
-     * @var \WordPress\HttpClient\Client
-     */
-    private $client;
-    /**
-     * @var mixed[]
-     */
-    private $subTrackers;
+	 * @var Client
+	 */
+	private $client;
 	/**
-     * @var mixed[]
-     */
-    private $dataReferences;
+	 * @var mixed[]
+	 */
+	private $subTrackers;
 	/**
-     * @var mixed[]
-     */
-    private $resolvedDataReferences;
+	 * @var mixed[]
+	 */
+	private $dataReferences;
 	/**
-     * @var \WordPress\Blueprints\Progress\Tracker
-     */
-    private $dataResolutionTracker;
+	 * @var mixed[]
+	 */
+	private $resolvedDataReferences;
 	/**
-     * @var \WordPress\Filesystem\Filesystem|null
-     */
-    private $executionContext;
+	 * @var Tracker
+	 */
+	private $dataResolutionTracker;
 	/**
-     * @var string
-     */
-    private $tmpRoot;
-	
-	public function __construct(Client $client, ?string $tmpRoot = null) {
-		$this->client = $client;
-        $this->tmpRoot = $tmpRoot ?: sys_get_temp_dir();
+	 * @var Filesystem|null
+	 */
+	private $executionContext;
+	/**
+	 * @var string
+	 */
+	private $tmpRoot;
+
+	public function __construct( Client $client, ?string $tmpRoot = null ) {
+		$this->client  = $client;
+		$this->tmpRoot = $tmpRoot ?: sys_get_temp_dir();
 	}
 
 	public function setExecutionContext( Filesystem $executionContext ) {
@@ -70,8 +69,9 @@ class DataReferenceResolver {
 	}
 
 	/** Core service method shared by runner, target resolvers and steps
-     * @return \WordPress\Blueprints\DataReference\File|\WordPress\Blueprints\DataReference\Directory */
-    public function resolve( DataReference $reference ) {
+	 * @return File|Directory
+	 */
+	public function resolve( DataReference $reference ) {
 		// TODO: Comment this. Make semantics clearer.
 		if ( isset( $this->resolvedDataReferences[ $reference->id ] ) ) {
 			return $this->resolvedDataReferences[ $reference->id ];
@@ -92,15 +92,15 @@ class DataReferenceResolver {
 			$tracked_stream = new SeekableRequestReadStream(
 				$url,
 				array(
-					'client' => $this->client,
-					'cache_path' => wp_join_paths( $this->tmpRoot, uniqid( 'blueprints_seekable_cache_' ) ),
+					'client'           => $this->client,
+					'cache_path'       => wp_join_paths( $this->tmpRoot, uniqid( 'blueprints_seekable_cache_' ) ),
 					/**
 					 * Use a 100MB buffer to support seek()-ing in the streamed ZIP files.
 					 * To support ZIPs larger than 100MB, we'll need a custom SeekableRequestReadStream that:
 					 *
 					 * * Uses range headers when possible.
 					 * * Buffers data on disk for seeking(), not in memory.
-					 * 
+					 *
 					 * @TODO: Support ZIPs >= 100MB.
 					 */
 					'buffer_size'      => 100 * 1024 * 1024,
@@ -114,8 +114,8 @@ class DataReferenceResolver {
 				$tracked_stream,
 				$filename
 			);
-		// TODO: Consider a clearer name. Some not-so-great ballpark ideas:
-		// BlueprintParentPath, BlueprintRootPath, BlueprintContextPath, BlueprintRelativePath
+			// TODO: Consider a clearer name. Some not-so-great ballpark ideas:
+			// BlueprintParentPath, BlueprintRootPath, BlueprintContextPath, BlueprintRelativePath
 		} elseif ( $reference instanceof ExecutionContextPath ) {
 			$path = $reference->get_path();
 			if ( ! $this->executionContext->exists( $path ) ) {
@@ -137,14 +137,15 @@ class DataReferenceResolver {
 			} else {
 				throw new DataResolutionException( 'Path referenced in the Blueprint is not a file or directory: ' . $path );
 			}
-		// TODO: Lovely name.
+			// TODO: Lovely name.
 		} elseif ( $reference instanceof InlineFile ) {
 			$progress_tracker->finish();
 
 			return new File( new MemoryPipe( $reference->get_content() ), $reference->get_filename() );
-		// TODO: What is an InlineDirectory?! Can we actually specify directories with file content inline?
+			// TODO: What is an InlineDirectory?! Can we actually specify directories with file content inline?
 		} elseif ( $reference instanceof InlineDirectory ) {
 			$progress_tracker->finish();
+
 			return $reference->as_directory();
 		} elseif ( $reference instanceof GitPath ) {
 			// @TODO (low priority): Actually track the download progress for git repositories.
@@ -152,15 +153,15 @@ class DataReferenceResolver {
 
 			/**
 			 * Create a temporary directory for the git repository.
-			 * 
+			 *
 			 * Do not clean it up after the pull()! That would remove the
 			 * data before we're able to consume it in the Step.
-			 * 
+			 *
 			 * The Blueprint Runner will clean up all temporary directories at
 			 * the end of the execution.
 			 */
 			$tmp_dir = wp_join_paths( $this->tmpRoot, 'git-repo-' . uniqid() );
-			
+
 			$repo = new GitRepository( LocalFilesystem::create( $tmp_dir ) );
 			$repo->add_remote( 'origin', $reference->get_git_repository() );
 			$client = $repo->get_remote_client( 'origin' );

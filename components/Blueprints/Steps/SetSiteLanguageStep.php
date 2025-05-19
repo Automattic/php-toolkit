@@ -2,6 +2,7 @@
 
 namespace WordPress\Blueprints\Steps;
 
+use Exception;
 use WordPress\Blueprints\Progress\Tracker;
 use WordPress\Blueprints\Runtime;
 use WordPress\HttpClient\Client;
@@ -15,10 +16,10 @@ use function WordPress\Filesystem\copy_between_filesystems;
  */
 class SetSiteLanguageStep implements StepInterface {
 	/**
-     * The language code (e.g., 'en_US', 'de_DE').
-     * @var string
-     */
-    public $language;
+	 * The language code (e.g., 'en_US', 'de_DE').
+	 * @var string
+	 */
+	public $language;
 
 	/**
 	 * @param  string  $language  The language code.
@@ -163,12 +164,12 @@ class SetSiteLanguageStep implements StepInterface {
 		}
 
 		// Download all translations in parallel
-		$progress->split(count($download_targets));
+		$progress->split( count( $download_targets ) );
 		foreach ( $download_targets as $k => $target ) {
-			$progress[$k]->setCaption( 'Fetching translations for ' . $target['name'] );
+			$progress[ $k ]->setCaption( 'Fetching translations for ' . $target['name'] );
 			$download_targets[ $k ]['stream'] = $client->fetch( $target['request'], [
 				// @see Runtime for more details on these options
-				'progress_tracker' => $progress[$k],
+				'progress_tracker' => $progress[ $k ],
 				'eagerly_enqueue'  => true,
 				'buffer_size'      => 100 * 1024 * 1024,
 			] );
@@ -184,13 +185,13 @@ class SetSiteLanguageStep implements StepInterface {
 					'target_path'       => $target['target_dir'],
 					'recursive'         => true,
 				] );
-			} catch ( \Exception $e ) {
+			} catch ( Exception $e ) {
 				/**
 				 * Log warnings for missing plugin and theme translations. This is an expected
 				 * scenario. Not all plugins and themes are translated to all languages.
 				 */
 				if ( isset( $target['is_plugin'] ) ) {
-					$runtime->getLogger()->warning( 
+					$runtime->getLogger()->warning(
 						sprintf(
 							"Warning: Failed to download translations for plugin %s: %s",
 							$target['slug'],
@@ -211,26 +212,27 @@ class SetSiteLanguageStep implements StepInterface {
 					 * WordPress core is expected to be translated to all languages. If a translation
 					 * is missing, why use it in the Blueprint?
 					 */
-					throw new \Exception( "Failed to download core translations: " . $e->getMessage(), 0, $e );
+					throw new Exception( "Failed to download core translations: " . $e->getMessage(), 0, $e );
 				}
 			}
 		}
 	}
 
 	/**
-     * Get the translation package URL for a given WordPress version and language.
-     *
-     * @param  string  $wpVersion  WordPress version
-     * @param  string  $language  Language code
-     * @return string|false
-     */
-    private function getWordPressTranslationUrl( Runtime $runtime, string $wpVersion, string $language, Client $client ) {
+	 * Get the translation package URL for a given WordPress version and language.
+	 *
+	 * @param  string  $wpVersion  WordPress version
+	 * @param  string  $language  Language code
+	 *
+	 * @return string|false
+	 */
+	private function getWordPressTranslationUrl( Runtime $runtime, string $wpVersion, string $language, Client $client ) {
 		try {
 			$api_url           = "https://api.wordpress.org/translations/core/1.0/?version={$wpVersion}";
 			$translations_data = $client->fetch( $api_url )->json();
 
 			if ( ! isset( $translations_data['translations'] ) || ! is_array( $translations_data['translations'] ) ) {
-				throw new \Exception( "Invalid response from WordPress.org translations API" );
+				throw new Exception( "Invalid response from WordPress.org translations API" );
 			}
 
 			foreach ( $translations_data['translations'] as $translation ) {
@@ -238,7 +240,7 @@ class SetSiteLanguageStep implements StepInterface {
 					return $translation['package'];
 				}
 			}
-		} catch ( \Exception $e ) {
+		} catch ( Exception $e ) {
 			$runtime->getLogger()->warning( "Warning: Failed to fetch translations details from WordPress.org API: " . $e->getMessage() );
 		}
 

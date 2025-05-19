@@ -2,9 +2,9 @@
 
 namespace WordPress\HttpClient;
 
+use WordPress\ByteStream\ByteTransformer\InflateTransformer;
 use WordPress\ByteStream\ReadStream\FileReadStream;
 use WordPress\ByteStream\ReadStream\TransformedReadStream;
-use WordPress\ByteStream\ByteTransformer\InflateTransformer;
 use WordPress\ByteStream\WriteStream\ByteWriteStream;
 use WordPress\HttpClient\ByteStream\ChunkedDecoderReadStream;
 use WordPress\HttpClient\ByteStream\ChunkedEncoderByteTransformer;
@@ -104,20 +104,20 @@ class Client {
 	 * @var array
 	 */
 	protected $connections = array();
-	protected $events      = array();
+	protected $events = array();
 	protected $event;
 	protected $request;
 	protected $response_body_chunk;
 	protected $timeout;
 	protected $requests_started_at = array();
 	/**
-     * @var \WordPress\HttpClient\CacheStorage|null
-     */
-    protected $cache;
+	 * @var CacheStorage|null
+	 */
+	protected $cache;
 	/**
-     * @var mixed[]
-     */
-    protected $stale_cache_entries = array();
+	 * @var mixed[]
+	 */
+	protected $stale_cache_entries = array();
 	/** @var array<int, ByteWriteStream> */
 	protected $cache_write_streams = array();
 
@@ -133,29 +133,30 @@ class Client {
 	 * Returns a RemoteFileReader that streams the response body of the
 	 * given request.
 	 *
-	 * @param Request $request The request to stream.
+	 * @param  Request  $request  The request to stream.
 	 *
 	 * @return RequestReadStream
 	 */
 	public function fetch( $request, $options = array() ) {
-		return new RequestReadStream( $request, array_merge(['client' => $this], is_array($options) ? $options : iterator_to_array($options)) );
+		return new RequestReadStream( $request,
+			array_merge( [ 'client' => $this ], is_array( $options ) ? $options : iterator_to_array( $options ) ) );
 	}
 
 	/**
 	 * Returns an array of RemoteFileReader instances that stream the response bodies
 	 * of the given requests.
 	 *
-	 * @param Request[] $requests The requests to stream.
+	 * @param  Request[]  $requests  The requests to stream.
 	 *
 	 * @return RequestReadStream[]
 	 */
 	public function fetch_many( array $requests, $options = array() ) {
 		$streams = array();
-		
+
 		foreach ( $requests as $request ) {
 			$streams[] = $this->fetch( $request, $options );
 		}
-		
+
 		return $streams;
 	}
 
@@ -165,7 +166,7 @@ class Client {
 	 * an internal queue. Network transmission is delayed until one of the returned
 	 * streams is read from.
 	 *
-	 * @param  Request|Request[] $requests  The HTTP request(s) to enqueue. Can be a single request or an array of requests.
+	 * @param  Request|Request[]  $requests  The HTTP request(s) to enqueue. Can be a single request or an array of requests.
 	 */
 	public function enqueue( $requests ) {
 		if ( ! is_array( $requests ) ) {
@@ -178,7 +179,7 @@ class Client {
 				if ( $cached && CachePolicy::is_fresh( $cached ) ) {
 					$this->hydrate_from_cache( $request, $cached );
 					// Still track the request internally so that await_next_event() can emit the cached events.
-					$this->requests[] = apply_filters( 'wp_http_client_request', $request );
+					$this->requests[]                          = apply_filters( 'wp_http_client_request', $request );
 					$this->requests_started_at[ $request->id ] = microtime( true );
 					continue;
 				}
@@ -201,7 +202,7 @@ class Client {
 		}
 	}
 
-	private function hydrate_from_cache( Request $r, CacheEntry $e ) : void {
+	private function hydrate_from_cache( Request $r, CacheEntry $e ): void {
 		$r->response              = new Response( $r );
 		$r->response->status_code = $e->status;
 		$r->response->headers     = $e->headers;
@@ -209,9 +210,9 @@ class Client {
 		$this->events[ $r->id ]   = array(
 			self::EVENT_GOT_HEADERS          => true,
 			self::EVENT_BODY_CHUNK_AVAILABLE => true,
-			self::EVENT_FINISHED    => true,
+			self::EVENT_FINISHED             => true,
 		);
-	
+
 		// lazy-load body through RequestReadStream
 		if ( ! isset( $this->connections[ $r->id ] ) ) {
 			$this->connections[ $r->id ] = new Connection( $r );
@@ -421,9 +422,9 @@ class Client {
 		/**
 		 * Allows the caller to consume the headers before we start polling
 		 * for the body of those requests.
-		 * 
+		 *
 		 * This prevents the following scenario:
-		 * 
+		 *
 		 * 1. The consumer calls await_next_event() and they're only interested in
 		 *    the EVENT_GOT_HEADERS event.
 		 * 2. In the same event_loop_tick:
@@ -434,7 +435,7 @@ class Client {
 		 * 3. The consumer gets the EVENT_GOT_HEADERS event 10 seconds later
 		 *    than they could have.
 		 */
-		if ($nb_headers_received > 0) {
+		if ( $nb_headers_received > 0 ) {
 			return true;
 		}
 
@@ -517,7 +518,7 @@ class Client {
 		);
 		$available_slots    = $this->concurrency - count( $processed_requests );
 		$enqueued_requests  = $this->get_requests( Request::STATE_ENQUEUED );
-		for ( $i = 0; $i < $available_slots; $i++ ) {
+		for ( $i = 0; $i < $available_slots; $i ++ ) {
 			if ( ! isset( $enqueued_requests[ $i ] ) ) {
 				break;
 			}
@@ -553,7 +554,7 @@ class Client {
 	/**
 	 * Handle transfer encodings.
 	 *
-	 * @param  Request $request
+	 * @param  Request  $request
 	 *
 	 * @return false|resource
 	 */
@@ -608,7 +609,7 @@ class Client {
 	 *
 	 * Enables crypto on the $requests HTTP socksts and sends the request body asynchronously.
 	 *
-	 * @param  Request[] $requests  An array of HTTP requests.
+	 * @param  Request[]  $requests  An array of HTTP requests.
 	 */
 	protected function enable_crypto( array $requests ) {
 		foreach ( $this->stream_select( $requests, static::STREAM_SELECT_WRITE ) as $request ) {
@@ -620,7 +621,8 @@ class Client {
 			);
 			if ( false === $enabled_crypto ) {
 				$last_error = error_get_last();
-				$this->set_error( $request, new HttpError( 'Failed to enable crypto: ' . ( is_array( $last_error ) ? $last_error['message'] : 'unknown' ) ) );
+				$this->set_error( $request,
+					new HttpError( 'Failed to enable crypto: ' . ( is_array( $last_error ) ? $last_error['message'] : 'unknown' ) ) );
 				continue;
 			} elseif ( 0 === $enabled_crypto ) {
 				// The SSL handshake isn't finished yet, let's skip it
@@ -635,7 +637,7 @@ class Client {
 	/**
 	 * Sends HTTP request headers.
 	 *
-	 * @param  Request[] $requests  An array of HTTP requests.
+	 * @param  Request[]  $requests  An array of HTTP requests.
 	 */
 	protected function send_request_headers( array $requests ) {
 		foreach ( $this->stream_select( $requests, static::STREAM_SELECT_WRITE ) as $request ) {
@@ -643,7 +645,8 @@ class Client {
 
 			if ( false === @fwrite( $this->connections[ $request->id ]->http_socket, $header_bytes ) ) {
 				$last_error = error_get_last();
-				$this->set_error( $request, new HttpError( 'Failed to write request bytes - ' . ( is_array( $last_error ) ? $last_error['message'] : 'unknown' ) ) );
+				$this->set_error( $request,
+					new HttpError( 'Failed to write request bytes - ' . ( is_array( $last_error ) ? $last_error['message'] : 'unknown' ) ) );
 				continue;
 			}
 
@@ -665,7 +668,7 @@ class Client {
 	/**
 	 * Sends HTTP request body.
 	 *
-	 * @param  Request[] $requests  An array of HTTP requests.
+	 * @param  Request[]  $requests  An array of HTTP requests.
 	 */
 	protected function send_request_body( array $requests ) {
 		foreach ( $this->stream_select( $requests, self::STREAM_SELECT_WRITE ) as $request ) {
@@ -685,7 +688,7 @@ class Client {
 			}
 
 			$chunk = $request->upload_body_stream->consume( $available_bytes );
-			if ( !fwrite( $this->connections[ $request->id ]->http_socket, $chunk ) ) {
+			if ( ! fwrite( $this->connections[ $request->id ]->http_socket, $chunk ) ) {
 				$this->set_error( $request, new HttpError( 'Failed to write request bytes.' ) );
 				continue;
 			}
@@ -695,7 +698,7 @@ class Client {
 	/**
 	 * Reads the next received portion of HTTP response headers for multiple requests.
 	 *
-	 * @param  array $requests  An array of requests.
+	 * @param  array  $requests  An array of requests.
 	 */
 	protected function receive_response_headers( $requests ) {
 		$nb_headers_received = 0;
@@ -727,8 +730,8 @@ class Client {
 				}
 
 				$parsed = static::parse_http_headers( $connection->response_buffer );
-				if(false === $parsed) {
-					$this->set_error($request, new HttpError('Malformed HTTP headers received from the server.'));
+				if ( false === $parsed ) {
+					$this->set_error( $request, new HttpError( 'Malformed HTTP headers received from the server.' ) );
 					break;
 				}
 				$connection->response_buffer = '';
@@ -744,7 +747,7 @@ class Client {
 				}
 
 				$this->events[ $request->id ][ self::EVENT_GOT_HEADERS ] = true;
-				$nb_headers_received++;
+				$nb_headers_received ++;
 
 				if ( $response->total_bytes === 0 ) {
 					$request->state = Request::STATE_RECEIVED;
@@ -756,8 +759,8 @@ class Client {
 				if ( $response->status_code === 304 && $stale_cache_entry ) {
 					$entry = $stale_cache_entry;
 					// @TODO: Should we merge these headers? Or replace them?
-					$entry->headers      = array_merge( $entry->headers, $response->headers );
-					$entry->stored_at    = time();
+					$entry->headers   = array_merge( $entry->headers, $response->headers );
+					$entry->stored_at = time();
 					$this->cache->store( $entry );
 					$this->hydrate_from_cache( $request, $entry );
 					unset( $this->stale_cache_entries[ $request->id ] );
@@ -771,16 +774,16 @@ class Client {
 
 				// Cache the response metadata
 				if ( $this->cache ) {
-					$meta = new CacheEntry();
-					$meta->url          = $request->url;
-					$meta->status       = $request->response->status_code;
-					$meta->headers      = $request->response->headers;
-					$meta->stored_at    = time();
-					$cc                 = $request->response->get_header( 'cache-control' );
-					$meta->max_age      = $cc ? CachePolicy::parse_max_age( $cc ) : null;
-					$meta->etag         = $request->response->get_header( 'etag' );
-					$meta->last_modified= $request->response->get_header( 'last-modified' );
-		
+					$meta                = new CacheEntry();
+					$meta->url           = $request->url;
+					$meta->status        = $request->response->status_code;
+					$meta->headers       = $request->response->headers;
+					$meta->stored_at     = time();
+					$cc                  = $request->response->get_header( 'cache-control' );
+					$meta->max_age       = $cc ? CachePolicy::parse_max_age( $cc ) : null;
+					$meta->etag          = $request->response->get_header( 'etag' );
+					$meta->last_modified = $request->response->get_header( 'last-modified' );
+
 					$this->cache->store( $meta );
 				}
 
@@ -788,13 +791,14 @@ class Client {
 				break;
 			}
 		}
+
 		return $nb_headers_received;
 	}
 
 	/**
 	 * Reads the next received portion of HTTP response headers for multiple requests.
 	 *
-	 * @param  array $requests  An array of requests.
+	 * @param  array  $requests  An array of requests.
 	 */
 	protected function receive_response_body( $requests ) {
 		// @TODO: Assume body is fully received when either
@@ -811,8 +815,8 @@ class Client {
 			while ( true ) {
 				$available_bytes = $stream->pull( 65536 );
 				if ( $available_bytes > 0 ) {
-					$body_chunk                         = $stream->consume( $available_bytes );
-					$request->response->received_bytes += $available_bytes;
+					$body_chunk                                         = $stream->consume( $available_bytes );
+					$request->response->received_bytes                  += $available_bytes;
 					$this->connections[ $request->id ]->response_buffer .= $body_chunk;
 
 					$this->events[ $request->id ][ self::EVENT_BODY_CHUNK_AVAILABLE ] = true;
@@ -841,7 +845,7 @@ class Client {
 	}
 
 	/**
-	 * @param  array $requests  An array of requests.
+	 * @param  array  $requests  An array of requests.
 	 */
 	protected function handle_redirects( $requests ) {
 		foreach ( $requests as $request ) {
@@ -863,7 +867,7 @@ class Client {
 			$redirects_so_far = 0;
 			$cause            = $request;
 			while ( $cause->redirected_from ) {
-				++$redirects_so_far;
+				++ $redirects_so_far;
 				$cause = $cause->redirected_from;
 			}
 
@@ -896,7 +900,7 @@ class Client {
 				new Request(
 					$redirect_url,
 					array(
-						'method' => $request->method,
+						'method'          => $request->method,
 						'redirected_from' => $request,
 					)
 				)
@@ -907,15 +911,15 @@ class Client {
 	/**
 	 * Parses an HTTP headers string into an array containing the status and headers.
 	 *
-	 * @param  string $headers  The HTTP headers to parse.
+	 * @param  string  $headers  The HTTP headers to parse.
 	 *
 	 * @return array An array containing the parsed status and headers.
 	 */
 	protected function parse_http_headers( string $headers ) {
-		$lines   = explode( "\r\n", $headers );
-		$status  = array_shift( $lines );
-		$status  = explode( ' ', $status );
-		if(count($status) < 3) {
+		$lines  = explode( "\r\n", $headers );
+		$status = array_shift( $lines );
+		$status = explode( ' ', $status );
+		if ( count( $status ) < 3 ) {
 			return false;
 		}
 		$status  = array(
@@ -956,7 +960,7 @@ class Client {
 	 * until the SSL handshake is complete.
 	 * The actual socket it then switched to non-blocking mode using stream_set_blocking().
 	 *
-	 * @param  Request $request  The Request to open the socket for.
+	 * @param  Request  $request  The Request to open the socket for.
 	 *
 	 * @return bool Whether the stream was opened successfully.
 	 */
@@ -1027,7 +1031,7 @@ class Client {
 	/**
 	 * Prepares an HTTP request string for a given URL.
 	 *
-	 * @param  Request $request  The Request to prepare the HTTP headers for.
+	 * @param  Request  $request  The Request to prepare the HTTP headers for.
 	 *
 	 * @return string The prepared HTTP request string.
 	 */
@@ -1094,7 +1098,7 @@ class Client {
 			}
 		}
 		$except = null;
-		if(count($read) === 0 && count($write) === 0) {
+		if ( count( $read ) === 0 && count( $write ) === 0 ) {
 			return array();
 		}
 
@@ -1125,14 +1129,14 @@ class Client {
 		return $selected_requests;
 	}
 
-	protected const STREAM_SELECT_READ  = 1;
+	protected const STREAM_SELECT_READ = 1;
 	protected const STREAM_SELECT_WRITE = 2;
 
-	const EVENT_GOT_HEADERS          = 'EVENT_GOT_HEADERS';
+	const EVENT_GOT_HEADERS = 'EVENT_GOT_HEADERS';
 	const EVENT_BODY_CHUNK_AVAILABLE = 'EVENT_BODY_CHUNK_AVAILABLE';
-	const EVENT_REDIRECT             = 'EVENT_REDIRECT';
-	const EVENT_FAILED               = 'EVENT_FAILED';
-	const EVENT_FINISHED             = 'EVENT_FINISHED';
+	const EVENT_REDIRECT = 'EVENT_REDIRECT';
+	const EVENT_FAILED = 'EVENT_FAILED';
+	const EVENT_FINISHED = 'EVENT_FINISHED';
 
 	/**
 	 * Microsecond is 1 millionth of a second.

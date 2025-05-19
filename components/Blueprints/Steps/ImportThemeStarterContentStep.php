@@ -7,11 +7,11 @@ use WordPress\Blueprints\Runtime;
 
 class ImportThemeStarterContentStep implements StepInterface {
 	/**
-     * Optional slug of the theme to import content from.
-     * If null, might imply the currently active theme.
-     * @var string|null
-     */
-    public $themeSlug;
+	 * Optional slug of the theme to import content from.
+	 * If null, might imply the currently active theme.
+	 * @var string|null
+	 */
+	public $themeSlug;
 
 	/**
 	 * @param  string|null  $themeSlug  Optional theme slug.

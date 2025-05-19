@@ -7,6 +7,7 @@
 
 namespace WordPress\Merge\Tests;
 
+use PHPUnit\Framework\TestCase;
 use WordPress\Merge\Diff\MyersDiffer;
 use WordPress\Merge\Merge\ChunkMerger;
 use WordPress\Merge\MergeException;
@@ -15,7 +16,7 @@ use WordPress\Merge\Validate\BlockMarkupMergeValidator;
 
 use function WordPress\Merge\print_diff_chunks;
 
-class BlockMarkupMergeTest extends \PHPUnit\Framework\TestCase {
+class BlockMarkupMergeTest extends TestCase {
 	/**
 	 * @dataProvider threeWayMergeDataProvider
 	 */

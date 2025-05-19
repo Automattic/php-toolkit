@@ -8,7 +8,7 @@ define( 'WP_ADMIN', true );
 if ( ! class_exists( '\WP_Upgrader_Skin', false ) ) {
 	require_once getenv( 'DOCROOT' ) . '/wp-admin/includes/class-wp-upgrader.php';
 
-	class Blueprint_WP_Upgrader_Skin extends \WP_Upgrader_Skin {
+	class Blueprint_WP_Upgrader_Skin extends WP_Upgrader_Skin {
 		public $destination;
 		public $options = array(
 			'type'   => '',
@@ -158,7 +158,7 @@ if ( ! is_writable( $wp_plugin_dir ) ) {
 
 // Use the Plugin_Upgrader class to install the plugin.
 $skin     = new Blueprint_WP_Upgrader_Skin();
-$upgrader = new \Plugin_Upgrader( $skin );
+$upgrader = new Plugin_Upgrader( $skin );
 
 // If we have a plugin slug from the zip, create the target directory first
 $target_directory = null;
@@ -219,7 +219,7 @@ if ( empty( $plugins_in_folder ) ) {
 	exit( 1 );
 }
 // The key of the first plugin entry is the relative path needed for activation.
-reset($plugins_in_folder);
+reset( $plugins_in_folder );
 
 // The key of the first plugin entry is the relative path needed for activation.
 $plugin_file_relative_path = key( $plugins_in_folder );

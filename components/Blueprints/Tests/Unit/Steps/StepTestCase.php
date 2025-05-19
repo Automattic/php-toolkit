@@ -36,25 +36,25 @@ class StepTestCase extends TestCase {
 	 * @before
 	 */
 	public function setUp(): void {
-		$this->document_root = wp_join_paths( sys_get_temp_dir(), 'test_' . uniqid() );
+		$this->document_root          = wp_join_paths( sys_get_temp_dir(), 'test_' . uniqid() );
 		$this->execution_context_path = wp_join_paths( sys_get_temp_dir(), 'test_' . uniqid() );
-		$this->execution_context = LocalFilesystem::create($this->execution_context_path);
+		$this->execution_context      = LocalFilesystem::create( $this->execution_context_path );
 
-		$config = (new RunnerConfiguration())
-			->setBlueprint([ "version" => 2 ])
-			->setDatabaseEngine('sqlite')
-			->setExecutionMode('create-new-site')
-			->setExecutionContext($this->execution_context)
-			->setTargetSiteRoot($this->document_root)
-			->setTargetSiteUrl('http://127.0.0.1:2456') // Arbitrary URL for the new site
+		$config = ( new RunnerConfiguration() )
+			->setBlueprint( [ "version" => 2 ] )
+			->setDatabaseEngine( 'sqlite' )
+			->setExecutionMode( 'create-new-site' )
+			->setExecutionContext( $this->execution_context )
+			->setTargetSiteRoot( $this->document_root )
+			->setTargetSiteUrl( 'http://127.0.0.1:2456' ) // Arbitrary URL for the new site
 		;
-	
-		$runner = new Runner($config);
+
+		$runner = new Runner( $config );
 		$runner->run();
 		$this->runtime = $runner->runtime;
 		// Recreate the temp root directory – the runner cleans it up at the
 		// end of run().
-		mkdir($this->runtime->getTempRoot());
+		mkdir( $this->runtime->getTempRoot() );
 	}
 
 	/**
