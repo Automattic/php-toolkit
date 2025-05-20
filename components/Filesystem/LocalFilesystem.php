@@ -29,6 +29,10 @@ class LocalFilesystem implements Filesystem {
 			} else {
 				$root = '/';
 			}
+		} else {
+			if ( strtoupper( substr( PHP_OS, 0, 3 ) ) === 'WIN' ) {
+				$root = self::normalize_path( $root );
+			}
 		}
 
 		if ( ! is_dir( $root ) ) {
@@ -184,7 +188,7 @@ class LocalFilesystem implements Filesystem {
 	 * OS-specific path separators is specific to the LocalFilesystem
 	 * class
 	 */
-	private function normalize_path( $path ) {
+	static private function normalize_path( $path ) {
 		return str_replace( DIRECTORY_SEPARATOR, '/', $path );
 	}
 }

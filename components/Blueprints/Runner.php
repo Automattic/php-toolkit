@@ -270,60 +270,64 @@ class Runner {
 			return;
 		}
 
+		// AbsoluteLocalPath is a necessary special case to correctly support
+		// Windows absolute paths. There's so much more to them than C:\
+		//
+		// See https://www.fileside.app/blog/2023-03-17_windows-file-paths/
 		if ( $reference instanceof AbsoluteLocalPath ) {
 			$resolved = new File(
 				FileReadStream::from_path( $reference->get_path() ),
 				$reference->get_filename()
 			);
+			$this->blueprintExecutionContext = LocalFilesystem::create( dirname( $reference->get_path() ) );
 		} else {
 			$resolved = $this->assets->resolve( $reference );
-		}
+			if ( $resolved instanceof File ) {
+				$stream = $resolved->getStream();
 
-		if ( $resolved instanceof File ) {
-			$stream = $resolved->getStream();
-
-			// @TODO: A general http error checking solution for all resources
-			if ( $stream instanceof RequestReadStream ) {
-				$response = $stream->await_response();
-				if ( ! $response->ok() ) {
-					throw new BlueprintExecutionException(
-						sprintf(
-							'Failed to load blueprint from %s. Server responded with %d %s.',
-							$reference instanceof URLReference ? $reference->get_url() : $reference,
-							$response->status_code,
-							$response->get_reason_phrase()
-						)
-					);
+				// @TODO: A general http error checking solution for all resources
+				if ( $stream instanceof RequestReadStream ) {
+					$response = $stream->await_response();
+					if ( ! $response->ok() ) {
+						throw new BlueprintExecutionException(
+							sprintf(
+								'Failed to load blueprint from %s. Server responded with %d %s.',
+								$reference instanceof URLReference ? $reference->get_url() : $reference,
+								$response->status_code,
+								$response->get_reason_phrase()
+							)
+						);
+					}
 				}
-			}
 
-			if ( is_zip_file_stream( $stream ) ) {
-				$blueprintString                 = $this->blueprintExecutionContext->get_contents( '/blueprint.json' );
-				$this->blueprintExecutionContext = new ZipFilesystem( $stream );
-			} else {
-				// JSON file
-				$blueprintString = $stream->consume_all();
-				if ( $reference instanceof URLReference ) {
-					// @TODO: Only display this if the Blueprint references any bundled files. And in that case,
-					//        make it a fatal error.
-					$this->configuration->getLogger()->warning( 'Blueprints loaded from remote URLs have no execution context.' );
-					$this->blueprintExecutionContext = InMemoryFilesystem::create();
-				} elseif ( $reference instanceof ExecutionContextPath ) {
-					// It was resolved as an ExecutionContextPath, but it's actually a local
-					// filesystem path at this point.
-					// The execution context is the directory containing the blueprint.json file.
-					$this->blueprintExecutionContext = LocalFilesystem::create( dirname( $reference->get_path() ) );
-				} elseif ( $reference instanceof InlineFile ) {
-					$this->blueprintExecutionContext = InMemoryFilesystem::create();
+				if ( is_zip_file_stream( $stream ) ) {
+					$blueprintString                 = $this->blueprintExecutionContext->get_contents( '/blueprint.json' );
+					$this->blueprintExecutionContext = new ZipFilesystem( $stream );
 				} else {
-					throw new BlueprintExecutionException( 'Unsupported blueprint reference type: ' . get_class( $reference ) );
+					// JSON file
+					$blueprintString = $stream->consume_all();
+					if ( $reference instanceof URLReference ) {
+						// @TODO: Only display this if the Blueprint references any bundled files. And in that case,
+						//        make it a fatal error.
+						$this->configuration->getLogger()->warning( 'Blueprints loaded from remote URLs have no execution context.' );
+						$this->blueprintExecutionContext = InMemoryFilesystem::create();
+					} elseif ( $reference instanceof ExecutionContextPath ) {
+						// It was resolved as an ExecutionContextPath, but it's actually a local
+						// filesystem path at this point.
+						// The execution context is the directory containing the blueprint.json file.
+						$this->blueprintExecutionContext = LocalFilesystem::create( dirname( $reference->get_path() ) );
+					} elseif ( $reference instanceof InlineFile ) {
+						$this->blueprintExecutionContext = InMemoryFilesystem::create();
+					} else {
+						throw new BlueprintExecutionException( 'Unsupported blueprint reference type: ' . get_class( $reference ) );
+					}
 				}
+			} elseif ( $resolved instanceof Directory ) {
+				$blueprintString                 = $resolved->filesystem->get_contents( '/blueprint.json' );
+				$this->blueprintExecutionContext = $resolved->filesystem;
+			} else {
+				throw new BlueprintExecutionException( 'Invalid blueprint reference type: ' . get_class( $reference ) );
 			}
-		} elseif ( $resolved instanceof Directory ) {
-			$blueprintString                 = $resolved->filesystem->get_contents( '/blueprint.json' );
-			$this->blueprintExecutionContext = $resolved->filesystem;
-		} else {
-			throw new BlueprintExecutionException( 'Invalid blueprint reference type: ' . get_class( $reference ) );
 		}
 
 		// Validate the Blueprint string we've just loaded.
