@@ -28,7 +28,7 @@ jobs:
     name: ${{ inputs.os }}
     runs-on: ${{ inputs.os }}
 	# These tests can really drag on Windows CI runner!
-    timeout-minutes: 120
+    timeout-minutes: 60
 
     steps:
       - name: Checkout repository
