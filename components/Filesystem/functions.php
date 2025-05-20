@@ -134,21 +134,6 @@ function wp_path_segments( $path ) {
 	return explode( '/', $without_slashes );
 }
 
-function wp_parent_paths( $path, $options = array() ) {
-	$include_self = $options['include_self'] ?? false;
-	$path         = '/' . trim( $path, '/' );
-	$segments     = wp_path_segments( $path );
-	$paths        = array( '/' );
-	yield '/';
-	for ( $i = 0; $i < count( $segments ) - 1; $i ++ ) {
-		$paths[] = $segments[ $i ];
-		yield wp_join_paths( ...$paths );
-	}
-	if ( $include_self ) {
-		yield $path;
-	}
-}
-
 /**
  * Joins multiple path segments together into a single path.
  *

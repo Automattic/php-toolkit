@@ -21,7 +21,16 @@ class LocalFilesystem implements Filesystem {
 
 	private $root;
 
-	public static function create( $root = '/' ) {
+	public static function create( $root = null ) {
+		if ( null === $root ) {
+			if ( strtoupper( substr( PHP_OS, 0, 3 ) ) === 'WIN' ) {
+				$systemDrive = getenv( 'SystemDrive' );
+				$root = $systemDrive ? $systemDrive . '\\' : 'C:\\';
+			} else {
+				$root = '/';
+			}
+		}
+
 		if ( ! is_dir( $root ) ) {
 			if ( false === mkdir( $root, 0755, true ) ) {
 				throw new FilesystemException( sprintf( 'Root directory did not exist and could not be created: %s', $root ) );
@@ -109,7 +118,7 @@ class LocalFilesystem implements Filesystem {
 	}
 
 	protected function mkdir_single( $path, $options = array() ) {
-		$resolved_path = $this->resolve_path( $path );
+		$resolved_path = $this->normalize_path( $path );
 		if ( $this->exists( $path ) ) {
 			throw new FilesystemException(
 				sprintf( 'Path already exists: %s', $path )
@@ -117,7 +126,7 @@ class LocalFilesystem implements Filesystem {
 		}
 		if ( false === @mkdir( $resolved_path ) ) {
 			throw new FilesystemException(
-				sprintf( 'Failed to create directory: %s (%s)', $resolved_path, $path )
+				sprintf( 'Failed to create directory: %s', $resolved_path )
 			);
 		}
 		if ( isset( $options['chmod'] ) ) {
@@ -175,7 +184,7 @@ class LocalFilesystem implements Filesystem {
 	 * OS-specific path separators is specific to the LocalFilesystem
 	 * class
 	 */
-	private function resolve_path( $path ) {
-		return str_replace( '/', DIRECTORY_SEPARATOR, $path );
+	private function normalize_path( $path ) {
+		return str_replace( DIRECTORY_SEPARATOR, '/', $path );
 	}
 }

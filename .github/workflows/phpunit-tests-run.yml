@@ -40,11 +40,11 @@ jobs:
           tools: phpunit-polyfills
           extensions: zip, sqlite3, pdo, pdo_sqlite
 
-      - name: Install Composer dependencies
-        uses: ramsey/composer-install@v3
-        with:
-          ignore-cache: "yes"
-          composer-options: "--optimize-autoloader"
+      - name: Install Composer dependencies (using composer-ci-matrix-tests.json)
+        run: |
+          rm composer.lock
+          cp composer-ci-matrix-tests.json composer.json
+          composer install --no-interaction --no-progress --optimize-autoloader
 
       - name: Run PHPUnit tests
         # Explicitly use the composer-installed version of phpunit
