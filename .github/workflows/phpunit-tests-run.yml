@@ -38,7 +38,6 @@ jobs:
       - name: Create DEV_DRIVE/tmp and set TEMP and TMP
         if: ${{ inputs.os == 'windows-latest' }}
         run: |
-          mkdir "${{ env.DEV_DRIVE }}\tmp" || true
           echo "Setting TEMP and TMP to ${{ env.DEV_DRIVE }}\tmp"
         env:
           DEV_DRIVE: ${{ env.DEV_DRIVE }}
