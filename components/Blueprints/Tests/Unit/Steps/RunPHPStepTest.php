@@ -3,6 +3,7 @@
 namespace WordPress\Blueprints\Tests\Unit\Steps;
 
 use Exception;
+use WordPress\Blueprints\DataReference\InlineFile;
 use WordPress\Blueprints\Progress\Tracker;
 use WordPress\Blueprints\Steps\RunPHPStep;
 
@@ -14,14 +15,21 @@ class RunPHPStepTest extends StepTestCase {
 	 * Test running simple PHP code
 	 */
 	public function testRunSimplePHPCode() {
-		$step = new RunPHPStep(
-			'<?php echo "Hello World";'
-		);
+		$output_file = wp_join_paths( $this->runtime->getConfiguration()->getTargetSiteRoot(), 'output.txt' );
+		
+		$step = new RunPHPStep(new InlineFile(
+			'script.php',
+			<<<PHP
+<?php 
+file_put_contents(getenv('DOCROOT') . '/output.txt', 'Hello World');
+PHP
+		));
 
 		$tracker = new Tracker();
-		$result  = $step->run( $this->runtime, $tracker );
+		$step->run( $this->runtime, $tracker );
 
-		$this->assertEquals( 'Hello World', $result );
+		$this->assertFileExists( $output_file );
+		$this->assertEquals( 'Hello World', file_get_contents( $output_file ) );
 	}
 
 	/**
@@ -29,22 +37,27 @@ class RunPHPStepTest extends StepTestCase {
 	 */
 	public function testRunPHPCodeCreatingFile() {
 		$test_file_path = wp_join_paths( $this->runtime->getConfiguration()->getTargetSiteRoot(), 'test_file.txt' );
-		$test_content   = 'This is a test file created by PHP';
+		$output_file = wp_join_paths( $this->runtime->getConfiguration()->getTargetSiteRoot(), 'output.txt' );
+		$test_content = 'This is a test file created by PHP';
 
 		$step = new RunPHPStep(
-			<<<PHP
+			new InlineFile(
+				'script.php',
+				<<<PHP
 <?php
 \$docroot = getenv('DOCROOT');
 \$test_file_path = \$docroot . '/test_file.txt';
 file_put_contents(\$test_file_path, 'This is a test file created by PHP');
-echo "File created";
+file_put_contents(\$docroot . '/output.txt', 'File created');
 PHP
+			)
 		);
 
 		$tracker = new Tracker();
-		$result  = $step->run( $this->runtime, $tracker );
+		$step->run( $this->runtime, $tracker );
 
-		$this->assertEquals( 'File created', $result );
+		$this->assertFileExists( $output_file );
+		$this->assertEquals( 'File created', file_get_contents( $output_file ) );
 		$this->assertFileExists( $test_file_path );
 		$this->assertEquals( $test_content, file_get_contents( $test_file_path ) );
 	}
@@ -53,23 +66,29 @@ PHP
 	 * Test running PHP code that loads WordPress
 	 */
 	public function testRunPHPCodeWithWordPress() {
+		$output_file = wp_join_paths( $this->runtime->getConfiguration()->getTargetSiteRoot(), 'output.txt' );
+		
 		$step = new RunPHPStep(
-			<<<PHP
+			new InlineFile(
+				'script.php',
+				<<<PHP
 <?php
 require_once getenv('DOCROOT') . '/wp-load.php';
 
 // Create a test option
 update_option('test_option', 'test_value');
 
-// Return the option value
-echo get_option('test_option');
+// Write the option value to an output file
+file_put_contents(getenv('DOCROOT') . '/output.txt', get_option('test_option'));
 PHP
+			)
 		);
 
 		$tracker = new Tracker();
-		$result  = $step->run( $this->runtime, $tracker );
+		$step->run( $this->runtime, $tracker );
 
-		$this->assertEquals( 'test_value', $result );
+		$this->assertFileExists( $output_file );
+		$this->assertEquals( 'test_value', file_get_contents( $output_file ) );
 
 		// Verify the option was actually set in WordPress
 		$option_value = $this->runtime->evalPhpCodeInSubProcess(
@@ -88,8 +107,12 @@ PHP
 	 * Test running PHP code that returns complex data
 	 */
 	public function testRunPHPCodeReturningComplexData() {
+		$output_file = wp_join_paths( $this->runtime->getConfiguration()->getTargetSiteRoot(), 'output.txt' );
+		
 		$step = new RunPHPStep(
-			<<<PHP
+			new InlineFile(
+				'script.php',
+				<<<PHP
 <?php
 \$data = [
     'string' => 'Hello',
@@ -99,13 +122,16 @@ PHP
     'object' => (object)['name' => 'Test']
 ];
 
-echo json_encode(\$data);
+file_put_contents(getenv('DOCROOT') . '/output.txt', json_encode(\$data));
 PHP
+			)
 		);
 
 		$tracker = new Tracker();
-		$result  = $step->run( $this->runtime, $tracker );
-		$data    = json_decode( $result, true );
+		$step->run( $this->runtime, $tracker );
+
+		$this->assertFileExists( $output_file );
+		$data = json_decode( file_get_contents( $output_file ), true );
 
 		$this->assertIsArray( $data );
 		$this->assertEquals( 'Hello', $data['string'] );
@@ -120,7 +146,10 @@ PHP
 	 */
 	public function testRunPHPCodeWithSyntaxError() {
 		$step = new RunPHPStep(
-			'<?php echo "Missing semicolon" echo "Another string";'
+			new InlineFile(
+				'script.php',
+				'<?php echo "Missing semicolon" echo "Another string";'
+			)
 		);
 
 		$tracker = new Tracker();

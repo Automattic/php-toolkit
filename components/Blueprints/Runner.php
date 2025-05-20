@@ -51,7 +51,6 @@ use WordPress\Filesystem\InMemoryFilesystem;
 use WordPress\Filesystem\LocalFilesystem;
 use WordPress\HttpClient\ByteStream\RequestReadStream;
 use WordPress\HttpClient\Client;
-use WordPress\HttpClient\FilesystemCache;
 use WordPress\Zip\ZipFilesystem;
 
 use function WordPress\Encoding\utf8_is_valid_byte_stream;
@@ -112,27 +111,16 @@ class Runner {
 		$this->configuration = $configuration;
 		$this->validateConfiguration( $configuration );
 
-		$this->client      = new Client( [
-			/**
-			 * !! DO NOT USE IN PRODUCTION !!
-			 *
-			 * Store cached HTTP responses in a temporary directory with a stable path
-			 * to reuse across multiple runs.
-			 * 
-			 * HTTP cache support is experimental. Sometimes it loses data and
-			 * reuses incomplete cache. Sometimes it gets the fetch stream into an infinite loop.
-			 */
-			// 'cache' => new FilesystemCache(
-				// LocalFilesystem::create(
-				// 	sys_get_temp_dir() . '/wp-blueprints'
-				// )
-			// ),
-		] );
+		$this->client      = new Client();
 		$this->mainTracker = new Tracker();
 
 		// Set up progress logging
 		$this->progressObserver = $configuration->getProgressObserver() ?? new ProgressObserver();
 		$this->progressObserver->attachTo( $this->mainTracker );
+	}
+
+	public function getExecutionContext(): Filesystem {
+		return $this->blueprintExecutionContext;
 	}
 
 	private function validateConfiguration( RunnerConfiguration $config ): void {
@@ -197,7 +185,7 @@ class Runner {
 			}
 		} elseif ( $dbEngine === 'sqlite' ) {
 			if ( empty( $dbCreds['path'] ) ) {
-				throw new BlueprintExecutionException( "SQLite file path is required when database engine is 'sqlite'." );
+				$dbCreds['path'] = 'wp-content/.ht.sqlite';
 			}
 		}
 	}

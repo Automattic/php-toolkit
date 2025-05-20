@@ -2,11 +2,12 @@
 
 namespace WordPress\Blueprints\Tests\Unit\Steps;
 
+use WordPress\Blueprints\Exception\BlueprintExecutionException;
 use WordPress\Blueprints\Progress\Tracker;
 use WordPress\Blueprints\Steps\MkdirStep;
 use WordPress\Filesystem\FilesystemException;
 
-class MkdirStepRunnerTest extends StepTestCase {
+class MkdirStepTest extends StepTestCase {
 
 	public function testCreateDirectoryWhenUsingRelativePath() {
 		$path = 'dir';
@@ -75,7 +76,7 @@ class MkdirStepRunnerTest extends StepTestCase {
 		);
 
 		$tracker = new Tracker();
-		$this->expectException( FilesystemException::class );
+		$this->expectException( BlueprintExecutionException::class );
 		$this->expectExceptionMessageMatches( "/Path already exists:/" );
 		$step->run( $this->runtime, $tracker );
 	}

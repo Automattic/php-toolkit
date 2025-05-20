@@ -3,6 +3,7 @@
 namespace WordPress\Blueprints\Tests\Unit\Steps;
 
 use PHPUnit\Framework\TestCase;
+use WordPress\Blueprints\DataReference\DataReference;
 use WordPress\Blueprints\Runner;
 use WordPress\Blueprints\RunnerConfiguration;
 use WordPress\Blueprints\Runtime;
@@ -40,14 +41,29 @@ class StepTestCase extends TestCase {
 		$this->execution_context_path = wp_join_paths( sys_get_temp_dir(), 'test_' . uniqid() );
 		$this->execution_context      = LocalFilesystem::create( $this->execution_context_path );
 
-		$config = ( new RunnerConfiguration() )
-			->setBlueprint( [ "version" => 2 ] )
+		$base_site_root = wp_join_paths( sys_get_temp_dir(), 'blueprint_test_base_site' );
+		if ( is_dir( $base_site_root ) ) {
+			LocalFilesystem::create()->copy( $base_site_root, $this->document_root, [ 'recursive' => true ] );
+			$config = ( new RunnerConfiguration() )
+				->setExecutionMode( 'apply-to-existing-site' )
+				->setTargetSiteRoot( $this->document_root ) // Arbitrary URL for the new site
+			;
+		} else {
+			$config = ( new RunnerConfiguration() )
+				->setExecutionMode( 'create-new-site' )
+				->setTargetSiteRoot( $base_site_root ) // Arbitrary URL for the new site
+			;
+		}
+
+		file_put_contents(
+			wp_join_paths( $this->execution_context_path, 'blueprint.json' ),
+			json_encode( [ "version" => 2 ] )
+		);
+
+		$config
+			->setBlueprint( DataReference::create( wp_join_paths($this->execution_context_path, 'blueprint.json' ) ) )
 			->setDatabaseEngine( 'sqlite' )
-			->setExecutionMode( 'create-new-site' )
-			->setExecutionContext( $this->execution_context )
-			->setTargetSiteRoot( $this->document_root )
-			->setTargetSiteUrl( 'http://127.0.0.1:2456' ) // Arbitrary URL for the new site
-		;
+			->setTargetSiteUrl( 'http://127.0.0.1:2456' );
 
 		$runner = new Runner( $config );
 		$runner->run();

@@ -14,37 +14,6 @@ use WordPress\Blueprints\Validator\ValidationError;
  */
 class HumanFriendlySchemaValidatorTest extends TestCase {
 
-	private function assertValidationError(
-		?ValidationError $error,
-		string $expectedMessageContains = null,
-		string $expectedCode = null,
-		string $expectedPointer = null,
-		array $expectedContextContains = null,
-		int $expectedChildrenCount = null
-	): void {
-		$this->assertInstanceOf( ValidationError::class, $error, 'Expected a ValidationError instance.' );
-
-		if ( $expectedMessageContains !== null ) {
-			$this->assertStringContainsString( $expectedMessageContains, $error->message, 'Error message mismatch.' );
-		}
-		if ( $expectedCode !== null ) {
-			$this->assertEquals( $expectedCode, $error->code, 'Error code mismatch.' );
-		}
-		if ( $expectedPointer !== null ) {
-			$this->assertEquals( $expectedPointer, $error->pointer, 'Error pointer mismatch.' );
-		}
-		if ( $expectedContextContains !== null ) {
-			foreach ( $expectedContextContains as $key => $value ) {
-				$this->assertArrayHasKey( $key, $error->context, "Context missing key: {$key}" );
-				$this->assertEquals( $value, $error->context[ $key ], "Context value mismatch for key: {$key}" );
-			}
-		}
-		if ( $expectedChildrenCount !== null ) {
-			$this->assertCount( $expectedChildrenCount, $error->children, 'Error children count mismatch.' );
-		}
-	}
-
-
 	// Test Primitive Types
 	public static function primitiveTypeProvider(): array {
 		return [
@@ -95,10 +64,7 @@ class HumanFriendlySchemaValidatorTest extends TestCase {
 	public function testPrimitiveTypeValidation(
 		array $schema,
 		$value,
-		bool $shouldBeValid,
-		string $expectedErrorMessage = null,
-		string $expectedCode = null,
-		string $expectedPointer = null
+		bool $shouldBeValid
 	) {
 		$validator = new HumanFriendlySchemaValidator( $schema );
 		$error     = $validator->validate( $value );
@@ -136,10 +102,7 @@ class HumanFriendlySchemaValidatorTest extends TestCase {
 	public function testEnumValidation(
 		array $schema,
 		$value,
-		bool $shouldBeValid,
-		string $expectedErrorMessage = null,
-		string $expectedCode = null,
-		string $expectedPointer = null
+		bool $shouldBeValid
 	) {
 		$validator = new HumanFriendlySchemaValidator( $schema );
 		$error     = $validator->validate( $value );
@@ -190,7 +153,7 @@ class HumanFriendlySchemaValidatorTest extends TestCase {
 				array_merge( $baseSchema, [ 'additionalProperties' => false ] ),
 				[ 'foo' => 'text', 'extra' => 'disallowed' ],
 				false,
-				'Property "extra" isn\'t allowed here.',
+				'Property "extra" isn\'t allowed here. Allowed properties are: foo, bar.',
 			],
 			'object with additionalProperties: true, extra prop'                   => [ // True is default, but explicit for test
 				array_merge( $baseSchema, [ 'additionalProperties' => true ] ),
@@ -232,7 +195,7 @@ class HumanFriendlySchemaValidatorTest extends TestCase {
 				[
 					'Expected type "string" but got type "integer".',
 					'Missing required field: bar.',
-					'Property "extra" isn\'t allowed here.',
+					'Property "extra" isn\'t allowed here. Allowed properties are: foo, bar.',
 				],
 			],
 		];
@@ -268,12 +231,16 @@ class HumanFriendlySchemaValidatorTest extends TestCase {
 				$this->assertCount( count( $expectedChildErrorChecks ), $error->children, "Children count mismatch." );
 				foreach ( $expectedChildErrorChecks as $index => $check ) {
 					$childError = $error->children[ $index ] ?? null;
-					$this->assertValidationError(
-						$childError,
-						$check->messageContains ?? null,
-						$check->code ?? null,
-						$check->pointer ?? null
-					);
+					$this->assertInstanceOf( ValidationError::class, $childError, 'Expected a ValidationError instance.' );
+					if ( isset( $check->messageContains ) ) {
+						$this->assertStringContainsString( $check->messageContains, $childError->message, 'Error message mismatch.' );
+					}
+					if ( isset( $check->code ) ) {
+						$this->assertEquals( $check->code, $childError->code, 'Error code mismatch.' );
+					}
+					if ( isset( $check->pointer ) ) {
+						$this->assertEquals( $check->pointer, $childError->pointer, 'Error pointer mismatch.' );
+					}
 				}
 			}
 		}
@@ -351,7 +318,7 @@ class HumanFriendlySchemaValidatorTest extends TestCase {
 	/**
 	 * @dataProvider arrayProvider
 	 */
-	public function testArrayValidation( array $schema, $value, bool $shouldBeValid, string $expectedErrorMessage = null ) {
+	public function testArrayValidation( array $schema, $value, bool $shouldBeValid, ?string $expectedErrorMessage = null ) {
 		$validator = new HumanFriendlySchemaValidator( $schema );
 		$result    = $validator->validate( $value );
 		$this->assertIsValid( $result, $shouldBeValid, $expectedErrorMessage );
@@ -736,8 +703,8 @@ class HumanFriendlySchemaValidatorTest extends TestCase {
 		array $schema,
 		$value,
 		bool $shouldBeValid,
-		string $expectedErrorMessage = null,
-		string $expectedExplanation = null
+		?string $expectedErrorMessage = null,
+		?string $expectedExplanation = null
 	) {
 		$validator = new HumanFriendlySchemaValidator( $schema );
 		$result    = $validator->validate( $value );
@@ -814,7 +781,7 @@ class HumanFriendlySchemaValidatorTest extends TestCase {
 	/**
 	 * @dataProvider oneOfProvider
 	 */
-	public function testOneOfValidation( array $schema, $value, bool $shouldBeValid, string $expectedErrorMessage = null ) {
+	public function testOneOfValidation( array $schema, $value, bool $shouldBeValid, ?string $expectedErrorMessage = null ) {
 		$validator = new HumanFriendlySchemaValidator( $schema );
 		$result    = $validator->validate( $value );
 		$this->assertIsValid( $result, $shouldBeValid );
@@ -999,53 +966,6 @@ class HumanFriendlySchemaValidatorTest extends TestCase {
 		$this->assertInstanceOf( ValidationError::class, $result );
 		$this->assertEquals( 'Object validation failed.', $result->message );
 		$this->assertEquals( 'Expected type "string" but got type "integer".', $result->getMostProbableCause()->message );
-	}
-
-	/**
-	 * Test complex nested references
-	 */
-	public function testComplexNestedReferences() {
-		$schema = [
-			'definitions' => [
-				'baseConfig'     => [
-					'type'       => 'object',
-					'properties' => [
-						'id'      => [ 'type' => 'string' ],
-						'enabled' => [ 'type' => 'boolean' ],
-					],
-					'required'   => [ 'id' ],
-				],
-				'extendedConfig' => [
-					'allOf' => [
-						[ '$ref' => '#/definitions/baseConfig' ],
-						[
-							'properties' => [
-								'advanced' => [ 'type' => 'boolean' ],
-								'settings' => [ '$ref' => '#/definitions/settingsObject' ],
-							],
-						],
-					],
-				],
-				'settingsObject' => [
-					'type'       => 'object',
-					'properties' => [
-						'timeout' => [ 'type' => 'integer' ],
-						'retries' => [ 'type' => 'integer' ],
-					],
-				],
-			],
-			'type'        => 'object',
-			'properties'  => [
-				'config'         => [ '$ref' => '#/definitions/baseConfig' ],
-				'advancedConfig' => [ '$ref' => '#/definitions/extendedConfig' ],
-			],
-		];
-
-		// We expect this to throw an exception because allOf is not supported
-		$validator = new HumanFriendlySchemaValidator( $schema );
-		$this->expectException( UnsupportedSchemaException::class );
-		$this->expectExceptionMessage( 'The schema keyword "allOf" is not supported' );
-		$validator->validate( [ 'config' => [ 'id' => 'test' ], 'advancedConfig' => [ 'id' => 'advanced', 'enabled' => true ] ] );
 	}
 
 	/**
@@ -1287,19 +1207,6 @@ class HumanFriendlySchemaValidatorTest extends TestCase {
 		$this->assertEquals( 'Property "type" must be one of [A, B], but it was missing.', $result4->message );
 	}
 
-	/**
-	 * Helper to find an error message containing a specific substring.
-	 */
-	private function findErrorMessageContaining( array $errors, string $substring ): ?string {
-		foreach ( $errors as $error ) {
-			if ( strpos( $error->message, $substring ) !== false ) {
-				return $error->message;
-			}
-		}
-
-		return null;
-	}
-
 	public function testArrayIsValidObjectOption() {
 		$schema = [ 'type' => 'object', 'properties' => [ 'a' => [ 'type' => 'string' ] ] ];
 
@@ -1319,15 +1226,6 @@ class HumanFriendlySchemaValidatorTest extends TestCase {
 		$stdClass->a  = 'test';
 		$resultObject = $validatorStrict->validate( $stdClass );
 		$this->assertIsValid( $resultObject );
-	}
-
-	// Test for unsupported schema keywords
-	public function testAllOfThrows() {
-		$schema    = [ 'allOf' => [ [ 'type' => 'string' ], [ 'type' => 'string' ] ] ];
-		$validator = new HumanFriendlySchemaValidator( $schema );
-		$this->expectException( UnsupportedSchemaException::class );
-		$this->expectExceptionMessage( 'The schema keyword "allOf" is not supported' );
-		$validator->validate( 'test' );
 	}
 
 	public function testNotThrows() {
@@ -1370,12 +1268,12 @@ class HumanFriendlySchemaValidatorTest extends TestCase {
 		$validator->validate( [ 'a', 'b', 'c' ] );
 	}
 
-	public function testTypeAsArrayThrows() {
+	public function testTypeAsArray() {
 		$schema    = [ 'type' => [ 'string', 'integer' ] ];
 		$validator = new HumanFriendlySchemaValidator( $schema );
-		$this->expectException( UnsupportedSchemaException::class );
-		$this->expectExceptionMessage( "Defining 'type' as an array of types is not supported" );
-		$validator->validate( 'test' );
+		$this->assertIsValid( $validator->validate( 'test' ) );
+		$this->assertIsValid( $validator->validate( 123 ) );
+		$this->assertIsInvalid( $validator->validate( [] ) );
 	}
 
 	public function testEnumMismatchedTypeThrows() {

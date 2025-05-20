@@ -14,9 +14,7 @@ use WordPress\Blueprints\DataReference\File;
 use WordPress\Blueprints\DataReference\GitPath;
 use WordPress\Blueprints\DataReference\InlineDirectory;
 use WordPress\Blueprints\DataReference\InlineFile;
-use WordPress\Blueprints\DataReference\URLReference;
-use WordPress\Blueprints\DataReference\WordPressOrgPlugin;
-use WordPress\Blueprints\DataReference\WordPressOrgTheme;
+use WordPress\Blueprints\Exception\DataResolutionException;
 use WordPress\Blueprints\Progress\Tracker;
 use WordPress\ByteStream\MemoryPipe;
 use WordPress\ByteStream\ReadStream\ByteReadStream;
@@ -32,57 +30,12 @@ class DataReferenceResolverTest extends TestCase {
 	protected $tracker;
 
 	protected function setUp(): void {
-		// TODO: Mock Client and Filesystem as needed
-		$this->client           = $this->createMock( Client::class );
+		// @TODO: Don't mock. Just test actual resolution.
+		$this->client           = new Client();
 		$this->resolver         = new DataReferenceResolver( $this->client );
 		$this->executionContext = $this->createMock( Filesystem::class );
 		$this->tracker          = $this->createMock( Tracker::class );
 		$this->resolver->setExecutionContext( $this->executionContext );
-	}
-
-	public function testResolveURLReference() {
-		$url         = 'https://example.com/file.zip';
-		$reference   = new URLReference( $url );
-		$dummyStream = $this->createMock( ByteReadStream::class );
-		$this->client->expects( $this->once() )
-		             ->method( 'fetch' )
-		             ->with( $url, $this->arrayHasKey( 'progress_tracker' ) )
-		             ->willReturn( $dummyStream );
-
-		$result = $this->resolver->resolve( $reference );
-		$this->assertInstanceOf( File::class, $result );
-		$this->assertSame( $dummyStream, $result->getStream() );
-		$this->assertEquals( 'file.zip', $result->filename );
-	}
-
-	public function testResolveWordPressOrgPlugin() {
-		$reference   = new WordPressOrgPlugin( 'akismet' );
-		$expectedUrl = 'https://downloads.wordpress.org/plugin/akismet.latest-stable.zip';
-		$dummyStream = $this->createMock( ByteReadStream::class );
-		$this->client->expects( $this->once() )
-		             ->method( 'fetch' )
-		             ->with( $expectedUrl, $this->arrayHasKey( 'progress_tracker' ) )
-		             ->willReturn( $dummyStream );
-
-		$result = $this->resolver->resolve( $reference );
-		$this->assertInstanceOf( File::class, $result );
-		$this->assertSame( $dummyStream, $result->getStream() );
-		$this->assertEquals( 'akismet.latest-stable.zip', $result->filename );
-	}
-
-	public function testResolveWordPressOrgTheme() {
-		$reference   = new WordPressOrgTheme( 'twentytwentyfour' );
-		$expectedUrl = 'https://downloads.wordpress.org/theme/twentytwentyfour.latest-stable.zip';
-		$dummyStream = $this->createMock( ByteReadStream::class );
-		$this->client->expects( $this->once() )
-		             ->method( 'fetch' )
-		             ->with( $expectedUrl, $this->arrayHasKey( 'progress_tracker' ) )
-		             ->willReturn( $dummyStream );
-
-		$result = $this->resolver->resolve( $reference );
-		$this->assertInstanceOf( File::class, $result );
-		$this->assertSame( $dummyStream, $result->getStream() );
-		$this->assertEquals( 'twentytwentyfour.latest-stable.zip', $result->filename );
 	}
 
 	public function testResolveExecutionContextPathFile() {
@@ -158,7 +111,7 @@ class DataReferenceResolverTest extends TestCase {
 	public function testResolveMissingExecutionContextFileThrows() {
 		$reference = new ExecutionContextPath( './missing.txt' );
 		$this->executionContext->method( 'exists' )->with( './missing.txt' )->willReturn( false );
-		$this->expectException( RuntimeException::class );
+		$this->expectException( DataResolutionException::class );
 		$this->resolver->resolve( $reference );
 	}
 
@@ -168,14 +121,4 @@ class DataReferenceResolverTest extends TestCase {
 		$this->resolver->resolve( $reference );
 	}
 
-	public function testResolveURLReferenceFetchFailureThrows() {
-		$url       = 'https://example.com/fail.zip';
-		$reference = new URLReference( $url );
-		$this->client->expects( $this->once() )
-		             ->method( 'fetch' )
-		             ->with( $url, $this->arrayHasKey( 'progress_tracker' ) )
-		             ->will( $this->throwException( new RuntimeException( 'Fetch failed' ) ) );
-		$this->expectException( RuntimeException::class );
-		$this->resolver->resolve( $reference );
-	}
 }

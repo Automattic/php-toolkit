@@ -6,7 +6,7 @@ use WordPress\Blueprints\Progress\Tracker;
 use WordPress\Blueprints\Steps\RmDirStep;
 use WordPress\Filesystem\FilesystemException;
 
-class RmDirStepRunnerTest extends StepTestCase {
+class RmDirStepTest extends StepTestCase {
 
 	public function testRemoveEmptyDirectory() {
 		$fs = $this->runtime->getTargetFilesystem();

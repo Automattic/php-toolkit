@@ -2,6 +2,7 @@
 
 namespace WordPress\Blueprints\Steps;
 
+use WordPress\Blueprints\Exception\BlueprintExecutionException;
 use WordPress\Blueprints\Progress\Tracker;
 use WordPress\Blueprints\Runtime;
 
@@ -26,7 +27,10 @@ class MkdirStep implements StepInterface {
 	 */
 	public function run( Runtime $runtime, Tracker $tracker ) {
 		$tracker->setCaption( 'Creating directory ' . $this->path );
-		// @TODO: Throw exception in the LocalFilesystem class if the creation fails
-		$runtime->getTargetFilesystem()->mkdir( $this->path, [ 'recursive' => true ] );
+		$fs = $runtime->getTargetFilesystem();
+		if($fs->exists($this->path)) {
+			throw new BlueprintExecutionException(sprintf('Path already exists: %s', $this->path));
+		}
+		$fs->mkdir( $this->path, [ 'recursive' => true ] );
 	}
 }

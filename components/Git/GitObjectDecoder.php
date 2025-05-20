@@ -94,7 +94,7 @@ class GitObjectDecoder extends BaseByteReadStream {
 
 		$header = '';
 		while ( true ) {
-			if ( 0 === $this->inflated_reader->pull( 1 ) ) {
+			if ( 0 === $this->inflated_reader->pull( 1, ByteReadStream::PULL_EXACTLY ) ) {
 				throw new GitException( 'Unexpected end of data while reading object header' );
 			}
 			$byte   = $this->inflated_reader->consume( 1 );
