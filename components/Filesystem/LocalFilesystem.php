@@ -22,6 +22,8 @@ class LocalFilesystem implements Filesystem {
 	private $root;
 
 	public static function create( $root = null ) {
+		// Make sure the root path uses forward slashes on Windows.
+		// This allows us to use all wp_unix_* functions across the board.
 		if ( null === $root ) {
 			if ( strtoupper( substr( PHP_OS, 0, 3 ) ) === 'WIN' ) {
 				$systemDrive = getenv( 'SystemDrive' );

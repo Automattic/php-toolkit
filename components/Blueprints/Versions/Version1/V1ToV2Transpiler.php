@@ -7,7 +7,7 @@ use WordPress\Blueprints\Exception\BlueprintExecutionException;
 use WordPress\Blueprints\Validator\HumanFriendlySchemaValidator;
 use WordPress\Blueprints\Validator\ValidationError;
 
-use function WordPress\Filesystem\wp_join_paths;
+use function WordPress\Filesystem\wp_join_unix_paths;
 
 /**
  * @TODO: rewrite https://github.com urls to raw.githubusercontent.com urls like
@@ -499,7 +499,7 @@ PHP
 							$v2step['files']['/'] = self::convertV1ResourceToV2Reference( $v1step['filesTree'], $base_path );
 						} else {
 							foreach ( $v1step['filesTree'] as $path => $data ) {
-								$joined_path                     = wp_join_paths( $base_path, $path );
+								$joined_path                     = wp_join_unix_paths( $base_path, $path );
 								$v2step['files'][ $joined_path ] = is_string( $data )
 								? [
 									'filename' => basename( $path ),

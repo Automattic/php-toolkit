@@ -295,7 +295,7 @@ class SQLiteFilesystem implements Filesystem {
 					if ( $recursive ) {
 						$path = rtrim( $path, '/' );
 						foreach ( $this->ls( $path ) as $child ) {
-							$child_path = wp_join_paths( $path, $child );
+							$child_path = wp_join_unix_paths( $path, $child );
 							if ( $this->is_dir( $child_path ) ) {
 								$this->rmdir( $child_path, $options );
 							} else {

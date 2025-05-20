@@ -5,7 +5,7 @@ namespace WordPress\Filesystem\Visitor;
 use ArrayIterator;
 use WordPress\Filesystem\Filesystem;
 
-use function WordPress\Filesystem\wp_join_paths;
+use function WordPress\Filesystem\wp_join_unix_paths;
 
 class FilesystemVisitor {
 	private $filesystem;
@@ -71,7 +71,7 @@ class FilesystemVisitor {
 		}
 
 		foreach ( $children as $child ) {
-			if ( $filesystem->is_dir( wp_join_paths( $dir, $child ) ) ) {
+			if ( $filesystem->is_dir( wp_join_unix_paths( $dir, $child ) ) ) {
 				$this->directories[] = $child;
 				continue;
 			}

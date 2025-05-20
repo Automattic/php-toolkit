@@ -7,8 +7,8 @@ use WordPress\ByteStream\WriteStream\ByteWriteStream;
 use WordPress\Filesystem\Filesystem;
 use WordPress\Filesystem\LocalFilesystem;
 
-use function WordPress\Filesystem\wp_join_paths;
-use function WordPress\Filesystem\wp_resolve_dots_in_unix_path;
+use function WordPress\Filesystem\wp_join_unix_paths;
+use function WordPress\Filesystem\wp_unix_path_resolve_dots;
 
 /**
  * A filesystem wrapper that chroot's the filesystem to a specific path.
@@ -25,8 +25,10 @@ class ChrootLayer extends Layer {
 	 * @param  string  $root  The root path to chroot to.
 	 */
 	function __construct( Filesystem $fs, $chroot ) {
-		$this->chroot = rtrim( $chroot, '/' ) . '/';
 		parent::__construct( $fs );
+		$this->chroot = $this->forward_slashes_on_local_filesystem_on_windows(
+			rtrim( $chroot, '/' ) . '/'
+		);
 	}
 
 	/**
@@ -37,17 +39,32 @@ class ChrootLayer extends Layer {
 	 * @return string The normalized path.
 	 */
 	public function chrooted_path( $path ) {
-		// Abstraction leak! ChrootLayer is generic but it makes choices
-		// on behalf of LocalFilesystem.
-		// @TODO: Reorganize the code to avoid this. Otherwise, every layer
-		//        will need to implement this logic.
-		if(DIRECTORY_SEPARATOR === '\\' && $this->fs instanceof LocalFilesystem) {
-			$path = str_replace('\\', '/', $path);
-		}
-		return wp_join_paths( 
+		$path = $this->forward_slashes_on_local_filesystem_on_windows($path);
+		return wp_join_unix_paths( 
 			$this->chroot,
-			wp_resolve_dots_in_unix_path( $path )
+			wp_unix_path_resolve_dots( $path )
 		);
+	}
+
+	/**
+	 * Make sure we use forward slashes when addressing a local filesystem on 
+	 * a Windows host. This allows all the wp_unix_* functions to work.
+	 * 
+	 * This is an abstraction leak! ChrootLayer is generic but it makes choices
+	 * on behalf of LocalFilesystem.
+	 *
+	 * @TODO: Reorganize the code to avoid this. Otherwise, every Layer class
+	 *        will need to implement this logic. That's error-prone.
+	 * 
+	 * @param  string  $path  The path to normalize.
+	 * 
+	 * @return string The normalized path.
+	 */
+	private function forward_slashes_on_local_filesystem_on_windows($path) {
+		if(DIRECTORY_SEPARATOR === '\\' && $this->fs instanceof LocalFilesystem) {
+			return str_replace('\\', '/', $path);
+		}
+		return $path;
 	}
 
 	public function exists( $path ) {

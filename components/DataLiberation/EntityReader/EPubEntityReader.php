@@ -7,7 +7,7 @@ use WordPress\DataLiberation\DataFormatConsumer\MarkupProcessorConsumer;
 use WordPress\Filesystem\Filesystem;
 use WordPress\XML\XMLProcessor;
 
-use function WordPress\Filesystem\wp_join_paths;
+use function WordPress\Filesystem\wp_join_unix_paths;
 
 /**
  * https://www.w3.org/AudioVideo/ebook/
@@ -61,7 +61,7 @@ class EPubEntityReader implements EntityReader {
 				if ( ( $item['properties'] ?? '' ) === 'nav' ) {
 					continue;
 				}
-				$this->remaining_html_files[] = wp_join_paths(
+				$this->remaining_html_files[] = wp_join_unix_paths(
 					dirname( $this->manifest_path ),
 					$item['href']
 				);

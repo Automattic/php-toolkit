@@ -6,7 +6,7 @@ use InvalidArgumentException;
 use WordPress\Filesystem\Filesystem;
 use WordPress\Filesystem\InMemoryFilesystem;
 
-use function WordPress\Filesystem\wp_join_paths;
+use function WordPress\Filesystem\wp_join_unix_paths;
 
 /**
  * Represents a directory that is inlined within the Blueprint JSON document.
@@ -62,10 +62,10 @@ class InlineDirectory extends DataReference {
 		$add_to_fs = function ( $children, $base_path = '' ) use ( &$add_to_fs, $fs ) {
 			foreach ( $children as $child ) {
 				if ( $child instanceof InlineFile ) {
-					$path = wp_join_paths( $base_path, $child->get_filename() );
+					$path = wp_join_unix_paths( $base_path, $child->get_filename() );
 					$fs->put_contents( $path, $child->get_content() );
 				} elseif ( $child instanceof InlineDirectory ) {
-					$dir_path = wp_join_paths( $base_path, $child->get_name() );
+					$dir_path = wp_join_unix_paths( $base_path, $child->get_name() );
 					$fs->mkdir( $dir_path, [ 'recursive' => true ] );
 					$add_to_fs( $child->get_children(), $dir_path );
 				}

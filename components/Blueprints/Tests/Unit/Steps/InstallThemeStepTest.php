@@ -9,7 +9,7 @@ use WordPress\Blueprints\Steps\InstallThemeStep;
 
 use ZipArchive;
 
-use function WordPress\Filesystem\wp_join_paths;
+use function WordPress\Filesystem\wp_join_unix_paths;
 
 class InstallThemeStepTest extends StepTestCase {
 	const THEME_STYLE_CSS_CONTENT = <<<'CSS'
@@ -123,7 +123,7 @@ PHP
 	}
 
 	public function testInstallThemeFromZip() {
-		$zip_file = wp_join_paths( $this->execution_context_path, 'zipped-test-theme.zip' );
+		$zip_file = wp_join_unix_paths( $this->execution_context_path, 'zipped-test-theme.zip' );
 		$zip      = new ZipArchive();
 		if ( $zip->open( $zip_file, ZipArchive::CREATE ) === true ) {
 			$zip->addFromString( 'test-theme/style.css', self::THEME_STYLE_CSS_CONTENT );

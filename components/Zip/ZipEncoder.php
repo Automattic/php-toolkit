@@ -8,7 +8,7 @@ use WordPress\ByteStream\ReadStream\TransformedReadStream;
 use WordPress\ByteStream\WriteStream\ByteWriteStream;
 use WordPress\Filesystem\Filesystem;
 
-use function WordPress\Filesystem\wp_join_paths;
+use function WordPress\Filesystem\wp_join_unix_paths;
 
 class ZipEncoder {
 
@@ -22,7 +22,7 @@ class ZipEncoder {
 
 	public function append_from_filesystem( Filesystem $filesystem, $path = '/' ) {
 		foreach ( $filesystem->ls( $path ) as $entry ) {
-			$entry_path = wp_join_paths( $path, $entry );
+			$entry_path = wp_join_unix_paths( $path, $entry );
 			if ( $filesystem->is_dir( $entry_path ) ) {
 				$this->append_from_filesystem( $filesystem, $entry_path );
 			} else {

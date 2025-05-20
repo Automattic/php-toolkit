@@ -9,7 +9,7 @@ use WordPress\Blueprints\Steps\InstallPluginStep;
 
 use ZipArchive;
 
-use function WordPress\Filesystem\wp_join_paths;
+use function WordPress\Filesystem\wp_join_unix_paths;
 
 class InstallPluginStepTest extends StepTestCase {
 	const PLUGIN_FILE_CONTENT = <<<'PHP'
@@ -122,7 +122,7 @@ PHP
 	}
 
 	public function testInstallPluginFromZip() {
-		$zip_file = wp_join_paths( $this->execution_context_path, 'zipped-test-plugin.zip' );
+		$zip_file = wp_join_unix_paths( $this->execution_context_path, 'zipped-test-plugin.zip' );
 		$zip      = new ZipArchive();
 		if ( $zip->open( $zip_file, ZipArchive::CREATE ) === true ) {
 			$zip->addFromString( 'test-plugin.php', self::PLUGIN_FILE_CONTENT );
@@ -159,7 +159,7 @@ PHP
 	}
 
 	public function testInstallPluginFromZipWithSubfolder() {
-		$zip_file = wp_join_paths( $this->execution_context_path, 'zipped-test-plugin.zip' );
+		$zip_file = wp_join_unix_paths( $this->execution_context_path, 'zipped-test-plugin.zip' );
 		$zip      = new ZipArchive();
 		if ( $zip->open( $zip_file, ZipArchive::CREATE ) === true ) {
 			$zip->addFromString( 'subfolder-name/test-plugin.php', self::PLUGIN_FILE_CONTENT );

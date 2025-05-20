@@ -10,13 +10,13 @@ use WordPress\Blueprints\Steps\UnzipStep;
 
 use ZipArchive;
 
-use function WordPress\Filesystem\wp_join_paths;
+use function WordPress\Filesystem\wp_join_unix_paths;
 
 class UnzipStepTest extends StepTestCase {
 
 	public function setUp(): void {
 		parent::setUp();
-		$zip_file = wp_join_paths( $this->execution_context_path, 'test_zip.zip' );
+		$zip_file = wp_join_unix_paths( $this->execution_context_path, 'test_zip.zip' );
 		if ( file_exists( $zip_file ) ) {
 			unlink( $zip_file );
 		}
@@ -71,7 +71,7 @@ class UnzipStepTest extends StepTestCase {
 
 	public function testUnzipWithNestedDirectories() {
 		// Create a zip with nested directories
-		$zip_file = wp_join_paths( $this->execution_context_path, 'nested_test.zip' );
+		$zip_file = wp_join_unix_paths( $this->execution_context_path, 'nested_test.zip' );
 		$zip      = new ZipArchive();
 		if ( $zip->open( $zip_file, ZipArchive::CREATE ) === true ) {
 			$zip->addFromString( 'folder1/test1.txt', 'Test file 1' );

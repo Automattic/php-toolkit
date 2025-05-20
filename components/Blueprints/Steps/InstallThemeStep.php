@@ -12,7 +12,7 @@ use WordPress\ByteStream\WriteStream\FileWriteStream;
 use WordPress\Zip\ZipEncoder;
 
 use function WordPress\Filesystem\pipe_stream;
-use function WordPress\Filesystem\wp_join_paths;
+use function WordPress\Filesystem\wp_join_unix_paths;
 use function WordPress\Zip\is_zip_file_stream;
 
 /**
@@ -68,14 +68,14 @@ class InstallThemeStep implements StepInterface {
 
 			if ( $theme_data instanceof Directory ) {
 				$zip_filename      = $theme_data->dirname . '.zip';
-				$zip_absolute_path = wp_join_paths( $temp_dir, $zip_filename );
+				$zip_absolute_path = wp_join_unix_paths( $temp_dir, $zip_filename );
 				$zip_stream        = FileWriteStream::from_path( $zip_absolute_path, 'truncate' );
 				$zip_encoder       = new ZipEncoder( $zip_stream );
 				$zip_encoder->append_from_filesystem( $theme_data->filesystem );
 				$zip_encoder->close();
 			} elseif ( $theme_data instanceof File ) {
 				$zip_filename      = preg_replace( '/\.(zip|php)$/', '', $theme_data->filename ) . '.zip';
-				$zip_absolute_path = wp_join_paths( $temp_dir, $zip_filename );
+				$zip_absolute_path = wp_join_unix_paths( $temp_dir, $zip_filename );
 				$zip_stream        = FileWriteStream::from_path( $zip_absolute_path, 'truncate' );
 
 				if ( is_zip_file_stream( $theme_data->getStream() ) ) {
@@ -89,7 +89,7 @@ class InstallThemeStep implements StepInterface {
 			$tracker->set( 50 );
 
 			$output = $runtime->evalPhpFileInSubProcess(
-				wp_join_paths( __DIR__, 'scripts/InstallTheme/wp_install_theme.php' ),
+				wp_join_unix_paths( __DIR__, 'scripts/InstallTheme/wp_install_theme.php' ),
 				[ 'THEME_ZIP_PATH' => $zip_absolute_path ]
 			);
 
@@ -103,7 +103,7 @@ class InstallThemeStep implements StepInterface {
 			if ( $this->active ) {
 				$tracker->set( 75, 'Activating theme ' . $theme_folder_name );
 				$runtime->evalPhpFileInSubProcess(
-					wp_join_paths( __DIR__, 'scripts/ActivateTheme/wp_activate_theme.php' ),
+					wp_join_unix_paths( __DIR__, 'scripts/ActivateTheme/wp_activate_theme.php' ),
 					[ 'THEME_FOLDER_NAME' => $theme_folder_name ]
 				);
 			}

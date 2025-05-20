@@ -24,11 +24,18 @@ function ls_recursive( Filesystem $filesystem, $path = '/' ) {
 	return $tree;
 }
 
+/**
+ * Copies a file or directory between two Filesystem instances.
+ * 
+ * @param  array  $args  The arguments to pass to the copy function. {
+ *     @type Filesystem $source_filesystem The source filesystem.
+ *     @type Filesystem $destination_filesystem The destination filesystem.
+ *     @type string $source_path The path to the source file or directory. It must use forward slashes as path separators.
+ *     @type string $destination_path The path to the destination file or directory. It must use forward slashes as path separators.
+ *     @type bool $recursive Whether to copy the file or directory recursively.
+ * }
+ */
 function copy_between_filesystems( array $args ) {
-	/**
-	 * @var Filesystem $source
-	 * @var Filesystem $destination
-	 */
 	$source           = $args['source_filesystem'];
 	$source_path      = $args['source_path'] ?? '/';
 	$destination      = $args['target_filesystem'];
@@ -36,11 +43,6 @@ function copy_between_filesystems( array $args ) {
 	$recursive        = $args['recursive'] ?? true;
 
 	if ( $source->is_file( $source_path ) ) {
-		// @TODO: unix path requirement is a gotcha. We might get
-		//        a windows path here if the developer is not careful.
-		//        Either document it or support windows paths.
-		//        The latter isn't trivial as the behavior depends
-		//        on a cartesian product of IsWindows() x IsLocalFilesystem()
 		$destination_dir = wp_unix_dirname( $destination_path );
 		if ( ! $destination->is_dir( $destination_dir ) ) {
 			$destination->mkdir(
@@ -89,9 +91,9 @@ function copy_between_filesystems( array $args ) {
 			copy_between_filesystems(
 				array(
 					'source_filesystem' => $source,
-					'source_path'       => wp_join_paths( $source_path, $item ),
+					'source_path'       => wp_join_unix_paths( $source_path, $item ),
 					'target_filesystem' => $destination,
-					'target_path'       => wp_join_paths( $destination_path, $item ),
+					'target_path'       => wp_join_unix_paths( $destination_path, $item ),
 				)
 			);
 		}
@@ -135,8 +137,8 @@ function pipe_stream( $from_stream, $to_stream, $chunk_size = 65536 ) {
 
 
 function wp_unix_path_segments( $path ) {
-	$canonicalized   = wp_resolve_dots_in_unix_path( $path );
-	$without_slashes = trim( $canonicalized, '/' );
+	$without_dots   = wp_unix_path_resolve_dots( $path );
+	$without_slashes = trim( $without_dots, '/' );
 
 	return explode( '/', $without_slashes );
 }
@@ -146,7 +148,7 @@ function wp_unix_path_segments( $path ) {
  *
  * Removes any double slashes between path segments.
  */
-function wp_join_paths( ...$path_segments ) {
+function wp_join_unix_paths( ...$path_segments ) {
 	$input_starts_with_slash = null;
 
 	$paths = array();
@@ -176,13 +178,12 @@ function wp_join_paths( ...$path_segments ) {
  *
  * Example:
  *
- * wp_resolve_dots_in_unix_path( 'foo/bar/../baz' ) => '/foo/baz'
+ * wp_unix_path_resolve_dots( 'foo/bar/../baz' ) => '/foo/baz'
  *
- * @TODO: Make it windows-safe. Prepending the forward slash breaks paths such as C:/foo/bar.
  * @param  string  $path  The file path that needs cleaning up
  * @return string The cleaned, absolute path
  */
-function wp_resolve_dots_in_unix_path( $path ) {
+function wp_unix_path_resolve_dots( $path ) {
 	// Convert to absolute path
 	if ( strncmp( $path, '/', strlen( '/' ) ) !== 0 ) {
 		$path = '/' . $path;
@@ -211,9 +212,10 @@ function wp_resolve_dots_in_unix_path( $path ) {
 
 
 /**
- * Like sys_get_temp_dir(), but uses forward slashes on Windows.
+ * Like sys_get_temp_dir(), but returns a path using forward slashes
+ * as separators.
  */
-function wp_sys_get_temp_dir() {
+function wp_unix_sys_get_temp_dir() {
 	$path = sys_get_temp_dir();
 	if ( DIRECTORY_SEPARATOR === '\\' ) {
 		$path = str_replace( '\\', '/', $path );
@@ -222,9 +224,27 @@ function wp_sys_get_temp_dir() {
 }
 
 /**
- * wp_unix_dirname()
- * A strict-Unix clone of PHP's dirname().
+ * A clone of PHP's dirname() that assumes the path is a Unix path.
  *
+ * Both functions agree on the following:
+ * 
+ *     dirname("/") === wp_unix_dirname("/") === "/"
+ *     dirname("/foo/bar") === wp_unix_dirname("/foo/bar") === "/foo"
+ *     dirname("/foo/bar/") === wp_unix_dirname("/foo/bar/") === "/foo/bar"
+ * 
+ * However, they disagree on Windows paths:
+ * 
+ *     dirname("C:/") === "C:/" (when ran on windows)
+ *     dirname("C:/") === "." (when ran on unix)
+ * 
+ *     wp_unix_dirname("C:/") === "." (regardless of the OS)
+ * 
+ * This ensures we get reliable results on all host OSes.
+ * 
+ * It might seem weird to use unix semantics on windows. However, keep in mind,
+ * that php-toolkit supports more filesystems than just a local disk and that
+ * C: is a valid filename on unix.
+ * 
  * @param string $path   Path to inspect (assumed Unix).
  * @param int    $levels How many levels to climb (≥ 1).
  * @return string
@@ -238,7 +258,7 @@ function wp_unix_dirname(string $path, int $levels = 1): string
 
     // treat empty string the same way PHP does
     if ($path === '') {
-        $path = '.';
+        return '';
     }
 
     // if the path is nothing but slashes, the result is always "/"

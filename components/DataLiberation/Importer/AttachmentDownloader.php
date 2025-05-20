@@ -7,7 +7,7 @@ use WordPress\Filesystem\Filesystem;
 use WordPress\HttpClient\Client;
 use WordPress\HttpClient\Request;
 
-use function WordPress\Filesystem\wp_join_paths;
+use function WordPress\Filesystem\wp_join_unix_paths;
 
 class AttachmentDownloader {
 	private $client;
@@ -50,7 +50,7 @@ class AttachmentDownloader {
 	public function enqueue_if_not_exists( $url, $output_relative_path ) {
 		$this->enqueued_url = $url;
 
-		$output_path = wp_join_paths( $this->output_root, $output_relative_path );
+		$output_path = wp_join_unix_paths( $this->output_root, $output_relative_path );
 		if ( file_exists( $output_path ) ) {
 			$this->pending_events[] = new AttachmentDownloaderEvent(
 				$this->enqueued_url,

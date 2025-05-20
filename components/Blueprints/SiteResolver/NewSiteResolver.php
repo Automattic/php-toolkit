@@ -13,7 +13,7 @@ use WordPress\HttpClient\Client;
 use WordPress\Zip\ZipFilesystem;
 
 use function WordPress\Filesystem\copy_between_filesystems;
-use function WordPress\Filesystem\wp_join_paths;
+use function WordPress\Filesystem\wp_join_unix_paths;
 
 class NewSiteResolver {
 	static public function resolve( Runtime $runtime, Tracker $progress, ?VersionConstraint $wpVersionConstraint = null, ?string $recommendedWpVersion = 'latest' ) {
@@ -88,7 +88,7 @@ class NewSiteResolver {
 			] );
 
 			$targetFs->copy(
-				wp_join_paths( $targetPath, 'db.copy' ),
+				wp_join_unix_paths( $targetPath, 'db.copy' ),
 				'/wp-content/db.php'
 			);
 		}

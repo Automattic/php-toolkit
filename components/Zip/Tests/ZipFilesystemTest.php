@@ -7,7 +7,7 @@ use WordPress\HttpClient\ByteStream\SeekableRequestReadStream;
 use WordPress\HttpClient\Client;
 use WordPress\Zip\ZipFilesystem;
 
-use function WordPress\Filesystem\wp_join_paths;
+use function WordPress\Filesystem\wp_join_unix_paths;
 
 class ZipFilesystemTest extends TestCase {
 
@@ -81,10 +81,10 @@ class ZipFilesystemTest extends TestCase {
 	}
 
 	private function withServer( callable $callback, $host = '127.0.0.1', $port = 8940 ) {
-		$test_server_root = wp_join_paths( __DIR__, 'test-server' );
+		$test_server_root = wp_join_unix_paths( __DIR__, 'test-server' );
 		$server           = new Process( [
 			'php',
-			wp_join_paths( $test_server_root, 'run.php' ),
+			wp_join_unix_paths( $test_server_root, 'run.php' ),
 			$host,
 			$port,
 		], $test_server_root );

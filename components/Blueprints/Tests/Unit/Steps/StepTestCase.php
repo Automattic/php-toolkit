@@ -10,8 +10,8 @@ use WordPress\Blueprints\Runtime;
 use WordPress\Filesystem\Filesystem;
 use WordPress\Filesystem\LocalFilesystem;
 
-use function WordPress\Filesystem\wp_join_paths;
-use function WordPress\Filesystem\wp_sys_get_temp_dir;
+use function WordPress\Filesystem\wp_join_unix_paths;
+use function WordPress\Filesystem\wp_unix_sys_get_temp_dir;
 
 class StepTestCase extends TestCase {
 	/**
@@ -41,12 +41,12 @@ class StepTestCase extends TestCase {
 		if (PHP_OS_FAMILY === 'Linux' && file_exists('/etc/os-release') && strpos(file_get_contents('/etc/os-release'), 'Ubuntu') !== false) {
 			$this->markTestSkipped('Step tests are skipped on Ubuntu. @TODO: Re-enable them. Somehow the WordPress.zip request always times out.');
 		}
-		$tmp_dir = wp_sys_get_temp_dir();
-		$this->document_root          = wp_join_paths( $tmp_dir, 'test_' . uniqid() );
-		$this->execution_context_path = wp_join_paths( $tmp_dir, 'test_' . uniqid() );
+		$tmp_dir = wp_unix_sys_get_temp_dir();
+		$this->document_root          = wp_join_unix_paths( $tmp_dir, 'test_' . uniqid() );
+		$this->execution_context_path = wp_join_unix_paths( $tmp_dir, 'test_' . uniqid() );
 		$this->execution_context      = LocalFilesystem::create( $this->execution_context_path );
 
-		$base_site_root = wp_join_paths( $tmp_dir, 'blueprint_test_base_site' );
+		$base_site_root = wp_join_unix_paths( $tmp_dir, 'blueprint_test_base_site' );
 		if ( is_dir( $base_site_root ) && file_exists( $base_site_root . '/wp-load.php' ) ) {
 			LocalFilesystem::create( $tmp_dir )->copy(
 				'blueprint_test_base_site',
@@ -65,12 +65,12 @@ class StepTestCase extends TestCase {
 		}
 
 		file_put_contents(
-			wp_join_paths( $this->execution_context_path, 'blueprint.json' ),
+			wp_join_unix_paths( $this->execution_context_path, 'blueprint.json' ),
 			json_encode( [ "version" => 2 ] )
 		);
 
 		$config
-			->setBlueprint( new AbsoluteLocalPath( wp_join_paths( $this->execution_context_path, 'blueprint.json' ) ) )
+			->setBlueprint( new AbsoluteLocalPath( wp_join_unix_paths( $this->execution_context_path, 'blueprint.json' ) ) )
 			->setDatabaseEngine( 'sqlite' )
 			->setTargetSiteUrl( 'http://127.0.0.1:2456' );
 

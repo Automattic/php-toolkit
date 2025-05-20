@@ -14,8 +14,8 @@ use WordPress\Git\GitRepository;
 use WordPress\HttpClient\ByteStream\SeekableRequestReadStream;
 use WordPress\HttpClient\Client;
 
-use function WordPress\Filesystem\wp_join_paths;
-use function WordPress\Filesystem\wp_sys_get_temp_dir;
+use function WordPress\Filesystem\wp_join_unix_paths;
+use function WordPress\Filesystem\wp_unix_sys_get_temp_dir;
 
 class DataReferenceResolver {
 	/**
@@ -49,7 +49,7 @@ class DataReferenceResolver {
 
 	public function __construct( Client $client, ?string $tmpRoot = null ) {
 		$this->client  = $client;
-		$this->tmpRoot = $tmpRoot ?: wp_sys_get_temp_dir();
+		$this->tmpRoot = $tmpRoot ?: wp_unix_sys_get_temp_dir();
 	}
 
 	public function setExecutionContext( Filesystem $executionContext ) {
@@ -94,7 +94,7 @@ class DataReferenceResolver {
 				$url,
 				array(
 					'client'           => $this->client,
-					'cache_path'       => wp_join_paths( $this->tmpRoot, uniqid( 'blueprints_seekable_cache_' ) ),
+					'cache_path'       => wp_join_unix_paths( $this->tmpRoot, uniqid( 'blueprints_seekable_cache_' ) ),
 					/**
 					 * Use a 100MB buffer to support seek()-ing in the streamed ZIP files.
 					 * To support ZIPs larger than 100MB, we'll need a custom SeekableRequestReadStream that:
@@ -161,7 +161,7 @@ class DataReferenceResolver {
 			 * The Blueprint Runner will clean up all temporary directories at
 			 * the end of the execution.
 			 */
-			$tmp_dir = wp_join_paths( $this->tmpRoot, 'git-repo-' . uniqid() );
+			$tmp_dir = wp_join_unix_paths( $this->tmpRoot, 'git-repo-' . uniqid() );
 
 			$repo = new GitRepository( LocalFilesystem::create( $tmp_dir ) );
 			$repo->add_remote( 'origin', $reference->get_git_repository() );

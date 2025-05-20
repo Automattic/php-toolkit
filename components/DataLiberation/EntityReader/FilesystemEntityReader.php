@@ -14,7 +14,7 @@ use WordPress\Markdown\MarkdownConsumer;
 use WordPress\XML\XMLProcessor;
 use WP_HTML_Processor;
 
-use function WordPress\Filesystem\wp_join_paths;
+use function WordPress\Filesystem\wp_join_unix_paths;
 
 /**
  * Recursively reads files from a filesystem and converts them into WordPress post entities.
@@ -472,7 +472,7 @@ class FilesystemEntityReader implements EntityReader {
 			if ( $event->is_entering() ) {
 				$abs_paths = array();
 				foreach ( $event->files as $filename ) {
-					$abs_paths[] = wp_join_paths( $event->dir, $filename );
+					$abs_paths[] = wp_join_unix_paths( $event->dir, $filename );
 				}
 				$this->pending_files = array();
 				foreach ( $abs_paths as $path ) {

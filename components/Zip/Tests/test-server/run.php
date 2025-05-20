@@ -8,7 +8,7 @@ use WordPress\HttpServer\Response\TcpResponseWriteStream;
 use WordPress\HttpServer\TcpServer;
 
 use function WordPress\Filesystem\pipe_stream;
-use function WordPress\Filesystem\wp_join_paths;
+use function WordPress\Filesystem\wp_join_unix_paths;
 
 // Initialize runtime for the given document root
 require_once __DIR__ . '/../../../../vendor/autoload.php';
@@ -34,7 +34,7 @@ $server = new TcpServer( $host, $port );
 $server->set_handler( function ( IncomingRequest $request, TcpResponseWriteStream $response ) use ( $document_root ) {
 	$pathname = $request->get_parsed_url()->pathname;
 
-	$file_path = wp_join_paths( $document_root, $pathname );
+	$file_path = wp_join_unix_paths( $document_root, $pathname );
 	if ( ! file_exists( $file_path ) || ! is_file( $file_path ) ) {
 		$response->send_http_code( 404 );
 		$response->send_header( 'Content-Type', 'text/plain' );

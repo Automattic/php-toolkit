@@ -12,8 +12,8 @@ use WordPress\Merge\Merge\ChunkMerger;
 use WordPress\Merge\MergeStrategy;
 
 use function WordPress\Filesystem\wp_unix_dirname;
-use function WordPress\Filesystem\wp_join_paths;
-use function WordPress\Filesystem\wp_resolve_dots_in_unix_path;
+use function WordPress\Filesystem\wp_join_unix_paths;
+use function WordPress\Filesystem\wp_unix_path_resolve_dots;
 
 class GitRepository {
 
@@ -67,7 +67,7 @@ class GitRepository {
 
 	public function add_remote( $name, $url ) {
 		$this->set_config_value( array( 'remote', $name, 'url' ), $url );
-		$path = wp_join_paths( 'refs/remotes', $name );
+		$path = wp_join_unix_paths( 'refs/remotes', $name );
 		if ( ! $this->fs->is_dir( $path ) ) {
 			$this->fs->mkdir( $path );
 		}
@@ -436,7 +436,7 @@ class GitRepository {
 		while ( ! empty( $tree_stack ) ) {
 			list( $incoming_branch_diff, $current_branch_diff, $parent_path ) = array_pop( $tree_stack );
 			foreach ( $incoming_branch_diff as $name => $incoming_entry ) {
-				$path = wp_join_paths( $parent_path, $name );
+				$path = wp_join_unix_paths( $parent_path, $name );
 				if ( $incoming_entry === self::DELETE_PLACEHOLDER ) {
 					$deletes[] = $path;
 					continue;
@@ -1035,7 +1035,7 @@ class GitRepository {
 		 */
 		$stack = array( 'refs/heads/' );
 		foreach ( $prefixes as $prefix ) {
-			$path       = ltrim( wp_resolve_dots_in_unix_path( $prefix ), '/' );
+			$path       = ltrim( wp_unix_path_resolve_dots( $prefix ), '/' );
 			$first_path = $this->fs->is_dir( $path ) ? $path : wp_unix_dirname( $path );
 			if ( strncmp( $first_path, 'refs/', strlen( 'refs/' ) ) === 0 ) {
 				$stack[] = $first_path;
@@ -1047,7 +1047,7 @@ class GitRepository {
 			if ( $this->fs->is_dir( $path ) ) {
 				$ref_files = $this->fs->ls( $path );
 				foreach ( $ref_files as $ref_file ) {
-					$full_path = wp_join_paths( $path, $ref_file );
+					$full_path = wp_join_unix_paths( $path, $ref_file );
 					array_push( $stack, $full_path );
 				}
 			} elseif ( $this->fs->is_file( $path ) ) {

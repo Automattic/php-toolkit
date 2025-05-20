@@ -17,7 +17,7 @@ use WordPress\Filesystem\LocalFilesystem;
 use WordPress\HttpClient\Client;
 
 use function WordPress\Filesystem\pipe_stream;
-use function WordPress\Filesystem\wp_join_paths;
+use function WordPress\Filesystem\wp_join_unix_paths;
 
 class EvalResult {
 	/**
@@ -124,7 +124,7 @@ class Runtime {
 	}
 
 	public function getWpCliPath(): string {
-		$wp_cli_path = wp_join_paths( $this->getTempRoot(), 'wp-cli.phar' );
+		$wp_cli_path = wp_join_unix_paths( $this->getTempRoot(), 'wp-cli.phar' );
 		if ( ! file_exists( $wp_cli_path ) ) {
 			$resolved = $this->resolve( $this->wpCliReference );
 			if ( ! $resolved instanceof File ) {
@@ -154,7 +154,7 @@ class Runtime {
 
 	public function createTemporaryDirectory(): string {
 		do {
-			$dirname = wp_join_paths( $this->tempRoot, uniqid( 'tmp_' ) );
+			$dirname = wp_join_unix_paths( $this->tempRoot, uniqid( 'tmp_' ) );
 		} while ( file_exists( $dirname ) );
 
 		mkdir( $dirname, 0777, true );
@@ -173,7 +173,7 @@ class Runtime {
 
 	public function createTemporaryFile( ?string $suffix = null ): string {
 		do {
-			$filename = wp_join_paths( $this->tempRoot, uniqid( $suffix ?? 'tmp_' ) );
+			$filename = wp_join_unix_paths( $this->tempRoot, uniqid( $suffix ?? 'tmp_' ) );
 		} while ( file_exists( $filename ) );
 
 		touch( $filename );
@@ -235,12 +235,12 @@ class Runtime {
 		return $this->withTemporaryDirectory( function ( $tempDir ) use ( $script_path, $env, $input, $timeout ) {
 			// Still put the script in a temporary file as the path may be refering
 			// to a file inside the currently executed .phar archive.
-			$actual_script_path = wp_join_paths( $tempDir, 'script.php' );
+			$actual_script_path = wp_join_unix_paths( $tempDir, 'script.php' );
 			$code = '<?php function append_output( $output ) { file_put_contents( getenv("OUTPUT_FILE"), $output, FILE_APPEND ); } $_SERVER["HTTP_HOST"] = "localhost"; ?>';
 			$code .= file_get_contents( $script_path );
 			file_put_contents( $actual_script_path, $code );
 
-			$output_path = wp_join_paths( $tempDir, 'output.txt' );
+			$output_path = wp_join_unix_paths( $tempDir, 'output.txt' );
 			touch( $output_path );
 
 			$phpBinary = null;
