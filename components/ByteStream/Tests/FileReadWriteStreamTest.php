@@ -22,12 +22,12 @@ class FileReadWriteStreamTest extends TestCase {
 	public function testLongDistanceSeek() {
 		$stream = FileReadWriteStream::from_path( __DIR__ . '/fixtures/pygmalion.html' );
 
-		$stream->seek( 242900 );
+		$stream->seek( $stream->length() - 83 );
 		$stream->pull( 83 );
 		$last_bytes             = $stream->consume( 83 );
-		$expected_last_83_bytes = 'bscribe to our email newsletter to hear about new eBooks.
+		$expected_last_83_bytes = 'subscribe to our email newsletter to hear about new eBooks.
 </div>
-  </body>
+</body>
 </html>
 ';
 		$this->assertEquals( $expected_last_83_bytes, $last_bytes );
@@ -35,12 +35,11 @@ class FileReadWriteStreamTest extends TestCase {
 		$stream->seek( 0 );
 		$stream->pull( 83 );
 		$first_bytes             = $stream->consume( 83 );
-		$expected_first_83_bytes = '
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
-   "http://www.w3.org/TR/';
+		$expected_first_83_bytes = '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+		"http://www.w3.org/TR/xh';
 		$this->assertEquals( $expected_first_83_bytes, $first_bytes );
 
-		$stream->seek( 242900 );
+		$stream->seek( $stream->length() - 83 );
 		$stream->pull( 40 );
 		$last_bytes = $stream->consume( 40 );
 

@@ -135,18 +135,18 @@ HTML
 		);
 	}
 
-	public function test_html_to_blocks_excerpt( $input ) {
+	public function test_html_to_blocks_excerpt() {
 		$this->markTestSkipped( 'Skipping this test because of outdated fixture.' );
-		$consumer         = new MarkupProcessorConsumer( WP_HTML_Processor::create_fragment( $input ) );
-		$blocks_with_meta = $consumer->consume();
-		$blocks           = $blocks_with_meta->get_block_markup();
+		// $consumer         = new MarkupProcessorConsumer( WP_HTML_Processor::create_fragment( $input ) );
+		// $blocks_with_meta = $consumer->consume();
+		// $blocks           = $blocks_with_meta->get_block_markup();
 
-		$output_file = __DIR__ . '/fixtures/html-to-blocks/excerpt.output.html';
-		if ( getenv( 'UPDATE_FIXTURES' ) ) {
-			file_put_contents( $output_file, $blocks );
-		}
+		// $output_file = __DIR__ . '/fixtures/html-to-blocks/excerpt.output.html';
+		// if ( getenv( 'UPDATE_FIXTURES' ) ) {
+		// 	file_put_contents( $output_file, $blocks );
+		// }
 
-		$this->assertEquals( file_get_contents( $output_file ), $blocks );
+		// $this->assertEquals( file_get_contents( $output_file ), $blocks );
 	}
 
 	public function test_xhtml_to_blocks_conversion() {
