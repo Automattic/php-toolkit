@@ -8,11 +8,13 @@ use WordPress\Filesystem\FilesystemException;
 
 class CpStepTest extends StepTestCase {
 	public function testCopyFile() {
+		echo "testCopyFile\n";
 		$this->runtime->getTargetFilesystem()->put_contents( 'source_file.txt', 'test content' );
-
+		echo "testCopyFile 2\n";
 		$step = new CpStep( 'source_file.txt', 'target_file.txt' );
+		echo "testCopyFile 3\n";
 		$step->run( $this->runtime, new Tracker() );
-
+		echo "testCopyFile 4\n";
 		$this->assertTrue( $this->runtime->getTargetFilesystem()->exists( 'source_file.txt' ) );
 		$this->assertTrue( $this->runtime->getTargetFilesystem()->exists( 'target_file.txt' ) );
 		$this->assertEquals( 'test content', $this->runtime->getTargetFilesystem()->get_contents( 'target_file.txt' ) );
@@ -31,12 +33,15 @@ class CpStepTest extends StepTestCase {
 	}
 
 	public function testCopyDirectoryWithRecursiveOption() {
+		echo "testCopyDirectoryWithRecursiveOption\n";
 		$this->runtime->getTargetFilesystem()->mkdir( 'source_dir' );
+		echo "testCopyDirectoryWithRecursiveOption 2\n";
 		$this->runtime->getTargetFilesystem()->put_contents( 'source_dir/file.txt', 'test content' );
-
+		echo "testCopyDirectoryWithRecursiveOption 3\n";
 		$step = new CpStep( 'source_dir', 'target_dir' );
+		echo "testCopyDirectoryWithRecursiveOption 4\n";
 		$step->run( $this->runtime, new Tracker() );
-
+		echo "testCopyDirectoryWithRecursiveOption 5\n";
 		$this->assertTrue( $this->runtime->getTargetFilesystem()->exists( 'source_dir' ) );
 		$this->assertTrue( $this->runtime->getTargetFilesystem()->exists( 'target_dir' ) );
 		$this->assertTrue( $this->runtime->getTargetFilesystem()->exists( 'target_dir/file.txt' ) );
