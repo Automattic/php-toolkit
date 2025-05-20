@@ -40,6 +40,7 @@
             "/Tests/"
         ],
         "classmap": [
+            "components/BlockParser/",
             "components/Blueprints/vendor-patched/",
             "components/DataLiberation/vendor-patched/",
             "components/Markdown/vendor-patched",
@@ -60,7 +61,6 @@
             "Brick\\": "components/DataLiberation/vendor-patched/",
             "WordPress\\HttpClient\\": "components/HttpClient/",
             "WordPress\\Merge\\": "components/Merge/",
-            "WordPress\\BlockParser\\": "components/BlockParser/",
             "WordPress\\Markdown\\": "components/Markdown/",
             "WordPress\\Filesystem\\": "components/Filesystem/",
             "WordPress\\XML\\": "components/XML/",

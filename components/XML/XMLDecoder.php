@@ -27,15 +27,14 @@ class XMLDecoder {
 	 *     '&' = WP_XML_Decoder::decode( '&amp;' );
 	 *     '…' = WP_XML_Decoder::decode( '&#x2026;' );
 	 *
-	 * @param  string  $text  Text document containing span of text to decode.
-	 *
-	 * @return string Decoded UTF-8 string.
 	 * @todo Add examples of parse failures, and decide if it should fail or not.
 	 *
 	 * @since WP_VERSION
 	 *
 	 * @access private
 	 *
+	 * @param string $text    Text document containing span of text to decode.
+	 * @return string Decoded UTF-8 string.
 	 */
 	public static function decode( $text ) {
 		$decoded = '';
@@ -87,25 +86,23 @@ class XMLDecoder {
 					'q' === $start_of_potential_reference
 				)
 			) {
-				foreach (
-					array(
-						'amp;'  => '&',
-						'apos;' => "'",
-						'lt;'   => '<',
-						'gt;'   => '>',
-						'quot;' => '"',
-					) as $name => $substitution
-				) {
+				foreach ( array(
+					'amp;'  => '&',
+					'apos;' => "'",
+					'lt;'   => '<',
+					'gt;'   => '>',
+					'quot;' => '"',
+				) as $name => $substitution ) {
 					if ( 0 === substr_compare( $text, $name, $next_character_reference_at, strlen( $name ) ) ) {
 						$decoded .= substr( $text, $was_at, $next_character_reference_at - $was_at ) . $substitution;
-						$at      = $start_of_potential_reference_at + strlen( $name );
-						$was_at  = $at;
+						$at       = $start_of_potential_reference_at + strlen( $name );
+						$was_at   = $at;
 						continue 2;
 					}
 				}
 
 				// @todo This is an invalid document. It should be communicated. Treat as plaintext and continue.
-				++ $at;
+				++$at;
 				continue;
 			}
 
@@ -118,7 +115,7 @@ class XMLDecoder {
 			 */
 			if ( '#' !== $start_of_potential_reference || $next_character_reference_at + 4 >= $end ) {
 				// @todo This is an error. This ampersand _must_ be encoded. Treat as plaintext and move on.
-				++ $at;
+				++$at;
 				continue;
 			}
 
@@ -142,7 +139,7 @@ class XMLDecoder {
 
 			if ( $digit_count === 0 || $semi_at >= $end || ';' !== $text[ $semi_at ] ) {
 				// @todo This is an error. Treat as plaintext and move on.
-				++ $at;
+				++$at;
 				continue;
 			}
 
@@ -166,14 +163,14 @@ class XMLDecoder {
 				 * See https://www.w3.org/TR/xml/#charencoding
 				 */
 				// @todo This is an error. Treat as plaintext and continue, which is wrong.
-				++ $at;
+				++$at;
 				continue;
 			}
 
 			$decoded .= substr( $text, $was_at, $at - $was_at );
 			$decoded .= $character_reference;
-			$at      = $semi_at + 1;
-			$was_at  = $at;
+			$at       = $semi_at + 1;
+			$was_at   = $at;
 		}
 
 		if ( 0 === $was_at ) {
@@ -191,39 +188,39 @@ class XMLDecoder {
 	 * Finds and parses the next entity in a given text starting after the
 	 * given byte offset, and being entirely found within the given max length.
 	 *
-	 * @param  string  $text  Text in which to search for an XML entity.
-	 * @param  int  $starting_byte_offset  Start looking after this byte offset.
-	 * @param  int  $ending_byte_offset  Stop looking if entity is not fully contained before this byte offset.
-	 * @param  int|null  $entity_at  Optional. If provided, will be set to byte offset where entity was
+	 * @since {WP_VERSION}
+	 *
+	 * // @todo Implement this function.
+	 *
+	 * @param string   $text                 Text in which to search for an XML entity.
+	 * @param int      $starting_byte_offset Start looking after this byte offset.
+	 * @param int      $ending_byte_offset   Stop looking if entity is not fully contained before this byte offset.
+	 * @param int|null $entity_at            Optional. If provided, will be set to byte offset where entity was
 	 *                                       found, if found. Otherwise, will not be set.
 	 *
 	 * @return string|null Parsed entity, if parsed, otherwise `null`.
-	 * @todo Implement this function.
-	 *
-	 * @since {WP_VERSION}
-	 *
-	 * ///
-	public static function next_entity( string $text, int $starting_byte_offset, int $ending_byte_offset, ?int &$entity_at = null ): ?string {
-	$at  = $starting_byte_offset;
-	$end = $ending_byte_offset;
-
-	while ( $at < $end ) {
-	$remaining = $end - $at;
-	$amp_after = strcspn( $text, '&', $at, $remaining );
-
-	// There are no more possible entities.
-	if ( $amp_after === $remaining ) {
-	return null;
-	}
-
-	/*
-	 * @todo Move the decoding logic from `decode()` above into here,
-	 *       then call this function in a loop from `decode()`.
 	 */
+	public static function next_entity( string $text, int $starting_byte_offset, int $ending_byte_offset, ?int &$entity_at = null ): ?string {
+		$at  = $starting_byte_offset;
+		$end = $ending_byte_offset;
 
-++$at;
-}
+		while ( $at < $end ) {
+			$remaining = $end - $at;
+			$amp_after = strcspn( $text, '&', $at, $remaining );
 
-return null;
-}
+			// There are no more possible entities.
+			if ( $amp_after === $remaining ) {
+				return null;
+			}
+
+			/*
+			 * @todo Move the decoding logic from `decode()` above into here,
+			 *       then call this function in a loop from `decode()`.
+			 */
+
+			++$at;
+		}
+
+		return null;
+	}
 }

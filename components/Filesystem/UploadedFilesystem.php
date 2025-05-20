@@ -187,4 +187,8 @@ class UploadedFilesystem implements Filesystem {
 
 		return $current;
 	}
+
+	public function get_meta(): array {
+		return array();
+	}
 }
