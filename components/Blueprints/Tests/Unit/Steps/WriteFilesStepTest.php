@@ -3,6 +3,7 @@
 namespace WordPress\Blueprints\Tests\Unit\Steps;
 
 use WordPress\Blueprints\DataReference\DataReference;
+use WordPress\Blueprints\DataReference\ExecutionContextPath;
 use WordPress\Blueprints\DataReference\InlineFile;
 use WordPress\Blueprints\Progress\Tracker;
 use WordPress\Blueprints\Steps\WriteFilesStep;
@@ -41,7 +42,9 @@ class WriteFilesStepTest extends StepTestCase {
 
 		// Create and run the step with a data reference
 		$step = new WriteFilesStep( [
-			'test_output_from_ref.txt' => DataReference::create( './test_source.txt' ),
+			'test_output_from_ref.txt' => DataReference::create( './test_source.txt', [
+				ExecutionContextPath::class
+			] ),
 		] );
 
 		$tracker = new Tracker();

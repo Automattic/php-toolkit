@@ -3,6 +3,7 @@
 namespace WordPress\Blueprints\Tests\Unit\Steps;
 
 use WordPress\Blueprints\DataReference\DataReference;
+use WordPress\Blueprints\DataReference\ExecutionContextPath;
 use WordPress\Blueprints\Progress\Tracker;
 use WordPress\Blueprints\Steps\InstallPluginStep;
 
@@ -37,7 +38,9 @@ PHP;
 		);
 
 		$step = new InstallPluginStep(
-			DataReference::create( './test-plugin/test-plugin.php' ),
+			DataReference::create( './test-plugin/test-plugin.php', [
+				ExecutionContextPath::class
+			] ),
 			true
 		);
 
@@ -73,7 +76,9 @@ PHP
 		);
 
 		$step = new InstallPluginStep(
-			DataReference::create( './test-plugin/test-plugin.php' ),
+			DataReference::create( './test-plugin/test-plugin.php', [
+				ExecutionContextPath::class
+			] ),
 			false
 		);
 
@@ -125,7 +130,9 @@ PHP
 		}
 
 		$step = new InstallPluginStep(
-			DataReference::create( './zipped-test-plugin.zip' ),
+			DataReference::create( './zipped-test-plugin.zip', [
+				ExecutionContextPath::class
+			] ),
 			true
 		);
 
@@ -160,7 +167,9 @@ PHP
 		}
 
 		$step = new InstallPluginStep(
-			DataReference::create( './zipped-test-plugin.zip' ),
+			DataReference::create( './zipped-test-plugin.zip', [
+				ExecutionContextPath::class
+			] ),
 			true
 		);
 
@@ -196,7 +205,9 @@ PHP
 		);
 
 		$step = new InstallPluginStep(
-			DataReference::create( './plugin-directory' ),
+			DataReference::create( './plugin-directory', [
+				ExecutionContextPath::class
+			] ),
 			true
 		);
 

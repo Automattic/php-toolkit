@@ -12,6 +12,7 @@ use WordPress\Filesystem\Filesystem;
 use WordPress\Filesystem\LocalFilesystem;
 
 use function WordPress\Filesystem\wp_join_paths;
+use function WordPress\Filesystem\wp_sys_get_temp_dir;
 
 class StepTestCase extends TestCase {
 	/**
@@ -38,11 +39,11 @@ class StepTestCase extends TestCase {
 	 * @before
 	 */
 	public function setUp(): void {
-		$this->document_root          = wp_join_paths( sys_get_temp_dir(), 'test_' . uniqid() );
-		$this->execution_context_path = wp_join_paths( sys_get_temp_dir(), 'test_' . uniqid() );
+		$this->document_root          = wp_join_paths( wp_sys_get_temp_dir(), 'test_' . uniqid() );
+		$this->execution_context_path = wp_join_paths( wp_sys_get_temp_dir(), 'test_' . uniqid() );
 		$this->execution_context      = LocalFilesystem::create( $this->execution_context_path );
 
-		$base_site_root = wp_join_paths( sys_get_temp_dir(), 'blueprint_test_base_site' );
+		$base_site_root = wp_join_paths( wp_sys_get_temp_dir(), 'blueprint_test_base_site' );
 		if ( is_dir( $base_site_root ) && file_exists( $base_site_root . '/wp-load.php' ) ) {
 			LocalFilesystem::create()->copy( $base_site_root, $this->document_root, [ 'recursive' => true ] );
 			$config = ( new RunnerConfiguration() )

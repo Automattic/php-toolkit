@@ -15,6 +15,7 @@ use WordPress\HttpClient\ByteStream\SeekableRequestReadStream;
 use WordPress\HttpClient\Client;
 
 use function WordPress\Filesystem\wp_join_paths;
+use function WordPress\Filesystem\wp_sys_get_temp_dir;
 
 class DataReferenceResolver {
 	/**
@@ -48,7 +49,7 @@ class DataReferenceResolver {
 
 	public function __construct( Client $client, ?string $tmpRoot = null ) {
 		$this->client  = $client;
-		$this->tmpRoot = $tmpRoot ?: sys_get_temp_dir();
+		$this->tmpRoot = $tmpRoot ?: wp_sys_get_temp_dir();
 	}
 
 	public function setExecutionContext( Filesystem $executionContext ) {

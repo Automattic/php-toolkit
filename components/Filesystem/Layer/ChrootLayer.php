@@ -35,86 +35,86 @@ class ChrootLayer extends Layer {
 	 *
 	 * @return string The normalized path.
 	 */
-	public function normalize_path( $path ) {
+	public function chrooted_path( $path ) {
 		return wp_join_paths( $this->chroot, wp_canonicalize_path( $path ) );
 	}
 
 	public function exists( $path ) {
-		$path = $this->normalize_path( $path );
+		$path = $this->chrooted_path( $path );
 
 		return $this->fs->exists( $path );
 	}
 
 	public function is_file( $path ) {
-		$path = $this->normalize_path( $path );
+		$path = $this->chrooted_path( $path );
 
 		return $this->fs->is_file( $path );
 	}
 
 	public function is_dir( $path ) {
-		$path = $this->normalize_path( $path );
+		$path = $this->chrooted_path( $path );
 
 		return $this->fs->is_dir( $path );
 	}
 
 	public function mkdir( $path, $options = array() ) {
-		$path = $this->normalize_path( $path );
+		$path = $this->chrooted_path( $path );
 
 		return $this->fs->mkdir( $path, $options );
 	}
 
 	public function rm( $path, $options = array() ) {
-		$path = $this->normalize_path( $path );
+		$path = $this->chrooted_path( $path );
 
 		return $this->fs->rm( $path, $options );
 	}
 
 	public function rmdir( $path, $options = array() ) {
-		$path = $this->normalize_path( $path );
+		$path = $this->chrooted_path( $path );
 
 		return $this->fs->rmdir( $path, $options );
 	}
 
 	public function ls( $path = '/' ) {
-		$path = $this->normalize_path( $path );
+		$path = $this->chrooted_path( $path );
 
 		return $this->fs->ls( $path );
 	}
 
 	public function open_read_stream( $path ): ByteReadStream {
-		$path = $this->normalize_path( $path );
+		$path = $this->chrooted_path( $path );
 
 		return $this->fs->open_read_stream( $path );
 	}
 
 	public function open_write_stream( $path ): ByteWriteStream {
-		$path = $this->normalize_path( $path );
+		$path = $this->chrooted_path( $path );
 
 		return $this->fs->open_write_stream( $path );
 	}
 
 	public function copy( $source, $destination, $options = array() ) {
-		$source      = $this->normalize_path( $source );
-		$destination = $this->normalize_path( $destination );
+		$source      = $this->chrooted_path( $source );
+		$destination = $this->chrooted_path( $destination );
 
 		return $this->fs->copy( $source, $destination, $options );
 	}
 
 	public function rename( $source, $destination, $options = array() ) {
-		$source      = $this->normalize_path( $source );
-		$destination = $this->normalize_path( $destination );
+		$source      = $this->chrooted_path( $source );
+		$destination = $this->chrooted_path( $destination );
 
 		return $this->fs->rename( $source, $destination, $options );
 	}
 
 	public function get_contents( $path ) {
-		$path = $this->normalize_path( $path );
+		$path = $this->chrooted_path( $path );
 
 		return $this->fs->get_contents( $path );
 	}
 
 	public function put_contents( $path, $contents, $options = array() ) {
-		$path = $this->normalize_path( $path );
+		$path = $this->chrooted_path( $path );
 
 		return $this->fs->put_contents( $path, $contents, $options );
 	}

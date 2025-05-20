@@ -55,6 +55,7 @@ use WordPress\HttpClient\Client;
 use WordPress\Zip\ZipFilesystem;
 
 use function WordPress\Encoding\utf8_is_valid_byte_stream;
+use function WordPress\Filesystem\wp_sys_get_temp_dir;
 use function WordPress\Zip\is_zip_file_stream;
 
 class Runner {
@@ -192,7 +193,7 @@ class Runner {
 	}
 
 	public function run(): void {
-		$tempRoot = sys_get_temp_dir() . '/wp-blueprints-runtime-' . uniqid();
+		$tempRoot = wp_sys_get_temp_dir() . '/wp-blueprints-runtime-' . uniqid();
 		// TODO: Are there cases where we should not have these permissions?
 		mkdir( $tempRoot, 0777, true );
 

@@ -4,6 +4,7 @@ namespace WordPress\Blueprints\Tests\Unit\Steps;
 
 use Exception;
 use WordPress\Blueprints\DataReference\DataReference;
+use WordPress\Blueprints\DataReference\ExecutionContextPath;
 use WordPress\Blueprints\Progress\Tracker;
 use WordPress\Blueprints\Steps\UnzipStep;
 
@@ -30,7 +31,9 @@ class UnzipStepTest extends StepTestCase {
 
 	public function testUnzipFile() {
 		$step = new UnzipStep(
-			DataReference::create( './test_zip.zip' ),
+			DataReference::create( './test_zip.zip', [
+				ExecutionContextPath::class
+			] ),
 			'extract_dir'
 		);
 
@@ -53,7 +56,9 @@ class UnzipStepTest extends StepTestCase {
 		$fs->mkdir( 'existing_dir', [ 'recursive' => true ] );
 
 		$step = new UnzipStep(
-			DataReference::create( './test_zip.zip' ),
+			DataReference::create( './test_zip.zip', [
+				ExecutionContextPath::class
+			] ),
 			'existing_dir'
 		);
 
@@ -75,7 +80,9 @@ class UnzipStepTest extends StepTestCase {
 		}
 
 		$step = new UnzipStep(
-			DataReference::create( './nested_test.zip' ),
+			DataReference::create( './nested_test.zip', [
+				ExecutionContextPath::class
+			] ),
 			'nested_extract'
 		);
 

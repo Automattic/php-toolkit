@@ -240,7 +240,7 @@ function wp_canonicalize_path( $path ) {
 	}
 
 	// Reconstruct path
-	$result = '/' . implode( '/', $normalized );
+	$result = '/'.ltrim(implode( '/', $normalized ), '/');
 	if ( $result === '/.' ) {
 		$result = '/';
 	}
@@ -262,4 +262,15 @@ function wp_dirname( $path ) {
 	// we mess things up on Unix when a directory name
 	// legitimately contains a backslash?
 	return str_replace( '\\', '/', dirname( $path ) );
+}
+
+/**
+ * Like sys_get_temp_dir(), but uses forward slashes on Windows.
+ */
+function wp_sys_get_temp_dir() {
+	$path = sys_get_temp_dir();
+	if ( DIRECTORY_SEPARATOR === '/' ) {
+		$path = str_replace( '\\', '/', $path );
+	}
+	return $path;
 }

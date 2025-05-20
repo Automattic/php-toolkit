@@ -44,4 +44,9 @@ class FunctionsTest extends TestCase {
 		$this->assertEquals( '/foo/bar/baz', wp_join_paths( '/foo/', '/bar/', '/baz' ) );
 		$this->assertEquals( 'foo/bar/baz', wp_join_paths( 'foo/', '/bar/', '/baz' ) );
 	}
+
+	public function testJoinWindowsPaths() {
+		$this->assertEquals( 'C:/foo/bar', wp_join_paths( 'C:/foo', 'bar' ) );
+		$this->assertEquals( 'C:\foo/bar', wp_join_paths( 'C:\foo', 'bar' ) );
+	}
 }

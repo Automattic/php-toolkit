@@ -3,6 +3,7 @@
 namespace WordPress\Blueprints\Tests\Unit\Steps;
 
 use WordPress\Blueprints\DataReference\DataReference;
+use WordPress\Blueprints\DataReference\ExecutionContextPath;
 use WordPress\Blueprints\Progress\Tracker;
 use WordPress\Blueprints\Steps\InstallThemeStep;
 
@@ -55,7 +56,9 @@ PHP;
 		);
 
 		$step = new InstallThemeStep(
-			DataReference::create( './test-theme' ),
+			DataReference::create( './test-theme', [
+				ExecutionContextPath::class
+			] ),
 			true
 		);
 
@@ -93,7 +96,9 @@ PHP
 		);
 
 		$step = new InstallThemeStep(
-			DataReference::create( './test-theme' ),
+			DataReference::create( './test-theme', [
+				ExecutionContextPath::class
+			] ),
 			false
 		);
 
@@ -127,7 +132,9 @@ PHP
 		}
 
 		$step = new InstallThemeStep(
-			DataReference::create( './zipped-test-theme.zip' ),
+			DataReference::create( './zipped-test-theme.zip', [
+				ExecutionContextPath::class
+			] ),
 			true
 		);
 

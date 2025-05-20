@@ -3,6 +3,7 @@
 namespace WordPress\Blueprints\Tests\Unit\Steps;
 
 use WordPress\Blueprints\DataReference\DataReference;
+use WordPress\Blueprints\DataReference\ExecutionContextPath;
 use WordPress\Blueprints\Progress\Tracker;
 use WordPress\Blueprints\Steps\RunSqlStep;
 
@@ -14,7 +15,9 @@ class RunSQLStepTest extends StepTestCase {
 		$sql = "CREATE TABLE IF NOT EXISTS test_table (id INT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(100));";
 		$this->execution_context->put_contents( 'test.sql', $sql );
 
-		$step = new RunSqlStep( DataReference::create( './test.sql' ) );
+		$step = new RunSqlStep( DataReference::create( './test.sql', [
+			ExecutionContextPath::class
+		] ) );
 		$step->run( $this->runtime, new Tracker() );
 
 		$table_exists = $this->runtime->evalPhpCodeInSubProcess(
@@ -44,7 +47,9 @@ INSERT INTO test_table (name) VALUES ('Test 3');
 SQL;
 		$this->execution_context->put_contents( 'test.sql', $sql );
 
-		$step = new RunSqlStep( DataReference::create( './test.sql' ) );
+		$step = new RunSqlStep( DataReference::create( './test.sql', [
+			ExecutionContextPath::class
+		] ) );
 		$step->run( $this->runtime, new Tracker() );
 
 		$result = $this->runtime->evalPhpCodeInSubProcess(
@@ -79,7 +84,9 @@ UPDATE wp_options SET option_value = 'updated_via_sql' WHERE option_name = 'sql_
 SQL;
 		$this->execution_context->put_contents( 'test.sql', $sql );
 
-		$step = new RunSqlStep( DataReference::create( './test.sql' ) );
+		$step = new RunSqlStep( DataReference::create( './test.sql', [
+			ExecutionContextPath::class
+		] ) );
 		$step->run( $this->runtime, new Tracker() );
 
 		$option_value = $this->runtime->evalPhpCodeInSubProcess(
@@ -106,7 +113,9 @@ INSERT INTO test_table_2 (value) VALUES ('table_2_data');
 SQL;
 		$this->execution_context->put_contents( 'test.sql', $sql );
 
-		$step = new RunSqlStep( DataReference::create( './test.sql' ) );
+		$step = new RunSqlStep( DataReference::create( './test.sql', [
+			ExecutionContextPath::class
+		] ) );
 		$step->run( $this->runtime, new Tracker() );
 
 		$result = $this->runtime->evalPhpCodeInSubProcess(
@@ -138,7 +147,9 @@ PHP
 		$sql = "CREATE TABLE test_table (id INT PRIMARY KEY); INSERT INTO nonexistent_table VALUES (1);";
 		$this->execution_context->put_contents( 'test.sql', $sql );
 
-		$step = new RunSqlStep( DataReference::create( './test.sql' ) );
+		$step = new RunSqlStep( DataReference::create( './test.sql', [
+			ExecutionContextPath::class
+		] ) );
 		$step->run( $this->runtime, new Tracker() );
 
 		$table_exists = $this->runtime->evalPhpCodeInSubProcess(
