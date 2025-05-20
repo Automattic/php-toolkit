@@ -134,21 +134,6 @@ function wp_path_segments( $path ) {
 	return explode( '/', $without_slashes );
 }
 
-function wp_parent_paths( $path, $options = array() ) {
-	$include_self = $options['include_self'] ?? false;
-	$path         = '/' . trim( $path, '/' );
-	$segments     = wp_path_segments( $path );
-	$paths        = array( '/' );
-	yield '/';
-	for ( $i = 0; $i < count( $segments ) - 1; $i ++ ) {
-		$paths[] = $segments[ $i ];
-		yield wp_join_paths( ...$paths );
-	}
-	if ( $include_self ) {
-		yield $path;
-	}
-}
-
 /**
  * Joins multiple path segments together into a single path.
  *
@@ -203,6 +188,7 @@ function wp_join_paths( ...$path_segments ) {
  * @return string The resolved path.
  */
 function wp_resolve_path( ...$path_segments ) {
+
 	$last_absolute_segment = null;
 	for ( $i = count( $path_segments ) - 1; $i >= 0; $i -- ) {
 		if ( strncmp( $path_segments[ $i ], '/', strlen( '/' ) ) === 0 ) {
@@ -229,8 +215,8 @@ function wp_resolve_path( ...$path_segments ) {
  *
  * wp_canonicalize_path( 'foo/bar/../baz' ) => '/foo/baz'
  *
+ * @TODO: Make it windows-safe. Prepending the forward slash breaks paths such as C:/foo/bar.
  * @param  string  $path  The file path that needs cleaning up
- *
  * @return string The cleaned, absolute path
  */
 function wp_canonicalize_path( $path ) {
@@ -254,8 +240,12 @@ function wp_canonicalize_path( $path ) {
 	}
 
 	// Reconstruct path
-	$result = implode( '/', $normalized );
-	return $result === '.' ? '' : $result;
+	$result = '/' . implode( '/', $normalized );
+	if ( $result === '/.' ) {
+		$result = '/';
+	}
+
+	return $result === '' ? '/' : $result;
 }
 
 /**

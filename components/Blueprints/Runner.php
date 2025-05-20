@@ -279,6 +279,7 @@ class Runner {
 				FileReadStream::from_path( $reference->get_path() ),
 				$reference->get_filename()
 			);
+			$blueprintString                 = $resolved->getStream()->consume_all();
 			$this->blueprintExecutionContext = LocalFilesystem::create( dirname( $reference->get_path() ) );
 		} else {
 			$resolved = $this->assets->resolve( $reference );
