@@ -13,6 +13,7 @@ use WordPress\Filesystem\LocalFilesystem;
 
 use function WordPress\Filesystem\wp_join_paths;
 use function WordPress\Filesystem\wp_sys_get_temp_dir;
+use function WordPress\Filesystem\wp_unix_dirname;
 
 class StepTestCase extends TestCase {
 	/**
@@ -48,7 +49,7 @@ class StepTestCase extends TestCase {
 		if ( is_dir( $base_site_root ) && file_exists( $base_site_root . '/wp-load.php' ) ) {
 			LocalFilesystem::create( $tmp_dir )->copy(
 				'blueprint_test_base_site',
-				dirname( $this->document_root ),
+				wp_unix_dirname( $this->document_root ),
 				[ 'recursive' => true ]
 			);
 			$config = ( new RunnerConfiguration() )
