@@ -218,7 +218,7 @@ function wp_canonicalize_unix_path( $path ) {
  */
 function wp_sys_get_temp_dir() {
 	$path = sys_get_temp_dir();
-	if ( DIRECTORY_SEPARATOR === '/' ) {
+	if ( DIRECTORY_SEPARATOR === '\\' ) {
 		$path = str_replace( '\\', '/', $path );
 	}
 	return $path;
