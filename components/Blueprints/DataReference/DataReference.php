@@ -26,7 +26,6 @@ class DataReference {
 			GitPath::class,
 			InlineDirectory::class,
 			InlineFile::class,
-			ExecutionContextPath::class,
 		], $additional_reference_classes );
 		foreach ( $classes as $class ) {
 			if ( $class::is_valid( $reference ) ) {

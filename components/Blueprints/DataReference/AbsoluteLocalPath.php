@@ -7,7 +7,7 @@ use WordPress\Blueprints\Resources\DataReference\The;
 /**
  * Represents a path in the Blueprint Execution Context.
  */
-class ExecutionContextPath extends DataReference {
+class AbsoluteLocalPath extends DataReference {
 	/**
 	 * @var string The path.
 	 */
@@ -19,7 +19,7 @@ class ExecutionContextPath extends DataReference {
 	 * @param  string  $path  The path.
 	 */
 	public function __construct( string $path ) {
-		$this->path = $path;
+		$this->path = realpath($path);
 		parent::__construct();
 	}
 
@@ -37,24 +37,21 @@ class ExecutionContextPath extends DataReference {
 	}
 
 	/**
-	 * Checks if a string is a valid context-relative path.
-	 * A valid path must start with either '/' or './'.
-	 * At this stage, we're not yet concerned whether the file actually
-	 * exists. We're only validating that the path format is correct
-	 * according to the Blueprint specification.
+	 * Checks if a string is a valid absolute local path. Useful
+	 * for resolving a Blueprint reference to an actual file before
+	 * we know the execution context.
+	 * 
+	 * Windows paths can be really comples:
+	 * 
+	 *    https://www.fileside.app/blog/2023-03-17_windows-file-paths/
+	 * 
+	 * Instead of parsing them, we'll just ask the OS whether the path exists.
 	 *
 	 * @param $path The path to check.
-	 *
 	 * @return bool Whether the path is valid.
 	 */
 	public static function is_valid( $path ): bool {
-		if(!is_string($path)) {
-			return false;
-		}
-		if(strpos($path, './') === 0 || strpos($path, '/') === 0) {
-			return true;
-		}
-		return false;
+		return false !== realpath($path);
 	}
 
 	/**

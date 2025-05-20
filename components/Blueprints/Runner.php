@@ -5,6 +5,7 @@ namespace WordPress\Blueprints;
 use InvalidArgumentException;
 use PDO;
 use PDOException;
+use WordPress\Blueprints\DataReference\AbsoluteLocalPath;
 use WordPress\Blueprints\DataReference\DataReference;
 use WordPress\Blueprints\DataReference\DataReferenceResolver;
 use WordPress\Blueprints\DataReference\Directory;
@@ -269,13 +270,9 @@ class Runner {
 			return;
 		}
 
-		if ( $reference instanceof ExecutionContextPath ) {
-			$absolute_path = $reference->get_path();
-			if ( substr( $absolute_path, 0, 1 ) !== '/' ) {
-				throw new BlueprintExecutionException( 'Blueprint path must be absolute (given: ' . $absolute_path . ')' );
-			}
+		if ( $reference instanceof AbsoluteLocalPath ) {
 			$resolved = new File(
-				FileReadStream::from_path( $absolute_path ),
+				FileReadStream::from_path( $reference->get_path() ),
 				$reference->get_filename()
 			);
 		} else {

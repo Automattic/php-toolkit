@@ -33,6 +33,7 @@
 
 require __DIR__ . '/../../../vendor/autoload.php';
 
+use WordPress\Blueprints\DataReference\AbsoluteLocalPath;
 use WordPress\Blueprints\DataReference\DataReference;
 use WordPress\Blueprints\Exception\BlueprintExecutionException;
 use WordPress\Blueprints\Exception\PermissionsException;
@@ -283,10 +284,9 @@ function cliArgsToRunnerConfiguration( array $positionalArgs, array $options ): 
 	// The first positional is the blueprint reference
 	try {
 		$blueprint_reference = $positionalArgs[0];
-		if ( strncmp( $blueprint_reference, './', strlen( './' ) ) === 0 ) {
-			$blueprint_reference = realpath( $blueprint_reference );
-		}
-		$config->setBlueprint( DataReference::create( $blueprint_reference ) );
+		$config->setBlueprint( DataReference::create( $blueprint_reference, [
+			AbsoluteLocalPath::class,
+		] ) );
 	} catch ( InvalidArgumentException $e ) {
 		throw new InvalidArgumentException( "Invalid Blueprint reference: " . $positionalArgs[0] );
 	}

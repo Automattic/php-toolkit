@@ -188,6 +188,7 @@ function wp_join_paths( ...$path_segments ) {
  * @return string The resolved path.
  */
 function wp_resolve_path( ...$path_segments ) {
+
 	$last_absolute_segment = null;
 	for ( $i = count( $path_segments ) - 1; $i >= 0; $i -- ) {
 		if ( strncmp( $path_segments[ $i ], '/', strlen( '/' ) ) === 0 ) {

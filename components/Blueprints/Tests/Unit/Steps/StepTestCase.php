@@ -3,6 +3,7 @@
 namespace WordPress\Blueprints\Tests\Unit\Steps;
 
 use PHPUnit\Framework\TestCase;
+use WordPress\Blueprints\DataReference\AbsoluteLocalPath;
 use WordPress\Blueprints\DataReference\DataReference;
 use WordPress\Blueprints\Runner;
 use WordPress\Blueprints\RunnerConfiguration;
@@ -61,7 +62,7 @@ class StepTestCase extends TestCase {
 		);
 
 		$config
-			->setBlueprint( DataReference::create( $this->execution_context_path . DIRECTORY_SEPARATOR . 'blueprint.json' ) )
+			->setBlueprint( new AbsoluteLocalPath( wp_join_paths( $this->execution_context_path, 'blueprint.json' ) ) )
 			->setDatabaseEngine( 'sqlite' )
 			->setTargetSiteUrl( 'http://127.0.0.1:2456' );
 
