@@ -38,6 +38,7 @@ class StepTestCase extends TestCase {
 	 * @before
 	 */
 	public function setUp(): void {
+		var_dump("calling setUp()");
 		if (PHP_OS_FAMILY === 'Linux' && file_exists('/etc/os-release') && strpos(file_get_contents('/etc/os-release'), 'Ubuntu') !== false) {
 			$this->markTestSkipped('Step tests are skipped on Ubuntu. @TODO: Re-enable them. Somehow the WordPress.zip request always times out.');
 		}
@@ -90,6 +91,7 @@ class StepTestCase extends TestCase {
 	 * @after
 	 */
 	public function tearDown(): void {
+		var_dump("tearing down");
 		// Clean up temp directory
 		if ( is_dir( $this->document_root ) ) {
 			$this->removeDirectory( $this->document_root );
@@ -97,6 +99,7 @@ class StepTestCase extends TestCase {
 		if ( is_dir( $this->runtime->getTempRoot() ) ) {
 			$this->removeDirectory( $this->runtime->getTempRoot() );
 		}
+		var_dump("done tearing down");
 	}
 
 	private function removeDirectory( $dir ) {
