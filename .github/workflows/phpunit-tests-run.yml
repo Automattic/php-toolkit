@@ -35,13 +35,15 @@ jobs:
         uses: samypr100/setup-dev-drive@v3
         if: ${{ inputs.os == 'windows-latest' }}
 
-      - name: Set TEMP and TMP to Dev Drive
+      - name: Create DEV_DRIVE/tmp and set TEMP and TMP
         if: ${{ inputs.os == 'windows-latest' }}
         run: |
-          echo "Setting TEMP and TMP to ${{ env.DEV_DRIVE }}"
+          mkdir "${{ env.DEV_DRIVE }}\tmp"
+          echo "Setting TEMP and TMP to ${{ env.DEV_DRIVE }}\tmp"
         env:
-          TEMP: ${{ env.DEV_DRIVE }}
-          TMP: ${{ env.DEV_DRIVE }}
+          DEV_DRIVE: ${{ env.DEV_DRIVE }}
+          TEMP: ${{ env.DEV_DRIVE }}\tmp
+          TMP: ${{ env.DEV_DRIVE }}\tmp
 
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -53,7 +55,7 @@ jobs:
           tools: phpunit-polyfills
           extensions: zip, sqlite3, pdo, pdo_sqlite
           ini-values: |
-            ${{ inputs.os == 'windows-latest' && format('sys_temp_dir={0}', env.DEV_DRIVE) || '' }}
+            ${{ inputs.os == 'windows-latest' && format('sys_temp_dir={0}', env.DEV_DRIVE ~ '\tmp') || '' }}
 
       - name: Install Composer dependencies (using composer-ci-matrix-tests.json)
         run: |
