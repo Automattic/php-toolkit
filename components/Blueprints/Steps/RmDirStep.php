@@ -15,14 +15,20 @@ class RmDirStep implements StepInterface {
 	public $path;
 
 	/**
+	 * @var array
+	 */
+	public $options;
+
+	/**
 	 * @param  string  $path  The directory path to remove.
 	 */
-	public function __construct( string $path ) {
+	public function __construct( string $path, $options = [] ) {
 		$this->path = $path;
+		$this->options = $options;
 	}
 
 	public function run( Runtime $runtime, Tracker $tracker ) {
 		$tracker->setCaption( 'Removing directory ' . $this->path );
-		$runtime->getTargetFilesystem()->rmdir( $this->path, [ 'recursive' => true ] );
+		$runtime->getTargetFilesystem()->rmdir( $this->path, $this->options );
 	}
 }

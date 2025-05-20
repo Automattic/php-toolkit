@@ -151,7 +151,7 @@ class LocalFilesystem implements Filesystem {
 	}
 
 	protected function rmdir_single( $path, $options = array() ) {
-		if ( false === rmdir( $path ) ) {
+		if ( false === @rmdir( $path ) ) {
 			throw new FilesystemException(
 				sprintf( 'Failed to remove directory: %s', $path )
 			);
@@ -159,7 +159,7 @@ class LocalFilesystem implements Filesystem {
 	}
 
 	public function put_contents( $path, $data, $options = array() ) {
-		if ( false === file_put_contents(
+		if ( false === @file_put_contents(
 				$path,
 				$data
 			) ) {

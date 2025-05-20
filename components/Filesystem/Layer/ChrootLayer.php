@@ -5,6 +5,7 @@ namespace WordPress\Filesystem\Layer;
 use WordPress\ByteStream\ReadStream\ByteReadStream;
 use WordPress\ByteStream\WriteStream\ByteWriteStream;
 use WordPress\Filesystem\Filesystem;
+use WordPress\Filesystem\LocalFilesystem;
 
 use function WordPress\Filesystem\wp_canonicalize_unix_path;
 use function WordPress\Filesystem\wp_join_paths;
@@ -36,10 +37,14 @@ class ChrootLayer extends Layer {
 	 * @return string The normalized path.
 	 */
 	public function chrooted_path( $path ) {
-		if(DIRECTORY_SEPARATOR === '\\') {
+		// Abstraction leak! ChrootLayer is generic but it makes choices
+		// on behalf of LocalFilesystem.
+		// @TODO: Reorganize the code to avoid this. Otherwise, every layer
+		//        will need to implement this logic.
+		if(DIRECTORY_SEPARATOR === '\\' && $this->fs instanceof LocalFilesystem) {
 			$path = str_replace('\\', '/', $path);
 		}
-		return wp_join_paths( $this->chroot, wp_canonicalize_unix_path( $path ) );
+		return wp_join_paths( $this->chroot, wp_canonicalize_unix_path( $path, false ) );
 	}
 
 	public function exists( $path ) {

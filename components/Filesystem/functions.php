@@ -183,7 +183,7 @@ function wp_join_paths( ...$path_segments ) {
  * @param  string  $path  The file path that needs cleaning up
  * @return string The cleaned, absolute path
  */
-function wp_canonicalize_unix_path( $path ) {
+function wp_canonicalize_unix_path( $path, $prepend_slash = true ) {
 	// Convert to absolute path
 	if ( strncmp( $path, '/', strlen( '/' ) ) !== 0 ) {
 		$path = '/' . $path;
@@ -204,7 +204,10 @@ function wp_canonicalize_unix_path( $path ) {
 	}
 
 	// Reconstruct path
-	$result = '/'.ltrim(implode( '/', $normalized ), '/');
+	if ( $prepend_slash ) {
+		$result = '/'.ltrim(implode( '/', $normalized ), '/');
+	}
+	
 	if ( $result === '/.' ) {
 		$result = '/';
 	}
