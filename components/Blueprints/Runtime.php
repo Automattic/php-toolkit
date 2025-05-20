@@ -257,7 +257,7 @@ class Runtime {
 			if ( getenv('PHP_BINARY') ) {
 				$phpBinary = getenv('PHP_BINARY');
 			} elseif ( PHP_SAPI === 'cli' && isset($_SERVER['argv'][0]) ) {
-				$phpBinary = $_SERVER['argv'][0];
+				$phpBinary = PHP_BINARY;
 			} else {
 				$phpBinary = 'php';
 			}
