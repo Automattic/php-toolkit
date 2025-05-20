@@ -36,6 +36,9 @@ class ChrootLayer extends Layer {
 	 * @return string The normalized path.
 	 */
 	public function chrooted_path( $path ) {
+		if(DIRECTORY_SEPARATOR === '\\') {
+			$path = str_replace('\\', '/', $path);
+		}
 		return wp_join_paths( $this->chroot, wp_canonicalize_unix_path( $path ) );
 	}
 

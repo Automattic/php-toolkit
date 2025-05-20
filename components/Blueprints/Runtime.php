@@ -233,21 +233,11 @@ class Runtime {
 		$timeout = 60
 	) {
 		return $this->withTemporaryDirectory( function ( $tempDir ) use ( $script_path, $env, $input, $timeout ) {
-			$prepend_path = wp_join_paths( $tempDir, 'prepend.php' );
-			file_put_contents(
-				$prepend_path,
-				'<?php 
-				function append_output( $output ) {
-					file_put_contents( getenv("OUTPUT_FILE"), $output, FILE_APPEND );
-				}
-				$_SERVER["HTTP_HOST"] = "localhost";
-				?>'
-			);
-
 			// Still put the script in a temporary file as the path may be refering
 			// to a file inside the currently executed .phar archive.
 			$actual_script_path = wp_join_paths( $tempDir, 'script.php' );
-			$code = file_get_contents( $script_path );
+			$code = '<?php function append_output( $output ) { file_put_contents( getenv("OUTPUT_FILE"), $output, FILE_APPEND ); } $_SERVER["HTTP_HOST"] = "localhost"; ?>';
+			$code .= file_get_contents( $script_path );
 			file_put_contents( $actual_script_path, $code );
 
 			$output_path = wp_join_paths( $tempDir, 'output.txt' );
@@ -266,7 +256,6 @@ class Runtime {
 				$process = $this->runShellCommand(
 					array(
 						$phpBinary,
-						'-d auto_prepend_file=' . $prepend_path,
 						$actual_script_path,
 					),
 					$this->configuration->getTargetSiteRoot(),
