@@ -27,7 +27,8 @@ jobs:
   phpunit-tests:
     name: ${{ inputs.os }}
     runs-on: ${{ inputs.os }}
-    timeout-minutes: 20
+	# These tests can really drag on Windows CI runner!
+    timeout-minutes: 120
 
     steps:
       - name: Checkout repository
