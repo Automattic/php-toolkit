@@ -32,10 +32,17 @@ jobs:
 
     steps:
       - name: Setup RAM Disk
-        uses: samypr100/setup-dev-drive@v3
-        with:
-          drive-size: 15GB
         if: ${{ inputs.os == 'windows-latest' }}
+        run: |
+          $ramDiskSize = 5GB
+          $ramDiskLetter = 'R:'
+          $ramDiskLabel = 'RAMDISK'
+          $ramDisk = Mount-DiskImage -ImagePath (New-VHD -Path "$env:TEMP\ramdisk.vhdx" -SizeBytes $ramDiskSize -Dynamic).Path -PassThru
+          Initialize-Disk -Number $ramDisk.Number -PartitionStyle MBR -PassThru | New-Partition -AssignDriveLetter -UseMaximumSize | Format-Volume -FileSystem NTFS -NewFileSystemLabel $ramDiskLabel -Confirm:$false
+          $driveLetter = ($ramDisk | Get-Disk | Get-Partition | Get-Volume).DriveLetter + ':'
+          New-Item -ItemType Directory -Path "$driveLetter\tmp" | Out-Null
+          echo "DEV_DRIVE=$driveLetter" | Out-File -FilePath $env:GITHUB_ENV -Append
+        shell: pwsh
 
       - name: Create DEV_DRIVE/tmp and set TEMP and TMP
         if: ${{ inputs.os == 'windows-latest' }}
