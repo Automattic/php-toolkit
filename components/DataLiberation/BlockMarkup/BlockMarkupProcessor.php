@@ -476,6 +476,7 @@ class BlockMarkupProcessor extends WP_HTML_Tag_Processor {
 			JSON_HEX_TAG | // Convert < and > to \u003C and \u003E
 			JSON_HEX_AMP   // Convert & to \u0026
 		);
+		var_dump($encoded_attributes);
 		if ( $encoded_attributes === '[]' ) {
 			$encoded_attributes = '';
 		} else {
