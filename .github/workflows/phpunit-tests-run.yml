@@ -20,6 +20,8 @@ on:
 env:
   LOCAL_PHP: ${{ inputs.php }}-fpm
   PHPUNIT_CONFIG: ${{ inputs.phpunit-config }}
+  LC_ALL: en_US.UTF-8
+  LANG:   en_US.UTF-8
 
 jobs:
   phpunit-tests:
@@ -36,7 +38,7 @@ jobs:
         with:
           php-version: '${{ inputs.php }}'
           tools: phpunit-polyfills
-          extensions: zip, sqlite3
+          extensions: zip, sqlite3, pdo
 
       - name: Install Composer dependencies
         uses: ramsey/composer-install@v3
