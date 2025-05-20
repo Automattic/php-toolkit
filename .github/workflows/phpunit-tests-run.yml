@@ -33,6 +33,8 @@ jobs:
     steps:
       - name: Setup RAM Disk
         uses: samypr100/setup-dev-drive@v3
+        with:
+          drive-size: 15GB
         if: ${{ inputs.os == 'windows-latest' }}
 
       - name: Create DEV_DRIVE/tmp and set TEMP and TMP
