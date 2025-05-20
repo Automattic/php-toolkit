@@ -42,16 +42,16 @@ class StepTestCase extends TestCase {
 		$this->execution_context      = LocalFilesystem::create( $this->execution_context_path );
 
 		$base_site_root = wp_join_paths( sys_get_temp_dir(), 'blueprint_test_base_site' );
-		if ( is_dir( $base_site_root ) ) {
+		if ( is_dir( $base_site_root ) && file_exists( $base_site_root . '/wp-load.php' ) ) {
 			LocalFilesystem::create()->copy( $base_site_root, $this->document_root, [ 'recursive' => true ] );
 			$config = ( new RunnerConfiguration() )
 				->setExecutionMode( 'apply-to-existing-site' )
-				->setTargetSiteRoot( $this->document_root ) // Arbitrary URL for the new site
+				->setTargetSiteRoot( $this->document_root )
 			;
 		} else {
 			$config = ( new RunnerConfiguration() )
 				->setExecutionMode( 'create-new-site' )
-				->setTargetSiteRoot( $base_site_root ) // Arbitrary URL for the new site
+				->setTargetSiteRoot( $base_site_root )
 			;
 		}
 
