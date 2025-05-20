@@ -214,8 +214,8 @@ function wp_resolve_path( ...$path_segments ) {
  *
  * wp_canonicalize_path( 'foo/bar/../baz' ) => '/foo/baz'
  *
+ * @TODO: Make it windows-safe. Prepending the forward slash breaks paths such as C:/foo/bar.
  * @param  string  $path  The file path that needs cleaning up
- *
  * @return string The cleaned, absolute path
  */
 function wp_canonicalize_path( $path ) {

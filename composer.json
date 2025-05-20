@@ -41,6 +41,7 @@
             "components/Blueprints/vendor-patched/",
             "components/DataLiberation/vendor-patched/",
             "components/Markdown/vendor-patched",
+            "components/Merge/vendor-patched",
             "components/HTML/./"
         ],
         "files": [
