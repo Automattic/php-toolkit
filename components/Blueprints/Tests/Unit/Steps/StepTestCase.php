@@ -47,18 +47,14 @@ class StepTestCase extends TestCase {
 		$this->execution_context      = LocalFilesystem::create( $this->execution_context_path );
 
 		$base_site_root = wp_join_unix_paths( $tmp_dir, 'blueprint_test_base_site' );
-		var_dump([
-			'base_site_root' => $base_site_root,
-			'is_dir' => is_dir( $base_site_root ),
-			'file_exists' => file_exists( wp_join_unix_paths( $base_site_root, 'wp-load.php' ) ),
-			'glob' => glob( wp_join_unix_paths( $base_site_root, 'wp-load.php' ) ),
-		]);
 		if ( is_dir( $base_site_root ) && file_exists( wp_join_unix_paths( $base_site_root, 'wp-load.php' ) ) ) {
+			var_dump("Copying base site");
 			LocalFilesystem::create( $tmp_dir )->copy(
 				'blueprint_test_base_site',
 				basename( $this->document_root ),
 				[ 'recursive' => true ]
 			);
+			var_dump("done copying base site");
 			$config = ( new RunnerConfiguration() )
 				->setExecutionMode( 'apply-to-existing-site' )
 				->setTargetSiteRoot( $this->document_root )
@@ -81,7 +77,9 @@ class StepTestCase extends TestCase {
 			->setTargetSiteUrl( 'http://127.0.0.1:2456' );
 
 		$runner = new Runner( $config );
+		var_dump("running runner");
 		$runner->run();
+		var_dump("done running runner");
 		$this->runtime = $runner->runtime;
 		// Recreate the temp root directory – the runner cleans it up at the
 		// end of run().
