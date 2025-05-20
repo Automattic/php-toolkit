@@ -84,7 +84,7 @@ class UploadedFilesystem implements Filesystem {
 	}
 
 	public function ls( $parent = '/' ) {
-		$parent = wp_canonicalize_unix_path( $parent );
+		$parent = '/' . ltrim( wp_resolve_dots_in_unix_path( $parent ), '/' );
 		$node   = $this->find_node( $parent );
 		if ( ! $node || $node['type'] !== 'directory' ) {
 			return array();

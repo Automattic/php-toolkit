@@ -135,7 +135,7 @@ function pipe_stream( $from_stream, $to_stream, $chunk_size = 65536 ) {
 
 
 function wp_unix_path_segments( $path ) {
-	$canonicalized   = wp_canonicalize_unix_path( $path );
+	$canonicalized   = wp_resolve_dots_in_unix_path( $path );
 	$without_slashes = trim( $canonicalized, '/' );
 
 	return explode( '/', $without_slashes );
@@ -169,21 +169,20 @@ function wp_join_paths( ...$path_segments ) {
 }
 
 /**
- * Cleans up a file path.
+ * Cleans up a path segment.
  *
- * - Ensures it starts with a forward slash
  * - Removes the /./ segments
  * - Flattens the /../ segments
  *
  * Example:
  *
- * wp_canonicalize_unix_path( 'foo/bar/../baz' ) => '/foo/baz'
+ * wp_resolve_dots_in_unix_path( 'foo/bar/../baz' ) => '/foo/baz'
  *
  * @TODO: Make it windows-safe. Prepending the forward slash breaks paths such as C:/foo/bar.
  * @param  string  $path  The file path that needs cleaning up
  * @return string The cleaned, absolute path
  */
-function wp_canonicalize_unix_path( $path, $prepend_slash = true ) {
+function wp_resolve_dots_in_unix_path( $path ) {
 	// Convert to absolute path
 	if ( strncmp( $path, '/', strlen( '/' ) ) !== 0 ) {
 		$path = '/' . $path;
@@ -203,17 +202,11 @@ function wp_canonicalize_unix_path( $path, $prepend_slash = true ) {
 		$normalized[] = $part;
 	}
 
-	// Reconstruct path
 	$result = implode( '/', $normalized );
-	if ( $prepend_slash ) {
-		$result = '/'.ltrim($result, '/');
+	if($result === '.') {
+		$result = '';
 	}
-
-	if ( $result === '/.' ) {
-		$result = '/';
-	}
-
-	return $result === '' ? '/' : $result;
+	return $result;
 }
 
 

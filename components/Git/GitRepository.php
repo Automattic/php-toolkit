@@ -11,9 +11,9 @@ use WordPress\Merge\Diff\MyersDiffer;
 use WordPress\Merge\Merge\ChunkMerger;
 use WordPress\Merge\MergeStrategy;
 
-use function WordPress\Filesystem\wp_canonicalize_unix_path;
 use function WordPress\Filesystem\wp_unix_dirname;
 use function WordPress\Filesystem\wp_join_paths;
+use function WordPress\Filesystem\wp_resolve_dots_in_unix_path;
 
 class GitRepository {
 
@@ -1035,7 +1035,7 @@ class GitRepository {
 		 */
 		$stack = array( 'refs/heads/' );
 		foreach ( $prefixes as $prefix ) {
-			$path       = ltrim( wp_canonicalize_unix_path( $prefix ), '/' );
+			$path       = ltrim( wp_resolve_dots_in_unix_path( $prefix ), '/' );
 			$first_path = $this->fs->is_dir( $path ) ? $path : wp_unix_dirname( $path );
 			if ( strncmp( $first_path, 'refs/', strlen( 'refs/' ) ) === 0 ) {
 				$stack[] = $first_path;

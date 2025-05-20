@@ -7,8 +7,8 @@ use WordPress\ByteStream\WriteStream\ByteWriteStream;
 use WordPress\Filesystem\Filesystem;
 use WordPress\Filesystem\LocalFilesystem;
 
-use function WordPress\Filesystem\wp_canonicalize_unix_path;
 use function WordPress\Filesystem\wp_join_paths;
+use function WordPress\Filesystem\wp_resolve_dots_in_unix_path;
 
 /**
  * A filesystem wrapper that chroot's the filesystem to a specific path.
@@ -25,7 +25,7 @@ class ChrootLayer extends Layer {
 	 * @param  string  $root  The root path to chroot to.
 	 */
 	function __construct( Filesystem $fs, $chroot ) {
-		$this->chroot = rtrim( $chroot, '/' );
+		$this->chroot = rtrim( $chroot, '/' ) . '/';
 		parent::__construct( $fs );
 	}
 
@@ -44,7 +44,10 @@ class ChrootLayer extends Layer {
 		if(DIRECTORY_SEPARATOR === '\\' && $this->fs instanceof LocalFilesystem) {
 			$path = str_replace('\\', '/', $path);
 		}
-		return wp_join_paths( $this->chroot, wp_canonicalize_unix_path( $path ) );
+		return wp_join_paths( 
+			$this->chroot,
+			wp_resolve_dots_in_unix_path( $path )
+		);
 	}
 
 	public function exists( $path ) {
