@@ -61,7 +61,7 @@ class StepTestCase extends TestCase {
 		);
 
 		$config
-			->setBlueprint( DataReference::create( wp_join_paths($this->execution_context_path, 'blueprint.json' ) ) )
+			->setBlueprint( DataReference::create( $this->execution_context_path . DIRECTORY_SEPARATOR . 'blueprint.json' ) )
 			->setDatabaseEngine( 'sqlite' )
 			->setTargetSiteUrl( 'http://127.0.0.1:2456' );
 

@@ -253,7 +253,7 @@ class Runtime {
 			$output_path = wp_join_paths( $tempDir, 'output.txt' );
 			touch( $output_path );
 
-			try {
+			// try {
 				$process = $this->runShellCommand(
 					array(
 						'php',
@@ -271,12 +271,12 @@ class Runtime {
 					$input,
 					$timeout
 				);
-			} catch ( \Exception $e ) {
-				throw new RuntimeException( sprintf(
-					'PHP script	"%s" failed.',
-					$script_path
-				), 0, $e );
-			}
+			// } catch ( \Exception $e ) {
+			// 	throw new RuntimeException( sprintf(
+			// 		'PHP script	"%s" failed.',
+			// 		$script_path
+			// 	), 0, $e );
+			// }
 
 			return new EvalResult(
 				file_get_contents( $output_path ),
