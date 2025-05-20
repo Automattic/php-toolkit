@@ -109,6 +109,7 @@ class LocalFilesystem implements Filesystem {
 	}
 
 	protected function mkdir_single( $path, $options = array() ) {
+		$path = $this->resolve_path( $path );
 		if ( $this->exists( $path ) ) {
 			throw new FilesystemException(
 				sprintf( 'Path already exists: %s', $path )
@@ -161,5 +162,20 @@ class LocalFilesystem implements Filesystem {
 
 	public function open_read_stream( $path ): ByteReadStream {
 		return FileReadStream::from_path( $path );
+	}
+
+	/**
+	 * Turns a linux path into an OS-specific path.
+	 *
+	 * This is necessary because Filesystem-related classes use
+	 * forward slashes to separate paths. They must. LocalFilesystem
+	 * is just one of the available Filesystem implementations.
+	 *
+	 * Therefore, the problem of converting forward slashes to
+	 * OS-specific path separators is specific to the LocalFilesystem
+	 * class
+	 */
+	private function resolve_path( $path ) {
+		return str_replace( '/', DIRECTORY_SEPARATOR, $path );
 	}
 }
