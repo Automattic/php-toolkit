@@ -99,6 +99,7 @@ class NewSiteResolver {
 		//    a WordPress site installed..
 		$installCheck = $runtime->evalPhpCodeInSubProcess(
 			<<<'PHP'
+<?php
 $wp_load = getenv('DOCROOT') . '/wp-load.php';
 if (!file_exists($wp_load)) {
 append_output('0');
