@@ -43,7 +43,7 @@ class RequestReadStream extends BaseByteReadStream {
 		if ( is_string( $request ) ) {
 			$request = new Request( $request );
 		}
-		$this->client  = $options['client'];
+		$this->client  = $options['client'] ?? new Client();
 		$this->request = $request;
 		if ( isset( $options['buffer_size'] ) ) {
 			$this->buffer_size = $options['buffer_size'];
