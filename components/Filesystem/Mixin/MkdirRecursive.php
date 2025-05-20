@@ -13,6 +13,11 @@ use function WordPress\Filesystem\wp_parent_paths;
 trait MkdirRecursive {
 
 	public function mkdir( $path, $options = array() ) {
+		// Windows paths compatibility for LocalFilesystem:
+		if(method_exists($this, 'resolve_path')) {
+			$path = $this->resolve_path( $path );
+		}
+
 		$recursive = $options['recursive'] ?? false;
 		if ( ! $recursive ) {
 			$this->mkdir_single( $path, $options );
@@ -33,6 +38,12 @@ trait MkdirRecursive {
 		 */
 		$root = rtrim( $this->get_root(), '/' ) . '/';
 		$path = rtrim( $path, '/' ) . '/';
+
+		// Windows paths compatibility for LocalFilesystem:
+		if(method_exists($this, 'resolve_path')) {
+			$root = $this->resolve_path( $root );
+			$path = $this->resolve_path( $path );
+		}
 		if ( strncmp( $path, $root, strlen( $root ) ) !== 0 ) {
 			throw new FilesystemException( sprintf( 'Path %s is not within the root %s', $path, $root ) );
 		}

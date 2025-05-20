@@ -109,19 +109,19 @@ class LocalFilesystem implements Filesystem {
 	}
 
 	protected function mkdir_single( $path, $options = array() ) {
-		$path = $this->resolve_path( $path );
+		$resolved_path = $this->resolve_path( $path );
 		if ( $this->exists( $path ) ) {
 			throw new FilesystemException(
 				sprintf( 'Path already exists: %s', $path )
 			);
 		}
-		if ( false === mkdir( $path ) ) {
+		if ( false === @mkdir( $resolved_path ) ) {
 			throw new FilesystemException(
-				sprintf( 'Failed to create directory: %s', $path )
+				sprintf( 'Failed to create directory: %s (%s)', $resolved_path, $path )
 			);
 		}
 		if ( isset( $options['chmod'] ) ) {
-			if ( false === chmod( $path, $options['chmod'] ) ) {
+			if ( false === @chmod( $path, $options['chmod'] ) ) {
 				throw new FilesystemException(
 					sprintf( 'Failed to chmod directory: %s', $path )
 				);
