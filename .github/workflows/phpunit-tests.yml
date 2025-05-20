@@ -22,7 +22,7 @@ jobs:
     with:
       os: ${{ matrix.os }}
       php: ${{ matrix.php }}
-      phpunit-config: ${{ 'phpunit.xml.dist' }}
+      phpunit-config: ${{ 'phpunit.xml' }}
 
 #   test_wasm:
 #     name: PHP.wasm 8.2

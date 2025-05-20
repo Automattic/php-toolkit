@@ -38,7 +38,28 @@ class StepTestCase extends TestCase {
 	 * @before
 	 */
 	public function setUp(): void {
-		var_dump("calling setUp()");
+		static $startTime = null;
+		static $lastTime = null;
+
+		// Helper to print elapsed time
+		$printElapsed = function($label) use (&$startTime, &$lastTime) {
+			$now = microtime(true);
+			if ($startTime === null) {
+				$startTime = $now;
+				$lastTime = $now;
+			}
+			$total = $now - $startTime;
+			$sinceLast = $now - $lastTime;
+			$lastTime = $now;
+			var_dump(sprintf(
+				"%s | +%.3fs since last, +%.3fs total",
+				$label,
+				$sinceLast,
+				$total
+			));
+		};
+
+		$printElapsed("calling setUp()");
 		if (PHP_OS_FAMILY === 'Linux' && file_exists('/etc/os-release') && strpos(file_get_contents('/etc/os-release'), 'Ubuntu') !== false) {
 			$this->markTestSkipped('Step tests are skipped on Ubuntu. @TODO: Re-enable them. Somehow the WordPress.zip request always times out.');
 		}
@@ -49,13 +70,13 @@ class StepTestCase extends TestCase {
 
 		$base_site_root = wp_join_unix_paths( $tmp_dir, 'blueprint_test_base_site' );
 		if ( is_dir( $base_site_root ) && file_exists( wp_join_unix_paths( $base_site_root, 'wp-load.php' ) ) ) {
-			var_dump("Copying base site");
+			$printElapsed("Copying base site");
 			LocalFilesystem::create( $tmp_dir )->copy(
 				'blueprint_test_base_site',
 				basename( $this->document_root ),
 				[ 'recursive' => true ]
 			);
-			var_dump("done copying base site");
+			$printElapsed("done copying base site");
 			$config = ( new RunnerConfiguration() )
 				->setExecutionMode( 'apply-to-existing-site' )
 				->setTargetSiteRoot( $this->document_root )
@@ -78,9 +99,9 @@ class StepTestCase extends TestCase {
 			->setTargetSiteUrl( 'http://127.0.0.1:2456' );
 
 		$runner = new Runner( $config );
-		var_dump("running runner");
+		$printElapsed("running runner");
 		$runner->run();
-		var_dump("done running runner");
+		$printElapsed("done running runner");
 		$this->runtime = $runner->runtime;
 		// Recreate the temp root directory – the runner cleans it up at the
 		// end of run().
@@ -91,7 +112,28 @@ class StepTestCase extends TestCase {
 	 * @after
 	 */
 	public function tearDown(): void {
-		var_dump("tearing down");
+		static $startTime = null;
+		static $lastTime = null;
+
+		// Helper to print elapsed time
+		$printElapsed = function($label) use (&$startTime, &$lastTime) {
+			$now = microtime(true);
+			if ($startTime === null) {
+				$startTime = $now;
+				$lastTime = $now;
+			}
+			$total = $now - $startTime;
+			$sinceLast = $now - $lastTime;
+			$lastTime = $now;
+			var_dump(sprintf(
+				"%s | +%.3fs since last, +%.3fs total",
+				$label,
+				$sinceLast,
+				$total
+			));
+		};
+
+		$printElapsed("tearing down");
 		// Clean up temp directory
 		if ( is_dir( $this->document_root ) ) {
 			$this->removeDirectory( $this->document_root );
@@ -99,7 +141,7 @@ class StepTestCase extends TestCase {
 		if ( is_dir( $this->runtime->getTempRoot() ) ) {
 			$this->removeDirectory( $this->runtime->getTempRoot() );
 		}
-		var_dump("done tearing down");
+		$printElapsed("done tearing down");
 	}
 
 	private function removeDirectory( $dir ) {
