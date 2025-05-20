@@ -253,10 +253,19 @@ class Runtime {
 			$output_path = wp_join_paths( $tempDir, 'output.txt' );
 			touch( $output_path );
 
+			$phpBinary = null;
+			if ( getenv('PHP_BINARY') ) {
+				$phpBinary = getenv('PHP_BINARY');
+			} elseif ( PHP_SAPI === 'cli' && isset($_SERVER['argv'][0]) ) {
+				$phpBinary = $_SERVER['argv'][0];
+			} else {
+				$phpBinary = 'php';
+			}
+
 			// try {
 				$process = $this->runShellCommand(
 					array(
-						'php',
+						$phpBinary,
 						'-d auto_prepend_file=' . $prepend_path,
 						$actual_script_path,
 					),
