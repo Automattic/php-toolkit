@@ -41,10 +41,6 @@ use WordPress\Blueprints\Logger\CLILogger;
 use WordPress\Blueprints\ProgressObserver;
 use WordPress\Blueprints\Runner;
 use WordPress\Blueprints\RunnerConfiguration;
-use WordPress\Filesystem\LocalFilesystem;
-
-use function WordPress\Filesystem\wp_canonicalize_path;
-use function WordPress\Filesystem\wp_resolve_path;
 
 // Enable colours on Windows 10+ (safe‑no‑op elsewhere)
 if ( PHP_OS_FAMILY === 'Windows' && function_exists( 'sapi_windows_vt100_support' ) ) {
@@ -304,18 +300,17 @@ function cliArgsToRunnerConfiguration( array $positionalArgs, array $options ): 
 	}
 
 	$targetSiteRoot         = $options['site-path'];
-	$absoluteTargetSiteRoot = wp_canonicalize_path( wp_resolve_path( $targetSiteRoot ) );
-
 	if ( $options['truncate-new-site-directory'] ) {
 		if ( $options['mode'] !== 'create-new-site' ) {
 			throw new InvalidArgumentException( "--truncate-new-site-directory can only be used with --mode=create-new-site" );
 		}
-		$fs = LocalFilesystem::create( $absoluteTargetSiteRoot );
-		$fs->rmdir( '/', [ 'recursive' => true ] );
-		$fs->mkdir( '/', [ 'chmod' => 0755 ] );
+		if ( ! is_dir( $targetSiteRoot ) ) {
+			mkdir( $targetSiteRoot, 0755, true );
+		}
 	}
 
-	if ( ! is_dir( $absoluteTargetSiteRoot ) ) {
+	$absoluteTargetSiteRoot = realpath( $targetSiteRoot );
+	if ( false === $absoluteTargetSiteRoot || ! is_dir( $absoluteTargetSiteRoot ) ) {
 		throw new InvalidArgumentException( "The --site-path path does not exist: {$targetSiteRoot}" );
 	}
 	$config->setTargetSiteRoot( $absoluteTargetSiteRoot );

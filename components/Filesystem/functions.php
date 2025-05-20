@@ -2,6 +2,8 @@
 
 namespace WordPress\Filesystem;
 
+use ValueError;
+
 function ls_recursive( Filesystem $filesystem, $path = '/' ) {
 	$tree = array();
 	foreach ( $filesystem->ls( $path ) as $item ) {
@@ -34,7 +36,12 @@ function copy_between_filesystems( array $args ) {
 	$recursive        = $args['recursive'] ?? true;
 
 	if ( $source->is_file( $source_path ) ) {
-		$destination_dir = wp_dirname( $destination_path );
+		// @TODO: unix path requirement is a gotcha. We might get
+		//        a windows path here if the developer is not careful.
+		//        Either document it or support windows paths.
+		//        The latter isn't trivial as the behavior depends
+		//        on a cartesian product of IsWindows() x IsLocalFilesystem()
+		$destination_dir = wp_unix_dirname( $destination_path );
 		if ( ! $destination->is_dir( $destination_dir ) ) {
 			$destination->mkdir(
 				$destination_dir,
@@ -127,8 +134,8 @@ function pipe_stream( $from_stream, $to_stream, $chunk_size = 65536 ) {
 }
 
 
-function wp_path_segments( $path ) {
-	$canonicalized   = wp_canonicalize_path( $path );
+function wp_unix_path_segments( $path ) {
+	$canonicalized   = wp_canonicalize_unix_path( $path );
 	$without_slashes = trim( $canonicalized, '/' );
 
 	return explode( '/', $without_slashes );
@@ -162,49 +169,6 @@ function wp_join_paths( ...$path_segments ) {
 }
 
 /**
- * Resolves a sequence of paths or path segments into an absolute path.
- *
- * The given sequence of paths is processed from right to left, with each
- * subsequent path prepended until an absolute path is constructed. For instance
- * given the sequence of path segments: /foo, /bar, baz, calling
- * wp_resolve_path('/foo', '/bar', 'baz') would return /bar/baz because 'baz'
- * is not an absolute path but '/bar' + '/' + 'baz' is.
- *
- * If, after processing all given path segments, an absolute path has not yet been
- * generated, the current working directory is used.
- *
- * The resulting path is normalized and trailing slashes are removed unless the path is
- * resolved to the root directory.
- *
- * Zero-length path segments are ignored.
- *
- * If no path segments are passed, wp_resolve_path() will return the absolute path of the
- * current working directory.
- *
- * This docstring is sourced from Node.js path.resolve()
- *
- * @param  string[]  $path_segments  The path segments to resolve.
- *
- * @return string The resolved path.
- */
-function wp_resolve_path( ...$path_segments ) {
-
-	$last_absolute_segment = null;
-	for ( $i = count( $path_segments ) - 1; $i >= 0; $i -- ) {
-		if ( strncmp( $path_segments[ $i ], '/', strlen( '/' ) ) === 0 ) {
-			$last_absolute_segment = $i;
-			break;
-		}
-	}
-	if ( null === $last_absolute_segment ) {
-		$last_absolute_segment = 0;
-		$path_segments         = array_merge( array( getcwd() ), $path_segments );
-	}
-
-	return wp_join_paths( ...array_slice( $path_segments, $last_absolute_segment ) );
-}
-
-/**
  * Cleans up a file path.
  *
  * - Ensures it starts with a forward slash
@@ -213,13 +177,13 @@ function wp_resolve_path( ...$path_segments ) {
  *
  * Example:
  *
- * wp_canonicalize_path( 'foo/bar/../baz' ) => '/foo/baz'
+ * wp_canonicalize_unix_path( 'foo/bar/../baz' ) => '/foo/baz'
  *
  * @TODO: Make it windows-safe. Prepending the forward slash breaks paths such as C:/foo/bar.
  * @param  string  $path  The file path that needs cleaning up
  * @return string The cleaned, absolute path
  */
-function wp_canonicalize_path( $path ) {
+function wp_canonicalize_unix_path( $path ) {
 	// Convert to absolute path
 	if ( strncmp( $path, '/', strlen( '/' ) ) !== 0 ) {
 		$path = '/' . $path;
@@ -248,21 +212,6 @@ function wp_canonicalize_path( $path ) {
 	return $result === '' ? '/' : $result;
 }
 
-/**
- * Returns the directory name of a path. Like dirname(), but
- * consistent between different operating systems. wp_dirname("/foo")
- * will return "/" whereas dirname("/foo") would return "\\".
- *
- * @param  string  $path  The path to get the directory name of.
- *
- * @return string The directory name of the path.
- */
-function wp_dirname( $path ) {
-	// @TODO: Scrutinize this naive implementation. Could
-	// we mess things up on Unix when a directory name
-	// legitimately contains a backslash?
-	return str_replace( '\\', '/', dirname( $path ) );
-}
 
 /**
  * Like sys_get_temp_dir(), but uses forward slashes on Windows.
@@ -273,4 +222,51 @@ function wp_sys_get_temp_dir() {
 		$path = str_replace( '\\', '/', $path );
 	}
 	return $path;
+}
+
+/**
+ * wp_unix_dirname()
+ * A strict-Unix clone of PHP's dirname().
+ *
+ * @param string $path   Path to inspect (assumed Unix).
+ * @param int    $levels How many levels to climb (≥ 1).
+ * @return string
+ * @throws ValueError on $levels < 1 (keeps parity with PHP 8.x).
+ */
+function wp_unix_dirname(string $path, int $levels = 1): string
+{
+    if ($levels < 1) {
+        throw new ValueError('unix_dirname(): $levels must be >= 1');
+    }
+
+    // treat empty string the same way PHP does
+    if ($path === '') {
+        $path = '.';
+    }
+
+    // if the path is nothing but slashes, the result is always "/"
+    if (strspn($path, '/') === strlen($path)) {
+        return $levels === 1 ? '/' : wp_unix_dirname('/', $levels - 1);
+    }
+
+    // strip trailing slashes (but never the single root slash)
+    $path = rtrim($path, '/');
+    if ($path === '') {        // happens when the original was just "/"
+        return $levels === 1 ? '/' : wp_unix_dirname('/', $levels - 1);
+    }
+
+    // locate the last slash
+    $slash = strrpos($path, '/');
+    if ($slash === false) {    // no slash → current dir
+        $path = '.';
+    } else {
+        $path = substr($path, 0, $slash);  // cut off the basename
+        $path = rtrim($path, '/');         // collapse duplicate slashes
+        if ($path === '') {
+            $path = '/';                   // “/foo” → “/”
+        }
+    }
+
+    // recurse for additional levels
+    return $levels > 1 ? wp_unix_dirname($path, $levels - 1) : $path;
 }

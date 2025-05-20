@@ -6,7 +6,7 @@ use WordPress\ByteStream\ReadStream\ByteReadStream;
 use WordPress\ByteStream\WriteStream\ByteWriteStream;
 use WordPress\Filesystem\Filesystem;
 
-use function WordPress\Filesystem\wp_canonicalize_path;
+use function WordPress\Filesystem\wp_canonicalize_unix_path;
 use function WordPress\Filesystem\wp_join_paths;
 
 /**
@@ -36,7 +36,7 @@ class ChrootLayer extends Layer {
 	 * @return string The normalized path.
 	 */
 	public function chrooted_path( $path ) {
-		return wp_join_paths( $this->chroot, wp_canonicalize_path( $path ) );
+		return wp_join_paths( $this->chroot, wp_canonicalize_unix_path( $path ) );
 	}
 
 	public function exists( $path ) {

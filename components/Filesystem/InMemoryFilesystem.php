@@ -78,7 +78,7 @@ class InMemoryFilesystem implements Filesystem, InternalizedWriteStream {
 			);
 		}
 
-		$parent = wp_dirname( $new_path );
+		$parent = wp_unix_dirname( $new_path );
 		if ( ! $this->is_dir( $parent ) ) {
 			throw new FilesystemException(
 				sprintf( 'Parent directory not found: %s', $parent )
@@ -98,7 +98,7 @@ class InMemoryFilesystem implements Filesystem, InternalizedWriteStream {
 			);
 		}
 
-		$parent = wp_dirname( $path );
+		$parent = wp_unix_dirname( $path );
 		if ( ! $this->is_dir( $parent ) ) {
 			throw new FilesystemException(
 				sprintf( 'Parent directory not found: %s', $parent )
@@ -121,7 +121,7 @@ class InMemoryFilesystem implements Filesystem, InternalizedWriteStream {
 			);
 		}
 
-		$parent = wp_dirname( $path );
+		$parent = wp_unix_dirname( $path );
 		unset( $this->files[ $parent ]['contents'][ basename( $path ) ] );
 		unset( $this->files[ $path ] );
 
@@ -147,7 +147,7 @@ class InMemoryFilesystem implements Filesystem, InternalizedWriteStream {
 			}
 		}
 
-		$parent = wp_dirname( $path );
+		$parent = wp_unix_dirname( $path );
 		unset( $this->files[ $parent ]['contents'][ basename( $path ) ] );
 		unset( $this->files[ $path ] );
 
@@ -155,7 +155,7 @@ class InMemoryFilesystem implements Filesystem, InternalizedWriteStream {
 	}
 
 	public function put_contents( $path, $data, $options = array() ) {
-		$parent = wp_dirname( $path );
+		$parent = wp_unix_dirname( $path );
 		if ( ! $this->is_dir( $parent ) ) {
 			throw new FilesystemException(
 				sprintf( 'Parent directory not found: %s', $parent )

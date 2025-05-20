@@ -11,8 +11,8 @@ use WordPress\Merge\Diff\MyersDiffer;
 use WordPress\Merge\Merge\ChunkMerger;
 use WordPress\Merge\MergeStrategy;
 
-use function WordPress\Filesystem\wp_canonicalize_path;
-use function WordPress\Filesystem\wp_dirname;
+use function WordPress\Filesystem\wp_canonicalize_unix_path;
+use function WordPress\Filesystem\wp_unix_dirname;
 use function WordPress\Filesystem\wp_join_paths;
 
 class GitRepository {
@@ -369,7 +369,7 @@ class GitRepository {
 		}
 
 		// Make sure all the directories leading up to the ref exist
-		$parent_path = wp_dirname( $branch_name );
+		$parent_path = wp_unix_dirname( $branch_name );
 		if ( ! $this->fs->exists( $parent_path ) ) {
 			$this->fs->mkdir( $parent_path, array( 'recursive' => true ) );
 		}
@@ -652,12 +652,12 @@ class GitRepository {
 		foreach ( $updates as $path => $content ) {
 			$path     = '/' . ltrim( $path, '/' );
 			$blob_oid = $this->add_object( 'blob', $content );
-			$this->mark_tree_path_changed( $changed_trees, wp_dirname( $path ) );
+			$this->mark_tree_path_changed( $changed_trees, wp_unix_dirname( $path ) );
 			$basename = basename( $path );
 			if ( $basename === '' ) {
 				throw new GitException( 'Cannot commit a file with an empty filename' );
 			}
-			$changed_trees[ wp_dirname( $path ) ]->entries[ basename( $path ) ] = new TreeEntry(
+			$changed_trees[ wp_unix_dirname( $path ) ]->entries[ basename( $path ) ] = new TreeEntry(
 				array(
 					'name' => $basename,
 					'mode' => TreeEntry::FILE_MODE_REGULAR_NON_EXECUTABLE,
@@ -669,13 +669,13 @@ class GitRepository {
 		// Process deletes
 		foreach ( $deletes as $path ) {
 			$path = '/' . ltrim( $path, '/' );
-			if ( ! $this->read_object_by_path( wp_dirname( $path ) ) ) {
+			if ( ! $this->read_object_by_path( wp_unix_dirname( $path ) ) ) {
 				_doing_it_wrong( __METHOD__, 'File not found in HEAD: ' . $path, '1.0.0' );
 
 				return false;
 			}
-			$this->mark_tree_path_changed( $changed_trees, wp_dirname( $path ) );
-			$changed_trees[ wp_dirname( $path ) ]->entries[ basename( $path ) ] = self::DELETE_PLACEHOLDER;
+			$this->mark_tree_path_changed( $changed_trees, wp_unix_dirname( $path ) );
+			$changed_trees[ wp_unix_dirname( $path ) ]->entries[ basename( $path ) ] = self::DELETE_PLACEHOLDER;
 		}
 
 		// Process tree moves
@@ -687,15 +687,15 @@ class GitRepository {
 
 				return false;
 			}
-			$this->mark_tree_path_changed( $changed_trees, wp_dirname( $old_path ) );
-			$this->mark_tree_path_changed( $changed_trees, wp_dirname( $new_path ) );
+			$this->mark_tree_path_changed( $changed_trees, wp_unix_dirname( $old_path ) );
+			$this->mark_tree_path_changed( $changed_trees, wp_unix_dirname( $new_path ) );
 
-			$changed_trees[ wp_dirname( $old_path ) ]->entries[ basename( $old_path ) ] = self::DELETE_PLACEHOLDER;
+			$changed_trees[ wp_unix_dirname( $old_path ) ]->entries[ basename( $old_path ) ] = self::DELETE_PLACEHOLDER;
 			$new_basename                                                               = basename( $new_path );
 			if ( $new_basename === '' ) {
 				throw new GitException( 'Cannot rename a file to an empty filename' );
 			}
-			$changed_trees[ wp_dirname( $new_path ) ]->entries[ $new_basename ] = new TreeEntry(
+			$changed_trees[ wp_unix_dirname( $new_path ) ]->entries[ $new_basename ] = new TreeEntry(
 				array(
 					'name' => $new_basename,
 					'mode' => TreeEntry::FILE_MODE_DIRECTORY,
@@ -973,7 +973,7 @@ class GitRepository {
 			if ( ! isset( $changed_trees[ $path ] ) ) {
 				$changed_trees[ $path ] = new Tree();
 			}
-			$path = wp_dirname( $path );
+			$path = wp_unix_dirname( $path );
 		}
 	}
 
@@ -1000,7 +1000,7 @@ class GitRepository {
 
 		// Recursively process child trees
 		foreach ( $changed_trees as $child_path => $child_tree ) {
-			if ( wp_dirname( $child_path ) === $path && $child_path !== '/' ) {
+			if ( wp_unix_dirname( $child_path ) === $path && $child_path !== '/' ) {
 				$child_oid                               = $this->commit_tree( $child_path, $changed_trees );
 				$tree_objects[ basename( $child_path ) ] = new TreeEntry(
 					array(
@@ -1035,8 +1035,8 @@ class GitRepository {
 		 */
 		$stack = array( 'refs/heads/' );
 		foreach ( $prefixes as $prefix ) {
-			$path       = ltrim( wp_canonicalize_path( $prefix ), '/' );
-			$first_path = $this->fs->is_dir( $path ) ? $path : wp_dirname( $path );
+			$path       = ltrim( wp_canonicalize_unix_path( $prefix ), '/' );
+			$first_path = $this->fs->is_dir( $path ) ? $path : wp_unix_dirname( $path );
 			if ( strncmp( $first_path, 'refs/', strlen( 'refs/' ) ) === 0 ) {
 				$stack[] = $first_path;
 			}

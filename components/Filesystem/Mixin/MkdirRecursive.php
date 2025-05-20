@@ -5,8 +5,7 @@ namespace WordPress\Filesystem\Mixin;
 use WordPress\Filesystem\FilesystemException;
 
 use function WordPress\Filesystem\wp_join_paths;
-use function WordPress\Filesystem\wp_parent_paths;
-use function WordPress\Filesystem\wp_path_segments;
+use function WordPress\Filesystem\wp_unix_path_segments;
 
 /**
  * Implements a recursive mkdir() function by calling mkdir_single() for
@@ -52,7 +51,7 @@ trait MkdirRecursive {
 		}
 
 		$child_path = substr( $path, strlen( $root ) );
-		$segments = wp_path_segments( $child_path );
+		$segments = wp_unix_path_segments( $child_path );
 		for( $i = 0; $i < count( $segments ); $i++ ) {
 			$parent_path = wp_join_paths(
 				$root,
@@ -65,7 +64,7 @@ trait MkdirRecursive {
 	}
 
 	private function parent_paths( $path ) {
-		$segments     = wp_path_segments( $path );
+		$segments     = wp_unix_path_segments( $path );
 		$paths        = array();
 		for ( $i = 0; $i < count( $segments ) - 1; $i ++ ) {
 			$paths[] = $segments[ $i ];
