@@ -38,7 +38,7 @@ class StepTestCase extends TestCase {
 	 * @before
 	 */
 	public function setUp(): void {
-		if (getenv('GITHUB_ACTIONS') === 'true' || (PHP_OS_FAMILY === 'Linux' && file_exists('/etc/os-release') && strpos(file_get_contents('/etc/os-release'), 'Ubuntu') !== false)) {
+		if (PHP_OS_FAMILY === 'Linux' && file_exists('/etc/os-release') && strpos(file_get_contents('/etc/os-release'), 'Ubuntu') !== false) {
 			$this->markTestSkipped('Step tests are skipped on Ubuntu. @TODO: Re-enable them. Somehow the WordPress.zip request always times out.');
 		}
 		$tmp_dir = wp_sys_get_temp_dir();
