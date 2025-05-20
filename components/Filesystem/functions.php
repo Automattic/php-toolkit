@@ -204,10 +204,11 @@ function wp_canonicalize_unix_path( $path, $prepend_slash = true ) {
 	}
 
 	// Reconstruct path
+	$result = implode( '/', $normalized );
 	if ( $prepend_slash ) {
-		$result = '/'.ltrim(implode( '/', $normalized ), '/');
+		$result = '/'.ltrim($result, '/');
 	}
-	
+
 	if ( $result === '/.' ) {
 		$result = '/';
 	}

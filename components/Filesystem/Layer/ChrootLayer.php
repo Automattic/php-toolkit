@@ -44,7 +44,7 @@ class ChrootLayer extends Layer {
 		if(DIRECTORY_SEPARATOR === '\\' && $this->fs instanceof LocalFilesystem) {
 			$path = str_replace('\\', '/', $path);
 		}
-		return wp_join_paths( $this->chroot, wp_canonicalize_unix_path( $path, false ) );
+		return wp_join_paths( $this->chroot, wp_canonicalize_unix_path( $path ) );
 	}
 
 	public function exists( $path ) {
