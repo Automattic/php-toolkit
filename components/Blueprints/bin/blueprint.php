@@ -85,7 +85,7 @@ $commandConfigurations = [
 			'php blueprint.php exec my-blueprint.json --site-url https://mysite.test --site-path ./mysite --truncate-new-site-directory',
 		],
 		'aliases'         => [ 'run' ],
-		'requiredOptions' => [ 'site-path' ],
+		'requiredOptions' => [ 'site-path', 'site-url', 'mode' ],
 	],
 	'help' => [
 		'description'    => 'Show help for WordPress Blueprint Runner CLI',
@@ -210,15 +210,13 @@ function handleExecCommand( array $positionalArgs, array $options, array $comman
 	foreach ( $commandConfig['requiredOptions'] as $requiredOption ) {
 		if ( empty( $options[ $requiredOption ] ) ) {
 			echo "\033[31mError:\033[0m The --$requiredOption option is required for the exec command." . PHP_EOL;
-			showCommandHelpMessage( 'exec', $commandConfig );
 			exit( 1 );
 		}
 	}
 
 	// Validate required positional arguments
 	if ( empty( $positionalArgs ) ) {
-		echo "\033[31mError:\033[0m A Blueprint reference must be specified." . PHP_EOL;
-		showCommandHelpMessage( 'exec', $commandConfig );
+		echo "\033[31mError:\033[0m A Blueprint reference must be specified as a positional argument." . PHP_EOL;
 		exit( 1 );
 	}
 

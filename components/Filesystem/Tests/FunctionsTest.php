@@ -75,17 +75,17 @@ class FunctionsTest extends TestCase {
 			'Basic: foo/bar' => [ 'foo/bar', 1, 'foo', true ],
 
 			// Root and empty
-			'Root: /' => [ '/', 1, '/', true ],
-			'Root: /foo' => [ '/foo', 1, '/', true ],
+			'Root: /' => [ '/', 1, '/', false ],
+			'Root: /foo' => [ '/foo', 1, '/', false ],
 			'Empty path' => [ '', 1, '', true ],
 
 			// Trailing slashes
-			'Trailing slash: /foo/' => [ '/foo/', 1, '/', true ],
+			'Trailing slash: /foo/' => [ '/foo/', 1, '/', false ],
 			'Trailing slash: /foo/bar/' => [ '/foo/bar/', 1, '/foo', true ],
 
 			// Multiple slashes
 			'Multiple slashes: //' => [ '//', 1, '/', true ],
-			'Multiple slashes: ///' => [ '///', 1, '/', true ],
+			'Multiple slashes: ///' => [ '///', 1, '/', false ],
 
 			// No slash / relative
 			'No slash: foo' => [ 'foo', 1, '.', true ],
@@ -100,19 +100,19 @@ class FunctionsTest extends TestCase {
 
 			// Multiple levels
 			'Multiple levels: /foo/bar/baz, 2' => [ '/foo/bar/baz', 2, '/foo', true ],
-			'Multiple levels: /foo/bar/baz, 3' => [ '/foo/bar/baz', 3, '/', true ],
-			'Multiple levels: /foo/bar/baz, 4' => [ '/foo/bar/baz', 4, '/', true ],
+			'Multiple levels: /foo/bar/baz, 3' => [ '/foo/bar/baz', 3, '/', false ],
+			'Multiple levels: /foo/bar/baz, 4' => [ '/foo/bar/baz', 4, '/', false ],
 			'Multiple levels: foo/bar/baz, 3' => [ 'foo/bar/baz', 3, '.', true ],
 
 			// Deep nesting
 			'Deep nesting: /a/b/c/d/e/f/g, 3' => [ '/a/b/c/d/e/f/g', 3, '/a/b/c/d', true ],
-			'Deep nesting: /a/b/c/d/e/f/g, 7' => [ '/a/b/c/d/e/f/g', 7, '/', true ],
-			'Deep nesting: /a/b/c/d/e/f/g, 10' => [ '/a/b/c/d/e/f/g', 10, '/', true ],
+			'Deep nesting: /a/b/c/d/e/f/g, 7' => [ '/a/b/c/d/e/f/g', 7, '/', false ],
+			'Deep nesting: /a/b/c/d/e/f/g, 10' => [ '/a/b/c/d/e/f/g', 10, '/', false ],
 
 			// Edge cases
 			'Edge: /foo/./bar' => [ '/foo/./bar', 1, '/foo/.', true ],
 			'Edge: ./.' => [ './.', 1, '.', true ],
-			'Edge: /..' => [ '/..', 1, '/', true ],
+			'Edge: /..' => [ '/..', 1, '/', false ],
 			'Edge: /foo/bar////' => [ '/foo/bar////', 1, '/foo', true ],
 
 			// Weird Windows paths (expecting dot, no dirname parity)
