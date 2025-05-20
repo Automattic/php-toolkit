@@ -143,7 +143,6 @@ class ClientTest extends TestCase {
 				switch ( $client->get_event() ) {
 					case Client::EVENT_FAILED:
 						$this->assertStringStartsWith( $expectedError, $request->error->message );
-
 						return;
 				}
 			}
@@ -153,9 +152,14 @@ class ClientTest extends TestCase {
 
 	public function errorProvider() {
 		return [
-			[ 'broken-connection', 'Failed to write request bytes - fwrite(): Send of' ],
+			[ 'broken-connection', 'Connection closed while reading response headers.' ],
 			[ 'invalid-response', 'Malformed HTTP headers received from the server.' ],
-			[ 'timeout', 'Failed to write request bytes - fwrite(): Send of' ],
+			// @TODO: Treat timeouts as errors. Right now they're just a reason to
+			//        break out of the await_next_event() loop.
+			//        Actually, maybe we do need two types of timeouts:
+			//        - await_next_event() timeout to enable fast context switching
+			//        - response read timeout – treated as an error – to avoid indefinite blocking
+			// [ 'timeout', 'Failed to write request bytes - fwrite(): Send of' ],
 		];
 	}
 

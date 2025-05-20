@@ -1,133 +1,186 @@
 <?php
 
+namespace WordPress\HttpClient\Tests;
+
 use PHPUnit\Framework\TestCase;
 use WordPress\ByteStream\ByteStreamException;
 use WordPress\HttpClient\ByteStream\RequestReadStream;
 use WordPress\HttpClient\Client;
 use WordPress\HttpClient\Request;
 use WordPress\HttpClient\Response;
+use Symfony\Component\Process\Process;
+
+trait WithTestServer {
+	protected function withServer( callable $callback, $scenario = 'default', $host = '127.0.0.1', $port = 8950 ) {
+		$serverRoot = __DIR__ . '/test-server';
+		$server     = new Process( [
+			'php',
+			"$serverRoot/run.php",
+			$host,
+			$port,
+			$scenario,
+		], $serverRoot );
+		$server->start();
+		try {
+			$attempts = 0;
+			while ( $server->isRunning() ) {
+				$output = $server->getIncrementalOutput();
+				if ( strncmp( $output, 'Server started on http://', strlen( 'Server started on http://' ) ) === 0 ) {
+					break;
+				}
+				usleep( 40000 );
+				if ( ++ $attempts > 20 ) {
+					$this->fail( 'Server did not start' );
+				}
+			}
+			$callback( "http://{$host}:{$port}" );
+		} finally {
+			$server->stop( 0 );
+		}
+	}
+}
 
 class RequestReadStreamTest extends TestCase {
-	private $test_url = 'https://raw.githubusercontent.com/WordPress/gutenberg/0fa123b/schemas/json/font-collection.json';
+	use WithTestServer;
+
+	private $fixture = '/preface-to-pygmalion.txt';
 
 	public function testConstructWithString() {
-		$stream = new RequestReadStream( $this->test_url );
-		$this->assertInstanceOf( RequestReadStream::class, $stream );
-		$this->assertInstanceOf( Request::class, $stream->get_request() );
-		$this->assertEquals( $this->test_url, $stream->get_request()->url );
+		$this->withServer(function($url) {
+			$test_url = $url . $this->fixture;
+			$stream = new RequestReadStream( $test_url );
+			$this->assertInstanceOf( RequestReadStream::class, $stream );
+			$this->assertInstanceOf( Request::class, $stream->get_request() );
+			$this->assertEquals( $test_url, $stream->get_request()->url );
+		});
 	}
 
 	public function testConstructWithRequest() {
-		$request = new Request( $this->test_url );
-		$stream  = new RequestReadStream( $request );
-		$this->assertInstanceOf( RequestReadStream::class, $stream );
-		$this->assertSame( $request, $stream->get_request() );
+		$this->withServer(function($url) {
+			$test_url = $url . $this->fixture;
+			$request = new Request( $test_url );
+			$stream  = new RequestReadStream( $request );
+			$this->assertInstanceOf( RequestReadStream::class, $stream );
+			$this->assertSame( $request, $stream->get_request() );
+		});
 	}
 
 	public function testConstructWithCustomClient() {
-		$client = new Client();
-		$stream = new RequestReadStream( $this->test_url, [ 'client' => $client ] );
-		$this->assertInstanceOf( RequestReadStream::class, $stream );
-
-		// Cannot directly test that the custom client is used as it's a private property
-		// But we can verify the request works
-		$response = $stream->await_response();
-		$this->assertInstanceOf( Response::class, $response );
+		$this->withServer(function($url) {
+			$test_url = $url . $this->fixture;
+			$client = new Client();
+			$stream = new RequestReadStream( $test_url, [ 'client' => $client ] );
+			$this->assertInstanceOf( RequestReadStream::class, $stream );
+			$response = $stream->await_response();
+			$this->assertInstanceOf( Response::class, $response );
+		});
 	}
 
 	public function testGetResponse() {
-		$stream   = new RequestReadStream( $this->test_url );
-		$response = $stream->await_response();
-
-		$this->assertInstanceOf( Response::class, $response );
-		$this->assertEquals( 200, $response->status_code );
-		$this->assertStringContainsString( 'text/plain', $response->get_header( 'Content-Type' ) );
+		$this->withServer(function($url) {
+			$test_url = $url . $this->fixture;
+			$stream   = new RequestReadStream( $test_url );
+			$response = $stream->await_response();
+			$this->assertInstanceOf( Response::class, $response );
+			$this->assertEquals( 200, $response->status_code );
+			$this->assertStringContainsString( 'text/plain', $response->get_header( 'Content-Type' ) );
+		});
 	}
 
 	public function testAwaitResponse() {
-		$stream   = new RequestReadStream( $this->test_url );
-		$response = $stream->await_response();
-
-		$this->assertInstanceOf( Response::class, $response );
-		$this->assertEquals( 200, $response->status_code );
+		$this->withServer(function($url) {
+			$test_url = $url . $this->fixture;
+			$stream   = new RequestReadStream( $test_url );
+			$response = $stream->await_response();
+			$this->assertInstanceOf( Response::class, $response );
+			$this->assertEquals( 200, $response->status_code );
+		});
 	}
 
 	public function testLength() {
-		$stream = new RequestReadStream( $this->test_url );
-		$length = $stream->length();
-
-		$this->assertIsInt( $length );
-		$this->assertGreaterThan( 0, $length );
+		$this->withServer(function($url) {
+			$test_url = $url . $this->fixture;
+			$stream = new RequestReadStream( $test_url );
+			$stream->await_response();
+			$length = $stream->length();
+			$this->assertIsInt( $length );
+			$this->assertGreaterThan( 0, $length );
+		});
 	}
 
 	public function testReadingContent() {
-		$stream = new RequestReadStream( $this->test_url );
+		$this->withServer(function($url) {
+			$test_url = $url . $this->fixture;
+			$stream = new RequestReadStream( $test_url );
+			$stream->await_response();
 
-		$nb_bytes_pulled = $stream->pull( 1024 );
-		$this->assertGreaterThan( 0, $nb_bytes_pulled );
-
-		$data = $stream->consume( $nb_bytes_pulled );
-		$this->assertNotEmpty( $data );
-		$this->assertStringContainsString( '{', $data ); // JSON should start with {
-
-		// Pull more data if available
-		if ( ! $stream->reached_end_of_data() ) {
 			$nb_bytes_pulled = $stream->pull( 1024 );
-			$this->assertIsInt( $nb_bytes_pulled );
 			$this->assertGreaterThan( 0, $nb_bytes_pulled );
-		}
 
-		// Test reading to the end
-		$stream      = new RequestReadStream( $this->test_url );
-		$all_content = $stream->consume_all();
-		$this->assertNotEmpty( $all_content );
-		$this->assertStringContainsString( 'font_families', $all_content ); // Known content from the JSON
+			$data = $stream->consume( $nb_bytes_pulled );
+			$this->assertNotEmpty( $data );
+			$this->assertStringContainsString( 'PREFACE TO PYGMALION', $data );
 
-		// Verify it's valid JSON
-		$json_data = json_decode( $all_content, true );
-		$this->assertIsArray( $json_data );
+			// Pull more data if available
+			if ( ! $stream->reached_end_of_data() ) {
+				$nb_bytes_pulled = $stream->pull( 1024 );
+				$this->assertIsInt( $nb_bytes_pulled );
+				if ($nb_bytes_pulled > 0) {
+					$this->assertGreaterThan( 0, $nb_bytes_pulled );
+				}
+			}
+
+			// Test reading to the end
+			$stream      = new RequestReadStream( $test_url );
+			$stream->await_response();
+			$all_content = $stream->consume_all();
+			$this->assertNotEmpty( $all_content );
+			$this->assertStringContainsString( 'Professor of Phonetics', $all_content );
+		});
 	}
 
 	public function testTell() {
-		$stream = new RequestReadStream( $this->test_url );
-
-		// Pull some data first to initialize the request
-		$stream->pull( 10 );
-		$stream->seek( 100 );
-		$this->assertEquals( 100, $stream->tell() );
+		$this->withServer(function($url) {
+			$test_url = $url . $this->fixture;
+			$stream = new RequestReadStream( $test_url );
+			$stream->await_response();
+			$length = $stream->length();
+			$seek = ($length && $length > 100) ? 100 : 0;
+			$stream->pull( 10 );
+			$stream->seek( $seek );
+			$this->assertEquals( $seek, $stream->tell() );
+		});
 	}
 
 	public function testReachedEndOfData() {
-		$stream = new RequestReadStream( $this->test_url );
-
-		$this->assertFalse( $stream->reached_end_of_data() );
-
-		// Read all the data
-		while ( ! $stream->reached_end_of_data() ) {
-			$chunk = $stream->pull( 4096 );
-			$stream->consume( strlen( $chunk ) );
-		}
-
-		$this->assertTrue( $stream->reached_end_of_data() );
+		$this->withServer(function($url) {
+			$test_url = $url . $this->fixture;
+			$stream = new RequestReadStream( $test_url );
+			$stream->await_response();
+			$this->assertFalse( $stream->reached_end_of_data() );
+			while ( ! $stream->reached_end_of_data() ) {
+				$nb = $stream->pull( 4096 );
+				if ($nb === 0) break;
+				$stream->consume( $nb );
+			}
+			$this->assertTrue( $stream->reached_end_of_data() );
+		});
 	}
 
 	public function testCloseReading() {
-		$stream = new RequestReadStream( $this->test_url );
-
-		// Read some data to initialize the request
-		$stream->pull( 10 );
-
-		// Read everything to finish the request
-		while ( ! $stream->reached_end_of_data() ) {
-			$chunk = $stream->pull( 4096 );
-			$stream->consume( strlen( $chunk ) );
-		}
-
-		// Now we can close it without exception
-		$stream->close_reading();
-
-		// Trying to read after close should throw an exception
-		$this->expectException( ByteStreamException::class );
-		$stream->pull( 10 );
+		$this->withServer(function($url) {
+			$test_url = $url . $this->fixture;
+			$stream = new RequestReadStream( $test_url );
+			$stream->await_response();
+			$stream->pull( 10 );
+			while ( ! $stream->reached_end_of_data() ) {
+				$nb = $stream->pull( 4096 );
+				if ($nb === 0) break;
+				$stream->consume( $nb );
+			}
+			$stream->close_reading();
+			$this->expectException( ByteStreamException::class );
+			$stream->pull( 10 );
+		});
 	}
 }

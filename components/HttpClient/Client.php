@@ -702,6 +702,7 @@ class Client {
 	 */
 	protected function receive_response_headers( $requests ) {
 		$nb_headers_received = 0;
+
 		foreach ( $this->stream_select( $requests, static::STREAM_SELECT_READ ) as $request ) {
 			if ( ! $request->response ) {
 				$request->response = new Response( $request );
@@ -714,6 +715,13 @@ class Client {
 				// 1 seems slow and overly conservative.
 				$header_byte = fread( $this->connections[ $request->id ]->http_socket, 1 );
 				if ( false === $header_byte || '' === $header_byte ) {
+					if (
+						!is_resource($this->connections[ $request->id ]->http_socket) || 
+						feof($this->connections[ $request->id ]->http_socket)
+					) {
+						$this->set_error($request, new HttpError('Connection closed while reading response headers.'));
+						break;
+					}
 					break;
 				}
 				$connection->response_buffer .= $header_byte;

@@ -96,9 +96,9 @@ $server->set_handler( function ( IncomingRequest $request, TcpResponseWriteStrea
 		case 'error':
 			$err = basename( $path );
 			if ( $err === 'broken-connection' ) {
-				$response->send_http_code( 200 );
-				$response->send_header( 'Content-Type', 'text/plain' );
-				$response->append_bytes( 'partial' );
+				$response->dangerously_mark_headers_as_sent();
+				$response->append_bytes( "HTTP/1.1 200 OK\r\n" );
+				$response->append_bytes( "Content-Type: text/pla" );
 				// Simulate broken connection by not closing properly
 				exit( 1 );
 			} elseif ( $err === 'invalid-response' ) {
@@ -106,7 +106,7 @@ $server->set_handler( function ( IncomingRequest $request, TcpResponseWriteStrea
 				$response->dangerously_mark_headers_as_sent();
 				$response->append_bytes( "INVALID\r\n\r\n" );
 			} elseif ( $err === 'timeout' ) {
-				sleep( 3 ); // Simulate timeout
+				sleep( 10 ); // Simulate timeout
 				$response->send_http_code( 200 );
 				$response->append_bytes( 'timeout' );
 			} else {
@@ -174,14 +174,18 @@ $server->set_handler( function ( IncomingRequest $request, TcpResponseWriteStrea
 			if ( file_exists( $file ) && is_file( $file ) ) {
 				$response->send_http_code( 200 );
 				$response->send_header( 'Content-Type', 'text/plain' );
+				$response->send_header( 'Content-Length', (string) filesize( $file ) );
 				$stream = FileReadStream::from_path( $file );
-				while ( ! $stream->reached_end_of_data() ) {
-					$response->append_bytes( $stream->consume( 4096 ) );
+				while ( !$stream->reached_end_of_data() ) {
+					$n = $stream->pull( 4096 );
+					$response->append_bytes( $stream->consume( $n ) );
 				}
+				$stream->close_reading();
+				$response->close_writing();
 			} else {
-				$response->send_http_code( 200 );
+				$response->send_http_code( 404 );
 				$response->send_header( 'Content-Type', 'text/plain' );
-				$response->append_bytes( 'default response' );
+				$response->append_bytes( 'Not Found' );
 			}
 			break;
 	}
