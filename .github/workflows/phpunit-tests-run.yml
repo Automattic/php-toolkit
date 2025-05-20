@@ -55,7 +55,7 @@ jobs:
           tools: phpunit-polyfills
           extensions: zip, sqlite3, pdo, pdo_sqlite
           ini-values: |
-            ${{ inputs.os == 'windows-latest' && format('sys_temp_dir={0}', env.DEV_DRIVE + '\tmp') || '' }}
+            ${{ inputs.os == 'windows-latest' && format('sys_temp_dir={0}/tmp', env.DEV_DRIVE) || '' }}
 
       - name: Install Composer dependencies (using composer-ci-matrix-tests.json)
         run: |
