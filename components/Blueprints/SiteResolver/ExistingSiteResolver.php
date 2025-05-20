@@ -17,7 +17,6 @@ class ExistingSiteResolver {
 			'verify_database'     => 4,
 		] );
 
-		$blueprint = $runtime->getBlueprint();
 		$config    = $runtime->getConfiguration();
 		$targetFs  = $runtime->getTargetFilesystem();
 

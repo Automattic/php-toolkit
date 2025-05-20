@@ -49,7 +49,7 @@ class StepTestCase extends TestCase {
 		if ( is_dir( $base_site_root ) && file_exists( $base_site_root . '/wp-load.php' ) ) {
 			LocalFilesystem::create( $tmp_dir )->copy(
 				'blueprint_test_base_site',
-				wp_unix_dirname( $this->document_root ),
+				basename( $this->document_root ),
 				[ 'recursive' => true ]
 			);
 			$config = ( new RunnerConfiguration() )
