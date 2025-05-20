@@ -31,6 +31,18 @@ jobs:
     timeout-minutes: 60
 
     steps:
+      - name: Setup RAM Disk
+        uses: samypr100/setup-dev-drive@v3
+        if: ${{ inputs.os == 'windows-latest' }}
+		
+      - name: Set TEMP and TMP to Dev Drive
+        if: ${{ inputs.os == 'windows-latest' }}
+        run: |
+          echo "Setting TEMP and TMP to ${{ env.DEV_DRIVE }}"
+        env:
+          TEMP: ${{ env.DEV_DRIVE }}
+          TMP: ${{ env.DEV_DRIVE }}
+
       - name: Checkout repository
         uses: actions/checkout@v4
 
