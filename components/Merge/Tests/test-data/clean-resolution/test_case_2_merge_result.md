@@ -1,7 +1,6 @@
 ## 1. Merge Evaluation
 
-The paper from the University of Washington provides a methodology for testing merge tools. It adds a section on
-strategies.
+The paper from the University of Washington provides a methodology for testing merge tools. It adds a section on strategies.
 
 It outlines these scenarios:
 

@@ -7,22 +7,24 @@ overall quality of life, and personal safety.
 
 ## Why Sleep Matters
 
-* **Physical Restoration:** Sleep helps repair Lack of sleep is linked to heart disease, kidney disease, hypertension,
-  diabetes, and stroke.
+* **Physical Restoration:** Sleep helps repair Lack of sleep is linked to heart disease, kidney
+  disease, hypertension, diabetes, and stroke.
 * **Cognitive Function:** Sleep is crucial for the brain. When you don't sleep well, it's hard to concentrate and make
   decisions.
-* **Emotional Regulation:** Sleep aintricately linked. Insufficient sleep often make you irritable. Long-term lack of
-  sleep can significantly increase the risk of depression.
+* **Emotional Regulation:** Sleep affects mood. Poor sleep can make you irritable. Long-term lack of sleep can significantly increase
+  the risk of
+  depression.
 
 ## How Much Sleep?
 
-Most adults require 7-9 hours of sleep.8-10 hours. Children require more.
+Most adults require 7-9 hours of sleep. 8-10 hours. Children require more.
 
 ## Better Sleep Tips
 
 * **Regular Schedule:** Go to bed and wake up at the same time.
 * **Relaxing Routine:** Take a bath or read before bed.
-* **Dark, Quiet, Cool Room:** interfere with melatonin production and disrupt sleep.
+* **Dark, Quiet, Cool Room:** interfere with melatonin
+  production and disrupt sleep.
 * **Manage Stress:** Practice relaxation techniques, such as deep breathing or meditation.
 
 If you consistently experience sleep difficulties, consult a healthcare professional. An underlying medical condition or
