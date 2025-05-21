@@ -38,7 +38,7 @@ class GitRemote {
 		$this->repository  = $repository;
 		$this->http_client = $options['http_client'] ?? new Client(
 			array(
-				'timeout_ms' => 300,
+				'timeout_ms' => 300000,
 			)
 		);
 	}
