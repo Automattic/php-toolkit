@@ -301,6 +301,7 @@ PHP
                 case Client::EVENT_FAILED:
                     $this->assertNotNull( $request->error );
                     if(
+                        false === strpos($request->error->message, 'Request timed out') &&
                         false === strpos($request->error->message, 'Failed to write request bytes') &&
                         false === strpos($request->error->message, 'Connection closed while reading response headers')
                     ) {
@@ -622,7 +623,7 @@ PHP
 
     public function test_refused_connect() {
         $this->expectClientError(new Request('http://127.0.0.1:1/'), 300, [
-            'message' => ['Failed to write request bytes', 'Request timed out', 'Connection closed while reading response headers']
+            'message' => ['Failed to write request bytes', 'Request timed out', 'Connection closed while reading response headers', 'Request timed out']
         ]);
     }
 
@@ -645,7 +646,7 @@ PHP
             ]);
             $req->method = 'POST';
             $this->expectClientError($req, null, [
-                'message' => ['Failed to write request bytes', 'Connection closed while reading response headers', 'Broken pipe']
+                'message' => ['Failed to write request bytes', 'Connection closed while reading response headers', 'Broken pipe', 'Request timed out']
             ]);
         });
     }
@@ -653,7 +654,7 @@ PHP
     public function test_malformed_status_line() {
         $this->withRawResponse("HTP/1.1 200 OK\r\n\r\n", function (string $base) {
             $this->expectClientError(new Request("$base/"), null, [
-                'message' => ['Failed to write request bytes', 'Connection closed while reading response headers']
+                'message' => ['Failed to write request bytes', 'Connection closed while reading response headers', 'Request timed out']
             ]);
         });
     }
@@ -661,7 +662,7 @@ PHP
     public function test_malformed_headers() {
         $this->withRawResponse("HTTP/1.1 200 OK\r\nBadHeader\r\n\r\n", function (string $base) {
             $this->expectClientError(new Request("$base/"), null, [
-                'message' => ['Failed to write request bytes', 'Connection closed while reading response headers']
+                'message' => ['Failed to write request bytes', 'Connection closed while reading response headers', 'Request timed out']
             ]);
         });
     }
@@ -669,7 +670,7 @@ PHP
     public function test_eof_mid_headers() {
         $this->withRawResponse("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n", function (string $base) {
             $this->expectClientError(new Request("$base/"), null, [
-                'message' => ['Failed to write request bytes', 'Connection closed while reading response headers']
+                'message' => ['Failed to write request bytes', 'Connection closed while reading response headers', 'Request timed out']
             ]);
         });
     }
@@ -678,7 +679,7 @@ PHP
         $body = "Z\r\nHELLO\r\n0\r\n\r\n";
         $this->withRawResponse("HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n$body", function (string $base) {
             $this->expectClientError(new Request("$base/"), null, [
-                'message' => ['Failed to write request bytes', 'Connection closed while reading response headers']
+                'message' => ['Failed to write request bytes', 'Connection closed while reading response headers', 'Request timed out']
             ]);
         });
     }
@@ -687,7 +688,7 @@ PHP
         $body = "5\r\nHELLO\r\n";           // no terminating 0-chunk
         $this->withRawResponse("HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n$body", function (string $base) {
             $this->expectClientError(new Request("$base/"), 300, [
-                'message' => ['Failed to write request bytes', 'Connection closed while reading response headers']
+                'message' => ['Failed to write request bytes', 'Connection closed while reading response headers', 'Request timed out']
             ]);
         });
     }
@@ -696,7 +697,7 @@ PHP
         $raw = "HTTP/1.1 200 OK\r\nContent-Encoding: gzip\r\nContent-Length: 4\r\n\r\nBAD!";
         $this->withRawResponse($raw, function (string $base) {
             $this->expectClientError(new Request("$base/"), null, [
-                'message' => ['Failed to write request bytes', 'Connection closed while reading response headers']
+                'message' => ['Failed to write request bytes', 'Connection closed while reading response headers', 'Request timed out']
             ]);
         });
     }
