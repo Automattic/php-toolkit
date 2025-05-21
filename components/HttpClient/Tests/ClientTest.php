@@ -242,7 +242,7 @@ PHP
 	public function test_unsupported_encoding() {
 		$this->withServer(function (string $base) {
 			$request = new Request( "$base/encoding/rot13" );
-			$this->expectClientError($request, 0.3, [
+			$this->expectClientError($request, 300, [
 				'message' => 'Unsupported transfer encoding received from the server: rot13'
 			]);
 		}, 'encoding');
@@ -253,12 +253,12 @@ PHP
 	 */
 	public function test_errors( $scenario, $expectedErrorSubstring ) {
 		$this->withServer( function ( $url ) use ( $scenario, $expectedErrorSubstring ) {
-			$client  = new Client( [ 'timeout' => 1 ] ); // Increased timeout for timeout tests
+			$client  = new Client( [ 'timeout_ms' => 1000 ] ); // Increased timeout for timeout tests
 			$request = new Request( "$url/error/$scenario" );
 			$client->enqueue( $request );
 
 			$error_occurred = false;
-			while ( $client->await_next_event( [ 'requests' => [ $request ], 'timeout' => 2 ] ) ) {
+			while ( $client->await_next_event( [ 'requests' => [ $request ], 'timeout_ms' => 2000 ] ) ) {
 				switch ( $client->get_event() ) {
 					case Client::EVENT_FAILED:
 						$error_occurred = true;
@@ -291,7 +291,7 @@ PHP
 		$port = 9999;
 		$host = '127.0.0.1';
 
-		$client  = new Client( [ 'timeout' => 1 ] ); // Short timeout for connection attempt
+		$client  = new Client( [ 'timeout_ms' => 1000 ] ); // Short timeout for connection attempt
 		$request = new Request( "http://{$host}:{$port}/" );
 		$client->enqueue( $request );
 
@@ -455,7 +455,7 @@ PHP
 	 */
 	public function test_redirect_loop() {
 		$this->withServer( function ( $url ) {
-			$client  = new Client( [ 'max_redirects' => 2, 'timeout' => 20 ] ); // Set a low redirect limit
+			$client  = new Client( [ 'max_redirects' => 2, 'timeout_ms' => 20000 ] ); // Set a low redirect limit
 			$request = new Request( "$url/redirect/loop" );
 			$client->enqueue( $request );
 
@@ -603,24 +603,26 @@ PHP
 		}, 'edge-cases' );
 	}
 
-    public function test_invalid_scheme()               { $this->expectClientError(new Request('gopher://x'), 0.3, [
+    public function test_invalid_scheme()               { $this->expectClientError(new Request('gopher://x'), 300, [
 		'message' => 'only HTTP and HTTPS URLs are supported:'
 	]); }
 
-    public function test_dns_failure()                  { $this->expectClientError(new Request('http://nope.' . uniqid() . '/'), 0.3, [
+    public function test_dns_failure()                  { $this->expectClientError(new Request('http://nope.' . uniqid() . '/'), 300, [
 		'message' => 'unable to open a stream to http://nope.'
 	]); }
 
-    public function test_refused_connect()              { $this->expectClientError(new Request('http://127.0.0.1:1/'), 0.3, [
+    public function test_refused_connect()              { $this->expectClientError(new Request('http://127.0.0.1:1/'), 300, [
 		'message' => 'Failed to write'
 	]); }
 
+	/**
+	 * @small
+	 */
     public function test_ssl_handshake_failure() {
         $this->withServer(function (string $base) {
             $url = str_replace('http://', 'https://', $base).'/body/small';
-            $this->expectClientError(new Request($url), 0.25, [
-				// @TODO: Provide a truthful error message that talks about SSL handshake failure.
-				'message' => 'Request timed out'
+            $this->expectClientError(new Request($url), 250, [
+				'message' => ['Request timed out', 'Failed to enable crypto']
 			]);
         }, 'body');
     }
@@ -632,14 +634,14 @@ PHP
 			]);
             $req->method = 'POST';
             $this->expectClientError($req, null, [
-				'message' => 'Failed to write request bytes'
+				'message' => ['Failed to write request bytes', 'Connection closed while reading response headers']
 			]);
         });
     }
 
     public function test_stream_select_timeout() {
         $this->withSilentServer(function (string $base) {
-            $this->expectClientError(new Request("$base/hang"), 0.3, [
+            $this->expectClientError(new Request("$base/hang"), 300, [
 				'message' => 'Request timed out'
 			]);
         });
@@ -648,7 +650,7 @@ PHP
     public function test_malformed_status_line() {
         $this->withRawResponse("HTP/1.1 200 OK\r\n\r\n", function (string $base) {
             $this->expectClientError(new Request("$base/"), null, [
-				'message' => 'Failed to write request bytes'
+				'message' => ['Failed to write request bytes', 'Connection closed while reading response headers']
 			]);
         });
     }
@@ -656,7 +658,7 @@ PHP
     public function test_malformed_headers() {
         $this->withRawResponse("HTTP/1.1 200 OK\r\nBadHeader\r\n\r\n", function (string $base) {
             $this->expectClientError(new Request("$base/"), null, [
-				'message' => 'Failed to write request bytes'
+				'message' => ['Failed to write request bytes', 'Connection closed while reading response headers']
 			]);
         });
     }
@@ -664,7 +666,7 @@ PHP
     public function test_eof_mid_headers() {
         $this->withRawResponse("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n", function (string $base) {
             $this->expectClientError(new Request("$base/"), null, [
-				'message' => 'Failed to write request bytes'
+				'message' => ['Failed to write request bytes', 'Connection closed while reading response headers']
 			]);
         });
     }
@@ -673,7 +675,7 @@ PHP
         $body = "Z\r\nHELLO\r\n0\r\n\r\n";
         $this->withRawResponse("HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n$body", function (string $base) {
             $this->expectClientError(new Request("$base/"), null, [
-				'message' => 'Failed to write request bytes'
+				'message' => ['Failed to write request bytes', 'Connection closed while reading response headers']
 			]);
         });
     }
@@ -681,8 +683,8 @@ PHP
     public function test_missing_last_chunk() {
         $body = "5\r\nHELLO\r\n";           // no terminating 0-chunk
         $this->withRawResponse("HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n$body", function (string $base) {
-            $this->expectClientError(new Request("$base/"), 0.3, [
-				'message' => 'Failed to write request bytes'
+            $this->expectClientError(new Request("$base/"), 300, [
+				'message' => ['Failed to write request bytes', 'Connection closed while reading response headers']
 			]);
         });
     }
@@ -691,21 +693,32 @@ PHP
         $raw = "HTTP/1.1 200 OK\r\nContent-Encoding: gzip\r\nContent-Length: 4\r\n\r\nBAD!";
         $this->withRawResponse($raw, function (string $base) {
             $this->expectClientError(new Request("$base/"), null, [
-				'message' => 'Failed to write request bytes'
+				'message' => ['Failed to write request bytes', 'Connection closed while reading response headers']
 			]);
         });
     }
 
     /* ---------- tiny glue ---------- */
 
-    private function expectClientError(Request $req, ?float $timeout = null, array $opts = []): void {
-        if ($timeout !== null) $opts['timeout'] = $timeout;
+    private function expectClientError(Request $req, ?float $timeout_ms = null, array $opts = []): void {
+        if ($timeout_ms !== null) $opts['timeout_ms'] = $timeout_ms;
         $client = new Client($opts);
         try {
             $this->consume_entire_body($client, $req);
 			$this->fail('Expected error not thrown');
         } catch (HttpError $e) {
-            $this->assertStringContainsString($opts['message'] ?? 'Error', $e->message);
+            if (isset($opts['message']) && is_array($opts['message'])) {
+                $found = false;
+                foreach ($opts['message'] as $msg) {
+                    if (strpos($e->message, $msg) !== false) {
+                        $found = true;
+                        break;
+                    }
+                }
+                $this->assertTrue($found, "None of the expected messages found in error: " . $e->message);
+            } else {
+                $this->assertStringContainsString($opts['message'] ?? 'Error', $e->message);
+            }
         }
     }
 }

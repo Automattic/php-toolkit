@@ -114,7 +114,7 @@ class Client {
 	public function __construct( $options = array() ) {
 		$this->concurrency   = $options['concurrency'] ?? 10;
 		$this->max_redirects = $options['max_redirects'] ?? 3;
-		$this->request_timeout_ms = ($options['timeout'] ?? 30) * 1000;
+		$this->request_timeout_ms = $options['timeout_ms'] ?? 30000;
 		$this->requests      = array();
 	}
 
@@ -256,17 +256,13 @@ class Client {
 		$this->response_body_chunk = null;
 
 		$start_time = microtime( true );
-		$timeout_ms  = isset( $query['timeout'] ) 
-			? $query['timeout'] * 1000 
+		$timeout_ms = isset( $query['timeout_ms'] ) 
+			? $query['timeout_ms']
 			// Give the requests an opportunity to time out
 			: $this->request_timeout_ms * 1.1
 		;
 
 		do {
-			if ( $timeout_ms && ( microtime( true ) - $start_time ) * 1000 >= $timeout_ms ) {
-				return false;
-			}
-
 			if ( empty( $query['requests'] ) ) {
 				$events = array_keys( $this->events );
 			} else {
@@ -297,6 +293,15 @@ class Client {
 
 					return true;
 				}
+			}
+			
+			// After we've checked for any available events, see if we've run out of time.
+			// This way, we always return any events that were ready before worrying about the timeout.
+			// If we checked the timeout first, we might miss events that were already waiting for us
+			// when the timeout is set to zero.
+			$time_elapsed_ms = (microtime( true ) - $start_time) * 1000;
+			if ( $timeout_ms && $time_elapsed_ms >= $timeout_ms ) {
+				return false;
 			}
 		} while ( $this->event_loop_tick() );
 
@@ -368,9 +373,9 @@ class Client {
 			Request::STATE_RECEIVING_BODY,
 			Request::STATE_RECEIVED,
 		]) as $request ) {
-			$time_elapsed = (microtime( true ) - $this->requests_started_at[ $request->id ]) * 1000;
-			if ( $time_elapsed > $this->request_timeout_ms ) {
-				$this->set_error( $request, new HttpError( sprintf( 'Request timed out after %s seconds.', $time_elapsed ) ) );
+			$time_elapsed_ms = (microtime( true ) - $this->requests_started_at[ $request->id ]) * 1000;
+			if ( $time_elapsed_ms > $this->request_timeout_ms ) {
+				$this->set_error( $request, new HttpError( sprintf( 'Request timed out after %s seconds.', $time_elapsed_ms ) ) );
 			}
 		}
 
@@ -596,16 +601,17 @@ class Client {
 	 */
 	protected function enable_crypto( array $requests ) {
 		foreach ( $this->stream_select( $requests, static::STREAM_SELECT_WRITE ) as $request ) {
-			stream_set_timeout( $this->connections[ $request->id ]->http_socket, 1 );
+			@stream_set_timeout( $this->connections[ $request->id ]->http_socket, 1 );
 			$enabled_crypto = stream_socket_enable_crypto(
 				$this->connections[ $request->id ]->http_socket,
 				true,
-				STREAM_CRYPTO_METHOD_TLSv1_2_CLIENT
+				STREAM_CRYPTO_METHOD_TLS_CLIENT
 			);
 			if ( false === $enabled_crypto ) {
 				$last_error = error_get_last();
 				$this->set_error( $request,
-					new HttpError( 'Failed to enable crypto: ' . ( is_array( $last_error ) ? $last_error['message'] : 'unknown' ) ) );
+					new HttpError( 'Failed to enable crypto: ' . ( is_array( $last_error ) ? $last_error['message'] : 'unknown' ) )
+				);
 				continue;
 			} elseif ( 0 === $enabled_crypto ) {
 				// The SSL handshake isn't finished yet, let's skip it
@@ -756,6 +762,7 @@ class Client {
 				}
 
 				$request->state = Request::STATE_RECEIVING_BODY;
+				$this->connections[ $request->id ]->decoded_response_stream = $this->decode_and_monitor_response_body_stream( $request );
 				break;
 			}
 		}
@@ -774,10 +781,6 @@ class Client {
 		// * The last chunk in Transfer-Encoding: chunked is received
 		// * The connection is closed
 		foreach ( $this->stream_select( $requests, static::STREAM_SELECT_READ ) as $request ) {
-			if ( ! $this->connections[ $request->id ]->decoded_response_stream ) {
-				$this->connections[ $request->id ]->decoded_response_stream = $this->decode_and_monitor_response_body_stream( $request );
-			}
-
 			$stream = $this->connections[ $request->id ]->decoded_response_stream;
 
 			while ( true ) {
@@ -952,13 +955,7 @@ class Client {
 				continue;
 			}
 
-			if ( PHP_VERSION_ID >= 72000 ) {
-				// In PHP <= 7.1 and later, making the socket non-blocking before the
-				// SSL handshake makes the stream_socket_enable_crypto() call always return
-				// false. Therefore, we only make the socket non-blocking after the
-				// SSL handshake.
-				stream_set_blocking( $stream, 0 );
-			}
+			stream_set_blocking( $stream, false );
 
 			$this->connections[ $request->id ]->http_socket = $stream;
 			if ( $is_ssl ) {
