@@ -58,13 +58,14 @@ class ClientTest extends TestCase {
     private function withRawResponse(string $raw, callable $cb, int $port = 8970): void {
         $tmp  = tempnam(sys_get_temp_dir(), 'srv').'.php';
         $blob = var_export(base64_encode($raw), true);
-        file_put_contents($tmp, <<<PHP
-<?php
-\$srv = stream_socket_server("tcp://127.0.0.1:$port", \$e, \$s);
-\$c   = @stream_socket_accept(\$srv, 10);
-if (\$c) { fwrite(\$c, base64_decode($blob)); fclose(\$c); }
-fclose(\$srv);
-PHP
+        file_put_contents($tmp,
+		<<<PHP
+		<?php
+		\$srv = stream_socket_server("tcp://127.0.0.1:$port", \$e, \$s);
+		\$c   = @stream_socket_accept(\$srv, 10);
+		if (\$c) { fwrite(\$c, base64_decode($blob)); fclose(\$c); }
+		fclose(\$srv);
+		PHP
 		);
         $p = new Process(['php', $tmp]); $p->start();
         for ($i = 0; $i < 20 && !@fsockopen('127.0.0.1', $port); $i++) usleep(50_000);
@@ -75,13 +76,14 @@ PHP
     /** server that accepts and closes immediately – provokes fwrite() errors */
     private function withDroppingServer(callable $cb, int $port = 8971): void {
         $tmp = tempnam(sys_get_temp_dir(), 'srv').'.php';
-        file_put_contents($tmp, <<<PHP
-<?php
-\$srv = stream_socket_server("tcp://127.0.0.1:$port", \$e, \$s);
-\$c   = @stream_socket_accept(\$srv, 10);
-if (\$c) fclose(\$c);
-fclose(\$srv);
-PHP
+        file_put_contents($tmp,
+		<<<PHP
+		<?php
+		\$srv = stream_socket_server("tcp://127.0.0.1:$port", \$e, \$s);
+		\$c   = @stream_socket_accept(\$srv, 10);
+		if (\$c) fclose(\$c);
+		fclose(\$srv);
+		PHP
 		);
         $p = new Process(['php', $tmp]); $p->start();
         for ($i = 0; $i < 20 && !@fsockopen('127.0.0.1', $port); $i++) usleep(50_000);
@@ -92,11 +94,12 @@ PHP
     /** server that never answers – forces stream_select timeout */
     private function withSilentServer(callable $cb, int $port = 8972): void {
         $tmp = tempnam(sys_get_temp_dir(), 'srv').'.php';
-        file_put_contents($tmp, <<<PHP
-<?php
-\$srv = stream_socket_server("tcp://127.0.0.1:$port", \$e, \$s);
-@stream_socket_accept(\$srv, 10); sleep(10);
-PHP
+        file_put_contents($tmp,
+		<<<PHP
+		<?php
+		\$srv = stream_socket_server("tcp://127.0.0.1:$port", \$e, \$s);
+		@stream_socket_accept(\$srv, 10); sleep(10);
+		PHP
 		);
         $p = new Process(['php', $tmp]); $p->start();
         for ($i = 0; $i < 20 && !@fsockopen('127.0.0.1', $port); $i++) usleep(50_000);
