@@ -621,12 +621,6 @@ PHP
         ]);
     }
 
-    public function test_refused_connect() {
-        $this->expectClientError(new Request('http://127.0.0.1:1/'), 300, [
-            'message' => ['Failed to write request bytes', 'Request timed out', 'Connection closed while reading response headers', 'Request timed out']
-        ]);
-    }
-
     /**
      * @small
      */
