@@ -64,7 +64,8 @@ class ClientTest extends TestCase {
 \$c   = @stream_socket_accept(\$srv, 10);
 if (\$c) { fwrite(\$c, base64_decode($blob)); fclose(\$c); }
 fclose(\$srv);
-PHP);
+PHP
+		);
         $p = new Process(['php', $tmp]); $p->start();
         for ($i = 0; $i < 20 && !@fsockopen('127.0.0.1', $port); $i++) usleep(50_000);
         try   { $cb("http://127.0.0.1:$port"); }
@@ -80,7 +81,8 @@ PHP);
 \$c   = @stream_socket_accept(\$srv, 10);
 if (\$c) fclose(\$c);
 fclose(\$srv);
-PHP);
+PHP
+		);
         $p = new Process(['php', $tmp]); $p->start();
         for ($i = 0; $i < 20 && !@fsockopen('127.0.0.1', $port); $i++) usleep(50_000);
         try   { $cb("http://127.0.0.1:$port"); }
@@ -94,7 +96,8 @@ PHP);
 <?php
 \$srv = stream_socket_server("tcp://127.0.0.1:$port", \$e, \$s);
 @stream_socket_accept(\$srv, 10); sleep(10);
-PHP);
+PHP
+		);
         $p = new Process(['php', $tmp]); $p->start();
         for ($i = 0; $i < 20 && !@fsockopen('127.0.0.1', $port); $i++) usleep(50_000);
         try   { $cb("http://127.0.0.1:$port"); }
@@ -602,7 +605,7 @@ PHP);
     public function test_dns_failure()                  { $this->expectClientError(new Request('http://nope.' . uniqid() . '/'), 0.3, [
 		'message' => 'unable to open a stream to http://nope.'
 	]); }
-	
+
     public function test_refused_connect()              { $this->expectClientError(new Request('http://127.0.0.1:1/'), 0.3, [
 		'message' => 'Failed to write'
 	]); }
