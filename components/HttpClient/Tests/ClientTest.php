@@ -65,10 +65,12 @@ class ClientTest extends TestCase {
 		\$c   = @stream_socket_accept(\$srv, 10);
 		if (\$c) { fwrite(\$c, base64_decode($blob)); fclose(\$c); }
 		fclose(\$srv);
-		PHP
+PHP
 		);
         $p = new Process(['php', $tmp]); $p->start();
-        for ($i = 0; $i < 20 && !@fsockopen('127.0.0.1', $port); $i++) usleep(50_000);
+        for ($i = 0; $i < 20 && !@fsockopen('127.0.0.1', $port); $i++) {
+			usleep(50000);
+		}
         try   { $cb("http://127.0.0.1:$port"); }
         finally { $p->stop(0); @unlink($tmp); }
     }
@@ -83,10 +85,10 @@ class ClientTest extends TestCase {
 		\$c   = @stream_socket_accept(\$srv, 10);
 		if (\$c) fclose(\$c);
 		fclose(\$srv);
-		PHP
+PHP
 		);
         $p = new Process(['php', $tmp]); $p->start();
-        for ($i = 0; $i < 20 && !@fsockopen('127.0.0.1', $port); $i++) usleep(50_000);
+        for ($i = 0; $i < 20 && !@fsockopen('127.0.0.1', $port); $i++) usleep(50000);
         try   { $cb("http://127.0.0.1:$port"); }
         finally { $p->stop(0); @unlink($tmp); }
     }
@@ -99,10 +101,10 @@ class ClientTest extends TestCase {
 		<?php
 		\$srv = stream_socket_server("tcp://127.0.0.1:$port", \$e, \$s);
 		@stream_socket_accept(\$srv, 10); sleep(10);
-		PHP
+PHP
 		);
         $p = new Process(['php', $tmp]); $p->start();
-        for ($i = 0; $i < 20 && !@fsockopen('127.0.0.1', $port); $i++) usleep(50_000);
+        for ($i = 0; $i < 20 && !@fsockopen('127.0.0.1', $port); $i++) usleep(50000);
         try   { $cb("http://127.0.0.1:$port"); }
         finally { $p->stop(0); @unlink($tmp); }
     }
