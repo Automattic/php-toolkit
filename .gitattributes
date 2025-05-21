@@ -7,4 +7,6 @@
 # Let's make sure we use LF (\n) as the line ending in all test files
 # for consistent outcomes across different operating systems.
 **/Tests/**/* text eol=lf
-
+/examples export-ignore
+/plugins export-ignore
+/.github export-ignore
