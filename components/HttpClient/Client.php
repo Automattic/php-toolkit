@@ -5,6 +5,7 @@ namespace WordPress\HttpClient;
 use WordPress\ByteStream\ByteTransformer\InflateTransformer;
 use WordPress\ByteStream\ReadStream\FileReadStream;
 use WordPress\ByteStream\ReadStream\TransformedReadStream;
+use WordPress\DataLiberation\URL\WPURL;
 use WordPress\HttpClient\ByteStream\ChunkedDecoderReadStream;
 use WordPress\HttpClient\ByteStream\ChunkedEncoderByteTransformer;
 use WordPress\HttpClient\ByteStream\RequestReadStream;
@@ -162,10 +163,29 @@ class Client {
 		}
 
 		foreach ( $requests as $request ) {
+			if ( array_key_exists( $request->id, $this->connections ) ) {
+				throw new HttpClientException("Request {$request->id} is already enqueued.");
+			}
+
+			if($request->state !== Request::STATE_CREATED) {
+				throw new HttpClientException("Request {$request->id} is not in the created state.");
+			}
+			
+			$request->state = Request::STATE_ENQUEUED;
 			$this->requests[]                          = apply_filters( 'wp_http_client_request', $request );
 			$this->events[ $request->id ]              = array();
 			$this->connections[ $request->id ]         = new Connection( $request );
 			$this->requests_started_at[ $request->id ] = microtime( true );
+
+			$parsed = WPURL::parse($request->url);
+			if(false === $parsed) {
+				$this->set_error( $request, new HttpError( sprintf( 'Invalid URL: %s', $request->url ) ) );
+				continue;
+			}
+			if($parsed->protocol !== 'http:' && $parsed->protocol !== 'https:') {
+				$this->set_error( $request, new HttpError( sprintf( 'Invalid URL – only HTTP and HTTPS URLs are supported: %s', $parsed->toString() ) ) );
+				continue;
+			}
 		}
 	}
 
@@ -390,6 +410,7 @@ class Client {
 			$this->get_active_requests( Request::STATE_RECEIVING_BODY )
 		);
 
+
 		return true;
 	}
 
@@ -444,7 +465,7 @@ class Client {
 			if ( $this->connections[ $request->id ]->decoded_response_stream ) {
 				$stream = $this->connections[ $request->id ]->decoded_response_stream;
 				$stream->close_reading();
-				unset( $this->connections[ $request->id ]->decoded_response_stream );
+				$this->connections[ $request->id ]->decoded_response_stream = null;
 			} else {
 				@fclose( $socket );
 			}
@@ -533,6 +554,9 @@ class Client {
 						$transfer_encoding === 'gzip' ? ZLIB_ENCODING_GZIP : ZLIB_ENCODING_RAW
 					);
 					break;
+				case 'deflate':
+					$transformers[] = new InflateTransformer(ZLIB_ENCODING_DEFLATE);
+					break;
 				case 'identity':
 					// No-op
 					break;
@@ -589,7 +613,6 @@ class Client {
 	protected function send_request_headers( array $requests ) {
 		foreach ( $this->stream_select( $requests, static::STREAM_SELECT_WRITE ) as $request ) {
 			$header_bytes = static::prepare_request_headers( $request );
-
 			if ( false === @fwrite( $this->connections[ $request->id ]->http_socket, $header_bytes ) ) {
 				$last_error = error_get_last();
 				$this->set_error( $request,
@@ -660,9 +683,20 @@ class Client {
 			while ( true ) {
 				// @TODO: Use a larger chunk size here and then scan for \r\n\r\n.
 				// 1 seems slow and overly conservative.
+				if (
+					!$this->connections[ $request->id ]->http_socket ||
+					!is_resource($this->connections[ $request->id ]->http_socket) || 
+					feof($this->connections[ $request->id ]->http_socket)
+				) {
+					$this->set_error($request, new HttpError('Connection closed while reading response headers.'));
+					break;
+				}
+				
 				$header_byte = fread( $this->connections[ $request->id ]->http_socket, 1 );
+
 				if ( false === $header_byte || '' === $header_byte ) {
 					if (
+						!$this->connections[ $request->id ]->http_socket ||
 						!is_resource($this->connections[ $request->id ]->http_socket) || 
 						feof($this->connections[ $request->id ]->http_socket)
 					) {
@@ -705,12 +739,6 @@ class Client {
 				$nb_headers_received ++;
 
 				if ( $response->total_bytes === 0 ) {
-					$request->state = Request::STATE_RECEIVED;
-					break;
-				}
-
-				// If we're being redirected, we don't need to wait for the body.
-				if ( $response->status_code >= 300 && $response->status_code < 400 ) {
 					$request->state = Request::STATE_RECEIVED;
 					break;
 				}
@@ -789,30 +817,20 @@ class Client {
 			}
 
 			$redirect_url = $location;
-			if ( strpos( $redirect_url, 'http://' ) !== 0 && strpos( $redirect_url, 'https://' ) !== 0 ) {
-				$current_url_parts = parse_url( $request->url );
-				$redirect_url      = $current_url_parts['scheme'] . '://' . $current_url_parts['host'];
-				if ( $current_url_parts['port'] ) {
-					$redirect_url .= ':' . $current_url_parts['port'];
-				}
-				if ( strlen( $location ) === 0 || $location[0] !== '/' ) {
-					$redirect_url .= '/';
-				}
-				$redirect_url .= $location;
-			}
-
-			// @TODO: Use a WHATWG-compliant URL parser
-			if ( ! filter_var( $redirect_url, FILTER_VALIDATE_URL ) ) {
-				$this->set_error( $request, new HttpError( 'Invalid redirect URL' ) );
+			$parsed = WPURL::parse($redirect_url, $request->url);
+			if(false === $parsed) {
+				$this->set_error( $request, new HttpError( sprintf( 'Invalid redirect URL: %s', $redirect_url ) ) );
 				continue;
 			}
+			$redirect_url = $parsed->toString();
 
 			$this->events[ $request->id ][ self::EVENT_REDIRECT ] = true;
 			$this->enqueue(
 				new Request(
 					$redirect_url,
 					array(
-						'method'          => $request->method,
+						// Redirects are always GET requests
+						'method'          => 'GET',
 						'redirected_from' => $request,
 					)
 				)

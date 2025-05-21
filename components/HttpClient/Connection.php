@@ -7,7 +7,7 @@ class Connection {
 	public $request;
 	public $http_socket;
 	public $response_buffer;
-	public $decoded_response_stream;
+	public $decoded_response_stream = null;
 
 	public function __construct( Request $request ) {
 		$this->request = $request;
