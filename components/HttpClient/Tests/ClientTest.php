@@ -603,17 +603,23 @@ PHP
 		}, 'edge-cases' );
 	}
 
-    public function test_invalid_scheme()               { $this->expectClientError(new Request('gopher://x'), 300, [
-		'message' => 'only HTTP and HTTPS URLs are supported:'
-	]); }
+    public function test_invalid_scheme() {
+		$this->expectClientError(new Request('gopher://x'), 300, [
+			'message' => 'only HTTP and HTTPS URLs are supported:'
+		]);
+	}
 
-    public function test_dns_failure()                  { $this->expectClientError(new Request('http://nope.' . uniqid() . '/'), 300, [
-		'message' => 'unable to open a stream to http://nope.'
-	]); }
+    public function test_dns_failure()                  {
+		$this->expectClientError(new Request('http://nope.' . uniqid() . '/'), 300, [
+			'message' => ['unable to open a stream to http://nope.', 'Request timed out']
+		]);
+	}
 
-    public function test_refused_connect()              { $this->expectClientError(new Request('http://127.0.0.1:1/'), 300, [
-		'message' => 'Failed to write'
-	]); }
+    public function test_refused_connect() {
+		$this->expectClientError(new Request('http://127.0.0.1:1/'), 300, [
+			'message' => ['Failed to write request bytes', 'Request timed out']
+		]);
+	}
 
 	/**
 	 * @small
@@ -642,7 +648,7 @@ PHP
     public function test_stream_select_timeout() {
         $this->withSilentServer(function (string $base) {
             $this->expectClientError(new Request("$base/hang"), 300, [
-				'message' => 'Request timed out'
+				'message' => ['Failed to write request bytes', 'Request timed out']
 			]);
         });
     }
