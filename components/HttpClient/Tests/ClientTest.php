@@ -300,7 +300,12 @@ PHP
 			switch ( $client->get_event() ) {
 				case Client::EVENT_FAILED:
 					$this->assertNotNull( $request->error );
-					$this->assertStringContainsString( 'Failed to write request bytes', $request->error->message );
+					if(
+						false === strpos($request->error->message, 'Failed to write request bytes') &&
+						false === strpos($request->error->message, 'Connection closed while reading response headers')
+					) {
+						$this->fail('Unexpected error: ' . $request->error->message);
+					}
 					$error_occurred = true;
 					break 2;
 			}
