@@ -3,8 +3,16 @@
          colors="true"
          stopOnFailure="false">
     <testsuites>
+        <!--
+			Blueprints tests are slow so we'll run them last.
+			There's no need to hold up the prior test results.
+		-->
         <testsuite name="Project Test Suite">
             <directory>components/*/Tests</directory>
+            <exclude>components/Blueprints/Tests</exclude>
+        </testsuite>
+        <testsuite name="Blueprints Test Suite">
+            <directory>components/Blueprints/Tests</directory>
         </testsuite>
     </testsuites>
 </phpunit>
