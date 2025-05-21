@@ -633,8 +633,10 @@ class Client {
 			$header_bytes = static::prepare_request_headers( $request );
 			if ( false === @fwrite( $this->connections[ $request->id ]->http_socket, $header_bytes ) ) {
 				$last_error = error_get_last();
+				$last_error_message = is_array( $last_error ) ? $last_error['message'] : 'unknown';
 				$this->set_error( $request,
-					new HttpError( 'Failed to write request bytes - ' . ( is_array( $last_error ) ? $last_error['message'] : 'unknown' ) ) );
+					new HttpError( 'Failed to write request bytes - ' . $last_error_message )
+				);
 				continue;
 			}
 
@@ -676,8 +678,10 @@ class Client {
 			}
 
 			$chunk = $request->upload_body_stream->consume( $available_bytes );
-			if ( ! fwrite( $this->connections[ $request->id ]->http_socket, $chunk ) ) {
-				$this->set_error( $request, new HttpError( 'Failed to write request bytes.' ) );
+			if ( ! @fwrite( $this->connections[ $request->id ]->http_socket, $chunk ) ) {
+				$last_error = error_get_last();
+				$last_error_message = is_array( $last_error ) ? $last_error['message'] : 'unknown';
+				$this->set_error( $request, new HttpError( 'Failed to write request bytes: ' . $last_error_message ) );
 				continue;
 			}
 		}
@@ -704,7 +708,7 @@ class Client {
 				if (
 					!$this->connections[ $request->id ]->http_socket ||
 					!is_resource($this->connections[ $request->id ]->http_socket) ||
-					feof($this->connections[ $request->id ]->http_socket)
+					@feof($this->connections[ $request->id ]->http_socket)
 				) {
 					$this->set_error($request, new HttpError('Connection closed while reading response headers.'));
 					break;
@@ -716,7 +720,7 @@ class Client {
 					if (
 						!$this->connections[ $request->id ]->http_socket ||
 						!is_resource($this->connections[ $request->id ]->http_socket) ||
-						feof($this->connections[ $request->id ]->http_socket)
+						@feof($this->connections[ $request->id ]->http_socket)
 					) {
 						$this->set_error($request, new HttpError('Connection closed while reading response headers.'));
 						break;

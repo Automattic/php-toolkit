@@ -640,7 +640,7 @@ PHP
 			]);
             $req->method = 'POST';
             $this->expectClientError($req, null, [
-				'message' => ['Failed to write request bytes', 'Connection closed while reading response headers']
+				'message' => ['Failed to write request bytes', 'Connection closed while reading response headers', 'Broken pipe']
 			]);
         });
     }
