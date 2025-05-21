@@ -108,13 +108,13 @@ class Client {
 	protected $event;
 	protected $request;
 	protected $response_body_chunk;
-	protected $timeout;
+	protected $request_timeout_ms;
 	protected $requests_started_at = array();
 
 	public function __construct( $options = array() ) {
 		$this->concurrency   = $options['concurrency'] ?? 10;
 		$this->max_redirects = $options['max_redirects'] ?? 3;
-		$this->timeout       = $options['timeout'] ?? 30;
+		$this->request_timeout_ms = ($options['timeout'] ?? 30) * 1000;
 		$this->requests      = array();
 	}
 
@@ -170,12 +170,11 @@ class Client {
 			if($request->state !== Request::STATE_CREATED) {
 				throw new HttpClientException("Request {$request->id} is not in the created state.");
 			}
-			
+
 			$request->state = Request::STATE_ENQUEUED;
 			$this->requests[]                          = apply_filters( 'wp_http_client_request', $request );
 			$this->events[ $request->id ]              = array();
 			$this->connections[ $request->id ]         = new Connection( $request );
-			$this->requests_started_at[ $request->id ] = microtime( true );
 
 			$parsed = WPURL::parse($request->url);
 			if(false === $parsed) {
@@ -257,10 +256,14 @@ class Client {
 		$this->response_body_chunk = null;
 
 		$start_time = microtime( true );
-		$timeout    = $query['timeout'] ?? $this->timeout * 1000;
+		$timeout_ms  = isset( $query['timeout'] ) 
+			? $query['timeout'] * 1000 
+			// Give the requests an opportunity to time out
+			: $this->request_timeout_ms * 1.1
+		;
 
 		do {
-			if ( false !== $timeout && ( microtime( true ) - $start_time ) * 1000 >= $timeout ) {
+			if ( $timeout_ms && ( microtime( true ) - $start_time ) * 1000 >= $timeout_ms ) {
 				return false;
 			}
 
@@ -356,9 +359,18 @@ class Client {
 			return false;
 		}
 
-		foreach ( $this->get_active_requests() as $request ) {
-			if ( microtime( true ) - $this->requests_started_at[ $request->id ] > $this->timeout ) {
-				$this->set_error( $request, new HttpError( sprintf( 'Request timed out after %s seconds.', $this->timeout ) ) );
+		foreach ( $this->get_active_requests([ 
+			Request::STATE_WILL_ENABLE_CRYPTO,
+			Request::STATE_WILL_SEND_HEADERS,
+			Request::STATE_WILL_SEND_BODY,
+			Request::STATE_SENT,
+			Request::STATE_RECEIVING_HEADERS,
+			Request::STATE_RECEIVING_BODY,
+			Request::STATE_RECEIVED,
+		]) as $request ) {
+			$time_elapsed = (microtime( true ) - $this->requests_started_at[ $request->id ]) * 1000;
+			if ( $time_elapsed > $this->request_timeout_ms ) {
+				$this->set_error( $request, new HttpError( sprintf( 'Request timed out after %s seconds.', $time_elapsed ) ) );
 			}
 		}
 
@@ -555,7 +567,7 @@ class Client {
 					);
 					break;
 				case 'deflate':
-					$transformers[] = new InflateTransformer(ZLIB_ENCODING_DEFLATE);
+					$transformers[] = new InflateTransformer( ZLIB_ENCODING_DEFLATE );
 					break;
 				case 'identity':
 					// No-op
@@ -685,19 +697,19 @@ class Client {
 				// 1 seems slow and overly conservative.
 				if (
 					!$this->connections[ $request->id ]->http_socket ||
-					!is_resource($this->connections[ $request->id ]->http_socket) || 
+					!is_resource($this->connections[ $request->id ]->http_socket) ||
 					feof($this->connections[ $request->id ]->http_socket)
 				) {
 					$this->set_error($request, new HttpError('Connection closed while reading response headers.'));
 					break;
 				}
-				
+
 				$header_byte = fread( $this->connections[ $request->id ]->http_socket, 1 );
 
 				if ( false === $header_byte || '' === $header_byte ) {
 					if (
 						!$this->connections[ $request->id ]->http_socket ||
-						!is_resource($this->connections[ $request->id ]->http_socket) || 
+						!is_resource($this->connections[ $request->id ]->http_socket) ||
 						feof($this->connections[ $request->id ]->http_socket)
 					) {
 						$this->set_error($request, new HttpError('Connection closed while reading response headers.'));
@@ -922,11 +934,12 @@ class Client {
 				)
 			);
 
+			$this->requests_started_at[ $request->id ] = microtime( true );
 			$stream = @stream_socket_client(
 				'tcp://' . $host . ':' . $port,
 				$errno,
 				$errstr,
-				$this->timeout,
+				$this->request_timeout_ms,
 				STREAM_CLIENT_CONNECT | STREAM_CLIENT_ASYNC_CONNECT,
 				$context
 			);

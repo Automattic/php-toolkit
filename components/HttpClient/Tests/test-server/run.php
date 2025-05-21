@@ -81,8 +81,12 @@ $server->set_handler( function ( IncomingRequest $request, TcpResponseWriteStrea
 			} elseif ( $encoding === 'deflate' ) {
 				$response->send_header( 'Content-Encoding', 'deflate' );
 				$response->send_header( 'Content-Type', 'text/plain' );
-				$deflate = gzcompress( 'deflated', ZLIB_ENCODING_DEFLATE );
+				$deflate = gzcompress( 'deflated', -1, ZLIB_ENCODING_DEFLATE );
 				$response->append_bytes( $deflate );
+			} elseif ( $encoding === 'rot13' ) {
+				$response->send_header( 'Content-Encoding', 'rot13' );
+				$response->send_header( 'Content-Type', 'text/plain' );
+				$response->append_bytes( str_rot13( 'rot13' ) );
 			} else {
 				$response->send_header( 'Content-Type', 'text/plain' );
 				$response->append_bytes( 'plain' );
@@ -157,7 +161,7 @@ $server->set_handler( function ( IncomingRequest $request, TcpResponseWriteStrea
 				$response->dangerously_mark_headers_as_sent();
 				$response->append_bytes( "INVALID\r\n\r\n" );
 			} elseif ( $err === 'timeout' ) {
-				sleep( 10 ); // Simulate timeout longer than client default
+				sleep( 2 ); // Simulate timeout longer than client default
 				$response->send_http_code( 200 );
 				$response->append_bytes( 'timeout' );
 			} elseif ( $err === 'timeout-read-body' ) {
