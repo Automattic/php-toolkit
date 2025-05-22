@@ -5,6 +5,7 @@ namespace WordPress\HttpClient;
 use WordPress\ByteStream\ByteTransformer\InflateTransformer;
 use WordPress\ByteStream\ReadStream\FileReadStream;
 use WordPress\ByteStream\ReadStream\TransformedReadStream;
+use WordPress\DataLiberation\URL\WPURL;
 use WordPress\HttpClient\ByteStream\ChunkedDecoderReadStream;
 use WordPress\HttpClient\ByteStream\ChunkedEncoderByteTransformer;
 use WordPress\HttpClient\ByteStream\RequestReadStream;
@@ -107,13 +108,13 @@ class Client {
 	protected $event;
 	protected $request;
 	protected $response_body_chunk;
-	protected $timeout;
+	protected $request_timeout_ms;
 	protected $requests_started_at = array();
 
 	public function __construct( $options = array() ) {
 		$this->concurrency   = $options['concurrency'] ?? 10;
 		$this->max_redirects = $options['max_redirects'] ?? 3;
-		$this->timeout       = $options['timeout'] ?? 30;
+		$this->request_timeout_ms = $options['timeout_ms'] ?? 30000;
 		$this->requests      = array();
 	}
 
@@ -162,10 +163,28 @@ class Client {
 		}
 
 		foreach ( $requests as $request ) {
+			if ( array_key_exists( $request->id, $this->connections ) ) {
+				throw new HttpClientException("Request {$request->id} is already enqueued.");
+			}
+
+			if($request->state !== Request::STATE_CREATED) {
+				throw new HttpClientException("Request {$request->id} is not in the created state.");
+			}
+
+			$request->state = Request::STATE_ENQUEUED;
 			$this->requests[]                          = apply_filters( 'wp_http_client_request', $request );
 			$this->events[ $request->id ]              = array();
 			$this->connections[ $request->id ]         = new Connection( $request );
-			$this->requests_started_at[ $request->id ] = microtime( true );
+
+			$parsed = WPURL::parse($request->url);
+			if(false === $parsed) {
+				$this->set_error( $request, new HttpError( sprintf( 'Invalid URL: %s', $request->url ) ) );
+				continue;
+			}
+			if($parsed->protocol !== 'http:' && $parsed->protocol !== 'https:') {
+				$this->set_error( $request, new HttpError( sprintf( 'Invalid URL – only HTTP and HTTPS URLs are supported: %s', $parsed->toString() ) ) );
+				continue;
+			}
 		}
 	}
 
@@ -237,13 +256,13 @@ class Client {
 		$this->response_body_chunk = null;
 
 		$start_time = microtime( true );
-		$timeout    = $query['timeout'] ?? $this->timeout * 1000;
+		$timeout_ms = isset( $query['timeout_ms'] ) 
+			? $query['timeout_ms']
+			// Give the requests an opportunity to time out
+			: $this->request_timeout_ms * 1.1
+		;
 
 		do {
-			if ( false !== $timeout && ( microtime( true ) - $start_time ) * 1000 >= $timeout ) {
-				return false;
-			}
-
 			if ( empty( $query['requests'] ) ) {
 				$events = array_keys( $this->events );
 			} else {
@@ -274,6 +293,15 @@ class Client {
 
 					return true;
 				}
+			}
+			
+			// After we've checked for any available events, see if we've run out of time.
+			// This way, we always return any events that were ready before worrying about the timeout.
+			// If we checked the timeout first, we might miss events that were already waiting for us
+			// when the timeout is set to zero.
+			$time_elapsed_ms = (microtime( true ) - $start_time) * 1000;
+			if ( $timeout_ms && $time_elapsed_ms >= $timeout_ms ) {
+				return false;
 			}
 		} while ( $this->event_loop_tick() );
 
@@ -336,9 +364,18 @@ class Client {
 			return false;
 		}
 
-		foreach ( $this->get_active_requests() as $request ) {
-			if ( microtime( true ) - $this->requests_started_at[ $request->id ] > $this->timeout ) {
-				$this->set_error( $request, new HttpError( sprintf( 'Request timed out after %s seconds.', $this->timeout ) ) );
+		foreach ( $this->get_active_requests([ 
+			Request::STATE_WILL_ENABLE_CRYPTO,
+			Request::STATE_WILL_SEND_HEADERS,
+			Request::STATE_WILL_SEND_BODY,
+			Request::STATE_SENT,
+			Request::STATE_RECEIVING_HEADERS,
+			Request::STATE_RECEIVING_BODY,
+			Request::STATE_RECEIVED,
+		]) as $request ) {
+			$time_elapsed_ms = (microtime( true ) - $this->requests_started_at[ $request->id ]) * 1000;
+			if ( $time_elapsed_ms > $this->request_timeout_ms ) {
+				$this->set_error( $request, new HttpError( sprintf( 'Request timed out after %s seconds.', $time_elapsed_ms ) ) );
 			}
 		}
 
@@ -389,6 +426,7 @@ class Client {
 		$this->receive_response_body(
 			$this->get_active_requests( Request::STATE_RECEIVING_BODY )
 		);
+
 
 		return true;
 	}
@@ -444,7 +482,7 @@ class Client {
 			if ( $this->connections[ $request->id ]->decoded_response_stream ) {
 				$stream = $this->connections[ $request->id ]->decoded_response_stream;
 				$stream->close_reading();
-				unset( $this->connections[ $request->id ]->decoded_response_stream );
+				$this->connections[ $request->id ]->decoded_response_stream = null;
 			} else {
 				@fclose( $socket );
 			}
@@ -533,6 +571,9 @@ class Client {
 						$transfer_encoding === 'gzip' ? ZLIB_ENCODING_GZIP : ZLIB_ENCODING_RAW
 					);
 					break;
+				case 'deflate':
+					$transformers[] = new InflateTransformer( ZLIB_ENCODING_DEFLATE );
+					break;
 				case 'identity':
 					// No-op
 					break;
@@ -560,16 +601,17 @@ class Client {
 	 */
 	protected function enable_crypto( array $requests ) {
 		foreach ( $this->stream_select( $requests, static::STREAM_SELECT_WRITE ) as $request ) {
-			stream_set_timeout( $this->connections[ $request->id ]->http_socket, 1 );
+			@stream_set_timeout( $this->connections[ $request->id ]->http_socket, 1 );
 			$enabled_crypto = stream_socket_enable_crypto(
 				$this->connections[ $request->id ]->http_socket,
 				true,
-				STREAM_CRYPTO_METHOD_TLSv1_2_CLIENT
+				STREAM_CRYPTO_METHOD_TLS_CLIENT
 			);
 			if ( false === $enabled_crypto ) {
 				$last_error = error_get_last();
 				$this->set_error( $request,
-					new HttpError( 'Failed to enable crypto: ' . ( is_array( $last_error ) ? $last_error['message'] : 'unknown' ) ) );
+					new HttpError( 'Failed to enable crypto: ' . ( is_array( $last_error ) ? $last_error['message'] : 'unknown' ) )
+				);
 				continue;
 			} elseif ( 0 === $enabled_crypto ) {
 				// The SSL handshake isn't finished yet, let's skip it
@@ -589,11 +631,12 @@ class Client {
 	protected function send_request_headers( array $requests ) {
 		foreach ( $this->stream_select( $requests, static::STREAM_SELECT_WRITE ) as $request ) {
 			$header_bytes = static::prepare_request_headers( $request );
-
 			if ( false === @fwrite( $this->connections[ $request->id ]->http_socket, $header_bytes ) ) {
 				$last_error = error_get_last();
+				$last_error_message = is_array( $last_error ) ? $last_error['message'] : 'unknown';
 				$this->set_error( $request,
-					new HttpError( 'Failed to write request bytes - ' . ( is_array( $last_error ) ? $last_error['message'] : 'unknown' ) ) );
+					new HttpError( 'Failed to write request bytes - ' . $last_error_message )
+				);
 				continue;
 			}
 
@@ -635,8 +678,10 @@ class Client {
 			}
 
 			$chunk = $request->upload_body_stream->consume( $available_bytes );
-			if ( ! fwrite( $this->connections[ $request->id ]->http_socket, $chunk ) ) {
-				$this->set_error( $request, new HttpError( 'Failed to write request bytes.' ) );
+			if ( ! @fwrite( $this->connections[ $request->id ]->http_socket, $chunk ) ) {
+				$last_error = error_get_last();
+				$last_error_message = is_array( $last_error ) ? $last_error['message'] : 'unknown';
+				$this->set_error( $request, new HttpError( 'Failed to write request bytes: ' . $last_error_message ) );
 				continue;
 			}
 		}
@@ -660,11 +705,22 @@ class Client {
 			while ( true ) {
 				// @TODO: Use a larger chunk size here and then scan for \r\n\r\n.
 				// 1 seems slow and overly conservative.
+				if (
+					!$this->connections[ $request->id ]->http_socket ||
+					!is_resource($this->connections[ $request->id ]->http_socket) ||
+					@feof($this->connections[ $request->id ]->http_socket)
+				) {
+					$this->set_error($request, new HttpError('Connection closed while reading response headers.'));
+					break;
+				}
+
 				$header_byte = fread( $this->connections[ $request->id ]->http_socket, 1 );
+
 				if ( false === $header_byte || '' === $header_byte ) {
 					if (
-						!is_resource($this->connections[ $request->id ]->http_socket) || 
-						feof($this->connections[ $request->id ]->http_socket)
+						!$this->connections[ $request->id ]->http_socket ||
+						!is_resource($this->connections[ $request->id ]->http_socket) ||
+						@feof($this->connections[ $request->id ]->http_socket)
 					) {
 						$this->set_error($request, new HttpError('Connection closed while reading response headers.'));
 						break;
@@ -709,13 +765,8 @@ class Client {
 					break;
 				}
 
-				// If we're being redirected, we don't need to wait for the body.
-				if ( $response->status_code >= 300 && $response->status_code < 400 ) {
-					$request->state = Request::STATE_RECEIVED;
-					break;
-				}
-
 				$request->state = Request::STATE_RECEIVING_BODY;
+				$this->connections[ $request->id ]->decoded_response_stream = $this->decode_and_monitor_response_body_stream( $request );
 				break;
 			}
 		}
@@ -734,10 +785,6 @@ class Client {
 		// * The last chunk in Transfer-Encoding: chunked is received
 		// * The connection is closed
 		foreach ( $this->stream_select( $requests, static::STREAM_SELECT_READ ) as $request ) {
-			if ( ! $this->connections[ $request->id ]->decoded_response_stream ) {
-				$this->connections[ $request->id ]->decoded_response_stream = $this->decode_and_monitor_response_body_stream( $request );
-			}
-
 			$stream = $this->connections[ $request->id ]->decoded_response_stream;
 
 			while ( true ) {
@@ -789,30 +836,20 @@ class Client {
 			}
 
 			$redirect_url = $location;
-			if ( strpos( $redirect_url, 'http://' ) !== 0 && strpos( $redirect_url, 'https://' ) !== 0 ) {
-				$current_url_parts = parse_url( $request->url );
-				$redirect_url      = $current_url_parts['scheme'] . '://' . $current_url_parts['host'];
-				if ( $current_url_parts['port'] ) {
-					$redirect_url .= ':' . $current_url_parts['port'];
-				}
-				if ( strlen( $location ) === 0 || $location[0] !== '/' ) {
-					$redirect_url .= '/';
-				}
-				$redirect_url .= $location;
-			}
-
-			// @TODO: Use a WHATWG-compliant URL parser
-			if ( ! filter_var( $redirect_url, FILTER_VALIDATE_URL ) ) {
-				$this->set_error( $request, new HttpError( 'Invalid redirect URL' ) );
+			$parsed = WPURL::parse($redirect_url, $request->url);
+			if(false === $parsed) {
+				$this->set_error( $request, new HttpError( sprintf( 'Invalid redirect URL: %s', $redirect_url ) ) );
 				continue;
 			}
+			$redirect_url = $parsed->toString();
 
 			$this->events[ $request->id ][ self::EVENT_REDIRECT ] = true;
 			$this->enqueue(
 				new Request(
 					$redirect_url,
 					array(
-						'method'          => $request->method,
+						// Redirects are always GET requests
+						'method'          => 'GET',
 						'redirected_from' => $request,
 					)
 				)
@@ -904,11 +941,12 @@ class Client {
 				)
 			);
 
+			$this->requests_started_at[ $request->id ] = microtime( true );
 			$stream = @stream_socket_client(
 				'tcp://' . $host . ':' . $port,
 				$errno,
 				$errstr,
-				$this->timeout,
+				$this->request_timeout_ms,
 				STREAM_CLIENT_CONNECT | STREAM_CLIENT_ASYNC_CONNECT,
 				$context
 			);
@@ -921,13 +959,7 @@ class Client {
 				continue;
 			}
 
-			if ( PHP_VERSION_ID >= 72000 ) {
-				// In PHP <= 7.1 and later, making the socket non-blocking before the
-				// SSL handshake makes the stream_socket_enable_crypto() call always return
-				// false. Therefore, we only make the socket non-blocking after the
-				// SSL handshake.
-				stream_set_blocking( $stream, 0 );
-			}
+			stream_set_blocking( $stream, false );
 
 			$this->connections[ $request->id ]->http_socket = $stream;
 			if ( $is_ssl ) {

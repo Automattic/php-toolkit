@@ -16,7 +16,7 @@ class TestClient extends Client {
 	}
 
 	public function getTimeout() {
-		return $this->timeout;
+		return $this->request_timeout;
 	}
 
 	public function getRequests() {

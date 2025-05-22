@@ -4,6 +4,7 @@ namespace WordPress\HttpClient;
 
 class Request {
 
+	const STATE_CREATED = 'STATE_CREATED';
 	const STATE_ENQUEUED = 'STATE_ENQUEUED';
 	const STATE_WILL_ENABLE_CRYPTO = 'STATE_WILL_ENABLE_CRYPTO';
 	const STATE_WILL_SEND_HEADERS = 'STATE_WILL_SEND_HEADERS';
@@ -19,7 +20,7 @@ class Request {
 
 	public $id;
 
-	public $state = self::STATE_ENQUEUED;
+	public $state = self::STATE_CREATED;
 
 	public $url;
 	public $is_ssl;
