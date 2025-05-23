@@ -311,7 +311,7 @@ abstract class Client {
 	 *
 	 * @return string
 	 */
-	protected function consume_buffered_response_body( $request_id ): string|false {
+	protected function consume_buffered_response_body( $request_id ) {
 		$request = $this->get_request_by_id( $request_id );
 		if ( null === $request ) {
 			return false;
