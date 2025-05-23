@@ -2,6 +2,7 @@
 
 namespace WordPress\HttpClient;
 
+use WordPress\ByteStream\ReadStream\ByteReadStream;
 use WordPress\DataLiberation\URL\WPURL;
 
 /**
@@ -32,6 +33,7 @@ class CurlClient {
     protected $multi_handle;
     /** @var array Map of cURL handle resource IDs to request IDs (for callbacks) */
     protected $handleMap = array();
+	private $headers_buffer = [];
 
     /** @var array Internal event queue */
     private $events = array();
@@ -94,6 +96,7 @@ class CurlClient {
 
             // Initialize and add the curl handle for this request
             $ch = $this->init_curl_handle( $request );
+			/** @var \CurlHandle $ch */
             if ( ! $ch ) {
                 // If initialization fails, immediately mark this request as failed
                 $this->events[$request->id][self::EVENT_FAILED] = true;
@@ -126,8 +129,19 @@ class CurlClient {
 		curl_setopt($ch, CURLOPT_ENCODING, '');
         // Set HTTP method and body if needed
 		curl_setopt( $ch, CURLOPT_CUSTOMREQUEST, $request->method );
-		if ( ! empty( $request->body ) ) {
-			curl_setopt( $ch, CURLOPT_POSTFIELDS, $request->body );
+		if ( ! empty( $request->upload_body_stream ) ) {
+			curl_setopt( $ch, CURLOPT_READFUNCTION, function($ch, $fp, $length) use ($request) {
+				$stream = $request->upload_body_stream;
+				// Pull at most $length bytes until we either get some bytes
+				// or we reach the end of the stream.
+				while(!$stream->reached_end_of_data()) {
+					$got_bytes = $stream->pull($length);
+					if($got_bytes > 0) {
+						return $stream->consume($got_bytes);
+					}
+				}
+				return '';
+			});
 		}
         // Set headers if provided
         if ( ! empty( $request->headers ) ) {
@@ -149,8 +163,6 @@ class CurlClient {
 
         return $ch;
     }
-
-	private $headers_buffer = [];
 
     /**
      * cURL callback to handle incoming header lines.
