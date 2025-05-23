@@ -2,119 +2,165 @@
 
 namespace WordPress\HttpClient;
 
-use Exception;
 use RuntimeException;
-use WordPress\ByteStream\WriteStream\ByteWriteStream;
-use WordPress\Filesystem\Filesystem;
-use WordPress\Filesystem\FilesystemException;
+use Exception;
 
-final class FilesystemCache implements CacheStorage {
-	/**
-	 * @var Filesystem
-	 */
-	private $fs;
-	/** @var array<string, string> Maps URL to temporary body file path during streaming */
-	private $body_paths = [];
+/**
+ * Simple, process-safe cache that avoids the Filesystem abstraction and
+ * relies on atomic renames. All writes go to <name>.partial first, then
+ * get renamed into place. Every critical section is wrapped in flock().
+ */
+final class FilesystemCache
+{
+    /** @var string */
+    private string $dir;
 
-	public function __construct( Filesystem $fs ) {
-		$this->fs = $fs;
-	}
+    /** @var array<string,string> */
+    private array $partials = [];
 
-	public function get_body_path( string $url ): string {
-		$key = hash( 'sha256', $url );
+    public function __construct(string $dir)
+    {
+        $this->dir = rtrim($dir, '/');
+        if (!is_dir($this->dir) && !mkdir($this->dir, 0755, true)) {
+            throw new RuntimeException("Cannot create cache dir {$this->dir}");
+        }
+    }
 
-		return "$key.bin";
-	}
+    private function key(string $url): string
+    {
+        return hash('sha256', $url);
+    }
 
-	private function get_meta_path( string $url ): string {
-		$key = hash( 'sha256', $url );
+    public function get_body_path(string $url): string
+    {
+        return "{$this->dir}/{$this->key($url)}.bin";
+    }
 
-		return "$key.json";
-	}
+    private function get_meta_path(string $url): string
+    {
+        return "{$this->dir}/{$this->key($url)}.json";
+    }
 
-	public function lookup( string $url ): ?CacheEntry {
-		$meta_path = $this->get_meta_path( $url );
-		$body_path = $this->get_body_path( $url );
+    /** @return resource */
+    public function open_body_write_stream(string $url)
+    {
+        $partial = $this->get_body_path($url) . '.partial';
+        $h = fopen($partial, 'wb');
+        if (!$h) {
+            throw new RuntimeException("Cannot open {$partial} for writing");
+        }
+        if (!flock($h, LOCK_EX)) {
+            fclose($h);
+            throw new RuntimeException("Cannot get exclusive lock on {$partial}");
+        }
+        $this->partials[$url] = $partial;
+        return $h;              // caller must fclose(); promotion happens in store()
+    }
 
-		// Check for metadata first, as body without metadata is useless.
-		if ( ! $this->fs->exists( $meta_path ) ) {
-			return null;
-		}
+	public function commit(Response $response): void
+	{
+		$e = CacheEntry::from_response( $response );
+		
+        /* promote body if it was streamed */
+        if (isset($this->partials[$e->url])) {
+            $partial = $this->partials[$e->url];
+            $final   = $this->get_body_path($e->url);
+            fclose(fopen($partial, 'rb+'));   // flush & unlock
+            rename($partial, $final);         // atomic within fs
+            chmod($final, 0644);
+            unset($this->partials[$e->url]);
+        }
 
-		// If metadata exists, but body doesn't, invalidate and return null.
-		if ( ! $this->fs->exists( $body_path ) ) {
-			$this->invalidate( $url );
+        $json = json_encode($e, JSON_PRETTY_PRINT);
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            throw new Exception(json_last_error_msg());
+        }
 
-			return null;
-		}
+        $meta = $this->get_meta_path($e->url);
+        $tmp  = $meta . '.partial';
+        $h    = fopen($tmp, 'wb');
+        if (!$h) {
+            throw new RuntimeException("Cannot write {$tmp}");
+        }
+        flock($h, LOCK_EX);
+        fwrite($h, $json);
+        fflush($h);
+        if (function_exists('fsync')) {
+            fsync($h);
+        }
+        flock($h, LOCK_UN);
+        fclose($h);
+        rename($tmp, $meta);
+        chmod($meta, 0644);
+    }
 
-		$data  = json_decode( $this->fs->get_contents( $meta_path ), true );
-		$entry = new CacheEntry();
-		foreach ( $data as $k => $v ) {
-			// Skip body_path if it somehow exists in old cache files
-			if ( $k === 'body_path' ) {
-				continue;
-			}
-			$entry->$k = $v;
-		}
+    public function lookup(string $url): ?CacheEntry
+    {
+        $meta = $this->get_meta_path($url);
+        $body = $this->get_body_path($url);
 
-		// Re-check URL consistency in case of hash collisions (unlikely but possible)
-		if ( $entry->url !== $url ) {
-			// Log potential hash collision
-			$this->invalidate( $url ); // Invalidate the conflicting entry
+        if (!is_file($meta) || !is_file($body)) {
+            $this->invalidate($url);
+            return null;
+        }
 
-			return null;
-		}
+        $h = fopen($meta, 'rb');
+        if (!$h) {
+            $this->invalidate($url);
+            return null;
+        }
+        flock($h, LOCK_SH);
+        $json = stream_get_contents($h);
+        flock($h, LOCK_UN);
+        fclose($h);
 
-		return $entry;
-	}
+        $data = json_decode($json, true);
+        if (!is_array($data)) {
+            $this->invalidate($url);
+            return null;
+        }
 
-	public function open_body_write_stream( string $url ): ByteWriteStream {
-		$body_path                = $this->get_body_path( $url );
-		$this->body_paths[ $url ] = $body_path;
+        $entry = new CacheEntry();
+        foreach ($data as $k => $v) {
+            if ($k === 'body_path') {   // legacy field
+                continue;
+            }
+            $entry->$k = $v;
+        }
 
-		return $this->fs->open_write_stream( $body_path );
-	}
+        if ($entry->url !== $url) {     // hash collision guard
+            $this->invalidate($url);
+            return null;
+        }
 
-	public function get_body( CacheEntry $entry ): string {
-		$body_path = $this->get_body_path( $entry->url );
-		if ( ! $this->fs->exists( $body_path ) ) {
-			// Invalidate metadata if body is missing
-			$this->invalidate( $entry->url );
-			throw new RuntimeException( "Cache body file not found for URL: {$entry->url}" );
-		}
+        return $entry;
+    }
 
-		return $this->fs->get_contents( $body_path );
-	}
+    public function get_body(CacheEntry $e): string
+    {
+        $body = $this->get_body_path($e->url);
+        if (!is_file($body)) {
+            $this->invalidate($e->url);
+            throw new RuntimeException("Cache body missing for {$e->url}");
+        }
 
-	public function store( CacheEntry $e ): void {
-		$meta_path = $this->get_meta_path( $e->url );
+        $h = fopen($body, 'rb');
+        if (!$h) {
+            throw new RuntimeException("Cannot open body for {$e->url}");
+        }
+        flock($h, LOCK_SH);
+        $data = stream_get_contents($h);
+        flock($h, LOCK_UN);
+        fclose($h);
 
-		$jsonData = json_encode( $e, JSON_PRETTY_PRINT );
-		if ( json_last_error() !== JSON_ERROR_NONE ) {
-			throw new Exception( json_last_error_msg() );
-		}
-		$this->fs->put_contents( $meta_path, $jsonData );
-	}
+        return $data;
+    }
 
-	public function invalidate( string $url ): void {
-		$meta_path = $this->get_meta_path( $url );
-		$body_path = $this->get_body_path( $url );
-		try {
-			$this->fs->rm( $meta_path );
-			$this->fs->rm( $body_path );
-		} catch ( FilesystemException $e ) {
-			// Ignore
-		}
-		// Also remove from temporary tracking if invalidate is called mid-stream
-		unset( $this->body_paths[ $url ] );
-	}
-
-	public function tmp_path( string $url ): string {
-		$body_path = $this->get_body_path( $url );
-		if ( ! $this->fs->exists( 'tmp' ) ) {
-			$this->fs->mkdir( 'tmp' );
-		}
-		return $this->fs->get_meta()['root'] . '/tmp/' . $body_path;
-	}
+    public function invalidate(string $url): void
+    {
+        @unlink($this->get_meta_path($url));
+        @unlink($this->get_body_path($url));
+        @unlink($this->get_body_path($url) . '.partial');
+        unset($this->partials[$url]);
+    }
 }

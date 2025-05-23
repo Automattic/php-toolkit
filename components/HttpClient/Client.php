@@ -808,6 +808,10 @@ class Client {
 	 */
 	protected function handle_redirects( $requests ) {
 		foreach ( $requests as $request ) {
+			if ( ! $request->client_can_follow_redirects ) {
+				continue;
+			}
+
 			$response = $request->response;
 			if ( ! $response ) {
 				continue;

@@ -33,6 +33,7 @@ class Request {
 	public $upload_body_stream;
 	public $redirected_from;
 	public $redirected_to;
+	public $client_can_follow_redirects = true;
 
 	/**
 	 * @var HttpError
