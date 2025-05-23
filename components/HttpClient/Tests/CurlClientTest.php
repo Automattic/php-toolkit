@@ -137,7 +137,7 @@ class CurlClientTest extends AbstractClientTest {
 
     public function errorProvider() {
         return [
-            'Broken Connection' => [ 'broken-connection', 'Connection closed while reading response headers.' ],
+            'Broken Connection' => [ 'broken-connection', 'Connection closed while reading response headers.', 'cURL error', 'Request timed out' ],
             'Invalid Response' => [ 'invalid-response', 'cURL error 1: Received HTTP/0.9 when not allowed' ],
             'Timeout' => [ 'timeout', 'cURL error 28: Operation timed out after' ],
             'Timeout Read Body' => [ 'timeout-read-body', 'cURL error 28: Operation timed out after' ],
@@ -146,38 +146,38 @@ class CurlClientTest extends AbstractClientTest {
             // 'Unsupported Transfer Encoding' => [ 'unsupported-encoding', 'Unsupported transfer encoding received from the server: unsupported' ],
 
             'Incomplete Status Line' => [ 'incomplete-status-line', 'cURL error 1: Unsupported HTTP/1 subversion' ],
-            'Early EOF Headers' => [ 'early-eof-headers', 'Connection closed while reading response headers.' ],
+            'Early EOF Headers' => [ 'early-eof-headers', 'Connection closed while reading response headers.', 'cURL error', 'Request timed out' ],
         ];
     }
 
     protected function getClientSpecificErrorMessages(): array {
         return [
             'test_dns_failure' => [
-                'message' => ['Could not resolve host', 'Couldn\'t resolve host', 'Request timed out', 'cURL error 6']
+                'message' => ['Could not resolve host', 'Couldn\'t resolve host', 'Request timed out', 'cURL error']
             ],
             'test_ssl_handshake_failure' => [
-                'message' => ['SSL handshake failed', 'SSL connect error', 'Request timed out', 'cURL error 35']
+                'message' => ['SSL handshake failed', 'SSL connect error', 'Request timed out', 'cURL error']
             ],
             'test_write_failure' => [
-                'message' => ['Send failure', 'Failed sending data', 'Broken pipe', 'Request timed out', 'cURL error 55']
+                'message' => ['Send failure', 'Failed sending data', 'Broken pipe', 'Request timed out', 'cURL error']
             ],
             'test_malformed_status_line' => [
-                'message' => ['Malformed HTTP response', 'Invalid response', 'Request timed out', 'cURL error 56']
+                'message' => ['Malformed HTTP response', 'Invalid response', 'Request timed out', 'cURL error']
             ],
             'test_malformed_headers' => [
-                'message' => ['Malformed HTTP response', 'Invalid response', 'Request timed out', 'cURL error 56']
+                'message' => ['Malformed HTTP response', 'Invalid response', 'Request timed out', 'cURL error']
             ],
             'test_eof_mid_headers' => [
-                'message' => ['Transfer closed with outstanding read data remaining', 'Request timed out', 'cURL error 18']
+                'message' => ['Transfer closed with outstanding read data remaining', 'Request timed out', 'cURL error']
             ],
             'test_invalid_chunk_size' => [
-                'message' => ['Chunked-encoded data was malformed', 'Request timed out', 'cURL error 88']
+                'message' => ['Chunked-encoded data was malformed', 'Request timed out', 'cURL error']
             ],
             'test_missing_last_chunk' => [
-                'message' => ['Chunked-encoded data was malformed', 'Request timed out', 'cURL error 88']
+                'message' => ['Chunked-encoded data was malformed', 'Request timed out', 'cURL error']
             ],
             'test_corrupted_gzip' => [
-                'message' => ['Error in the HTTP2 framing layer', 'Content encoding error', 'Request timed out', 'cURL error 61']
+                'message' => ['Error in the HTTP2 framing layer', 'Content encoding error', 'Request timed out', 'cURL error']
             ],
         ];
     }

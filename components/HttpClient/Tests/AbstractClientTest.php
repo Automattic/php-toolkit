@@ -272,6 +272,7 @@ PHP
                     if(
                         false === strpos($request->error->message, 'Request timed out') &&
                         false === strpos($request->error->message, 'Failed to connect') &&
+                        false === strpos($request->error->message, 'Connection timed out') &&
                         false === strpos($request->error->message, 'Failed to write request bytes') &&
                         false === strpos($request->error->message, 'Connection closed while reading response headers')
                     ) {

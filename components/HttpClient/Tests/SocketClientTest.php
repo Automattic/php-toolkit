@@ -117,14 +117,14 @@ class SocketClientTest extends AbstractClientTest {
     protected function createClient( array $options = [] ): Client {
         return new SocketClient( $options );
     }
-	
+
     /**
      * @dataProvider errorProvider
      */
     public function test_errors( $scenario, $expectedErrorSubstring ) {
         $this->withServer( function ( $url ) use ( $scenario, $expectedErrorSubstring ) {
             $request = new Request( "$url/error/$scenario" );
-			$this->expectClientError($request, 300, [
+			$this->expectClientError($request, 200, [
 				'message' => $expectedErrorSubstring
 			]);
         }, 'error' );
@@ -132,13 +132,13 @@ class SocketClientTest extends AbstractClientTest {
 
     public function errorProvider() {
         return [
-            'Broken Connection' => [ 'broken-connection', 'Connection closed while reading response headers.' ],
+            'Broken Connection' => [ 'broken-connection', 'Connection closed while reading response headers.', 'Request timed out' ],
             'Invalid Response' => [ 'invalid-response', 'Malformed HTTP headers received from the server.' ],
             'Timeout' => [ 'timeout', 'Request timed out' ], // Client-side timeout
             'Timeout Read Body' => [ 'timeout-read-body', 'Request timed out' ], // Timeout during body read
             'Unsupported Encoding' => [ 'unsupported-encoding', 'Unsupported transfer encoding received from the server: unsupported' ],
             'Incomplete Status Line' => [ 'incomplete-status-line', 'Malformed HTTP headers received from the server.' ],
-            'Early EOF Headers' => [ 'early-eof-headers', 'Connection closed while reading response headers.' ],
+            'Early EOF Headers' => [ 'early-eof-headers', 'Connection closed while reading response headers.', 'Request timed out' ],
         ];
     }
 
