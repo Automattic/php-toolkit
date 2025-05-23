@@ -605,8 +605,8 @@ PHP
         
         $client = $this->createClient($opts);
         try {
-            $this->consume_entire_body($client, $req);
-            $this->fail('Expected error not thrown');
+            $body = $this->consume_entire_body($client, $req);
+            $this->fail('Expected error not thrown. First 100 response bytes: ' . substr($body, 0, 100));
         } catch (HttpError $e) {
             if (isset($opts['message']) && is_array($opts['message'])) {
                 $found = false;

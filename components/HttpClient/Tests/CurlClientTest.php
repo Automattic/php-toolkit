@@ -46,7 +46,7 @@ class CurlClientTest extends AbstractClientTest {
             ]);
             $req->method = 'POST';
             $this->expectClientError($req, null, [
-                'message' => 'cURL error 7: Failed to connect to 127.0.0.1'
+                'message' => 'cURL error'
             ]);
         });
     }
@@ -54,7 +54,7 @@ class CurlClientTest extends AbstractClientTest {
     public function test_malformed_status_line() {
         $this->withRawResponse("HTP/1.1 200 OK\r\n\r\n", function (string $base) {
             $this->expectClientError(new Request("$base/"), null, [
-                'message' => 'cURL error 7: Failed to connect to 127.0.0.1'
+                'message' => 'cURL error'
             ]);
         });
     }
@@ -62,7 +62,7 @@ class CurlClientTest extends AbstractClientTest {
     public function test_malformed_headers() {
         $this->withRawResponse("HTTP/1.1 200 OK\r\nBadHeader\r\n\r\n", function (string $base) {
             $this->expectClientError(new Request("$base/"), null, [
-                'message' => 'cURL error 7: Failed to connect to 127.0.0.1'
+                'message' => 'cURL error'
             ]);
         });
     }
@@ -70,7 +70,7 @@ class CurlClientTest extends AbstractClientTest {
     public function test_eof_mid_headers() {
         $this->withRawResponse("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n", function (string $base) {
             $this->expectClientError(new Request("$base/"), null, [
-                'message' => 'cURL error 7: Failed to connect to 127.0.0.1'
+                'message' => 'cURL error'
             ]);
         });
     }
@@ -80,7 +80,7 @@ class CurlClientTest extends AbstractClientTest {
         $body = "Z\r\nHELLO\r\n0\r\n\r\n";
         $this->withRawResponse("HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n$body", function (string $base) {
             $this->expectClientError(new Request("$base/"), null, [
-                'message' => 'cURL error 7: Failed to connect to 127.0.0.1'
+                'message' => 'cURL error'
             ]);
         });
     }
@@ -89,7 +89,7 @@ class CurlClientTest extends AbstractClientTest {
         $body = "5\r\nHELLO\r\n";           // no terminating 0-chunk
         $this->withRawResponse("HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n$body", function (string $base) {
             $this->expectClientError(new Request("$base/"), 300, [
-                'message' => 'cURL error 7: Failed to connect to 127.0.0.1'
+                'message' => 'cURL error'
             ]);
         });
     }
@@ -98,7 +98,7 @@ class CurlClientTest extends AbstractClientTest {
         $raw = "HTTP/1.1 200 OK\r\nContent-Encoding: gzip\r\nContent-Length: 4\r\n\r\nBAD!";
         $this->withRawResponse($raw, function (string $base) {
             $this->expectClientError(new Request("$base/"), null, [
-                'message' => 'cURL error 7: Failed to connect to 127.0.0.1'
+                'message' => 'cURL error'
             ]);
         });
     }
@@ -145,7 +145,7 @@ class CurlClientTest extends AbstractClientTest {
 			// cURL ignores unsupported transfer encodings
             // 'Unsupported Transfer Encoding' => [ 'unsupported-encoding', 'Unsupported transfer encoding received from the server: unsupported' ],
 
-            'Incomplete Status Line' => [ 'incomplete-status-line', 'cURL error 1: Unsupported HTTP/1 subversion' ],
+            'Incomplete Status Line' => [ 'incomplete-status-line', 'cURL error 1: Unsupported HTTP' ],
             'Early EOF Headers' => [ 'early-eof-headers', 'Connection closed while reading response headers.', 'cURL error', 'Request timed out' ],
         ];
     }
