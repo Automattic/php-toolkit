@@ -6,8 +6,9 @@ class Connection {
 
 	public $request;
 	public $http_socket;
-	public $response_buffer;
+	public $response_buffer = '';
 	public $decoded_response_stream = null;
+	public $started_at = null;
 
 	public function __construct( Request $request ) {
 		$this->request = $request;
@@ -21,5 +22,9 @@ class Connection {
 		$this->response_buffer = substr( $this->response_buffer, $length );
 
 		return $buffer;
+	}
+
+	public function time_elapsed_ms() {
+		return (microtime( true ) - $this->started_at) * 1000;
 	}
 }
