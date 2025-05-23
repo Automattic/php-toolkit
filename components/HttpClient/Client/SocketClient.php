@@ -73,6 +73,10 @@ class SocketClient extends Client {
 			$this->get_active_requests( Request::STATE_RECEIVED )
 		);
 
+		$this->finalize_requests(
+			$this->get_active_requests( Request::STATE_RECEIVED )
+		);
+
 		/**
 		 * Allows the caller to consume the headers before we start polling
 		 * for the body of those requests.

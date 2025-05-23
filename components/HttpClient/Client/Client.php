@@ -475,7 +475,6 @@ abstract class Client {
 				continue;
 			}
 			$code = $response->status_code;
-			$this->mark_finished( $request );
 			if ( ! ( $code >= 300 && $code < 400 ) ) {
 				continue;
 			}
@@ -516,6 +515,12 @@ abstract class Client {
 					)
 				)
 			);
+		}
+	}
+
+	protected function finalize_requests( $requests ) {
+		foreach ( $requests as $request ) {
+			$this->mark_finished( $request );
 		}
 	}
 

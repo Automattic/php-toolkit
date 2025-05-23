@@ -61,6 +61,15 @@ class CurlClient extends Client {
 		}
 
 		$this->poll_active_curl_requests();
+		
+		$this->handle_redirects(
+			$this->get_active_requests( [ Request::STATE_RECEIVED ] )
+		);
+
+		$this->finalize_requests(
+			$this->get_active_requests( [ Request::STATE_RECEIVED ] )
+		);
+		
 		return true;
 	}
 
@@ -106,10 +115,12 @@ class CurlClient extends Client {
 					$this->set_error($request, new HttpError('Connection closed while reading response headers.', $request));
 					return;
 				}
-				if(isset($request->response->headers['location'])) {
-					$this->handle_redirects( array( $request ) );
+				if($request->state === Request::STATE_FAILED || $request->state === Request::STATE_FINISHED) {
+					// We've already handled errors and successes.
+					continue;
 				}
-				$this->mark_finished($request);
+				// We'll mark it as finished in the event_loop_tick() method.
+				$request->state = Request::STATE_RECEIVED;
 			}
 		}
 
