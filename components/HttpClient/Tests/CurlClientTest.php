@@ -137,7 +137,7 @@ class CurlClientTest extends AbstractClientTest {
 
     public function errorProvider() {
         return [
-            'Broken Connection' => [ 'broken-connection', 'Connection closed while reading response headers.', 'cURL error', 'Request timed out' ],
+            'Broken Connection' => [ 'broken-connection', ['Connection closed while reading response headers.', 'cURL error', 'Request timed out' ]],
             'Invalid Response' => [ 'invalid-response', 'cURL error 1: Received HTTP/0.9 when not allowed' ],
             'Timeout' => [ 'timeout', 'cURL error 28: Operation timed out after' ],
             'Timeout Read Body' => [ 'timeout-read-body', 'cURL error 28: Operation timed out after' ],
@@ -146,7 +146,7 @@ class CurlClientTest extends AbstractClientTest {
             // 'Unsupported Transfer Encoding' => [ 'unsupported-encoding', 'Unsupported transfer encoding received from the server: unsupported' ],
 
             'Incomplete Status Line' => [ 'incomplete-status-line', 'cURL error 1: Unsupported HTTP' ],
-            'Early EOF Headers' => [ 'early-eof-headers', 'Connection closed while reading response headers.', 'cURL error', 'Request timed out' ],
+            'Early EOF Headers' => [ 'early-eof-headers', ['Connection closed while reading response headers.', 'cURL error', 'Request timed out' ]],
         ];
     }
 
