@@ -12,14 +12,14 @@ use WordPress\Filesystem\LocalFilesystem;
 use WordPress\Git\GitFilesystem;
 use WordPress\Git\GitRepository;
 use WordPress\HttpClient\ByteStream\SeekableRequestReadStream;
-use WordPress\HttpClient\Client;
+use WordPress\HttpClient\Client\SocketClient;
 
 use function WordPress\Filesystem\wp_join_unix_paths;
 use function WordPress\Filesystem\wp_unix_sys_get_temp_dir;
 
 class DataReferenceResolver {
 	/**
-	 * @var Client
+	 * @var SocketClient
 	 */
 	private $client;
 	/**
@@ -47,7 +47,7 @@ class DataReferenceResolver {
 	 */
 	private $tmpRoot;
 
-	public function __construct( Client $client, ?string $tmpRoot = null ) {
+	public function __construct( SocketClient $client, ?string $tmpRoot = null ) {
 		$this->client  = $client;
 		$this->tmpRoot = $tmpRoot ?: wp_unix_sys_get_temp_dir();
 	}

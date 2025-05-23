@@ -4,7 +4,7 @@ namespace WordPress\DataLiberation\Importer;
 
 use Exception;
 use WordPress\Filesystem\Filesystem;
-use WordPress\HttpClient\Client;
+use WordPress\HttpClient\Client\SocketClient;
 use WordPress\HttpClient\Request;
 
 use function WordPress\Filesystem\wp_join_unix_paths;
@@ -25,7 +25,7 @@ class AttachmentDownloader {
 	private $progress = array();
 
 	public function __construct( $output_root, $options = array() ) {
-		$this->client                 = new Client();
+		$this->client                 = new SocketClient();
 		$this->output_root            = $output_root;
 		$this->source_from_filesystem = $options['source_from_filesystem'] ?? null;
 	}
@@ -181,7 +181,7 @@ class AttachmentDownloader {
 		 */
 
 		switch ( $event ) {
-			case Client::EVENT_GOT_HEADERS:
+			case SocketClient::EVENT_GOT_HEADERS:
 				if ( ! $request->is_redirected() ) {
 					if ( file_exists( $this->output_paths[ $original_request_id ] . '.partial' ) ) {
 						unlink( $this->output_paths[ $original_request_id ] . '.partial' );
@@ -196,7 +196,7 @@ class AttachmentDownloader {
 					}
 				}
 				break;
-			case Client::EVENT_BODY_CHUNK_AVAILABLE:
+			case SocketClient::EVENT_BODY_CHUNK_AVAILABLE:
 				$chunk = $this->client->get_response_body_chunk();
 				if ( ! fwrite( $this->fps[ $original_request_id ], $chunk ) ) {
 					// @TODO: Don't echo the error message. Attach it to the import session instead for the user to review later on.
@@ -205,10 +205,10 @@ class AttachmentDownloader {
 				}
 				$this->progress[ $original_url ]['received'] += strlen( $chunk );
 				break;
-			case Client::EVENT_FAILED:
+			case SocketClient::EVENT_FAILED:
 				$this->on_failure( $original_url, $original_request_id, $request->error );
 				break;
-			case Client::EVENT_FINISHED:
+			case SocketClient::EVENT_FINISHED:
 				if ( ! $request->is_redirected() ) {
 					// Only process if this was the last request in the chain.
 					$is_success = (

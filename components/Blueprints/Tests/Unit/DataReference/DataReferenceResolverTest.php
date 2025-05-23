@@ -5,7 +5,6 @@ namespace WordPress\Blueprints\Tests\Unit\DataReference;
 use Exception;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
-use RuntimeException;
 use WordPress\Blueprints\DataReference\DataReference;
 use WordPress\Blueprints\DataReference\DataReferenceResolver;
 use WordPress\Blueprints\DataReference\Directory;
@@ -19,10 +18,10 @@ use WordPress\Blueprints\Progress\Tracker;
 use WordPress\ByteStream\MemoryPipe;
 use WordPress\ByteStream\ReadStream\ByteReadStream;
 use WordPress\Filesystem\Filesystem;
-use WordPress\HttpClient\Client;
+use WordPress\HttpClient\Client\SocketClient;
 
 class DataReferenceResolverTest extends TestCase {
-	/** @var Client&MockObject */
+	/** @var SocketClient&MockObject */
 	protected $client;
 	protected $resolver;
 	/** @var Filesystem&MockObject */
@@ -31,7 +30,7 @@ class DataReferenceResolverTest extends TestCase {
 
 	protected function setUp(): void {
 		// @TODO: Don't mock. Just test actual resolution.
-		$this->client           = new Client();
+		$this->client           = new SocketClient();
 		$this->resolver         = new DataReferenceResolver( $this->client );
 		$this->executionContext = $this->createMock( Filesystem::class );
 		$this->tracker          = $this->createMock( Tracker::class );

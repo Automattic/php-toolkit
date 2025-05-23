@@ -1,9 +1,13 @@
 <?php
 
-namespace WordPress\HttpClient;
+namespace WordPress\HttpClient\Client;
 
 use WordPress\DataLiberation\URL\WPURL;
 use WordPress\HttpClient\ByteStream\RequestReadStream;
+use WordPress\HttpClient\Connection;
+use WordPress\HttpClient\HttpClientException;
+use WordPress\HttpClient\HttpError;
+use WordPress\HttpClient\Request;
 
 /**
  * An asynchronous HTTP client library.
@@ -52,7 +56,7 @@ use WordPress\HttpClient\ByteStream\RequestReadStream;
  * @package  WordPress
  * @subpackage Async_HTTP
  */
-abstract class BaseClient {
+abstract class Client {
 
 	const EVENT_GOT_HEADERS = 'EVENT_GOT_HEADERS';
 	const EVENT_BODY_CHUNK_AVAILABLE = 'EVENT_BODY_CHUNK_AVAILABLE';
@@ -119,14 +123,27 @@ abstract class BaseClient {
 	 */
 	protected $connections = [];
 	protected $events = [];
-	protected $event               = null;
-	protected $request             = null;
+	protected $event = null;
+	protected $request = null;
 	protected $response_body_chunk = null;
 	protected $request_timeout_ms = null;
 
+	/**
+	 * Creates a new HTTP client instance best suited to your platform.
+	 * CurlClient is the default. If cURL is not available, it falls back to
+	 * SocketClient.
+	 */
+	static public function create( $options = array() ) {
+		if ( ! extension_loaded( 'curl' ) ) {
+			return new SocketClient( $options );
+		}
+
+		return new CurlClient( $options );
+	}
+
 	public function __construct( $options = array() ) {
-		$this->concurrency   = $options['concurrency'] ?? 10;
-		$this->max_redirects = $options['max_redirects'] ?? 3;
+		$this->concurrency        = $options['concurrency'] ?? 10;
+		$this->max_redirects      = $options['max_redirects'] ?? 3;
 		$this->request_timeout_ms = $options['timeout_ms'] ?? 30000;
 	}
 
@@ -142,7 +159,7 @@ abstract class BaseClient {
 		return new RequestReadStream(
 			$request,
 			array_merge( [ 'client' => $this ],
-			is_array( $options ) ? $options : iterator_to_array( $options ) )
+				is_array( $options ) ? $options : iterator_to_array( $options ) )
 		);
 	}
 
@@ -178,29 +195,30 @@ abstract class BaseClient {
 		}
 
 		foreach ( $requests as $request ) {
-			if(is_string($request)) {
-				$request = new Request($request);
+			if ( is_string( $request ) ) {
+				$request = new Request( $request );
 			}
 			if ( array_key_exists( $request->id, $this->connections ) ) {
-				throw new HttpClientException("Request {$request->id} is already enqueued.");
+				throw new HttpClientException( "Request {$request->id} is already enqueued." );
 			}
 
-			if($request->state !== Request::STATE_CREATED) {
-				throw new HttpClientException("Request {$request->id} is not in the created state.");
+			if ( $request->state !== Request::STATE_CREATED ) {
+				throw new HttpClientException( "Request {$request->id} is not in the created state." );
 			}
 
-			$request->state = Request::STATE_ENQUEUED;
-			$this->requests[]                          = apply_filters( 'wp_http_client_request', $request );
-			$this->events[ $request->id ]              = array();
-			$this->connections[ $request->id ]         = new Connection( $request );
+			$request->state                    = Request::STATE_ENQUEUED;
+			$this->requests[]                  = apply_filters( 'wp_http_client_request', $request );
+			$this->events[ $request->id ]      = array();
+			$this->connections[ $request->id ] = new Connection( $request );
 
-			$parsed = WPURL::parse($request->url);
-			if(false === $parsed) {
+			$parsed = WPURL::parse( $request->url );
+			if ( false === $parsed ) {
 				$this->set_error( $request, new HttpError( sprintf( 'Invalid URL: %s', $request->url ) ) );
 				continue;
 			}
-			if($parsed->protocol !== 'http:' && $parsed->protocol !== 'https:') {
-				$this->set_error( $request, new HttpError( sprintf( 'Invalid URL – only HTTP and HTTPS URLs are supported: %s', $parsed->toString() ) ) );
+			if ( $parsed->protocol !== 'http:' && $parsed->protocol !== 'https:' ) {
+				$this->set_error( $request,
+					new HttpError( sprintf( 'Invalid URL – only HTTP and HTTPS URLs are supported: %s', $parsed->toString() ) ) );
 				continue;
 			}
 		}
@@ -274,11 +292,10 @@ abstract class BaseClient {
 		$this->response_body_chunk = null;
 
 		$start_time = microtime( true );
-		$timeout_ms = isset( $query['timeout_ms'] ) 
+		$timeout_ms = isset( $query['timeout_ms'] )
 			? $query['timeout_ms']
 			// Give the requests an opportunity to time out
-			: $this->request_timeout_ms * 1.1
-		;
+			: $this->request_timeout_ms * 1.1;
 
 		do {
 			if ( empty( $query['requests'] ) ) {
@@ -302,8 +319,8 @@ abstract class BaseClient {
 					}
 
 					$this->events[ $request_id ][ $considered_event ] = false;
-					$this->event   = $considered_event;
-					$this->request = $this->get_request_by_id( $request_id );
+					$this->event                                      = $considered_event;
+					$this->request                                    = $this->get_request_by_id( $request_id );
 					switch ( $this->event ) {
 						case self::EVENT_BODY_CHUNK_AVAILABLE:
 							$this->response_body_chunk = $this->consume_buffered_response_body( $request_id );
@@ -321,12 +338,12 @@ abstract class BaseClient {
 					return true;
 				}
 			}
-			
+
 			// After we've checked for any available events, see if we've run out of time.
 			// This way, we always return any events that were ready before worrying about the timeout.
 			// If we checked the timeout first, we might miss events that were already waiting for us
 			// when the timeout is set to zero.
-			$time_elapsed_ms = (microtime( true ) - $start_time) * 1000;
+			$time_elapsed_ms = ( microtime( true ) - $start_time ) * 1000;
 			if ( $timeout_ms && $time_elapsed_ms >= $timeout_ms ) {
 				return false;
 			}
@@ -335,15 +352,14 @@ abstract class BaseClient {
 		return false;
 	}
 
-	
+
 	/**
 	 * Consumes $length bytes received in response to a given request.
 	 *
 	 * @return string
 	 */
-	protected function consume_buffered_response_body($request_id): string|false
-	{
-		$request    = $this->get_request_by_id( $request_id );
+	protected function consume_buffered_response_body( $request_id ): string|false {
+		$request = $this->get_request_by_id( $request_id );
 		if ( null === $request ) {
 			return false;
 		}
@@ -529,8 +545,8 @@ abstract class BaseClient {
 			}
 
 			$redirect_url = $location;
-			$parsed = WPURL::parse($redirect_url, $request->url);
-			if(false === $parsed) {
+			$parsed       = WPURL::parse( $redirect_url, $request->url );
+			if ( false === $parsed ) {
 				$this->set_error( $request, new HttpError( sprintf( 'Invalid redirect URL: %s', $redirect_url ) ) );
 				continue;
 			}

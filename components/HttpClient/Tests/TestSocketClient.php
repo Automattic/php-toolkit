@@ -2,10 +2,10 @@
 
 namespace WordPress\HttpClient\Tests;
 
-use WordPress\HttpClient\Client;
+use WordPress\HttpClient\Client\SocketClient;
 use WordPress\HttpClient\Response;
 
-class TestClient extends Client {
+class TestSocketClient extends SocketClient {
 
 	public function getConcurrency() {
 		return $this->concurrency;

@@ -1,19 +1,18 @@
 <?php
 
-namespace WordPress\HttpClient;
+namespace WordPress\HttpClient\Client;
 
-use WordPress\ByteStream\ReadStream\ByteReadStream;
-use WordPress\DataLiberation\URL\WPURL;
+use WordPress\HttpClient\HttpClientException;
+use WordPress\HttpClient\HttpError;
+use WordPress\HttpClient\Request;
+use WordPress\HttpClient\Response;
 
 /**
- * An asynchronous HTTP client using curl_multi for parallel requests.
- * 
- * This CurlClient class uses an internal event queue (array-based) and a cursor
- * to track the next event, instead of using an SplQueue. It emits events 
- * one at a time via await_next_event(), supporting EVENT_GOT_HEADERS, 
- * EVENT_BODY_CHUNK_AVAILABLE, and EVENT_FINISHED.
+ * An HTTP client using curl multihandle.
+ *
+ * @extends Client
  */
-class CurlClient extends BaseClient {
+class CurlClient extends Client {
     /**
 	 * @var \CurlMultiHandle cURL multi-handle managing parallel requests
 	 */
@@ -111,7 +110,7 @@ class CurlClient extends BaseClient {
 		}
 
 		// @TODO: What kind of timeout should we use here?
-		curl_multi_select( $this->multi_handle, 0.05 );		
+		curl_multi_select( $this->multi_handle, 0.05 );
 	}
 
     /**

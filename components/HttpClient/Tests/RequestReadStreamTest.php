@@ -3,12 +3,12 @@
 namespace WordPress\HttpClient\Tests;
 
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\Process\Process;
 use WordPress\ByteStream\ByteStreamException;
 use WordPress\HttpClient\ByteStream\RequestReadStream;
-use WordPress\HttpClient\Client;
+use WordPress\HttpClient\Client\SocketClient;
 use WordPress\HttpClient\Request;
 use WordPress\HttpClient\Response;
-use Symfony\Component\Process\Process;
 
 trait WithTestServer {
 	protected function withServer( callable $callback, $scenario = 'default', $host = '127.0.0.1', $port = 8950 ) {
@@ -68,7 +68,7 @@ class RequestReadStreamTest extends TestCase {
 	public function testConstructWithCustomClient() {
 		$this->withServer(function($url) {
 			$test_url = $url . $this->fixture;
-			$client = new Client();
+			$client = new SocketClient();
 			$stream = new RequestReadStream( $test_url, [ 'client' => $client ] );
 			$this->assertInstanceOf( RequestReadStream::class, $stream );
 			$response = $stream->await_response();

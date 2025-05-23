@@ -2,9 +2,7 @@
 
 namespace WordPress\Blueprints;
 
-use Exception;
 use Psr\Log\LoggerInterface;
-use RuntimeException;
 use Symfony\Component\Process\Process;
 use WordPress\Blueprints\DataReference\DataReference;
 use WordPress\Blueprints\DataReference\DataReferenceResolver;
@@ -14,7 +12,7 @@ use WordPress\Blueprints\Exception\BlueprintExecutionException;
 use WordPress\ByteStream\WriteStream\FileWriteStream;
 use WordPress\Filesystem\Filesystem;
 use WordPress\Filesystem\LocalFilesystem;
-use WordPress\HttpClient\Client;
+use WordPress\HttpClient\Client\SocketClient;
 
 use function WordPress\Filesystem\pipe_stream;
 use function WordPress\Filesystem\wp_join_unix_paths;
@@ -49,7 +47,7 @@ class Runtime {
 	 */
 	private $assets;
 	/**
-	 * @var Client
+	 * @var SocketClient
 	 */
 	private $client;
 	/**
@@ -69,7 +67,7 @@ class Runtime {
 		Filesystem $targetFs,
 		RunnerConfiguration $configuration,
 		DataReferenceResolver $assets,
-		Client $client,
+		SocketClient $client,
 		array $blueprint,
 		string $tempRoot,
 		DataReference $wpCliReference
@@ -83,7 +81,7 @@ class Runtime {
 		$this->wpCliReference = $wpCliReference;
 	}
 
-	public function getHttpClient(): Client {
+	public function getHttpClient(): SocketClient {
 		return $this->client;
 	}
 

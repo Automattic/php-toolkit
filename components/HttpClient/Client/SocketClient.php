@@ -1,14 +1,15 @@
 <?php
 
-namespace WordPress\HttpClient;
+namespace WordPress\HttpClient\Client;
 
 use WordPress\ByteStream\ByteTransformer\InflateTransformer;
 use WordPress\ByteStream\ReadStream\FileReadStream;
 use WordPress\ByteStream\ReadStream\TransformedReadStream;
-use WordPress\DataLiberation\URL\WPURL;
 use WordPress\HttpClient\ByteStream\ChunkedDecoderReadStream;
 use WordPress\HttpClient\ByteStream\ChunkedEncoderByteTransformer;
-use WordPress\HttpClient\ByteStream\RequestReadStream;
+use WordPress\HttpClient\HttpError;
+use WordPress\HttpClient\Request;
+use WordPress\HttpClient\Response;
 
 /**
  * An asynchronous HTTP client library.
@@ -52,12 +53,8 @@ use WordPress\HttpClient\ByteStream\RequestReadStream;
  *   format that curl accepts.
  * * Response caching – add a custom cache handler for easy caching of the same URLs
  * * Response caching – support HTTP cache-control headers
- *
- * @since    Next Release
- * @package  WordPress
- * @subpackage Async_HTTP
  */
-class Client extends BaseClient {
+class SocketClient extends Client {
 
 	protected const STREAM_SELECT_READ = 1;
 	protected const STREAM_SELECT_WRITE = 2;
@@ -73,7 +70,7 @@ class Client extends BaseClient {
 			return false;
 		}
 
-		foreach ( $this->get_active_requests([ 
+		foreach ( $this->get_active_requests([
 			Request::STATE_WILL_ENABLE_CRYPTO,
 			Request::STATE_WILL_SEND_HEADERS,
 			Request::STATE_WILL_SEND_BODY,

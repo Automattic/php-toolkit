@@ -2,14 +2,13 @@
 
 namespace WordPress\Blueprints\SiteResolver;
 
-use Exception;
 use WordPress\Blueprints\DataReference\DataReference;
 use WordPress\Blueprints\DataReference\File;
 use WordPress\Blueprints\Exception\BlueprintExecutionException;
 use WordPress\Blueprints\Progress\Tracker;
 use WordPress\Blueprints\Runtime;
 use WordPress\Blueprints\VersionStrings\VersionConstraint;
-use WordPress\HttpClient\Client;
+use WordPress\HttpClient\Client\SocketClient;
 use WordPress\Zip\ZipFilesystem;
 
 use function WordPress\Filesystem\copy_between_filesystems;
@@ -144,7 +143,7 @@ PHP
 		$progress->finish();
 	}
 
-	static private function resolveWordPressZipUrl( Client $client, string $version_string ): string {
+	static private function resolveWordPressZipUrl( SocketClient $client, string $version_string ): string {
 		if ( $version_string === 'latest' ) {
 			return 'https://wordpress.org/latest.zip';
 		}
