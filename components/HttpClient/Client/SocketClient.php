@@ -14,6 +14,14 @@ use WordPress\HttpClient\Response;
 /**
  * An HTTP client using stream_socket_client(). Supports
  * concurrent connections just like curl_multi.
+ * 
+ * Supports:
+ * * Concurrency
+ * * HTTP 1.0 and 1.1
+ * * HTTPS via TLS 1.2 and 1.3
+ * * Chunked transfer encoding
+ * * Streaming requests and responses
+ * * GZip and Deflate transfer encoding
  */
 class SocketClient extends Client {
 

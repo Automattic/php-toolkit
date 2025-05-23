@@ -102,6 +102,10 @@ class CurlClient extends Client {
 					$this->set_error($request, new HttpError(sprintf('cURL error %d: %s', $info['result'], curl_error( $ch ))));
 					return;
 				}
+				if(!$request->response) {
+					$this->set_error($request, new HttpError('Connection closed while reading response headers.', $request));
+					return;
+				}
 				if(isset($request->response->headers['location'])) {
 					$this->handle_redirects( array( $request ) );
 				}
