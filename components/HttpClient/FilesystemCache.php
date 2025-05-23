@@ -20,7 +20,7 @@ final class FilesystemCache implements CacheStorage {
 		$this->fs = $fs;
 	}
 
-	private function get_body_path( string $url ): string {
+	public function get_body_path( string $url ): string {
 		$key = hash( 'sha256', $url );
 
 		return "$key.bin";
@@ -108,5 +108,13 @@ final class FilesystemCache implements CacheStorage {
 		}
 		// Also remove from temporary tracking if invalidate is called mid-stream
 		unset( $this->body_paths[ $url ] );
+	}
+
+	public function tmp_path( string $url ): string {
+		$body_path = $this->get_body_path( $url );
+		if ( ! $this->fs->exists( 'tmp' ) ) {
+			$this->fs->mkdir( 'tmp' );
+		}
+		return $this->fs->get_meta()['root'] . '/tmp/' . $body_path;
 	}
 }
