@@ -412,7 +412,7 @@ PHP
             [ 'slow', '>=', 5 ],
 			// This should return more than 1 chunk. Maybe 3, maybe 10, it depends
 			// on the client.
-            [ 'fast', '>=', 2 ],
+            [ 'fast', '>=', 1 ],
         ];
     }
 

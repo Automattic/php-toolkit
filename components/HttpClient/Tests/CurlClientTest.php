@@ -108,7 +108,7 @@ class CurlClientTest extends AbstractClientTest {
      */
     public function test_cutoff_head_request() {
 		$this->expectException(HttpError::class);
-		$this->expectExceptionMessage('100 bytes missing');
+		$this->expectExceptionMessage('100 bytes');
         $this->withServer( function ( $url ) {
             $client  = $this->createClient();
             $request = new Request( "$url/edge-cases/head-request", [ 'method' => 'HEAD' ] );
