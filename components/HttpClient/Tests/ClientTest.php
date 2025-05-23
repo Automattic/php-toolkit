@@ -5,6 +5,7 @@ namespace WordPress\HttpClient\Tests;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Process\Process;
 use WordPress\HttpClient\Client;
+use WordPress\HttpClient\CurlClient;
 use WordPress\HttpClient\HttpError;
 use WordPress\HttpClient\Request;
 
@@ -140,12 +141,12 @@ PHP
     /**
      * Helper to consume the entire response body for a request using the event loop.
      */
-    protected function consume_entire_body( Client $client, Request $request ) {
+    protected function consume_entire_body( $client, Request $request ) {
         if($request->state === Request::STATE_CREATED) {
             $client->enqueue( $request );
         }
         $body = '';
-        while ( $client->await_next_event( [ 'requests' => [ $request ] ] ) ) {
+        while ( $client->await_next_event([ 'requests' => [ $request ] ] ) ) {
             switch ( $client->get_event() ) {
                 case Client::EVENT_BODY_CHUNK_AVAILABLE:
                     $chunk = $client->get_response_body_chunk();
@@ -168,7 +169,7 @@ PHP
      */
     public function test_http_methods( $method ) {
         $this->withServer( function ( $url ) use ( $method ) {
-            $client  = new Client();
+            $client  = new CurlClient();
             $request = new Request( "$url/echo-method", [ 'method' => $method ] );
             $body    = $this->consume_entire_body( $client, $request );
             $this->assertEquals( $method, $body );
@@ -192,7 +193,7 @@ PHP
      */
     public function test_status_codes( $status, $expectedBody ) {
         $this->withServer( function ( $url ) use ( $status, $expectedBody ) {
-            $client  = new Client();
+            $client  = new CurlClient();
             $request = new Request( "$url/status/$status" );
             $body    = $this->consume_entire_body( $client, $request );
             $this->assertEquals( $status, $request->response->status_code );
@@ -223,7 +224,7 @@ PHP
      */
     public function test_encodings( $encoding, $expectedBody ) {
         $this->withServer( function ( $url ) use ( $encoding, $expectedBody ) {
-            $client  = new Client();
+            $client  = new CurlClient();
             $request = new Request( "$url/encoding/$encoding" );
             $body    = $this->consume_entire_body( $client, $request );
             $this->assertEquals( $expectedBody, $body );
@@ -253,7 +254,7 @@ PHP
      */
     public function test_errors( $scenario, $expectedErrorSubstring ) {
         $this->withServer( function ( $url ) use ( $scenario, $expectedErrorSubstring ) {
-            $client  = new Client( [ 'timeout_ms' => 1000 ] ); // Increased timeout for timeout tests
+            $client  = new CurlClient( [ 'timeout_ms' => 1000 ] ); // Increased timeout for timeout tests
             $request = new Request( "$url/error/$scenario" );
             $client->enqueue( $request );
 
@@ -291,7 +292,7 @@ PHP
         $port = 9999;
         $host = '127.0.0.1';
 
-        $client  = new Client( [ 'timeout_ms' => 1000 ] ); // Short timeout for connection attempt
+        $client  = new CurlClient( [ 'timeout_ms' => 1000 ] ); // Short timeout for connection attempt
         $request = new Request( "http://{$host}:{$port}/" );
         $client->enqueue( $request );
 
@@ -320,7 +321,7 @@ PHP
      */
     public function test_headers( $headerName, $headerValue ) {
         $this->withServer( function ( $url ) use ( $headerName, $headerValue ) {
-            $client  = new Client();
+            $client  = new CurlClient();
             $request = new Request( "$url/headers/$headerName" );
             $body    = $this->consume_entire_body( $client, $request );
             $this->assertStringContainsString( $headerValue, $body );
@@ -341,7 +342,7 @@ PHP
      */
     public function test_multiple_set_cookie_headers() {
         $this->withServer( function ( $url ) {
-            $client  = new Client();
+            $client  = new CurlClient();
             $request = new Request( "$url/headers/multiple-set-cookie" );
             $client->enqueue( $request );
 
@@ -368,7 +369,7 @@ PHP
      */
     public function test_large_response_header() {
         $this->withServer( function ( $url ) {
-            $client = new Client();
+            $client = new CurlClient();
             $request = new Request( "$url/error/large-headers" ); // Using error scenario for large header
             $body = $this->consume_entire_body( $client, $request );
 
@@ -385,7 +386,7 @@ PHP
      */
     public function test_body_types( $type, $expectedLength ) {
         $this->withServer( function ( $url ) use ( $type, $expectedLength ) {
-            $client  = new Client();
+            $client  = new CurlClient();
             $request = new Request( "$url/body/$type" );
             $body    = $this->consume_entire_body( $client, $request );
             $this->assertEquals( $expectedLength, strlen( $body ) );
@@ -406,7 +407,7 @@ PHP
      */
     public function test_streaming( $type, $expectedChunks ) {
         $this->withServer( function ( $url ) use ( $type, $expectedChunks ) {
-            $client  = new Client();
+            $client  = new CurlClient();
             $request = new Request( "$url/stream/$type" );
             $client->enqueue( $request );
             $chunks = [];
@@ -440,7 +441,7 @@ PHP
      */
     public function test_redirect_chain() {
         $this->withServer( function ( $url ) {
-            $client  = new Client();
+            $client  = new CurlClient();
             $request = new Request( "$url/redirect/chain-1" );
             $body1    = $this->consume_entire_body( $client, $request );
             $this->assertEquals( 'Redirect 1', $body1 );
@@ -461,7 +462,7 @@ PHP
      */
     public function test_redirect_loop() {
         $this->withServer( function ( $url ) {
-            $client  = new Client( [ 'max_redirects' => 2, 'timeout_ms' => 20000 ] ); // Set a low redirect limit
+            $client  = new CurlClient( [ 'max_redirects' => 2, 'timeout_ms' => 20000 ] ); // Set a low redirect limit
             $request = new Request( "$url/redirect/loop" );
             $client->enqueue( $request );
 
@@ -484,7 +485,7 @@ PHP
      */
     public function test_post_to_get_redirect() {
         $this->withServer( function ( $url ) {
-            $client  = new Client();
+            $client  = new CurlClient();
             $request = new Request( "$url/redirect/post-to-get", [ 'method' => 'POST', 'body_stream' => new StringReadStream('test body') ] );
             $original_body    = $this->consume_entire_body( $client, $request );
             $this->assertEquals( 'POST', $request->method );
@@ -502,7 +503,7 @@ PHP
      */
     public function test_invalid_redirect_url() {
         $this->withServer( function ( $url ) {
-            $client  = new Client();
+            $client  = new CurlClient();
             $request = new Request( "$url/redirect/invalid-location" );
             $client->enqueue( $request );
 
@@ -525,7 +526,7 @@ PHP
      */
     public function test_relative_path_redirect() {
         $this->withServer( function ( $url ) {
-            $client  = new Client();
+            $client  = new CurlClient();
             $request = new Request( "$url/redirect/relative-path-redirect" );
 
             $body = $this->consume_entire_body( $client, $request );
@@ -544,7 +545,7 @@ PHP
      */
     public function test_no_body_204() {
         $this->withServer( function ( $url ) {
-            $client  = new Client();
+            $client  = new CurlClient();
             $request = new Request( "$url/edge-cases/no-body-204" );
             $body    = $this->consume_entire_body( $client, $request );
             $this->assertEquals( 204, $request->response->status_code );
@@ -558,7 +559,7 @@ PHP
      */
     public function test_no_body_304() {
         $this->withServer( function ( $url ) {
-            $client  = new Client();
+            $client  = new CurlClient();
             $request = new Request( "$url/edge-cases/no-body-304" );
             $body    = $this->consume_entire_body( $client, $request );
             $this->assertEquals( 304, $request->response->status_code );
@@ -572,7 +573,7 @@ PHP
      */
     public function test_content_length_zero() {
         $this->withServer( function ( $url ) {
-            $client  = new Client();
+            $client  = new CurlClient();
             $request = new Request( "$url/edge-cases/content-length-zero" );
             $body    = $this->consume_entire_body( $client, $request );
             $this->assertEquals( 200, $request->response->status_code );
@@ -586,7 +587,7 @@ PHP
      */
     public function test_head_request() {
         $this->withServer( function ( $url ) {
-            $client  = new Client();
+            $client  = new CurlClient();
             $request = new Request( "$url/edge-cases/head-request", [ 'method' => 'HEAD' ] );
             $body    = $this->consume_entire_body( $client, $request );
             $this->assertEquals( 200, $request->response->status_code );
@@ -600,7 +601,7 @@ PHP
      */
     public function test_range_request() {
         $this->withServer( function ( $url ) {
-            $client  = new Client();
+            $client  = new CurlClient();
             $request = new Request( "$url/edge-cases/range-request", [ 'headers' => [ 'Range' => 'bytes=0-9' ] ] );
             $body    = $this->consume_entire_body( $client, $request );
             $this->assertEquals( 206, $request->response->status_code );
@@ -700,7 +701,7 @@ PHP
 
     private function expectClientError(Request $req, ?float $timeout_ms = null, array $opts = []): void {
         if ($timeout_ms !== null) $opts['timeout_ms'] = $timeout_ms;
-        $client = new Client($opts);
+        $client = new CurlClient($opts);
         try {
             $this->consume_entire_body($client, $req);
             $this->fail('Expected error not thrown');

@@ -163,6 +163,9 @@ class Client {
 		}
 
 		foreach ( $requests as $request ) {
+			if(is_string($request)) {
+				$request = new Request($request);
+			}
 			if ( array_key_exists( $request->id, $this->connections ) ) {
 				throw new HttpClientException("Request {$request->id} is already enqueued.");
 			}
@@ -284,7 +287,6 @@ class Client {
 					}
 
 					$this->events[ $request_id ][ $considered_event ] = false;
-
 					$this->event   = $considered_event;
 					$this->request = $this->get_request_by_id( $request_id );
 					if ( $this->event === self::EVENT_BODY_CHUNK_AVAILABLE ) {
@@ -740,17 +742,15 @@ class Client {
 					continue;
 				}
 
-				$parsed = static::parse_http_headers( $connection->response_buffer );
-				if ( false === $parsed ) {
+				$request->response = Response::from_http_headers(
+					$connection->response_buffer,
+					$request
+				);
+				$connection->response_buffer = '';
+				if(false === $request->response) {
 					$this->set_error( $request, new HttpError( 'Malformed HTTP headers received from the server.' ) );
 					break;
 				}
-				$connection->response_buffer = '';
-
-				$response->headers        = $parsed['headers'];
-				$response->status_code    = $parsed['status']['code'];
-				$response->status_message = $parsed['status']['message'];
-				$response->protocol       = $parsed['status']['protocol'];
 
 				$total = $request->response->get_header( 'content-length' );
 				if ( null !== $total ) {
@@ -855,49 +855,6 @@ class Client {
 				)
 			);
 		}
-	}
-
-	/**
-	 * Parses an HTTP headers string into an array containing the status and headers.
-	 *
-	 * @param  string  $headers  The HTTP headers to parse.
-	 *
-	 * @return array An array containing the parsed status and headers.
-	 */
-	protected function parse_http_headers( string $headers ) {
-		$lines  = explode( "\r\n", $headers );
-		$status = array_shift( $lines );
-		$status = explode( ' ', $status );
-		if ( count( $status ) < 3 ) {
-			return false;
-		}
-		$status  = array(
-			'protocol' => $status[0],
-			'code'     => (int) $status[1],
-			'message'  => $status[2],
-		);
-		$headers = array();
-		foreach ( $lines as $line ) {
-			if ( strpos( $line, ': ' ) === false ) {
-				// @TODO: Error, not a valid response
-				continue;
-			}
-			$line = explode( ': ', $line );
-			/**
-			 * Headers names are case-insensitive.
-			 *
-			 * RFC 7230 states:
-			 *
-			 * > Each header field consists of a case-insensitive field name followed by a colon (":"),
-			 * > optional leading whitespace, the field value, and optional trailing whitespace."
-			 */
-			$headers[ strtolower( $line[0] ) ] = $line[1];
-		}
-
-		return array(
-			'status'  => $status,
-			'headers' => $headers,
-		);
 	}
 
 	/**
