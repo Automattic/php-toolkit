@@ -608,18 +608,20 @@ PHP
             $body = $this->consume_entire_body($client, $req);
             $this->fail('Expected error not thrown. First 100 response bytes: ' . substr($body, 0, 100). ". Has error: " . $req->error);
         } catch (HttpError $e) {
-            if (isset($opts['message']) && is_array($opts['message'])) {
-                $found = false;
-                foreach ($opts['message'] as $msg) {
-                    if (strpos($e->message, $msg) !== false) {
-                        $found = true;
-                        break;
-                    }
-                }
-                $this->assertTrue($found, "None of the expected messages found in error: " . $e->message);
-            } else {
-                $this->assertStringContainsString($opts['message'] ?? 'Error', $e->message);
-            }
+			$this->assertStringContainsAny($e->message, $opts['message'] ?? 'Error');
         }
     }
+
+	public function assertStringContainsAny(string $haystack, $needles, ?string $message = null): void {
+		if(!is_array($needles)) {
+			$needles = [$needles];
+		}
+		foreach ($needles as $needle) {
+			if (strpos($haystack, $needle) !== false) {
+				$this->assertTrue(true);
+				return;
+			}
+		}
+		$this->fail($message ?? "None of the needles found in haystack: " . $haystack);
+	}
 } 
