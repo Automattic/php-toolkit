@@ -130,17 +130,45 @@ class SocketClientTest extends AbstractClientTest {
         }, 'error' );
     }
 
-    public function errorProvider() {
-        return [
-            'Broken Connection' => [ 'broken-connection', ['Connection closed while reading response headers.', 'Request timed out'] ],
-            'Invalid Response' => [ 'invalid-response', 'Malformed HTTP headers received from the server.' ],
-            'Timeout' => [ 'timeout', 'Request timed out' ], // Client-side timeout
-            'Timeout Read Body' => [ 'timeout-read-body', 'Request timed out' ], // Timeout during body read
-            'Unsupported Encoding' => [ 'unsupported-encoding', 'Unsupported transfer encoding received from the server: unsupported' ],
-            'Incomplete Status Line' => [ 'incomplete-status-line', 'Malformed HTTP headers received from the server.' ],
-            'Early EOF Headers' => [ 'early-eof-headers', ['Connection closed while reading response headers.', 'Request timed out' ]],
-        ];
+	public function errorProvider() {
+		return [
+			'Broken Connection' => [ 'broken-connection', ['Connection closed while reading response headers.', 'Request timed out'] ],
+			'Invalid Response' => [ 'invalid-response', 'Malformed HTTP headers received from the server.' ],
+			'Unsupported Encoding' => [ 'unsupported-encoding', 'Unsupported transfer encoding received from the server: unsupported' ],
+			'Incomplete Status Line' => [ 'incomplete-status-line', 'Malformed HTTP headers received from the server.' ],
+			'Early EOF Headers' => [ 'early-eof-headers', ['Connection closed while reading response headers.', 'Request timed out' ]],
+		];
+	}
+
+    /**
+     * @dataProvider timeoutErrorProvider
+     */
+    public function test_timeout_errors( $scenario, $expectedErrorSubstring ) {
+        $this->withServer( function ( $url ) use ( $scenario, $expectedErrorSubstring ) {
+            $client  = new Client( [ 'timeout_ms' => 1000 ] ); // Increased timeout for timeout tests
+            $request = new Request( "$url/error/$scenario" );
+            $client->enqueue( $request );
+
+            $error_occurred = false;
+            while ( $client->await_next_event( [ 'requests' => [ $request ], 'timeout_ms' => 2000 ] ) ) {
+                switch ( $client->get_event() ) {
+                    case Client::EVENT_FAILED:
+                        $error_occurred = true;
+                        $this->assertNotNull( $request->error );
+                        $this->assertStringContainsString( $expectedErrorSubstring, $request->error->message );
+                        break 2; // Break out of switch and while
+                }
+            }
+            $this->assertTrue( $error_occurred, 'Request should have errored for scenario: ' . $scenario );
+        }, 'error' );
     }
+
+	public function timeoutErrorProvider() {
+		return [
+			'Timeout' => [ 'timeout', 'Request timed out' ], // Client-side timeout
+			'Timeout Read Body' => [ 'timeout-read-body', 'Request timed out' ], // Timeout during body read
+		];
+	}
 
     protected function getClientSpecificErrorMessages(): array {
         return [
