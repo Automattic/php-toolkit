@@ -1,9 +1,7 @@
 name: Build and Release
 
 on:
-    push:
-        branches:
-            - trunk
+    workflow_dispatch:
 
 jobs:
     build-and-release:
@@ -46,8 +44,8 @@ jobs:
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               with:
-                  tag_name: v${{ github.run_number }}
-                  release_name: Data Liberation plugin v${{ github.run_number }}
+                  tag_name: v0.0.${{ github.run_number }}-alpha
+                  release_name: Release v0.0.${{ github.run_number }}-alpha
                   draft: false
                   prerelease: false
 
@@ -90,3 +88,14 @@ jobs:
                   asset_path: ./dist/examples/create-wp-site.tar.gz
                   asset_name: create-wp-site.tar.gz
                   asset_content_type: application/gzip
+
+
+            - name: Upload Blueprints Asset
+              uses: actions/upload-release-asset@v1
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              with:
+                  upload_url: ${{ steps.create_release.outputs.upload_url }}
+                  asset_path: ./dist/blueprints.phar
+                  asset_name: blueprints.phar
+                  asset_content_type: application/phar

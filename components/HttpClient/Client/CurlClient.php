@@ -1,0 +1,259 @@
+<?php
+
+namespace WordPress\HttpClient\Client;
+
+use WordPress\HttpClient\HttpClientException;
+use WordPress\HttpClient\HttpError;
+use WordPress\HttpClient\Request;
+use WordPress\HttpClient\Response;
+
+/**
+ * An HTTP client using curl multihandle.
+ *
+ * @extends Client
+ */
+class CurlClient extends Client {
+    /**
+	 * @var \CurlMultiHandle cURL multi-handle managing parallel requests
+	 */
+    protected $multi_handle;
+
+    /**
+	 * @var array Map of cURL handle resource IDs to request IDs (for callbacks).
+	 */
+    protected $handleMap = array();
+
+    /**
+     * Initializes a new CurlClient with optional settings.
+     *
+     * @param array $options Optional config: 'concurrency', 'max_redirects', 'timeout_ms'.
+     */
+    public function __construct( $options = array() ) {
+		parent::__construct( $options );
+
+        $this->multi_handle      = curl_multi_init();
+		curl_multi_setopt( $this->multi_handle, CURLMOPT_PIPELINING, CURLPIPE_MULTIPLEX );
+		curl_multi_setopt( $this->multi_handle, CURLMOPT_MAX_TOTAL_CONNECTIONS, $this->concurrency );
+		curl_multi_setopt( $this->multi_handle, CURLMOPT_MAX_HOST_CONNECTIONS, $this->concurrency );
+    }
+
+    /**
+     * Destructor to clean up the curl_multi handle.
+     */
+    public function __destruct() {
+        if ( $this->multi_handle ) {
+            curl_multi_close( $this->multi_handle );
+			$this->multi_handle = null;
+        }
+    }
+
+	protected function event_loop_tick() {
+		if ( count( $this->get_active_requests() ) === 0 ) {
+			return false;
+		}
+
+		$this->open_nonblocking_curl_handles(
+			$this->get_active_requests( [ Request::STATE_ENQUEUED ] )
+		);
+
+		if(count($this->handleMap) === 0) {
+			return false;
+		}
+
+		$this->poll_active_curl_requests();
+		
+		$this->handle_redirects(
+			$this->get_active_requests( [ Request::STATE_RECEIVED ] )
+		);
+
+		$this->finalize_requests(
+			$this->get_active_requests( [ Request::STATE_RECEIVED ] )
+		);
+		
+		return true;
+	}
+
+	private function open_nonblocking_curl_handles( $requests ) {
+        foreach ( $requests as $request ) {
+            // Initialize and add the curl handle for this request
+            $ch = $this->init_curl_handle( $request );
+			/** @var \CurlHandle $ch */
+            if ( ! $ch ) {
+                // If initialization fails, immediately mark this request as failed
+				$this->set_error( $request, new HttpError('Failed to initialize cURL handle', $request) );
+                continue;
+            }
+			if(0 !== curl_multi_add_handle( $this->multi_handle, $ch )) {
+				$this->set_error( $request, new HttpError('Failed to add cURL handle to multi handle', $request) );
+				continue;
+			}
+            $this->connections[ $request->id ]->http_socket = $ch;
+            $this->handleMap[ (int) $ch ] = $request->id;
+        }
+	}
+
+	private function poll_active_curl_requests() {
+		$running = 0;
+		do {
+			$mrc = curl_multi_exec( $this->multi_handle, $running );
+		} while ( $mrc === CURLM_CALL_MULTI_PERFORM );
+
+		// Handle any completed requests
+		while ( $info = curl_multi_info_read( $this->multi_handle ) ) {
+			if ( $info['msg'] === CURLMSG_DONE ) {
+				$ch = $info['handle'];
+				$id = $this->handleMap[ (int) $ch ] ?? null;
+				if ( $id === null ) {
+					throw new HttpClientException('Received completion event for an unknown request ' . ($ch ? (int) $ch : 'unknown'));
+				}
+				$request = $this->get_request_by_id($id);
+				if ( $info['result'] !== CURLE_OK ) {
+					$this->set_error($request, new HttpError(sprintf('cURL error %d: %s', $info['result'], curl_error( $ch ))));
+					return;
+				}
+				if(!$request->response) {
+					$this->set_error($request, new HttpError('Connection closed while reading response headers.', $request));
+					return;
+				}
+				if($request->state === Request::STATE_FAILED || $request->state === Request::STATE_FINISHED) {
+					// We've already handled errors and successes.
+					continue;
+				}
+				// We'll mark it as finished in the event_loop_tick() method.
+				$request->state = Request::STATE_RECEIVED;
+			}
+		}
+
+		// @TODO: What kind of timeout should we use here?
+		curl_multi_select( $this->multi_handle, 0.05 );
+	}
+
+    /**
+     * Create and configure a curl handle for the given Request.
+     *
+     * @param Request $request The HTTP request to prepare.
+     * @return resource|false Returns the configured cURL handle, or false on failure.
+     */
+    private function init_curl_handle( $request ) {
+        $ch = curl_init();
+        if ( ! $ch ) {
+			throw new HttpClientException('Failed to initialize cURL handle');
+        }
+        // Basic curl settings for the request
+        curl_setopt( $ch, CURLOPT_URL, $request->url );
+        curl_setopt( $ch, CURLOPT_FOLLOWLOCATION, false );
+        curl_setopt( $ch, CURLOPT_MAXREDIRS, 0 ); //$this->max_redirects );
+        curl_setopt( $ch, CURLOPT_TIMEOUT_MS, $this->request_timeout_ms );
+        curl_setopt( $ch, CURLOPT_RETURNTRANSFER, false ); // use callbacks for data
+        curl_setopt( $ch, CURLOPT_HEADER, false );         // headers via callback
+		curl_setopt($ch, CURLOPT_ENCODING, '');
+        // Set HTTP method and body if needed
+		curl_setopt( $ch, CURLOPT_CUSTOMREQUEST, $request->method );
+		if ( ! empty( $request->upload_body_stream ) ) {
+			curl_setopt( $ch, CURLOPT_READFUNCTION, function($ch, $fp, $length) use ($request) {
+				$stream = $request->upload_body_stream;
+				// Pull at most $length bytes until we either get some bytes
+				// or we reach the end of the stream.
+				while(!$stream->reached_end_of_data()) {
+					$got_bytes = $stream->pull($length);
+					if($got_bytes > 0) {
+						return $stream->consume($got_bytes);
+					}
+				}
+				return '';
+			});
+		}
+        // Set headers if provided
+        if ( ! empty( $request->headers ) ) {
+            $header_lines = array();
+            foreach ( $request->headers as $name => $value ) {
+                $header_lines[] = "{$name}: {$value}";
+            }
+            curl_setopt( $ch, CURLOPT_HTTPHEADER, $header_lines );
+        }
+        // Set callback functions for data and headers
+        curl_setopt( $ch, CURLOPT_WRITEFUNCTION, function($ch, $data) {
+			return $this->handle_body_data($ch, $data);
+		});
+        curl_setopt( $ch, CURLOPT_HEADERFUNCTION, function($ch, $header) {
+			return $this->handle_header_line($ch, $header);
+		});
+        // Disable signals (required for timeout in multi)
+        curl_setopt( $ch, CURLOPT_NOSIGNAL, true );
+		$request->state = Request::STATE_WILL_SEND_HEADERS;
+
+        return $ch;
+    }
+
+    /**
+     * cURL callback to handle incoming header lines.
+     * Triggers an EVENT_GOT_HEADERS event when the header section is complete.
+     *
+     * @param resource $ch         The cURL handle.
+     * @param string   $header_line A line from the response headers.
+     * @return int Number of bytes handled (required by cURL).
+     */
+    private function handle_header_line( $ch, $header_line ) {
+		$request = $this->get_request_by_handle($ch);
+		if(null === $request) {
+			throw new HttpClientException('Received header data for an unknown request ' . ($ch ? (int) $ch : 'unknown'));
+        }
+		$connection = $this->connections[ $request->id ];
+		if(strlen($connection->response_buffer) === 0) {
+            $request->state = Request::STATE_RECEIVING_HEADERS;
+		}
+		$connection->response_buffer .= $header_line;
+
+        // Check for the end of the header section
+        if ( trim( $header_line ) === '' ) {
+			$request->response = Response::from_http_headers(
+				$connection->response_buffer,
+				$request
+			);
+			$connection->response_buffer = '';
+			if(false === $request->response) {
+				$request->response = new Response($request);
+				$this->set_error( $request, new HttpError('Failed to parse headers', $request) );
+				return strlen( $header_line );
+			}
+            $this->events[$request->id][self::EVENT_GOT_HEADERS] = true;
+            $request->state = Request::STATE_RECEIVING_BODY;
+			return strlen( $header_line );
+        }
+
+        return strlen( $header_line );
+    }
+
+    /**
+     * cURL callback to handle chunks of response body data.
+     * Triggers an EVENT_BODY_CHUNK_AVAILABLE event for each chunk received.
+     *
+     * @param resource $ch   The cURL handle.
+     * @param string   $data The chunk of response body data.
+     * @return int Number of bytes handled.
+     */
+    private function handle_body_data( $ch, $data ) {
+		$request = $this->get_request_by_handle($ch);
+		if(null === $request) {
+			throw new HttpClientException('Received body data for an unknown request ' . ($ch ? (int) $ch : 'unknown'));
+        }
+		$this->connections[ $request->id ]->response_buffer .= $data;
+		$this->events[$request->id][self::EVENT_BODY_CHUNK_AVAILABLE] = true;
+
+        return strlen( $data );
+    }
+
+	private function get_request_by_handle( $handle ) {
+		$request_id = $this->handleMap[ (int) $handle ] ?? null;
+		return $this->get_request_by_id($request_id);
+	}
+
+	protected function close_connection( Request $request ) {
+		$handle = $this->connections[ $request->id ]->http_socket;
+		if(null !== $handle) {
+			curl_multi_remove_handle( $this->multi_handle, $handle );
+			curl_close( $handle );
+		}
+		unset( $this->handleMap[ (int) $handle ] );
+	}
+}
