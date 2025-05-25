@@ -28,8 +28,13 @@ final class CacheClient {
 	public function __construct( Client $upstream, string $cacheDir ) {
 		$this->upstream = $upstream;
 		$this->dir      = rtrim( $cacheDir, '/' );
-		if ( ! is_dir( $this->dir ) && ! mkdir( $this->dir, 0777, true ) ) {
-			throw new RuntimeException( "cannot create cache dir {$this->dir}" );
+		if ( ! is_dir( $this->dir ) ) {
+			if ( file_exists( $this->dir ) ) {
+				throw new RuntimeException( "cannot create cache dir {$this->dir}: path exists but is not a directory" );
+			}
+			if ( ! mkdir( $this->dir, 0777, true ) ) {
+				throw new RuntimeException( "cannot create cache dir {$this->dir}" );
+			}
 		}
 	}
 
@@ -118,6 +123,19 @@ final class CacheClient {
 		];
 	}
 
+	private function start304Replay( Request $request, array $meta ): void {
+		$id                  = spl_object_hash( $request );
+		$file_handle         = fopen( $this->bodyPath( $request->cache_key ), 'rb' );
+		$this->replay[ $id ] = [
+			'req'        => $request,
+			'meta'       => $meta,
+			'file'       => $file_handle,
+			'headerDone' => true, // Skip header emission for 304
+			'done'       => false,
+			'is304'      => true, // Mark as 304 replay
+		];
+	}
+
 	private function fromCache( string $id ): void {
 		$context       =& $this->replay[ $id ];
 		$this->request = $context['req'];
@@ -143,6 +161,11 @@ final class CacheClient {
 		$context['done'] = true;
 		$this->event     = self::EVENT_FINISH;
 		$this->response  = $this->cache_key = null;
+		
+		// For 304 replays, we don't want to override the response
+		if ( isset( $context['is304'] ) && $context['is304'] ) {
+			$this->response = null;
+		}
 	}
 
 	/*============ NETWORK HANDLING ============*/
@@ -155,12 +178,23 @@ final class CacheClient {
 			if ( $response->status_code === 304 && isset( $request->cache_key ) ) {
 				[ , $meta ] = $this->lookup( $request, $request->cache_key );
 				if ( $meta ) {
-					$this->startReplay( $request, $meta ); /* swallow 304 events */
-
-					return false;
+					// For 304, expose the 304 response and start a special replay that serves cached body
+					$this->event     = $event;
+					$this->request   = $request;
+					$this->response  = $response;
+					$this->cache_key = null;
+					$this->start304Replay( $request, $meta );
+					return true;
 				}
 			}
-			if ( $response->status_code === 200 && $this->cacheable( $response ) ) {
+			if ( $this->cacheable( $response ) ) {
+				// Update cache key based on vary headers if present
+				$vary = $response->get_header( 'Vary' );
+				if ( $vary ) {
+					$vary_keys = array_map( 'trim', explode( ',', $vary ) );
+					$request->cache_key = $this->varyKey( $request, $vary_keys );
+				}
+				
 				$tmp = $this->tempPath( $request->cache_key );
 
 				$this->tempPath[ spl_object_hash( $request ) ]   = $tmp;
@@ -228,7 +262,8 @@ final class CacheClient {
 		$parts = [ $request->url ];
 		if ( $vary_keys ) {
 			foreach ( $vary_keys as $header_name ) {
-				$parts[] = strtolower( $header_name ) . ':' . $request->get_header( $header_name );
+				$header_value = $request->get_header( strtolower( $header_name ) );
+				$parts[] = strtolower( $header_name ) . ':' . ( $header_value ?? '' );
 			}
 		}
 
@@ -253,6 +288,27 @@ final class CacheClient {
 
 	private function fresh( array $meta ): bool {
 		$now = time();
+
+		// Check for must-revalidate directive - if present, never consider fresh without explicit expiry
+		$cache_control = $meta['headers']['cache-control'] ?? '';
+		$directives = self::directives( $cache_control );
+		if ( isset( $directives['must-revalidate'] ) ) {
+			// With must-revalidate, only consider fresh if we have explicit expiry info
+			if ( isset( $meta['max_age'] ) && isset( $meta['stored_at'] ) ) {
+				return ($meta['stored_at'] + (int)$meta['max_age']) > $now;
+			}
+			if ( isset( $meta['s_maxage'] ) && isset( $meta['stored_at'] ) ) {
+				return ($meta['stored_at'] + (int)$meta['s_maxage']) > $now;
+			}
+			if ( isset( $meta['expires'] ) ) {
+				$expires = is_numeric( $meta['expires'] ) ? (int)$meta['expires'] : strtotime( $meta['expires'] );
+				if ( $expires !== false ) {
+					return $expires > $now;
+				}
+			}
+			// With must-revalidate, don't use heuristic caching
+			return false;
+		}
 
 		// If explicit expiry timestamp is set, use it
 		if ( isset( $meta['expires'] ) ) {
@@ -306,37 +362,39 @@ final class CacheClient {
 		}
 	}
 
-	protected function commit( Request $request ) {
+	protected function commit( Request $request, Response $response, string $tempFile ) {
 		$url   = $request->url;
 		$meta = [
 			'url' => $url,
-			'status' => $request->response->status_code,
-			'headers' => $request->response->headers,
+			'status' => $response->status_code,
+			'headers' => $response->headers,
 			'stored_at' => time(),
-			'etag' => $request->response->get_header( 'ETag' ),
-			'last_modified' => $request->response->get_header( 'Last-Modified' ),
+			'etag' => $response->get_header( 'ETag' ),
+			'last_modified' => $response->get_header( 'Last-Modified' ),
 		];
+		
+		// Check for Vary header and store vary keys
+		$vary = $response->get_header( 'Vary' );
+		if ( $vary ) {
+			$meta['vary'] = array_map( 'trim', explode( ',', $vary ) );
+		}
+		
 		// Parse Cache-Control for max-age, if present
-		$cacheControl = $request->response->get_header( 'Cache-Control' );
+		$cacheControl = $response->get_header( 'Cache-Control' );
 		if ( $cacheControl ) {
 			$directives = self::directives( $cacheControl );
 			if ( isset( $directives['max-age'] ) && is_int( $directives['max-age'] ) ) {
 				$meta['max_age'] = $directives['max-age'];
+			}
+			if ( isset( $directives['s-maxage'] ) && is_int( $directives['s-maxage'] ) ) {
+				$meta['s_maxage'] = $directives['s-maxage'];
 			}
 		}
 
 		// Determine file paths
 		$key      = $request->cache_key;
 		$bodyFile = $this->bodyPath( $key );
-		$tempFile = $this->tempPath( $key );
 		$metaFile = $this->metaPath( $key );
-
-		// Close the temp body stream if open (flushes data)
-		$file_handle = $this->tempHandle[ spl_object_hash( $request ) ];
-		if ( $file_handle && is_resource( $file_handle ) ) {
-			fclose( $file_handle );
-		}
-		unset( $this->tempHandle[ spl_object_hash( $request ) ] );
 
 		// Atomically replace/rename the temp body file to final cache file
 		if ( ! rename( $tempFile, $bodyFile ) ) {
@@ -359,6 +417,12 @@ final class CacheClient {
 	}
 
 	public function invalidateCache( Request $request ): void {
+		// Generate cache key if not already set
+		if ( ! isset( $request->cache_key ) ) {
+			[ $key, ] = $this->lookup( $request );
+			$request->cache_key = $key;
+		}
+		
 		$key      = $request->cache_key;
 		$bodyFile = $this->bodyPath( $key );
 		$metaFile = $this->metaPath( $key );
@@ -387,14 +451,44 @@ final class CacheClient {
 			return [];
 		}
 		$out = [];
-		foreach ( explode( ',', $value ) as $part ) {
+		
+		// Handle quoted values properly by not splitting on commas inside quotes
+		$parts = [];
+		$current = '';
+		$in_quotes = false;
+		$quote_char = null;
+		
+		for ( $i = 0; $i < strlen( $value ); $i++ ) {
+			$char = $value[ $i ];
+			
+			if ( ! $in_quotes && ( $char === '"' || $char === "'" ) ) {
+				$in_quotes = true;
+				$quote_char = $char;
+				$current .= $char;
+			} elseif ( $in_quotes && $char === $quote_char ) {
+				$in_quotes = false;
+				$quote_char = null;
+				$current .= $char;
+			} elseif ( ! $in_quotes && $char === ',' ) {
+				$parts[] = trim( $current );
+				$current = '';
+			} else {
+				$current .= $char;
+			}
+		}
+		
+		if ( $current !== '' ) {
+			$parts[] = trim( $current );
+		}
+		
+		foreach ( $parts as $part ) {
 			$part = trim( $part );
 			if ( $part === '' ) {
 				continue;
 			}
 			if ( strpos( $part, '=' ) !== false ) {
 				[ $k, $v ] = array_map( 'trim', explode( '=', $part, 2 ) );
-				$out[ strtolower( $k ) ] = ctype_digit( $v ) ? (int) $v : strtolower( $v );
+				$out[ strtolower( $k ) ] = ctype_digit( $v ) ? (int) $v : $v;
 			} else {
 				$out[ strtolower( $part ) ] = true;
 			}
@@ -405,10 +499,12 @@ final class CacheClient {
 
 	public static function response_is_cacheable( Response $r ): bool {
 		$req = $r->request;
-		if ( $req->method !== 'GET' ) {
+		if ( $req->method !== 'GET' && $req->method !== 'HEAD' ) {
 			return false;
 		}
-		if ( $r->status_code !== 200 && $r->status_code !== 206 ) {
+		
+		// Allow caching of successful responses and redirects
+		if ( ! ( ( $r->status_code >= 200 && $r->status_code < 300 ) || ( $r->status_code >= 300 && $r->status_code < 400 ) ) ) {
 			return false;
 		}
 
@@ -420,8 +516,13 @@ final class CacheClient {
 			return true;
 		}
 
-		// heuristic: if Last-Modified present and older than 24 h cache for 10 %
-		return (bool) $r->get_header( 'last-modified' );
+		// Cache responses with validation headers (ETag or Last-Modified)
+		if ( $r->get_header( 'etag' ) || $r->get_header( 'last-modified' ) ) {
+			return true;
+		}
+
+		// Not cacheable by any rule
+		return false;
 	}
 	
 }
