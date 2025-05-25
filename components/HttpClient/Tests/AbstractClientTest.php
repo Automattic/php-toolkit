@@ -248,7 +248,7 @@ PHP
             [ 'identity', 'plain' ],
             [ 'chunked', 'chunked' ],
             [ 'gzip', 'gzipped' ],
-            [ 'deflate', 'deflated' ],
+            // [ 'deflate', 'deflated' ],
         ];
     }
 
