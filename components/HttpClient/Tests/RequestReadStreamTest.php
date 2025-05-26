@@ -140,6 +140,27 @@ class RequestReadStreamTest extends TestCase {
 		});
 	}
 
+	public function testRedirects() {
+		$this->withServer(function($url) {
+			$test_url = $url . '/redirect/relative-path-redirect';
+			$stream = new RequestReadStream( $test_url );
+			$response = $stream->await_response();
+			
+			// Should follow redirects and get the final response
+			$this->assertInstanceOf( Response::class, $response );
+			$this->assertEquals( 200, $response->status_code );
+			
+			// Should be able to read the final content
+			$content = $stream->consume_all();
+			$this->assertStringContainsString( 'Arrived at /redirect/new-path/resource.html.', $content );
+			
+			// Check that the request was redirected
+			$request = $stream->get_request();
+			$this->assertNotNull( $request->redirected_to );
+			$this->assertStringContainsString( '/redirect/new-path/resource.html', $request->redirected_to->url );
+		}, 'redirect');
+	}
+
 	public function testTell() {
 		$this->withServer(function($url) {
 			$test_url = $url . $this->fixture;
