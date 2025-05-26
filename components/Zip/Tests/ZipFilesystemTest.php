@@ -4,7 +4,7 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Component\Process\Process;
 use WordPress\ByteStream\ReadStream\FileReadStream;
 use WordPress\HttpClient\ByteStream\SeekableRequestReadStream;
-use WordPress\HttpClient\Transport;
+use WordPress\HttpClient\Client;
 use WordPress\Zip\ZipFilesystem;
 
 use function WordPress\Filesystem\wp_join_unix_paths;
