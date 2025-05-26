@@ -23,18 +23,26 @@ use WordPress\HttpClient\Response;
  * * Streaming requests and responses
  * * GZip and Deflate transfer encoding
  */
-class SocketClient extends Client {
+class SocketTransport implements TransportInterface {
 
 	protected const STREAM_SELECT_READ = 1;
 	protected const STREAM_SELECT_WRITE = 2;
 
+	/**
+	 * @var ClientState
+	 */
+	protected $state;
 
-	protected function event_loop_tick() {
-		if ( count( $this->get_active_requests() ) === 0 ) {
+	public function __construct( ClientState $state ) {
+		$this->state = $state;
+	}
+
+	public function event_loop_tick(): bool {
+		if ( count( $this->state->get_active_requests() ) === 0 ) {
 			return false;
 		}
 
-		foreach ( $this->get_active_requests([
+		foreach ( $this->state->get_active_requests([
 			Request::STATE_WILL_ENABLE_CRYPTO,
 			Request::STATE_WILL_SEND_HEADERS,
 			Request::STATE_WILL_SEND_BODY,
@@ -43,39 +51,35 @@ class SocketClient extends Client {
 			Request::STATE_RECEIVING_BODY,
 			Request::STATE_RECEIVED,
 		]) as $request ) {
-			$time_elapsed_ms = $this->connections[ $request->id ]->time_elapsed_ms();
-			if ( $time_elapsed_ms > $this->request_timeout_ms ) {
+			$time_elapsed_ms = $this->state->connections[ $request->id ]->time_elapsed_ms();
+			if ( $time_elapsed_ms > $this->state->request_timeout_ms ) {
 				$this->set_error( $request, new HttpError( sprintf( 'Request timed out after %s seconds.', $time_elapsed_ms ) ) );
 			}
 		}
 
 		$this->open_nonblocking_http_sockets(
-			$this->get_active_requests( Request::STATE_ENQUEUED )
+			$this->state->get_active_requests( Request::STATE_ENQUEUED )
 		);
 
 		$this->enable_crypto(
-			$this->get_active_requests( Request::STATE_WILL_ENABLE_CRYPTO )
+			$this->state->get_active_requests( Request::STATE_WILL_ENABLE_CRYPTO )
 		);
 
 		$this->send_request_headers(
-			$this->get_active_requests( Request::STATE_WILL_SEND_HEADERS )
+			$this->state->get_active_requests( Request::STATE_WILL_SEND_HEADERS )
 		);
 
 		$this->send_request_body(
-			$this->get_active_requests( Request::STATE_WILL_SEND_BODY )
+			$this->state->get_active_requests( Request::STATE_WILL_SEND_BODY )
 		);
 
 		$nb_headers_received = $this->receive_response_headers(
-			$this->get_active_requests( Request::STATE_RECEIVING_HEADERS )
+			$this->state->get_active_requests( Request::STATE_RECEIVING_HEADERS )
 		);
 
-		$this->handle_redirects(
-			$this->get_active_requests( Request::STATE_RECEIVED )
-		);
-
-		$this->finalize_requests(
-			$this->get_active_requests( Request::STATE_RECEIVED )
-		);
+		foreach ( $this->state->get_active_requests( Request::STATE_RECEIVED ) as $request ) {
+			$this->mark_finished( $request );
+		}
 
 		/**
 		 * Allows the caller to consume the headers before we start polling
@@ -98,7 +102,7 @@ class SocketClient extends Client {
 		}
 
 		$this->receive_response_body(
-			$this->get_active_requests( Request::STATE_RECEIVING_BODY )
+			$this->state->get_active_requests( Request::STATE_RECEIVING_BODY )
 		);
 
 
@@ -150,7 +154,7 @@ class SocketClient extends Client {
 				'tcp://' . $host . ':' . $port,
 				$errno,
 				$errstr,
-				$this->request_timeout_ms,
+				$this->state->request_timeout_ms,
 				STREAM_CLIENT_CONNECT | STREAM_CLIENT_ASYNC_CONNECT,
 				$context
 			);
@@ -165,8 +169,8 @@ class SocketClient extends Client {
 
 			stream_set_blocking( $stream, false );
 
-			$this->connections[ $request->id ]->http_socket = $stream;
-			$this->connections[ $request->id ]->started_at = microtime( true );
+			$this->state->connections[ $request->id ]->http_socket = $stream;
+			$this->state->connections[ $request->id ]->started_at = microtime( true );
 			if ( $is_ssl ) {
 				$request->state = Request::STATE_WILL_ENABLE_CRYPTO;
 			} else {
@@ -198,7 +202,7 @@ class SocketClient extends Client {
 		}
 
 		$body_stream = FileReadStream::from_resource(
-			$this->connections[ $request->id ]->http_socket
+			$this->state->connections[ $request->id ]->http_socket
 		);
 
 		$transformers = array();
@@ -242,9 +246,9 @@ class SocketClient extends Client {
 	 */
 	protected function enable_crypto( array $requests ) {
 		foreach ( $this->stream_select( $requests, static::STREAM_SELECT_WRITE ) as $request ) {
-			@stream_set_timeout( $this->connections[ $request->id ]->http_socket, 1 );
+			@stream_set_timeout( $this->state->connections[ $request->id ]->http_socket, 1 );
 			$enabled_crypto = stream_socket_enable_crypto(
-				$this->connections[ $request->id ]->http_socket,
+				$this->state->connections[ $request->id ]->http_socket,
 				true,
 				STREAM_CRYPTO_METHOD_TLS_CLIENT
 			);
@@ -272,7 +276,7 @@ class SocketClient extends Client {
 	protected function send_request_headers( array $requests ) {
 		foreach ( $this->stream_select( $requests, static::STREAM_SELECT_WRITE ) as $request ) {
 			$header_bytes = static::prepare_request_headers( $request );
-			if ( false === @fwrite( $this->connections[ $request->id ]->http_socket, $header_bytes ) ) {
+			if ( false === @fwrite( $this->state->connections[ $request->id ]->http_socket, $header_bytes ) ) {
 				$last_error = error_get_last();
 				$last_error_message = is_array( $last_error ) ? $last_error['message'] : 'unknown';
 				$this->set_error( $request,
@@ -319,7 +323,7 @@ class SocketClient extends Client {
 			}
 
 			$chunk = $request->upload_body_stream->consume( $available_bytes );
-			if ( ! @fwrite( $this->connections[ $request->id ]->http_socket, $chunk ) ) {
+			if ( ! @fwrite( $this->state->connections[ $request->id ]->http_socket, $chunk ) ) {
 				$last_error = error_get_last();
 				$last_error_message = is_array( $last_error ) ? $last_error['message'] : 'unknown';
 				$this->set_error( $request, new HttpError( 'Failed to write request bytes: ' . $last_error_message ) );
@@ -340,28 +344,28 @@ class SocketClient extends Client {
 			if ( ! $request->response ) {
 				$request->response = new Response( $request );
 			}
-			$connection = $this->connections[ $request->id ];
+			$connection = $this->state->connections[ $request->id ];
 			$response   = $request->response;
 
 			while ( true ) {
 				// @TODO: Use a larger chunk size here and then scan for \r\n\r\n.
 				// 1 seems slow and overly conservative.
 				if (
-					!$this->connections[ $request->id ]->http_socket ||
-					!is_resource($this->connections[ $request->id ]->http_socket) ||
-					@feof($this->connections[ $request->id ]->http_socket)
+					!$this->state->connections[ $request->id ]->http_socket ||
+					!is_resource($this->state->connections[ $request->id ]->http_socket) ||
+					@feof($this->state->connections[ $request->id ]->http_socket)
 				) {
 					$this->set_error($request, new HttpError('Connection closed while reading response headers.'));
 					break;
 				}
 
-				$header_byte = fread( $this->connections[ $request->id ]->http_socket, 1 );
+				$header_byte = fread( $this->state->connections[ $request->id ]->http_socket, 1 );
 
 				if ( false === $header_byte || '' === $header_byte ) {
 					if (
-						!$this->connections[ $request->id ]->http_socket ||
-						!is_resource($this->connections[ $request->id ]->http_socket) ||
-						@feof($this->connections[ $request->id ]->http_socket)
+						!$this->state->connections[ $request->id ]->http_socket ||
+						!is_resource($this->state->connections[ $request->id ]->http_socket) ||
+						@feof($this->state->connections[ $request->id ]->http_socket)
 					) {
 						$this->set_error($request, new HttpError('Connection closed while reading response headers.'));
 						break;
@@ -391,7 +395,7 @@ class SocketClient extends Client {
 					break;
 				}
 
-				$this->events[ $request->id ][ self::EVENT_GOT_HEADERS ] = true;
+				$this->state->events[ $request->id ][ Client::EVENT_GOT_HEADERS ] = true;
 				$nb_headers_received ++;
 
 				if ( $response->total_bytes === 0 ) {
@@ -400,7 +404,7 @@ class SocketClient extends Client {
 				}
 
 				$request->state = Request::STATE_RECEIVING_BODY;
-				$this->connections[ $request->id ]->decoded_response_stream = $this->decode_and_monitor_response_body_stream( $request );
+				$this->state->connections[ $request->id ]->decoded_response_stream = $this->decode_and_monitor_response_body_stream( $request );
 				break;
 			}
 		}
@@ -419,15 +423,15 @@ class SocketClient extends Client {
 		// * The last chunk in Transfer-Encoding: chunked is received
 		// * The connection is closed
 		foreach ( $this->stream_select( $requests, static::STREAM_SELECT_READ ) as $request ) {
-			$stream = $this->connections[ $request->id ]->decoded_response_stream;
+			$stream = $this->state->connections[ $request->id ]->decoded_response_stream;
 
 			while ( true ) {
 				$available_bytes = $stream->pull( 65536 );
 				if ( $available_bytes > 0 ) {
 					$body_chunk                                         = $stream->consume( $available_bytes );
 					$request->response->received_bytes                  += $available_bytes;
-					$this->connections[ $request->id ]->response_buffer .= $body_chunk;
-					$this->events[ $request->id ][ self::EVENT_BODY_CHUNK_AVAILABLE ] = true;
+					$this->state->connections[ $request->id ]->response_buffer .= $body_chunk;
+					$this->state->events[ $request->id ][ Client::EVENT_BODY_CHUNK_AVAILABLE ] = true;
 					break; // Process one chunk per loop iteration
 				} elseif ( $stream->reached_end_of_data() ) {
 					$request->state = Request::STATE_RECEIVED;
@@ -500,10 +504,10 @@ class SocketClient extends Client {
 		$write = array();
 		foreach ( $requests as $k => $request ) {
 			if ( $mode & static::STREAM_SELECT_READ ) {
-				$read[ $k ] = $this->connections[ $request->id ]->http_socket;
+				$read[ $k ] = $this->state->connections[ $request->id ]->http_socket;
 			}
 			if ( $mode & static::STREAM_SELECT_WRITE ) {
-				$write[ $k ] = $this->connections[ $request->id ]->http_socket;
+				$write[ $k ] = $this->state->connections[ $request->id ]->http_socket;
 			}
 		}
 		$except = null;
@@ -512,7 +516,7 @@ class SocketClient extends Client {
 		}
 
 		// phpcs:disable WordPress.PHP.NoSilencedErrors.Discouraged
-		$ready = @stream_select( $read, $write, $except, 0, static::NONBLOCKING_TIMEOUT_MICROSECONDS );
+		$ready = @stream_select( $read, $write, $except, 0, ClientState::NONBLOCKING_TIMEOUT_MICROSECONDS );
 		if ( $ready === false ) {
 			foreach ( $requests as $request ) {
 				$this->set_error( $request, new HttpError( 'Error: ' . error_get_last()['message'] ) );
@@ -538,14 +542,24 @@ class SocketClient extends Client {
 		return $selected_requests;
 	}
 
-	protected function close_connection( Request $request ) {
-		$socket = $this->connections[ $request->id ]->http_socket;
+	private function mark_finished( Request $request ) {
+		$this->state->set_request_finished( $request );
+		$this->close_connection( $request );
+	}
+
+	private function set_error( Request $request, $error ) {
+		$this->state->set_request_error( $request, $error );
+		$this->close_connection( $request );
+	}
+
+	private function close_connection( Request $request ) {
+		$socket = $this->state->connections[ $request->id ]->http_socket;
 		if ( $socket && is_resource( $socket ) ) {
 			// Close the TCP socket
-			if ( $this->connections[ $request->id ]->decoded_response_stream ) {
-				$stream = $this->connections[ $request->id ]->decoded_response_stream;
+			if ( $this->state->connections[ $request->id ]->decoded_response_stream ) {
+				$stream = $this->state->connections[ $request->id ]->decoded_response_stream;
 				$stream->close_reading();
-				$this->connections[ $request->id ]->decoded_response_stream = null;
+				$this->state->connections[ $request->id ]->decoded_response_stream = null;
 			} else {
 				@fclose( $socket );
 			}

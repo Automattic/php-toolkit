@@ -115,7 +115,7 @@ class SocketClientTest extends AbstractClientTest {
     }
 
     protected function createClient( array $options = [] ): Client {
-        return new SocketClient( $options );
+        return new Client( array_merge( $options, [ 'transport' => 'socket' ] ) );
     }
 
     /**
@@ -126,7 +126,7 @@ class SocketClientTest extends AbstractClientTest {
 			if(!is_array($expectedErrorSubstring)) {
 				$expectedErrorSubstring = [$expectedErrorSubstring];
 			}
-            $client  = new SocketClient( [ 'timeout_ms' => 1000 ] ); // Increased timeout for timeout tests
+            $client  = $this->createClient( [ 'timeout_ms' => 1000 ] ); // Increased timeout for timeout tests
             $request = new Request( "$url/error/$scenario" );
             $client->enqueue( $request );
 

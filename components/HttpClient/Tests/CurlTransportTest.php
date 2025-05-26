@@ -7,7 +7,7 @@ use WordPress\HttpClient\Client\CurlClient;
 use WordPress\HttpClient\HttpError;
 use WordPress\HttpClient\Request;
 
-class CurlClientTest extends AbstractClientTest {
+class CurlTransportTest extends AbstractClientTest {
 
     public function test_unsupported_encoding() {
         $this->withServer(function (string $base) {
@@ -120,7 +120,7 @@ class CurlClientTest extends AbstractClientTest {
     }
 	
     protected function createClient( array $options = [] ): Client {
-        return new CurlClient( $options );
+        return new Client( array_merge( $options, [ 'transport' => 'curl' ] ) );
     }
 
     /**
