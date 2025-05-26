@@ -8,7 +8,7 @@ use WordPress\ByteStream\ReadStream\TransformedReadStream;
 use WordPress\HttpClient\ByteStream\ChunkedDecoderReadStream;
 use WordPress\HttpClient\ByteStream\ChunkedEncoderByteTransformer;
 use WordPress\HttpClient\Client;
-use WordPress\HttpClient\Transport;
+use WordPress\HttpClient\Client;
 use WordPress\HttpClient\ClientState;
 use WordPress\HttpClient\HttpError;
 use WordPress\HttpClient\Request;

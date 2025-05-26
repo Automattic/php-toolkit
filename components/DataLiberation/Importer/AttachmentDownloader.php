@@ -4,7 +4,7 @@ namespace WordPress\DataLiberation\Importer;
 
 use Exception;
 use WordPress\Filesystem\Filesystem;
-use WordPress\HttpClient\Transport;
+use WordPress\HttpClient\Client;
 use WordPress\HttpClient\Request;
 
 use function WordPress\Filesystem\wp_join_unix_paths;

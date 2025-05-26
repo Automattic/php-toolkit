@@ -8,7 +8,7 @@ use WordPress\Blueprints\Exception\BlueprintExecutionException;
 use WordPress\Blueprints\Progress\Tracker;
 use WordPress\Blueprints\Runtime;
 use WordPress\Blueprints\VersionStrings\VersionConstraint;
-use WordPress\HttpClient\Transport;
+use WordPress\HttpClient\Client;
 use WordPress\Zip\ZipFilesystem;
 
 use function WordPress\Filesystem\copy_between_filesystems;

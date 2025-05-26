@@ -6,7 +6,7 @@
  * in https://github.com/WordPress/wordpress-playground/pull/1546.
  */
 
-use WordPress\HttpClient\Transport;
+use WordPress\HttpClient\Client;
 use WordPress\HttpClient\ClientEvent;
 use WordPress\HttpClient\Request;
 

@@ -1,6 +1,6 @@
 <?php
 
-use WordPress\HttpClient\Transport;
+use WordPress\HttpClient\Client;
 use WordPress\HttpClient\ClientEvent;
 use WordPress\HttpClient\Request;
 

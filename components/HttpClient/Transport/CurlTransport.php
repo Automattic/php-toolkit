@@ -3,7 +3,7 @@
 namespace WordPress\HttpClient\Transport;
 
 use WordPress\HttpClient\Client;
-use WordPress\HttpClient\Transport;
+use WordPress\HttpClient\Client;
 use WordPress\HttpClient\ClientState;
 use WordPress\HttpClient\HttpClientException;
 use WordPress\HttpClient\HttpError;

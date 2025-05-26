@@ -18,7 +18,7 @@ use WordPress\Git\Model\Commit;
 use WordPress\Git\Model\TreeEntry;
 use WordPress\Git\Protocol\GitProtocolEncoderPipe;
 use WordPress\Git\Protocol\Parser\GitProtocolDecoder;
-use WordPress\HttpClient\Transport;
+use WordPress\HttpClient\Client;
 use WordPress\HttpClient\Request;
 
 

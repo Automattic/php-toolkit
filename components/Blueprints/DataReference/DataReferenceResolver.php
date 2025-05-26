@@ -12,7 +12,7 @@ use WordPress\Filesystem\LocalFilesystem;
 use WordPress\Git\GitFilesystem;
 use WordPress\Git\GitRepository;
 use WordPress\HttpClient\ByteStream\SeekableRequestReadStream;
-use WordPress\HttpClient\Transport;
+use WordPress\HttpClient\Client;
 
 use function WordPress\Filesystem\wp_join_unix_paths;
 use function WordPress\Filesystem\wp_unix_sys_get_temp_dir;

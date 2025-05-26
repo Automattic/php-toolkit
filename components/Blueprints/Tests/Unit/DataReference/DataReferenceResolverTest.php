@@ -18,7 +18,7 @@ use WordPress\Blueprints\Progress\Tracker;
 use WordPress\ByteStream\MemoryPipe;
 use WordPress\ByteStream\ReadStream\ByteReadStream;
 use WordPress\Filesystem\Filesystem;
-use WordPress\HttpClient\Transport;
+use WordPress\HttpClient\Client;
 
 class DataReferenceResolverTest extends TestCase {
 	/** @var Client&MockObject */

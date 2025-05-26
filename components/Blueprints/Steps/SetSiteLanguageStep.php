@@ -5,7 +5,7 @@ namespace WordPress\Blueprints\Steps;
 use Exception;
 use WordPress\Blueprints\Progress\Tracker;
 use WordPress\Blueprints\Runtime;
-use WordPress\HttpClient\Transport;
+use WordPress\HttpClient\Client;
 use WordPress\HttpClient\Request;
 use WordPress\Zip\ZipFilesystem;
 

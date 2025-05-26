@@ -51,7 +51,7 @@ use WordPress\Filesystem\Filesystem;
 use WordPress\Filesystem\InMemoryFilesystem;
 use WordPress\Filesystem\LocalFilesystem;
 use WordPress\HttpClient\ByteStream\RequestReadStream;
-use WordPress\HttpClient\Transport;
+use WordPress\HttpClient\Client;
 use WordPress\Zip\ZipFilesystem;
 
 use function WordPress\Encoding\utf8_is_valid_byte_stream;

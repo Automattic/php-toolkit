@@ -12,7 +12,7 @@ use WordPress\Blueprints\Exception\BlueprintExecutionException;
 use WordPress\ByteStream\WriteStream\FileWriteStream;
 use WordPress\Filesystem\Filesystem;
 use WordPress\Filesystem\LocalFilesystem;
-use WordPress\HttpClient\Transport;
+use WordPress\HttpClient\Client;
 
 use function WordPress\Filesystem\pipe_stream;
 use function WordPress\Filesystem\wp_join_unix_paths;
