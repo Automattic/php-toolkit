@@ -5,7 +5,7 @@ namespace WordPress\Blueprints\Steps;
 use Exception;
 use WordPress\Blueprints\Progress\Tracker;
 use WordPress\Blueprints\Runtime;
-use WordPress\HttpClient\Client\SocketClient;
+use WordPress\HttpClient\Transport;
 use WordPress\HttpClient\Request;
 use WordPress\Zip\ZipFilesystem;
 
@@ -226,7 +226,7 @@ class SetSiteLanguageStep implements StepInterface {
 	 *
 	 * @return string|false
 	 */
-	private function getWordPressTranslationUrl( Runtime $runtime, string $wpVersion, string $language, SocketClient $client ) {
+	private function getWordPressTranslationUrl( Runtime $runtime, string $wpVersion, string $language, Client $client ) {
 		try {
 			$api_url           = "https://api.wordpress.org/translations/core/1.0/?version={$wpVersion}";
 			$translations_data = $client->fetch( $api_url )->json();

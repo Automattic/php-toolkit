@@ -1,13 +1,12 @@
 <?php
 
-namespace WordPress\HttpClient\Client;
+namespace WordPress\HttpClient;
 
 use WordPress\DataLiberation\URL\WPURL;
 use WordPress\HttpClient\ByteStream\RequestReadStream;
-use WordPress\HttpClient\Connection;
-use WordPress\HttpClient\HttpClientException;
-use WordPress\HttpClient\HttpError;
-use WordPress\HttpClient\Request;
+use WordPress\HttpClient\Transport\CurlTransport;
+use WordPress\HttpClient\Transport\SocketTransport;
+use WordPress\HttpClient\Transport\TransportInterface;
 
 class Client {
 
@@ -212,6 +211,9 @@ class Client {
 					$this->state->event                                      = $considered_event;
 					$this->state->request                                    = $this->state->get_request_by_id( $request_id );
 					switch ( $this->state->event ) {
+						case Client::EVENT_GOT_HEADERS:
+							$this->handle_redirect($this->state->request);
+							break;
 						case Client::EVENT_BODY_CHUNK_AVAILABLE:
 							$this->state->response_body_chunk = $this->state->consume_buffered_response_body( $request_id );
 							break;
@@ -240,6 +242,56 @@ class Client {
 		} while ( $this->transport->event_loop_tick() );
 
 		return false;
+	}
+
+	/**
+	 * @param  array  $requests  An array of requests.
+	 */
+	protected function handle_redirect( $request ) {
+		$response = $request->response;
+		if ( ! $response ) {
+			return;
+		}
+		$code = $response->status_code;
+		if ( ! in_array($code, [301, 302, 303, 307, 308]) ) {
+			return;
+		}
+
+		$location = $response->get_header( 'location' );
+		if ( null === $location ) {
+			return;
+		}
+
+		$redirects_so_far = 0;
+		$cause            = $request;
+		while ( $cause->redirected_from ) {
+			++ $redirects_so_far;
+			$cause = $cause->redirected_from;
+		}
+
+		if ( $redirects_so_far >= $this->state->max_redirects ) {
+			$this->state->set_request_error( $request, new HttpError( 'Too many redirects' ) );
+			return;
+		}
+
+		$redirect_url = $location;
+		$parsed = WPURL::parse($redirect_url, $request->url);
+		if(false === $parsed) {
+			$this->state->set_request_error( $request, new HttpError( sprintf( 'Invalid redirect URL: %s', $redirect_url ) ) );
+			return;
+		}
+		$redirect_url = $parsed->toString();
+
+		$this->enqueue(
+			new Request(
+				$redirect_url,
+				array(
+					// Redirects are always GET requests
+					'method'          => 'GET',
+					'redirected_from' => $request,
+				)
+			)
+		);
 	}
 
 	public function has_pending_event( $request, $event_type ) {
@@ -289,10 +341,6 @@ class Client {
 
 	public function get_active_requests( $states = null ) {
 		return $this->state->get_active_requests( $states );
-	}
-
-	public function get_failed_requests() {
-		return $this->state->get_failed_requests();
 	}
 
 }

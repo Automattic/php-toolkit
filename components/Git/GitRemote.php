@@ -18,13 +18,13 @@ use WordPress\Git\Model\Commit;
 use WordPress\Git\Model\TreeEntry;
 use WordPress\Git\Protocol\GitProtocolEncoderPipe;
 use WordPress\Git\Protocol\Parser\GitProtocolDecoder;
-use WordPress\HttpClient\Client\SocketClient;
+use WordPress\HttpClient\Transport;
 use WordPress\HttpClient\Request;
 
 
 class GitRemote {
 	/**
-	 * @var SocketClient
+	 * @var Client
 	 */
 	private $http_client;
 	/**
@@ -36,7 +36,7 @@ class GitRemote {
 	public function __construct( GitRepository $repository, $remote_name, $options = array() ) {
 		$this->remote_name = $remote_name;
 		$this->repository  = $repository;
-		$this->http_client = $options['http_client'] ?? new SocketClient(
+		$this->http_client = $options['http_client'] ?? new Client(
 			array(
 				'timeout_ms' => 300000,
 			)

@@ -51,7 +51,7 @@ use WordPress\Filesystem\Filesystem;
 use WordPress\Filesystem\InMemoryFilesystem;
 use WordPress\Filesystem\LocalFilesystem;
 use WordPress\HttpClient\ByteStream\RequestReadStream;
-use WordPress\HttpClient\Client\SocketClient;
+use WordPress\HttpClient\Transport;
 use WordPress\Zip\ZipFilesystem;
 
 use function WordPress\Encoding\utf8_is_valid_byte_stream;
@@ -65,7 +65,7 @@ class Runner {
 	private $configuration;
 	// TODO: Rename httpClient
 	/**
-	 * @var SocketClient
+	 * @var Client
 	 */
 	private $client;
 	/**
@@ -113,7 +113,7 @@ class Runner {
 		$this->configuration = $configuration;
 		$this->validateConfiguration( $configuration );
 
-		$this->client      = new SocketClient();
+		$this->client      = new Client();
 		$this->mainTracker = new Tracker();
 
 		// Set up progress logging

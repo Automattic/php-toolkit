@@ -18,10 +18,10 @@ use WordPress\Blueprints\Progress\Tracker;
 use WordPress\ByteStream\MemoryPipe;
 use WordPress\ByteStream\ReadStream\ByteReadStream;
 use WordPress\Filesystem\Filesystem;
-use WordPress\HttpClient\Client\SocketClient;
+use WordPress\HttpClient\Transport;
 
 class DataReferenceResolverTest extends TestCase {
-	/** @var SocketClient&MockObject */
+	/** @var Client&MockObject */
 	protected $client;
 	protected $resolver;
 	/** @var Filesystem&MockObject */
@@ -30,7 +30,7 @@ class DataReferenceResolverTest extends TestCase {
 
 	protected function setUp(): void {
 		// @TODO: Don't mock. Just test actual resolution.
-		$this->client           = new SocketClient();
+		$this->client           = new Client();
 		$this->resolver         = new DataReferenceResolver( $this->client );
 		$this->executionContext = $this->createMock( Filesystem::class );
 		$this->tracker          = $this->createMock( Tracker::class );

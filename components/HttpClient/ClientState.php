@@ -1,8 +1,6 @@
 <?php
 
-namespace WordPress\HttpClient\Client;
-
-use WordPress\HttpClient\Request;
+namespace WordPress\HttpClient;
 
 class ClientState {
 
@@ -146,10 +144,6 @@ class ClientState {
 		}
 
 		return $processed_requests;
-	}
-
-	public function get_failed_requests() {
-		return $this->get_requests( Request::STATE_FAILED );
 	}
 
 	public function get_requests( $states ) {

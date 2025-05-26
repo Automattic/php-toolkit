@@ -4,7 +4,8 @@ namespace WordPress\HttpClient\ByteStream;
 
 use WordPress\ByteStream\ByteStreamException;
 use WordPress\ByteStream\ReadStream\BaseByteReadStream;
-use WordPress\HttpClient\Client\SocketClient;
+use WordPress\HttpClient\Client;
+use WordPress\HttpClient\Transport;
 use WordPress\HttpClient\HttpClientException;
 use WordPress\HttpClient\Request;
 use WordPress\HttpClient\Response;
@@ -15,7 +16,7 @@ use WordPress\HttpClient\Response;
 class RequestReadStream extends BaseByteReadStream {
 
 	/**
-	 * @var SocketClient
+	 * @var Client
 	 */
 	private $client;
 	/**
@@ -43,7 +44,7 @@ class RequestReadStream extends BaseByteReadStream {
 		if ( is_string( $request ) ) {
 			$request = new Request( $request );
 		}
-		$this->client  = $options['client'] ?? new SocketClient();
+		$this->client  = $options['client'] ?? new Client();
 		$this->request = $request;
 		if ( isset( $options['buffer_size'] ) ) {
 			$this->buffer_size = $options['buffer_size'];
@@ -87,13 +88,13 @@ class RequestReadStream extends BaseByteReadStream {
 		return $this->pull_until_event(
 			array(
 				'max_bytes' => $max_bytes,
-				'event'     => SocketClient::EVENT_BODY_CHUNK_AVAILABLE,
+				'event'     => Client::EVENT_BODY_CHUNK_AVAILABLE,
 			)
 		);
 	}
 
 	private function pull_until_event( $options = array() ) {
-		$stop_at_event = $options['event'] ?? SocketClient::EVENT_BODY_CHUNK_AVAILABLE;
+		$stop_at_event = $options['event'] ?? Client::EVENT_BODY_CHUNK_AVAILABLE;
 		$this->ensure_is_enqueued();
 
 		while ( $this->client->await_next_event(
@@ -113,7 +114,7 @@ class RequestReadStream extends BaseByteReadStream {
 				continue;
 			}
 			switch ( $this->client->get_event() ) {
-				case SocketClient::EVENT_GOT_HEADERS:
+				case Client::EVENT_GOT_HEADERS:
 					$this->response = $response;
 					$content_length = $response->get_header( 'Content-Length' );
 					if ( null !== $content_length ) {
@@ -126,12 +127,12 @@ class RequestReadStream extends BaseByteReadStream {
 						 */
 						$this->remote_file_length = (int) $content_length;
 					}
-					if ( $stop_at_event === SocketClient::EVENT_GOT_HEADERS ) {
+					if ( $stop_at_event === Client::EVENT_GOT_HEADERS ) {
 						return true;
 					}
 					break;
-				case SocketClient::EVENT_BODY_CHUNK_AVAILABLE:
-					if ( $stop_at_event === SocketClient::EVENT_BODY_CHUNK_AVAILABLE ) {
+				case Client::EVENT_BODY_CHUNK_AVAILABLE:
+					if ( $stop_at_event === Client::EVENT_BODY_CHUNK_AVAILABLE ) {
 						$body_chunk = $this->client->get_response_body_chunk();
 
 						if ( $this->progress_tracker ) {
@@ -144,7 +145,7 @@ class RequestReadStream extends BaseByteReadStream {
 						return $body_chunk;
 					}
 					break;
-				case SocketClient::EVENT_FINISHED:
+				case Client::EVENT_FINISHED:
 					/**
 					 * If the server did not provide a Content-Length header,
 					 * backfill the file length with the number of downloaded
@@ -155,7 +156,7 @@ class RequestReadStream extends BaseByteReadStream {
 					}
 
 					return '';
-				case SocketClient::EVENT_FAILED:
+				case Client::EVENT_FAILED:
 					// TODO: Think through error handling. Errors are expected when working with
 					// the network. Should we auto retry? Make it easy for the caller to retry?
 					// Something else?
@@ -174,7 +175,7 @@ class RequestReadStream extends BaseByteReadStream {
 		if ( ! $this->response ) {
 			$this->pull_until_event(
 				array(
-					'event' => SocketClient::EVENT_GOT_HEADERS,
+					'event' => Client::EVENT_GOT_HEADERS,
 				)
 			);
 		}
@@ -188,7 +189,7 @@ class RequestReadStream extends BaseByteReadStream {
 	protected function internal_reached_end_of_data(): bool {
 		return (
 			Request::STATE_FINISHED === $this->request->latest_redirect()->state &&
-			! $this->client->has_pending_event( $this->request, SocketClient::EVENT_BODY_CHUNK_AVAILABLE ) &&
+			! $this->client->has_pending_event( $this->request, Client::EVENT_BODY_CHUNK_AVAILABLE ) &&
 			strlen( $this->buffer ) === $this->offset_in_current_buffer
 		);
 	}

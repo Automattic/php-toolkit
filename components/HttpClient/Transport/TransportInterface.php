@@ -1,6 +1,6 @@
 <?php
 
-namespace WordPress\HttpClient\Client;
+namespace WordPress\HttpClient\Transport;
 
 use WordPress\HttpClient\Request;
 

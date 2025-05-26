@@ -4,7 +4,7 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Component\Process\Process;
 use WordPress\ByteStream\ReadStream\FileReadStream;
 use WordPress\HttpClient\ByteStream\SeekableRequestReadStream;
-use WordPress\HttpClient\Client\SocketClient;
+use WordPress\HttpClient\Transport;
 use WordPress\Zip\ZipFilesystem;
 
 use function WordPress\Filesystem\wp_join_unix_paths;
@@ -63,7 +63,7 @@ class ZipFilesystemTest extends TestCase {
 			$zip = ZipFilesystem::create(
 				new SeekableRequestReadStream(
 					"$url/childrens-literature.zip?chunked=$chunked",
-					[ 'client' => new SocketClient() ]
+					[ 'client' => new Client() ]
 				)
 			);
 			$this->assertEquals(

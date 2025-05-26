@@ -6,7 +6,7 @@
  * in https://github.com/WordPress/wordpress-playground/pull/1546.
  */
 
-use WordPress\HttpClient\Client\SocketClient;
+use WordPress\HttpClient\Transport;
 use WordPress\HttpClient\ClientEvent;
 use WordPress\HttpClient\Request;
 
@@ -45,14 +45,14 @@ $requests   = array(
 	),
 );
 
-$client = new SocketClient();
+$client = new Client();
 $client->enqueue( $requests );
 
 $headers_sent = false;
 while ( $client->await_next_event() ) {
 	$request = $client->get_request();
 	switch ( $client->get_event() ) {
-		case SocketClient::EVENT_GOT_HEADERS:
+		case Client::EVENT_GOT_HEADERS:
 			http_response_code( $request->response->status_code );
 			foreach ( $request->response->headers as $name => $value ) {
 				if (
@@ -66,17 +66,16 @@ while ( $client->await_next_event() ) {
 			}
 			$headers_sent = true;
 			break;
-		case SocketClient::EVENT_BODY_CHUNK_AVAILABLE:
+		case Client::EVENT_BODY_CHUNK_AVAILABLE:
 			echo $client->get_response_body_chunk();
 			break;
-		case SocketClient::EVENT_FAILED:
+		case Client::EVENT_FAILED:
 			if ( ! $headers_sent ) {
 				http_response_code( 500 );
 				echo 'Failed request to ' . $request->url . ' – ' . $request->error;
 			}
 			break;
-		case SocketClient::EVENT_REDIRECT:
-		case SocketClient::EVENT_FINISHED:
+		case Client::EVENT_FINISHED:
 			break;
 	}
 	echo "\n";

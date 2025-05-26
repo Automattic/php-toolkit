@@ -4,7 +4,6 @@ namespace WordPress\HttpClient;
 
 use WordPress\DataLiberation\BlockMarkup\BlockMarkupUrlProcessor;
 use WordPress\DataLiberation\URL\WPURL;
-use WordPress\HttpClient\Client\SocketClient;
 
 use function WordPress\DataLiberation\URL\is_child_url_of;
 
@@ -12,7 +11,7 @@ use function WordPress\DataLiberation\URL\is_child_url_of;
  * A simple web crawler.
  */
 class Crawler {
-	/** @var SocketClient */
+	/** @var Client */
 	private $client;
 
 	/** @var array */
@@ -37,7 +36,7 @@ class Crawler {
 	 * @param  array  $options  Client options
 	 */
 	public function __construct( $base_url, array $options = array() ) {
-		$this->client                    = $options['client'] ?? new SocketClient();
+		$this->client                    = $options['client'] ?? new Client();
 		$this->preprocess_url            = $options['preprocess_url'] ?? null;
 		$this->base_url                  = $base_url;
 		$this->visited_urls[ $base_url ] = true;
@@ -89,14 +88,14 @@ class Crawler {
 
 			$this->current_url = $current_request->url;
 			switch ( $this->client->get_event() ) {
-				case SocketClient::EVENT_BODY_CHUNK_AVAILABLE:
+				case Client::EVENT_BODY_CHUNK_AVAILABLE:
 					if ( ! isset( $this->responses[ $this->current_url ] ) ) {
 						$this->responses[ $this->current_url ] = '';
 					}
 					$this->responses[ $this->current_url ] .= $this->client->get_response_body_chunk();
 					break;
 
-				case SocketClient::EVENT_FINISHED:
+				case Client::EVENT_FINISHED:
 					if ( ! isset( $this->responses[ $this->current_url ] ) ) {
 						continue 2;
 					}

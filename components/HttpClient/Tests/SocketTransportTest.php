@@ -2,11 +2,10 @@
 
 namespace WordPress\HttpClient\Tests;
 
-use WordPress\HttpClient\Client\Client;
-use WordPress\HttpClient\Client\SocketClient;
+use WordPress\HttpClient\Client;
 use WordPress\HttpClient\Request;
 
-class SocketClientTest extends AbstractClientTest {
+class SocketTransportTest extends ClientTestBase {
 
     public function test_unsupported_encoding() {
         $this->withServer(function (string $base) {
@@ -16,7 +15,7 @@ class SocketClientTest extends AbstractClientTest {
             ]);
         }, 'encoding');
     }
-	
+
     /**
      * Test HEAD request.
      */
@@ -187,4 +186,4 @@ class SocketClientTest extends AbstractClientTest {
             ],
         ];
     }
-} 
+}

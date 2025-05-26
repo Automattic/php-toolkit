@@ -1,12 +1,15 @@
 <?php
 
-namespace WordPress\HttpClient\Client;
+namespace WordPress\HttpClient\Transport;
 
 use WordPress\ByteStream\ByteTransformer\InflateTransformer;
 use WordPress\ByteStream\ReadStream\FileReadStream;
 use WordPress\ByteStream\ReadStream\TransformedReadStream;
 use WordPress\HttpClient\ByteStream\ChunkedDecoderReadStream;
 use WordPress\HttpClient\ByteStream\ChunkedEncoderByteTransformer;
+use WordPress\HttpClient\Client;
+use WordPress\HttpClient\Transport;
+use WordPress\HttpClient\ClientState;
 use WordPress\HttpClient\HttpError;
 use WordPress\HttpClient\Request;
 use WordPress\HttpClient\Response;
@@ -14,7 +17,7 @@ use WordPress\HttpClient\Response;
 /**
  * An HTTP client using stream_socket_client(). Supports
  * concurrent connections just like curl_multi.
- * 
+ *
  * Supports:
  * * Concurrency
  * * HTTP 1.0 and 1.1

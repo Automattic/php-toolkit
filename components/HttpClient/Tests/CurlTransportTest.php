@@ -2,12 +2,11 @@
 
 namespace WordPress\HttpClient\Tests;
 
-use WordPress\HttpClient\Client\Client;
-use WordPress\HttpClient\Client\CurlClient;
+use WordPress\HttpClient\Client;
 use WordPress\HttpClient\HttpError;
 use WordPress\HttpClient\Request;
 
-class CurlTransportTest extends AbstractClientTest {
+class CurlTransportTest extends ClientTestBase {
 
     public function test_unsupported_encoding() {
         $this->withServer(function (string $base) {
@@ -118,7 +117,7 @@ class CurlTransportTest extends AbstractClientTest {
             $this->assertEmpty( $body ); // Body should be empty for HEAD
         }, 'edge-cases' );
     }
-	
+
     protected function createClient( array $options = [] ): Client {
         return new Client( array_merge( $options, [ 'transport' => 'curl' ] ) );
     }
@@ -141,7 +140,7 @@ class CurlTransportTest extends AbstractClientTest {
             'Invalid Response' => [ 'invalid-response', 'cURL error 1: Received HTTP/0.9 when not allowed' ],
             'Timeout' => [ 'timeout', 'cURL error' ],
             'Timeout Read Body' => [ 'timeout-read-body', 'cURL error' ],
-			
+
 			// cURL ignores unsupported transfer encodings
             // 'Unsupported Transfer Encoding' => [ 'unsupported-encoding', 'Unsupported transfer encoding received from the server: unsupported' ],
 
@@ -181,4 +180,4 @@ class CurlTransportTest extends AbstractClientTest {
             ],
         ];
     }
-} 
+}

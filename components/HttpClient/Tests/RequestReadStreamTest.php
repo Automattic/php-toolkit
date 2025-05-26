@@ -6,7 +6,8 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Component\Process\Process;
 use WordPress\ByteStream\ByteStreamException;
 use WordPress\HttpClient\ByteStream\RequestReadStream;
-use WordPress\HttpClient\Client\SocketClient;
+use WordPress\HttpClient\Client;
+use WordPress\HttpClient\Transport;
 use WordPress\HttpClient\Request;
 use WordPress\HttpClient\Response;
 
@@ -68,7 +69,7 @@ class RequestReadStreamTest extends TestCase {
 	public function testConstructWithCustomClient() {
 		$this->withServer(function($url) {
 			$test_url = $url . $this->fixture;
-			$client = new SocketClient();
+			$client = new Client();
 			$stream = new RequestReadStream( $test_url, [ 'client' => $client ] );
 			$this->assertInstanceOf( RequestReadStream::class, $stream );
 			$response = $stream->await_response();

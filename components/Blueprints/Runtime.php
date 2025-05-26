@@ -12,7 +12,7 @@ use WordPress\Blueprints\Exception\BlueprintExecutionException;
 use WordPress\ByteStream\WriteStream\FileWriteStream;
 use WordPress\Filesystem\Filesystem;
 use WordPress\Filesystem\LocalFilesystem;
-use WordPress\HttpClient\Client\SocketClient;
+use WordPress\HttpClient\Transport;
 
 use function WordPress\Filesystem\pipe_stream;
 use function WordPress\Filesystem\wp_join_unix_paths;
@@ -47,7 +47,7 @@ class Runtime {
 	 */
 	private $assets;
 	/**
-	 * @var SocketClient
+	 * @var Client
 	 */
 	private $client;
 	/**
@@ -67,7 +67,7 @@ class Runtime {
 		Filesystem $targetFs,
 		RunnerConfiguration $configuration,
 		DataReferenceResolver $assets,
-		SocketClient $client,
+		Client $client,
 		array $blueprint,
 		string $tempRoot,
 		DataReference $wpCliReference
@@ -81,7 +81,7 @@ class Runtime {
 		$this->wpCliReference = $wpCliReference;
 	}
 
-	public function getHttpClient(): SocketClient {
+	public function getHttpClient(): Client {
 		return $this->client;
 	}
 
