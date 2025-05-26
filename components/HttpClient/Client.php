@@ -4,6 +4,8 @@ namespace WordPress\HttpClient;
 
 use WordPress\DataLiberation\URL\WPURL;
 use WordPress\HttpClient\ByteStream\RequestReadStream;
+use WordPress\HttpClient\Middleware\HttpMiddleware;
+use WordPress\HttpClient\Middleware\RedirectionMiddleware;
 use WordPress\HttpClient\Transport\CurlTransport;
 use WordPress\HttpClient\Transport\SocketTransport;
 use WordPress\HttpClient\Transport\TransportInterface;
@@ -20,9 +22,9 @@ class Client {
 	 */
 	private $state;
 	/**
-	 * @var TransportInterface
+	 * @var MiddlewareInterface
 	 */
-	private $transport;
+	private $middleware;
 
 	public function __construct( $options = array() ) {
 		$this->state = new ClientState( $options );
@@ -32,14 +34,19 @@ class Client {
 
 		switch ( $options['transport'] ) {
 			case 'curl':
-				$this->transport = new CurlTransport( $this->state );
+				$transport = new CurlTransport( $this->state );
 				break;
 			case 'socket':
-				$this->transport = new SocketTransport( $this->state );
+				$transport = new SocketTransport( $this->state );
 				break;
 			default:
 				throw new HttpClientException( "Invalid transport: {$options['transport']}" );
 		}
+
+		$this->middleware = new RedirectionMiddleware( 
+			new HttpMiddleware( array( 'state' => $this->state, 'transport' => $transport ) ),
+			array( 'client' => $this, 'state' => $this->state, 'max_redirects' => 5 )
+		);
 	}
 
 	/**
@@ -101,10 +108,7 @@ class Client {
 				throw new HttpClientException( "Request {$request->id} is not in the created state." );
 			}
 
-			$request->state                    = Request::STATE_ENQUEUED;
-			$this->state->requests[]                  = apply_filters( 'wp_http_client_request', $request );
-			$this->state->events[ $request->id ]      = array();
-			$this->state->connections[ $request->id ] = new Connection( $request );
+			$this->middleware->enqueue( $request );
 
 			$parsed = WPURL::parse( $request->url );
 			if ( false === $parsed ) {
@@ -174,124 +178,15 @@ class Client {
 	 * @return bool
 	 */
 	public function await_next_event( $query = array() ) {
-		$ordered_events            = array(
-			Client::EVENT_GOT_HEADERS,
-			Client::EVENT_BODY_CHUNK_AVAILABLE,
-			Client::EVENT_FAILED,
-			Client::EVENT_FINISHED,
-		);
-		$this->state->event               = null;
-		$this->state->request             = null;
-		$this->state->response_body_chunk = null;
-
-		$start_time = microtime( true );
-		$timeout_ms = isset( $query['timeout_ms'] )
-			? $query['timeout_ms']
-			// Give the requests an opportunity to time out
-			: $this->state->request_timeout_ms * 1.1;
-
-		do {
-			if ( empty( $query['requests'] ) ) {
-				$events = array_keys( $this->state->events );
-			} else {
-				$events = array();
-				foreach ( $query['requests'] as $query_request ) {
-					$events[] = $query_request->id;
-				}
-			}
-
-			foreach ( $events as $request_id ) {
-				foreach ( $ordered_events as $considered_event ) {
-					$needs_emitting = $this->state->events[ $request_id ][ $considered_event ] ?? false;
-					if ( ! $needs_emitting ) {
-						continue;
-					}
-
-					$this->state->events[ $request_id ][ $considered_event ] = false;
-					$this->state->event                                      = $considered_event;
-					$this->state->request                                    = $this->state->get_request_by_id( $request_id );
-					switch ( $this->state->event ) {
-						case Client::EVENT_GOT_HEADERS:
-							$this->handle_redirect($this->state->request);
-							break;
-						case Client::EVENT_BODY_CHUNK_AVAILABLE:
-							$this->state->response_body_chunk = $this->state->consume_buffered_response_body( $request_id );
-							break;
-						case Client::EVENT_FAILED:
-						case Client::EVENT_FINISHED:
-							// We don't need the response buffer anymore. It's
-							// safe to clean up the connection object now. The
-							// HTTP resource have been closed by now via the
-							// close_connection() method.
-							unset( $this->state->connections[ $request_id ] );
-							break;
-					}
-
-					return true;
-				}
-			}
-
-			// After we've checked for any available events, see if we've run out of time.
-			// This way, we always return any events that were ready before worrying about the timeout.
-			// If we checked the timeout first, we might miss events that were already waiting for us
-			// when the timeout is set to zero.
-			$time_elapsed_ms = ( microtime( true ) - $start_time ) * 1000;
-			if ( $timeout_ms && $time_elapsed_ms >= $timeout_ms ) {
-				return false;
-			}
-		} while ( $this->transport->event_loop_tick() );
-
-		return false;
-	}
-
-	/**
-	 * @param  array  $requests  An array of requests.
-	 */
-	protected function handle_redirect( $request ) {
-		$response = $request->response;
-		if ( ! $response ) {
-			return;
+		$requests_ids = array();
+		if(empty($query['requests'])) {
+			$requests_ids = array_keys( $this->state->events );
+		} else {
+			$requests_ids = array_map( function( $request ) {
+				return $request->id;
+			}, $query['requests'] );
 		}
-		$code = $response->status_code;
-		if ( ! in_array($code, [301, 302, 303, 307, 308]) ) {
-			return;
-		}
-
-		$location = $response->get_header( 'location' );
-		if ( null === $location ) {
-			return;
-		}
-
-		$redirects_so_far = 0;
-		$cause            = $request;
-		while ( $cause->redirected_from ) {
-			++ $redirects_so_far;
-			$cause = $cause->redirected_from;
-		}
-
-		if ( $redirects_so_far >= $this->state->max_redirects ) {
-			$this->state->set_request_error( $request, new HttpError( 'Too many redirects' ) );
-			return;
-		}
-
-		$redirect_url = $location;
-		$parsed = WPURL::parse($redirect_url, $request->url);
-		if(false === $parsed) {
-			$this->state->set_request_error( $request, new HttpError( sprintf( 'Invalid redirect URL: %s', $redirect_url ) ) );
-			return;
-		}
-		$redirect_url = $parsed->toString();
-
-		$this->enqueue(
-			new Request(
-				$redirect_url,
-				array(
-					// Redirects are always GET requests
-					'method'          => 'GET',
-					'redirected_from' => $request,
-				)
-			)
-		);
+		return $this->middleware->await_next_event( $requests_ids );
 	}
 
 	public function has_pending_event( $request, $event_type ) {

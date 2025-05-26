@@ -29,16 +29,6 @@ class ClientState {
 	public $concurrency;
 
 	/**
-	 * The maximum number of redirects to follow for a single request.
-	 *
-	 * This prevents infinite redirect loops and provides a degree of control over the client's behavior.
-	 * Setting it too high might lead to unexpected navigation paths.
-	 *
-	 * @var int
-	 */
-	public $max_redirects;
-
-	/**
 	 * All the HTTP requests ever enqueued with this Client.
 	 *
 	 * Each Request may have a different state, and this Client will manage them
@@ -70,7 +60,6 @@ class ClientState {
 
 	public function __construct( $options = array() ) {
 		$this->concurrency        = $options['concurrency'] ?? 10;
-		$this->max_redirects      = $options['max_redirects'] ?? 3;
 		$this->request_timeout_ms = $options['timeout_ms'] ?? 30000;
 	}
 
