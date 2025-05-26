@@ -5,7 +5,6 @@ namespace WordPress\HttpClient\ByteStream;
 use WordPress\ByteStream\ByteStreamException;
 use WordPress\ByteStream\ReadStream\BaseByteReadStream;
 use WordPress\HttpClient\Client;
-use WordPress\HttpClient\Client;
 use WordPress\HttpClient\HttpClientException;
 use WordPress\HttpClient\Request;
 use WordPress\HttpClient\Response;

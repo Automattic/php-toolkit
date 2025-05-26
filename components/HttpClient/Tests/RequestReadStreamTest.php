@@ -7,7 +7,6 @@ use Symfony\Component\Process\Process;
 use WordPress\ByteStream\ByteStreamException;
 use WordPress\HttpClient\ByteStream\RequestReadStream;
 use WordPress\HttpClient\Client;
-use WordPress\HttpClient\Client;
 use WordPress\HttpClient\Request;
 use WordPress\HttpClient\Response;
 
