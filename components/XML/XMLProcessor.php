@@ -553,8 +553,8 @@ class XMLProcessor {
 	 *     //   <wp:content wp:id="test-4" class="outline">
 	 *     // </channel>
 	 *     $this->qualified_attributes = array(
-	 *         '{http://wordpress.org/export/1.2/}id' => new XMLAttributeToken( 'id', 9, 6, 5, 14, 'wp', 'id' ),
-	 *         'class' => new XMLAttributeToken( 'class', 23, 7, 17, 13, '', 'class', '' )
+	 *         '{http://wordpress.org/export/1.2/}id' => new XMLAttributeToken( 9, 6, 5, 14, 'wp', 'id' ),
+	 *         'class' => new XMLAttributeToken( 23, 7, 17, 13, '', 'class', '' )
 	 *     );
 	 *
 	 * @since WP_VERSION
@@ -2294,7 +2294,6 @@ class XMLProcessor {
 		list( $namespace_prefix, $local_name ) = $this->parse_qualified_name( $attribute_qname );
 
 		$this->qualified_attributes[ $attribute_qname ] = new XMLAttributeToken(
-			$attribute_qname,
 			$value_start,
 			$value_length,
 			$attribute_start,
