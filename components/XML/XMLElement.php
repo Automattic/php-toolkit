@@ -72,5 +72,23 @@ class XMLElement {
 	public function get_full_name() {
 		return $this->namespace ? '{' . $this->namespace . '}' . $this->local_name : $this->local_name;
 	}
+
+	public function to_array() {
+		return [
+			'local_name' => $this->local_name,
+			'namespace_prefix' => $this->namespace_prefix,
+			'namespace' => $this->namespace,
+			'namespaces_in_scope' => $this->namespaces_in_scope,
+		];
+	}
+
+	public static function from_array( $array_value ) {
+		return new self(
+			$array_value['local_name'],
+			$array_value['namespace_prefix'],
+			$array_value['namespace'],
+			$array_value['namespaces_in_scope']
+		);
+	}
 	
 }

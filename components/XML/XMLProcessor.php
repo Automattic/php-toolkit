@@ -759,12 +759,7 @@ class XMLProcessor {
 	public function get_reentrancy_cursor() {
 		$stack_of_open_elements = [];
 		foreach ( $this->stack_of_open_elements->get_items() as $element ) {
-			$stack_of_open_elements[] = [
-				'local_name'          => $element->local_name,
-				'namespace_prefix'    => $element->namespace_prefix,
-				'namespace'           => $element->namespace,
-				'namespaces_in_scope' => $element->namespaces_in_scope,
-			];
+			$stack_of_open_elements[] = $element->to_array();
 		}
 
 		return base64_encode(
@@ -774,7 +769,7 @@ class XMLProcessor {
 					'upstream_bytes_forgotten' => $this->upstream_bytes_forgotten,
 					'parser_context'           => $this->parser_context,
 					'stack_of_open_elements'   => $stack_of_open_elements,
-					'expecting_more_input'     => $this->expecting_more_input,
+					'expecting_more_input'     => $this->expecting_more_input
 				)
 			)
 		);
@@ -821,8 +816,7 @@ class XMLProcessor {
 		$this->upstream_bytes_forgotten = $cursor['upstream_bytes_forgotten'];
 		$this->stack_of_open_elements   = new XMLStackOfOpenElements();
 		foreach ( $cursor['stack_of_open_elements'] as $element ) {
-			$this->stack_of_open_elements->push( new XMLElement( $element['local_name'], $element['namespace_prefix'],
-				$element['namespace'], $element['namespaces_in_scope'] ) );
+			$this->stack_of_open_elements->push( XMLElement::from_array( $element ) );
 		}
 		$this->parser_context       = $cursor['parser_context'];
 		$this->expecting_more_input = $cursor['expecting_more_input'];
@@ -1112,7 +1106,7 @@ class XMLProcessor {
 			 * Confirm the tag name is valid with respect to XML namespaces.
 			 * @see https://www.w3.org/TR/2006/REC-xml-names11-20060816/#Conformance
 			 */
-			$tag_name = $this->get_qualified_tag_name();
+			$tag_name = $this->get_tag_name_qualified();
 			if ( false === $this->validate_qualified_name( $tag_name ) ) {
 				return false;
 			}
@@ -1183,6 +1177,8 @@ class XMLProcessor {
 			$this->qualified_attributes = array();
 
 			$this->element = new XMLElement( $tag_local_name, $tag_namespace_prefix, $namespaces[ $tag_namespace_prefix ], $namespaces );
+			// Closers assume $this->element is the element created for the opener.
+			// @see step_in_element
 		}
 
 		/*
@@ -1576,7 +1572,7 @@ class XMLProcessor {
 		} else {
 			$query = $query_or_ns;
 		}
-		
+
 		if ( null === $query ) {
 			while ( $this->step() ) {
 				if ( '#tag' !== $this->get_token_type() ) {
@@ -2939,7 +2935,7 @@ class XMLProcessor {
 			return $this->element->local_name;
 		}
 
-		$qualified_tag_name = $this->get_qualified_tag_name();
+		$qualified_tag_name = $this->get_tag_name_qualified();
 		if ( null === $qualified_tag_name ) {
 			return null;
 		}
@@ -2949,7 +2945,7 @@ class XMLProcessor {
 		return $local_name;
 	}
 
-	public function get_qualified_tag_name() {
+	public function get_tag_name_qualified() {
 		if ( null !== $this->element ) {
 			// Return cached name if we already have it.
 			return $this->element->qualified_name;
@@ -2965,6 +2961,15 @@ class XMLProcessor {
 		}
 
 		return $tag_name;
+	}
+
+	public function get_tag_name_with_namespace() {
+		$namespace = $this->get_namespace();
+		if ( ! $namespace ) {
+			return $this->get_tag_local_name();
+		}
+
+		return '{' . $namespace . '}' . $this->get_tag_local_name();
 	}
 
 	/**
@@ -3376,7 +3381,7 @@ class XMLProcessor {
 		}
 
 		$value             = htmlspecialchars( $value, ENT_XML1, 'UTF-8' );
-		
+
 		if($namespace !== '') {
 			$prefix = $this->stack_of_open_elements->get_namespace_prefix($namespace);
 			if(false === $prefix) {
@@ -3740,7 +3745,7 @@ class XMLProcessor {
 				return true;
 			case '#tag':
 				// Update the stack of open elements
-				$tag_qname = $this->get_qualified_tag_name();
+				$tag_qname = $this->get_tag_name_qualified();
 				if ( $this->is_tag_closer() ) {
 					if(!$this->stack_of_open_elements->count()) {
 						$this->bail(
@@ -3750,7 +3755,8 @@ class XMLProcessor {
 						);
 						return false;
 					}
-					$popped_qname = $this->stack_of_open_elements->pop()->qualified_name;
+					$this->element = $this->stack_of_open_elements->pop();
+					$popped_qname = $this->element->qualified_name;
 					if ( $popped_qname !== $tag_qname ) {
 						$this->bail(
 							sprintf(
