@@ -7,6 +7,7 @@
  */
 
 use PHPUnit\Framework\TestCase;
+use WordPress\ByteStream\ReadStream\FileReadStream;
 use WordPress\XML\XMLProcessor;
 
 /**
@@ -1853,5 +1854,26 @@ XML;
 
 		$this->assertFalse( $processor->next_token(), 'Did not reject DOCTYPE in tag content' );
 		$this->assertEquals( 'syntax', $processor->get_last_error(), 'Did not detect a syntax error' );
+	}
+
+	public function test_auto_pulling_of_entities() {
+		$processor = XMLProcessor::create_for_streaming(
+			FileReadStream::from_path(__DIR__ . '/fixtures/10MB.xml')
+		);
+
+		$count_tags = 0;
+		while ( $processor->next_tag() ) {
+			$count_tags++;
+		}
+		$this->assertEquals( 120604, $count_tags, 'Did not find the expected number of tags.' );
+	}
+
+	public function test_get_all_modifiable_text_until_next_tag() {
+		$processor = XMLProcessor::create_for_streaming(
+			FileReadStream::from_path(__DIR__ . '/fixtures/10MB.xml')
+		);
+		$processor->next_tag('content:encoded');
+		$text = $processor->get_all_modifiable_text_until_next_tag();
+		$this->assertEquals( 82924, strlen($text), 'Did not find the expected number of bytes.' );
 	}
 }
