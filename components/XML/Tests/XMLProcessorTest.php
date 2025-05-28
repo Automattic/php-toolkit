@@ -24,7 +24,6 @@ class XMLProcessorTest extends TestCase {
 	}
 
 	/**
-	 * @ticket 61365
 	 *
 	 * @covers XMLProcessor::get_tag_local_name
 	 */
@@ -35,7 +34,6 @@ class XMLProcessorTest extends TestCase {
 	}
 
 	/**
-	 * @ticket 61365
 	 *
 	 * @covers XMLProcessor::get_tag_local_name
 	 */
@@ -47,7 +45,6 @@ class XMLProcessorTest extends TestCase {
 	}
 
 	/**
-	 * @ticket 61365
 	 *
 	 * @covers XMLProcessor::get_tag_local_name
 	 */
@@ -59,7 +56,6 @@ class XMLProcessorTest extends TestCase {
 	}
 
 	/**
-	 * @ticket 61365
 	 *
 	 * @covers       XMLProcessor::is_empty_element
 	 *
@@ -105,7 +101,6 @@ class XMLProcessorTest extends TestCase {
 	}
 
 	/**
-	 * @ticket 61365
 	 *
 	 * @covers XMLProcessor::get_attribute
 	 */
@@ -118,7 +113,6 @@ class XMLProcessorTest extends TestCase {
 	}
 
 	/**
-	 * @ticket 61365
 	 *
 	 * @covers XMLProcessor::get_attribute
 	 */
@@ -132,7 +126,6 @@ class XMLProcessorTest extends TestCase {
 	}
 
 	/**
-	 * @ticket 61365
 	 *
 	 * @covers XMLProcessor::get_attribute
 	 */
@@ -144,7 +137,6 @@ class XMLProcessorTest extends TestCase {
 	}
 
 	/**
-	 * @ticket 61365
 	 *
 	 * @expectedIncorrectUsage XMLProcessor::base_class_next_token
 	 * @covers XMLProcessor::get_attribute
@@ -158,7 +150,6 @@ class XMLProcessorTest extends TestCase {
 	}
 
 	/**
-	 * @ticket 61365
 	 *
 	 * @covers XMLProcessor::get_attribute
 	 */
@@ -171,7 +162,6 @@ class XMLProcessorTest extends TestCase {
 	}
 
 	/**
-	 * @ticket 61365
 	 * @expectedIncorrectUsage XMLProcessor::parse_next_attribute
 	 *
 	 * @covers XMLProcessor::get_attribute
@@ -183,7 +173,6 @@ class XMLProcessorTest extends TestCase {
 	}
 
 	/**
-	 * @ticket 61365
 	 * @expectedIncorrectUsage XMLProcessor::parse_next_attribute
 	 *
 	 * @covers XMLProcessor::get_attribute
@@ -195,7 +184,6 @@ class XMLProcessorTest extends TestCase {
 	}
 
 	/**
-	 * @ticket 61365
 	 * @expectedIncorrectUsage XMLProcessor::get_attribute
 	 *
 	 * @covers XMLProcessor::get_attribute
@@ -208,7 +196,6 @@ class XMLProcessorTest extends TestCase {
 	}
 
 	/**
-	 * @ticket 61365
 	 * @expectedIncorrectUsage XMLProcessor::get_attribute
 	 *
 	 * @covers XMLProcessor::get_attribute
@@ -221,7 +208,6 @@ class XMLProcessorTest extends TestCase {
 	}
 
 	/**
-	 * @ticket 61365
 	 * @expectedIncorrectUsage XMLProcessor::parse_next_attribute
 	 *
 	 * @covers XMLProcessor::get_attribute
@@ -233,7 +219,6 @@ class XMLProcessorTest extends TestCase {
 	}
 
 	/**
-	 * @ticket 61365
 	 * @expectedIncorrectUsage XMLProcessor::parse_next_attribute
 	 *
 	 * @covers XMLProcessor::get_attribute
@@ -245,7 +230,6 @@ class XMLProcessorTest extends TestCase {
 	}
 
 	/**
-	 * @ticket 61365
 	 * @expectedIncorrectUsage XMLProcessor::parse_next_attribute
 	 *
 	 * @covers XMLProcessor::get_attribute
@@ -257,7 +241,6 @@ class XMLProcessorTest extends TestCase {
 	}
 
 	/**
-	 * @ticket 61365
 	 *
 	 * @covers XMLProcessor::get_attribute
 	 */
@@ -275,7 +258,6 @@ class XMLProcessorTest extends TestCase {
 	}
 
 	/**
-	 * @ticket 61365
 	 *
 	 * @covers XMLProcessor::get_attribute
 	 */
@@ -291,7 +273,6 @@ class XMLProcessorTest extends TestCase {
 	}
 
 	/**
-	 * @ticket 61365
 	 *
 	 * @covers XMLProcessor::get_attribute
 	 *
@@ -315,7 +296,6 @@ class XMLProcessorTest extends TestCase {
 
 
 	/**
-	 * @ticket 61365
 	 *
 	 * @covers XMLProcessor::remove_attribute
 	 */
@@ -334,7 +314,6 @@ class XMLProcessorTest extends TestCase {
 	}
 
 	/**
-	 * @ticket 61365
 	 *
 	 * @covers XMLProcessor::set_attribute
 	 */
@@ -348,7 +327,6 @@ class XMLProcessorTest extends TestCase {
 	}
 
 	/**
-	 * @ticket 61365
 	 *
 	 * @covers XMLProcessor::get_attribute_qualified_names_with_prefix
 	 */
@@ -361,7 +339,6 @@ class XMLProcessorTest extends TestCase {
 	}
 
 	/**
-	 * @ticket 61365
 	 *
 	 * @covers XMLProcessor::get_attribute_qualified_names_with_prefix
 	 */
@@ -373,7 +350,6 @@ class XMLProcessorTest extends TestCase {
 	}
 
 	/**
-	 * @ticket 61365
 	 *
 	 * @covers XMLProcessor::get_attribute_qualified_names_with_prefix
 	 */
@@ -387,7 +363,6 @@ class XMLProcessorTest extends TestCase {
 	}
 
 	/**
-	 * @ticket 61365
 	 *
 	 * @covers XMLProcessor::get_attribute_qualified_names_with_prefix
 	 */
@@ -400,7 +375,6 @@ class XMLProcessorTest extends TestCase {
 	}
 
 	/**
-	 * @ticket 61365
 	 *
 	 * @covers XMLProcessor::get_attribute_qualified_names_with_prefix
 	 */
@@ -416,7 +390,6 @@ class XMLProcessorTest extends TestCase {
 	}
 
 	/**
-	 * @ticket 61365
 	 *
 	 * @covers XMLProcessor::get_attribute_qualified_names_with_prefix
 	 */
@@ -438,7 +411,6 @@ class XMLProcessorTest extends TestCase {
 	}
 
 	/**
-	 * @ticket 61365
 	 *
 	 * @covers XMLProcessor::__toString
 	 */
@@ -459,7 +431,6 @@ class XMLProcessorTest extends TestCase {
 	}
 
 	/**
-	 * @ticket 61365
 	 *
 	 * @covers XMLProcessor::get_updated_xml
 	 */
@@ -496,7 +467,6 @@ class XMLProcessorTest extends TestCase {
 	}
 
 	/**
-	 * @ticket 61365
 	 *
 	 * @covers XMLProcessor::get_updated_xml
 	 */
@@ -514,7 +484,6 @@ class XMLProcessorTest extends TestCase {
 	 * Ensures that when seeking to an earlier spot in the document that
 	 * all previously-enqueued updates are applied as they ought to be.
 	 *
-	 * @ticket 61365
 	 * @expectedIncorrectUsage XMLProcessor::parse_next_attribute
 	 */
 	public function test_get_updated_xml_applies_updates_to_content_after_seeking_to_before_parsed_bytes() {
@@ -561,7 +530,6 @@ class XMLProcessorTest extends TestCase {
 	/**
 	 * Ensures that bookmarks start and length correctly describe a given token in XML.
 	 *
-	 * @ticket 61365
 	 *
 	 * @dataProvider data_xml_nth_token_substring
 	 *
@@ -658,7 +626,6 @@ class XMLProcessorTest extends TestCase {
 	}
 
 	/**
-	 * @ticket 61365
 	 *
 	 * @covers XMLProcessor::next_tag
 	 */
@@ -669,7 +636,6 @@ class XMLProcessorTest extends TestCase {
 	}
 
 	/**
-	 * @ticket 61365
 	 *
 	 * @covers XMLProcessor::next_tag
 	 */
@@ -680,7 +646,6 @@ class XMLProcessorTest extends TestCase {
 	}
 
 	/**
-	 * @ticket 61365
 	 *
 	 * @covers XMLProcessor::get_modifiable_text
 	 */
@@ -698,7 +663,6 @@ class XMLProcessorTest extends TestCase {
 	}
 
 	/**
-	 * @ticket 61365
 	 *
 	 * @covers XMLProcessor::get_modifiable_text
 	 */
@@ -716,8 +680,6 @@ class XMLProcessorTest extends TestCase {
 	}
 
 	/**
-	 * @ticket 61365
-	 * @ticket 61365
 	 *
 	 * @covers XMLProcessor::next_tag
 	 * @covers XMLProcessor::is_tag_closer
@@ -734,7 +696,6 @@ class XMLProcessorTest extends TestCase {
 	 * Verifies that updates to a document before calls to `get_updated_xml()` don't
 	 * lead to the Tag Processor jumping to the wrong tag after the updates.
 	 *
-	 * @ticket 61365
 	 *
 	 * @covers XMLProcessor::get_updated_xml
 	 */
@@ -759,7 +720,6 @@ class XMLProcessorTest extends TestCase {
 	}
 
 	/**
-	 * @ticket 61365
 	 *
 	 * @covers XMLProcessor::set_attribute
 	 */
@@ -779,7 +739,6 @@ class XMLProcessorTest extends TestCase {
 	}
 
 	/**
-	 * @ticket 61365
 	 *
 	 * @covers XMLProcessor::set_attribute
 	 * @covers XMLProcessor::remove_attribute
@@ -806,7 +765,6 @@ class XMLProcessorTest extends TestCase {
 
 
 	/**
-	 * @ticket 61365
 	 *
 	 * @covers XMLProcessor::set_attribute
 	 */
@@ -828,7 +786,6 @@ class XMLProcessorTest extends TestCase {
 	}
 
 	/**
-	 * @ticket 61365
 	 *
 	 * @covers XMLProcessor::get_attribute
 	 */
@@ -850,7 +807,6 @@ class XMLProcessorTest extends TestCase {
 	}
 
 	/**
-	 * @ticket 61365
 	 *
 	 * @covers XMLProcessor::get_attribute
 	 */
@@ -873,7 +829,6 @@ class XMLProcessorTest extends TestCase {
 
 
 	/**
-	 * @ticket 61365
 	 *
 	 * @covers XMLProcessor::get_attribute
 	 */
@@ -894,7 +849,6 @@ class XMLProcessorTest extends TestCase {
 	}
 
 	/**
-	 * @ticket 61365
 	 *
 	 * @covers XMLProcessor::get_attribute
 	 */
@@ -916,7 +870,6 @@ class XMLProcessorTest extends TestCase {
 	}
 
 	/**
-	 * @ticket 61365
 	 *
 	 * @covers XMLProcessor::get_attribute
 	 */
@@ -938,7 +891,6 @@ class XMLProcessorTest extends TestCase {
 	}
 
 	/**
-	 * @ticket 61365
 	 *
 	 * @covers XMLProcessor::set_attribute
 	 */
@@ -957,7 +909,6 @@ class XMLProcessorTest extends TestCase {
 	 * Ensures that when setting an attribute multiple times that only
 	 * one update flushes out into the updated XML.
 	 *
-	 * @ticket 61365
 	 *
 	 * @covers XMLProcessor::set_attribute
 	 */
@@ -972,7 +923,6 @@ class XMLProcessorTest extends TestCase {
 	}
 
 	/**
-	 * @ticket 61365
 	 *
 	 * @covers XMLProcessor::next_tag
 	 * @covers XMLProcessor::set_attribute
@@ -991,7 +941,6 @@ class XMLProcessorTest extends TestCase {
 	}
 
 	/**
-	 * @ticket 61365
 	 *
 	 * @covers XMLProcessor::remove_attribute
 	 */
@@ -1008,7 +957,6 @@ class XMLProcessorTest extends TestCase {
 	}
 
 	/**
-	 * @ticket 61365
 	 *
 	 * @covers XMLProcessor::remove_attribute
 	 */
@@ -1025,7 +973,6 @@ class XMLProcessorTest extends TestCase {
 	}
 
 	/**
-	 * @ticket 61365
 	 *
 	 * @covers XMLProcessor::next_tag
 	 */
@@ -1055,7 +1002,6 @@ class XMLProcessorTest extends TestCase {
 	}
 
 	/**
-	 * @ticket 61365
 	 * @expectedIncorrectUsage XMLProcessor::parse_next_attribute
 	 * @expectedIncorrectUsage XMLProcessor::set_attribute
 	 *
@@ -1073,7 +1019,6 @@ class XMLProcessorTest extends TestCase {
 	}
 
 	/**
-	 * @ticket 61365
 	 * @expectedIncorrectUsage XMLProcessor::set_attribute
 	 *
 	 * @covers XMLProcessor::set_attribute
@@ -1093,7 +1038,6 @@ class XMLProcessorTest extends TestCase {
 	/**
 	 * Ensures that unclosed and invalid comments trigger warnings or errors.
 	 *
-	 * @ticket 61365
 	 *
 	 * @covers       XMLProcessor::next_tag
 	 * @covers       XMLProcessor::paused_at_incomplete_token
@@ -1131,7 +1075,6 @@ class XMLProcessorTest extends TestCase {
 	/**
 	 * Ensures that partial syntax triggers warnings or errors.
 	 *
-	 * @ticket 61365
 	 *
 	 * @covers       XMLProcessor::next_tag
 	 * @covers       XMLProcessor::paused_at_incomplete_token
@@ -1175,7 +1118,6 @@ class XMLProcessorTest extends TestCase {
 	/**
 	 * Ensures that the processor doesn't attempt to match an incomplete token.
 	 *
-	 * @ticket 61365
 	 *
 	 * @covers       XMLProcessor::next_tag
 	 * @covers       XMLProcessor::paused_at_incomplete_token
@@ -1225,7 +1167,6 @@ class XMLProcessorTest extends TestCase {
 	/**
 	 * Ensures that the processor doesn't attempt to match an incomplete text node.
 	 *
-	 * @ticket 61365
 	 *
 	 * @covers       XMLProcessor::next_tag
 	 * @covers       XMLProcessor::paused_at_incomplete_token
@@ -1312,7 +1253,6 @@ class XMLProcessorTest extends TestCase {
 	/**
 	 * Ensures that non-tag syntax starting with `<` is rejected.
 	 *
-	 * @ticket 61365
 	 */
 	public function test_single_text_node_with_taglike_text() {
 		$processor = XMLProcessor::create_from_string( '<root xmlns:wp="w.org">This is a text node< /A>' );
@@ -1326,7 +1266,6 @@ class XMLProcessorTest extends TestCase {
 	/**
 	 * Ensures that non-tag syntax starting with `<` is rejected.
 	 *
-	 * @ticket 61365
 	 */
 	public function test_parses_CDATA() {
 		$processor = XMLProcessor::create_from_string( '<root xmlns:wp="w.org"><![CDATA[This is a CDATA text node.]]></root>' );
@@ -1340,7 +1279,6 @@ class XMLProcessorTest extends TestCase {
 	}
 
 	/**
-	 * @ticket 61365
 	 */
 	public function test_yields_CDATA_a_separate_text_node() {
 		$processor = XMLProcessor::create_from_string( '<root xmlns:wp="w.org">This is the first text node <![CDATA[ and this is a second text node ]]> and this is the third text node.</root>' );
@@ -1370,7 +1308,6 @@ class XMLProcessorTest extends TestCase {
 
 	/**
 	 *
-	 * @ticket 61365
 	 */
 	public function test_xml_declaration() {
 		$processor = XMLProcessor::create_from_string( '<?xml version="1.0" encoding="UTF-8" ?>' );
@@ -1386,7 +1323,6 @@ class XMLProcessorTest extends TestCase {
 
 	/**
 	 *
-	 * @ticket 61365
 	 */
 	public function test_xml_declaration_with_single_quotes() {
 		$processor = XMLProcessor::create_from_string( "<?xml version='1.0' encoding='UTF-8' ?>" );
@@ -1402,7 +1338,6 @@ class XMLProcessorTest extends TestCase {
 
 	/**
 	 *
-	 * @ticket 61365
 	 */
 	public function test_processor_instructions() {
 		$processor = XMLProcessor::create_from_string(
@@ -1426,7 +1361,6 @@ class XMLProcessorTest extends TestCase {
 	 * Ensures that updates which are enqueued in front of the cursor
 	 * are applied before moving forward in the document.
 	 *
-	 * @ticket 61365
 	 */
 	public function test_applies_updates_before_proceeding() {
 		$xml = '<root xmlns:wp="w.org"><wp:content><photo/></wp:content><wp:content><photo/></wp:content></root>';
@@ -1473,7 +1407,6 @@ class XMLProcessorTest extends TestCase {
 
 
 	/**
-	 * @ticket 61365
 	 *
 	 * @covers XMLProcessor::next_tag
 	 * @covers XMLProcessor::get_breadcrumbs
@@ -1511,7 +1444,6 @@ class XMLProcessorTest extends TestCase {
 	}
 
 	/**
-	 * @ticket 61365
 	 *
 	 * @return void
 	 */
@@ -1530,7 +1462,6 @@ class XMLProcessorTest extends TestCase {
 	}
 
 	/**
-	 * @ticket 61365
 	 *
 	 * @return void
 	 */
@@ -1549,7 +1480,6 @@ class XMLProcessorTest extends TestCase {
 	}
 
 	/**
-	 * @ticket 61365
 	 *
 	 * @return void
 	 */
@@ -1582,7 +1512,6 @@ class XMLProcessorTest extends TestCase {
 	}
 
 	/**
-	 * @ticket 61365
 	 *
 	 * @expectedIncorrectUsage XMLProcessor::step_in_misc
 	 */
@@ -1598,7 +1527,6 @@ class XMLProcessorTest extends TestCase {
 	}
 
 	/**
-	 * @ticket 61365
 	 */
 	public function test_whitespace_text_allowed_after_root_element() {
 		$processor = XMLProcessor::create_from_string( '<root xmlns:wp="w.org"></root>   ' );
@@ -1608,7 +1536,6 @@ class XMLProcessorTest extends TestCase {
 	}
 
 	/**
-	 * @ticket 61365
 	 */
 	public function test_processing_directives_allowed_after_root_element() {
 		$processor = XMLProcessor::create_from_string( '<root xmlns:wp="w.org"></root><?xml processing directive! ?>' );
@@ -1618,7 +1545,6 @@ class XMLProcessorTest extends TestCase {
 	}
 
 	/**
-	 * @ticket 61365
 	 */
 	public function test_mixed_misc_grammar_allowed_after_root_element() {
 		$processor = XMLProcessor::create_from_string( '<root xmlns:wp="w.org"></root>   <?xml hey ?> <!-- comment --> <?xml another pi ?> <!-- more comments! -->' );
@@ -1631,7 +1557,6 @@ class XMLProcessorTest extends TestCase {
 	}
 
 	/**
-	 * @ticket 61365
 	 *
 	 * @expectedIncorrectUsage XMLProcessor::step_in_misc
 	 */
@@ -1647,7 +1572,6 @@ class XMLProcessorTest extends TestCase {
 	}
 
 	/**
-	 * @ticket 61365
 	 *
 	 * @return void
 	 */
@@ -1659,7 +1583,6 @@ class XMLProcessorTest extends TestCase {
 	}
 
 	/**
-	 * @ticket 61365
 	 *
 	 * @expectedIncorrectUsage XMLProcessor::step_in_misc
 	 * @return void
@@ -1676,7 +1599,6 @@ class XMLProcessorTest extends TestCase {
 	}
 
 	/**
-	 * @ticket 61365
 	 *
 	 * @covers XMLProcessor::next_tag
 	 */
@@ -1690,7 +1612,6 @@ class XMLProcessorTest extends TestCase {
 	}
 
 	/**
-	 * @ticket 61365
 	 *
 	 * @covers XMLProcessor::next_tag
 	 */
@@ -1708,7 +1629,6 @@ class XMLProcessorTest extends TestCase {
 	}
 
 	/**
-	 * @ticket 61365
 	 *
 	 * @covers XMLProcessor::next_token
 	 */
@@ -1726,7 +1646,6 @@ class XMLProcessorTest extends TestCase {
 	}
 
 	/**
-	 * @ticket 61365
 	 *
 	 * @covers XMLProcessor::next_token
 	 */
@@ -1744,7 +1663,6 @@ class XMLProcessorTest extends TestCase {
 	}
 
 	/**
-	 * @ticket 61365
 	 *
 	 * @covers XMLProcessor::pause
 	 * @covers XMLProcessor::resume
@@ -1775,7 +1693,6 @@ XML;
 	}
 
 	/**
-	 * @ticket 61365
 	 *
 	 * @covers XMLProcessor::next_token
 	 */
@@ -1791,7 +1708,6 @@ XML;
 	}
 
 	/**
-	 * @ticket 61365
 	 *
 	 * @covers XMLProcessor::next_token
 	 */
@@ -1811,7 +1727,6 @@ XML;
 	}
 
 	/**
-	 * @ticket 61365
 	 *
 	 * @covers XMLProcessor::next_token
 	 */
@@ -1831,7 +1746,6 @@ XML;
 	}
 
 	/**
-	 * @ticket 61365
 	 *
 	 * @covers XMLProcessor::next_token
 	 */
@@ -1854,5 +1768,117 @@ XML;
 
 		$this->assertFalse( $processor->next_token(), 'Did not reject DOCTYPE in tag content' );
 		$this->assertEquals( 'syntax', $processor->get_last_error(), 'Did not detect a syntax error' );
+	}
+
+	/**
+	 *
+	 * @covers XMLProcessor::set_attribute
+	 * @covers XMLProcessor::get_namespace
+	 */
+	public function test_setting_the_default_namespace_applies_to_element_and_children() {
+		$processor = XMLProcessor::create_from_string( '<root xmlns="http://example.com/ns1" attr="val1"><child attr="val2"><grandchild /></child></root>' );
+
+		// Root element should be in the http://example.com/ns1 namespace.
+		$this->assertTrue( $processor->next_tag( array( 'http://example.com/ns1', 'root' ) ) );
+		$this->assertEquals( 'http://example.com/ns1', $processor->get_namespace() );
+		// The attribute without a namespace prefix isn't namespaced.
+		$this->assertEquals( 'val1', $processor->get_attribute( '', 'attr' ), 'Unprefixed attribute attr was not found in the default namespace.' );
+
+		// Child element
+		$this->assertTrue( $processor->next_tag( array( 'http://example.com/ns1', 'child' ) ) );
+		$this->assertEquals( 'http://example.com/ns1', $processor->get_namespace() );
+		$this->assertEquals( 'val2', $processor->get_attribute( '', 'attr' ), 'Unprefixed attribute attr was not found in the default namespace.' ); 
+
+		// Grandchild element
+		$this->assertTrue( $processor->next_tag( array( 'http://example.com/ns1', 'grandchild' ) ) );
+		$this->assertEquals( 'http://example.com/ns1', $processor->get_namespace() );
+	}
+
+	/**
+	 *
+	 * @covers XMLProcessor::set_attribute
+	 * @covers XMLProcessor::get_namespace
+	 */
+	public function test_search_by_namespace() {
+		$processor = XMLProcessor::create_from_string( '<root xmlns="http://example.com/ns1" attr="val1"><child xmlns="http://example.com/ns2" attr="val2"><grandchild /></child></root>' );
+
+		// Root element should be in the http://example.com/ns1 namespace.
+		$this->assertTrue( $processor->next_tag( array( 'http://example.com/ns1', 'root' ) ) );
+		$this->assertEquals( 'http://example.com/ns1', $processor->get_namespace() );
+		// The attribute without a namespace prefix isn't namespaced.
+		$this->assertEquals( 'val1', $processor->get_attribute( '', 'attr' ), 'Unprefixed attribute attr was not found in the default namespace.' );
+
+		// Child element
+		$this->assertTrue( $processor->next_tag( array( 'http://example.com/ns2', 'child' ) ) );
+		$this->assertEquals( 'http://example.com/ns2', $processor->get_namespace() );
+		$this->assertEquals( 'val2', $processor->get_attribute( '', 'attr' ), 'Unprefixed attribute attr was not found in the default namespace.' ); 
+
+		// Grandchild element
+		$this->assertTrue( $processor->next_tag( array( 'http://example.com/ns2', 'grandchild' ) ) );
+		$this->assertEquals( 'http://example.com/ns2', $processor->get_namespace() );
+	}
+
+	/**
+	 *
+	 * @covers XMLProcessor::set_attribute
+	 * @covers XMLProcessor::get_namespace
+	 */
+	public function test_overriding_the_default_namespace_applies_to_element_and_children() {
+		$processor = XMLProcessor::create_from_string( '<root xmlns="http://example.com/ns1"><child xmlns="http://example.com/ns2" attr="val"><grandchild /></child></root>' );
+		$this->assertTrue( $processor->next_tag(['*', 'child']) );
+		$this->assertEquals( 'child', $processor->get_tag_local_name() );
+		$this->assertEquals( 'http://example.com/ns2', $processor->get_namespace() );
+		$this->assertEquals( 'val', $processor->get_attribute( '', 'attr' ), 'Unprefixed attribute attr was not found in the default namespace.' ); // Unprefixed attributes are in no namespace.
+
+		$processor->next_tag();
+		$this->assertEquals( 'grandchild', $processor->get_tag_local_name() );
+		$this->assertEquals( 'http://example.com/ns2', $processor->get_namespace() );
+	}
+
+	/**
+	 *
+	 * @covers XMLProcessor::set_attribute
+	 * @covers XMLProcessor::get_namespace
+	 */
+	public function test_changing_default_namespace_to_empty_string_removes_namespace() {
+		$processor = XMLProcessor::create_from_string( '<root xmlns="http://example.com/ns1"><child xmlns="" attr="val"><grandchild /></child></root>' );
+
+		// Root element
+		$this->assertTrue( $processor->next_tag() );
+		$this->assertEquals( 'http://example.com/ns1', $processor->get_namespace() );
+
+		// Child element - default namespace removed
+		$this->assertTrue( $processor->next_tag() );
+		$this->assertEquals( '', $processor->get_namespace() ); // Empty string indicates no namespace.
+		$this->assertEquals( 'val', $processor->get_attribute( '', 'attr' ) ); // Unprefixed attributes are in no namespace.
+
+		// Grandchild element - inherits no namespace from parent
+		$this->assertTrue( $processor->next_tag() );
+		$this->assertEquals( '', $processor->get_namespace() ); // Empty string indicates no namespace.
+	}
+
+	/**
+	 * @expectedIncorrectUsage XMLProcessor::parse_next_attribute
+	 *
+	 * @covers XMLProcessor::get_attribute
+	 */
+	public function test_rejects_duplicate_attributes_with_different_prefixes_same_namespace_uri() {
+		$processor = XMLProcessor::create_from_string( '<x xmlns:n1="http://www.w3.org" xmlns:n2="http://www.w3.org"><bad n1:a="1" n2:a="2" /></x>' );
+		$processor->next_tag( 'x' ); // Move to <x>
+		$this->assertFalse( $processor->next_tag( 'bad' ), 'Should reject tag with duplicate extended attribute names.' );
+		$this->assertEquals( 'syntax', $processor->get_last_error(), 'Did not detect a syntax error' );
+		$this->assertStringContainsString( 'Duplicate attribute', $processor->get_exception()->getMessage() );
+	}
+
+	/**
+	 * @expectedIncorrectUsage XMLProcessor::parse_next_attribute
+	 *
+	 * @covers XMLProcessor::get_attribute
+	 */
+	public function test_rejects_duplicate_unprefixed_attributes_on_element_with_default_namespace() {
+		// Though unprefixed attributes are in "no namespace", they are still checked for duplicates locally.
+		$processor = XMLProcessor::create_from_string( '<x xmlns="http://www.w3.org"><bad a="1" a="2" /></x>' );
+		$processor->next_tag( 'x' ); // Move to <x>
+		$this->assertFalse( $processor->next_tag( 'bad' ), 'Should reject tag with duplicate unprefixed attributes.' );
 	}
 }

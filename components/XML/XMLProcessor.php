@@ -347,8 +347,6 @@ class XMLProcessor {
 	 */
 	const MAX_SEEK_OPS = 1000;
 
-	const DEFAULT_NAMESPACE_PREFIX = '';
-
 	/**
 	 * The XML document to parse.
 	 *
@@ -1076,8 +1074,9 @@ class XMLProcessor {
 				 * @see https://www.w3.org/TR/2006/REC-xml-names11-20060816/#ns-decl
 				 */
 				if ( 'xmlns' === $attribute->qualified_name ) {
-					$value                                        = $this->get_qualified_attribute( $attribute->qualified_name );
-					$namespaces[ self::DEFAULT_NAMESPACE_PREFIX ] = $value;
+					$value          = $this->get_qualified_attribute( $attribute->qualified_name );
+					// Update the default namespace.
+					$namespaces[''] = $value;
 					continue;
 				}
 
@@ -1156,7 +1155,7 @@ class XMLProcessor {
 
 					return false;
 				}
-				$namespace_reference = $namespaces[ $attribute_namespace_prefix ];
+				$namespace_reference = $attribute_namespace_prefix ? $namespaces[ $attribute_namespace_prefix ] : '';
 
 				/**
 				 * It looks supicious but it's safe – $local_name is guaranteed to not contain
@@ -1571,7 +1570,13 @@ class XMLProcessor {
 	 * @since WP_VERSION
 	 *
 	 */
-	public function next_tag( $query = null ) {
+	public function next_tag( $query_or_ns = null, $null_or_local_name = null ) {
+		if ( null !== $null_or_local_name ) {
+			$query = array( 'breadcrumbs' => array( $query_or_ns, $null_or_local_name ) );
+		} else {
+			$query = $query_or_ns;
+		}
+		
 		if ( null === $query ) {
 			while ( $this->step() ) {
 				if ( '#tag' !== $this->get_token_type() ) {
@@ -3962,7 +3967,7 @@ class XMLProcessor {
 	 * @return array<string, string> The namespace prefix and local name.
 	 */
 	private function parse_qualified_name( $qualified_name ) {
-		$namespace_prefix = self::DEFAULT_NAMESPACE_PREFIX;
+		$namespace_prefix = '';
 		$local_name       = $qualified_name;
 
 		$prefix_length = strcspn( $qualified_name, ':' );

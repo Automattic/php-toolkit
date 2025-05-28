@@ -75,7 +75,7 @@ class XMLStackOfOpenElements {
 			return array(
 				'xml'   => 'http://www.w3.org/XML/1998/namespace', // Predefined, cannot be unbound or changed
 				'xmlns' => 'http://www.w3.org/2000/xmlns/',        // Reserved for xmlns attributes, not a real namespace for elements/attributes
-				XMLProcessor::DEFAULT_NAMESPACE_PREFIX      => '', // Default namespace is initially empty (no namespace)
+				''      => '', // Default namespace is initially empty (no namespace)
 			);
 		}
 		return $top->namespaces_in_scope;
