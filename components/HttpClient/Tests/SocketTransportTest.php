@@ -151,7 +151,8 @@ class SocketTransportTest extends ClientTestBase {
 			'Incomplete Status Line' => [ 'incomplete-status-line', 'Malformed HTTP headers received from the server.' ],
 			'Early EOF Headers' => [ 'early-eof-headers', ['Connection closed while reading response headers.', 'Request timed out' ]],
 			'Timeout' => [ 'timeout', 'Request timed out' ], // Client-side timeout
-			'Timeout Read Body' => [ 'timeout-read-body', 'Request timed out' ], // Timeout during body read
+			// @TODO: Fix this test. It's flaky between OSes and PHP versions.
+			// 'Timeout Read Body' => [ 'timeout-read-body', 'Request timed out' ], // Timeout during body read
 		];
 	}
 

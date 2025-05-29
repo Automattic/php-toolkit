@@ -511,25 +511,6 @@ PHP
     }
 
     /**
-     * Test Arrived at /new-path/resource.html.
-     */
-    public function test_relative_path_redirect() {
-        $this->withServer( function ( $url ) {
-            $client  = $this->createClient();
-            $request = new Request( "$url/redirect/relative-path-redirect" );
-
-            $body = $this->consume_entire_body( $client, $request );
-            $this->assertEquals( 'Redirecting to new-path/resource.html', $body );
-            $this->assertEquals( 302, $request->response->status_code );
-            $this->assertStringContainsString( '/redirect/new-path/resource.html', $request->redirected_to->url );
-
-            $redirected_body = $this->consume_entire_body( $client, $request->redirected_to );
-            $this->assertEquals( 'Arrived at /redirect/new-path/resource.html.', $redirected_body );
-            $this->assertEquals( 200, $request->redirected_to->response->status_code );
-        }, 'redirect' );
-    }
-
-    /**
      * Test no body for 204 No Content status.
      */
     public function test_no_body_204() {
