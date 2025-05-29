@@ -152,9 +152,10 @@ class CurlTransport implements TransportInterface {
         curl_setopt( $ch, CURLOPT_RETURNTRANSFER, false ); // use callbacks for data
         curl_setopt( $ch, CURLOPT_HEADER, false );         // headers via callback
 		curl_setopt($ch, CURLOPT_ENCODING, '');
-        // Set HTTP method and body if needed
+		// Set HTTP method and body if needed
 		curl_setopt( $ch, CURLOPT_CUSTOMREQUEST, $request->method );
 		if ( ! empty( $request->upload_body_stream ) ) {
+			curl_setopt( $ch, CURLOPT_UPLOAD, true );
 			curl_setopt( $ch, CURLOPT_READFUNCTION, function($ch, $fp, $length) use ($request) {
 				$stream = $request->upload_body_stream;
 				// Pull at most $length bytes until we either get some bytes
@@ -173,6 +174,9 @@ class CurlTransport implements TransportInterface {
             $header_lines = array();
             foreach ( $request->headers as $name => $value ) {
                 $header_lines[] = "{$name}: {$value}";
+                if($name === 'content-length' && is_numeric($value)) {
+                    curl_setopt($ch, CURLOPT_INFILESIZE, (int) $value);
+                }
             }
             curl_setopt( $ch, CURLOPT_HTTPHEADER, $header_lines );
         }
