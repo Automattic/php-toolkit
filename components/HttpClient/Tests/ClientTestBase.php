@@ -4,7 +4,7 @@ namespace WordPress\HttpClient\Tests;
 
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Process\Process;
-use WordPress\HttpClient\Client\Client;
+use WordPress\HttpClient\Client;
 use WordPress\HttpClient\HttpError;
 use WordPress\HttpClient\Request;
 
@@ -51,7 +51,7 @@ if ( ! class_exists( 'WordPress\ByteStream\ReadStream\StringReadStream' ) ) {
     }
 }
 
-abstract class AbstractClientTest extends TestCase {
+abstract class ClientTestBase extends TestCase {
 
     /**
      * Create the client instance to be tested.
@@ -447,9 +447,13 @@ PHP
             $request = new Request( "$url/redirect/loop" );
             $client->enqueue( $request );
 
+			$requests = [ $request ];
             $error_occurred = false;
-            while ( $client->await_next_event( [ 'requests' => [ $request ] ] ) ) {
+            while ( $client->await_next_event( [ 'requests' => $requests ] ) ) {
                 switch ( $client->get_event() ) {
+					case Client::EVENT_GOT_HEADERS:
+						$requests[] = $request->latest_redirect();
+						break;
                     case Client::EVENT_FAILED:
                         $this->assertNotNull( $request->latest_redirect()->error );
                         $this->assertStringContainsString( 'Too many redirects', $request->latest_redirect()->error->message );
@@ -489,8 +493,12 @@ PHP
             $client->enqueue( $request );
 
             $error_occurred = false;
-            while ( $client->await_next_event( [ 'requests' => [ $request ] ] ) ) {
+			$requests = [ $request ];
+            while ( $client->await_next_event( [ 'requests' => $requests ] ) ) {
                 switch ( $client->get_event() ) {
+					case Client::EVENT_GOT_HEADERS:
+						$requests[] = $request->latest_redirect();
+						break;
                     case Client::EVENT_FAILED:
                         $this->assertNotNull( $request->latest_redirect()->error );
                         $this->assertStringContainsString( 'Invalid URL', $request->latest_redirect()->error->message );
@@ -499,25 +507,6 @@ PHP
                 }
             }
             $this->assertTrue( $error_occurred, 'Invalid redirect URL should have resulted in an error.' );
-        }, 'redirect' );
-    }
-
-    /**
-     * Test Arrived at /new-path/resource.html.
-     */
-    public function test_relative_path_redirect() {
-        $this->withServer( function ( $url ) {
-            $client  = $this->createClient();
-            $request = new Request( "$url/redirect/relative-path-redirect" );
-
-            $body = $this->consume_entire_body( $client, $request );
-            $this->assertEquals( 'Redirecting to new-path/resource.html', $body );
-            $this->assertEquals( 302, $request->response->status_code );
-            $this->assertStringContainsString( '/redirect/new-path/resource.html', $request->redirected_to->url );
-
-            $redirected_body = $this->consume_entire_body( $client, $request->redirected_to );
-            $this->assertEquals( 'Arrived at /redirect/new-path/resource.html.', $redirected_body );
-            $this->assertEquals( 200, $request->redirected_to->response->status_code );
         }, 'redirect' );
     }
 
@@ -597,12 +586,12 @@ PHP
             $currentMethod = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 2)[1]['function'];
             if (isset($clientSpecificMappings[$currentMethod]['message'])) {
                 $opts['message'] = array_merge(
-                    (array) $opts['message'], 
+                    (array) $opts['message'],
                     (array) $clientSpecificMappings[$currentMethod]['message']
                 );
             }
         }
-        
+
         $client = $this->createClient($opts);
         try {
             $body = $this->consume_entire_body($client, $req);
@@ -624,4 +613,4 @@ PHP
 		}
 		$this->fail($message ?? "None of the needles found in haystack: " . $haystack);
 	}
-} 
+}

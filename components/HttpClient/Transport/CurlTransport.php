@@ -1,7 +1,9 @@
 <?php
 
-namespace WordPress\HttpClient\Client;
+namespace WordPress\HttpClient\Transport;
 
+use WordPress\HttpClient\Client;
+use WordPress\HttpClient\ClientState;
 use WordPress\HttpClient\HttpClientException;
 use WordPress\HttpClient\HttpError;
 use WordPress\HttpClient\Request;
@@ -12,7 +14,13 @@ use WordPress\HttpClient\Response;
  *
  * @extends Client
  */
-class CurlClient extends Client {
+class CurlTransport implements TransportInterface {
+
+	/**
+	 * @var ClientState
+	 */
+	protected $state;
+
     /**
 	 * @var \CurlMultiHandle cURL multi-handle managing parallel requests
 	 */
@@ -28,13 +36,13 @@ class CurlClient extends Client {
      *
      * @param array $options Optional config: 'concurrency', 'max_redirects', 'timeout_ms'.
      */
-    public function __construct( $options = array() ) {
-		parent::__construct( $options );
+    public function __construct( ClientState $state) {
+		$this->state = $state;
 
         $this->multi_handle      = curl_multi_init();
 		curl_multi_setopt( $this->multi_handle, CURLMOPT_PIPELINING, CURLPIPE_MULTIPLEX );
-		curl_multi_setopt( $this->multi_handle, CURLMOPT_MAX_TOTAL_CONNECTIONS, $this->concurrency );
-		curl_multi_setopt( $this->multi_handle, CURLMOPT_MAX_HOST_CONNECTIONS, $this->concurrency );
+		curl_multi_setopt( $this->multi_handle, CURLMOPT_MAX_TOTAL_CONNECTIONS, $this->state->concurrency );
+		curl_multi_setopt( $this->multi_handle, CURLMOPT_MAX_HOST_CONNECTIONS, $this->state->concurrency );
     }
 
     /**
@@ -47,13 +55,13 @@ class CurlClient extends Client {
         }
     }
 
-	protected function event_loop_tick() {
-		if ( count( $this->get_active_requests() ) === 0 ) {
+	public function event_loop_tick(): bool {
+		if ( count( $this->state->get_active_requests() ) === 0 ) {
 			return false;
 		}
 
 		$this->open_nonblocking_curl_handles(
-			$this->get_active_requests( [ Request::STATE_ENQUEUED ] )
+			$this->state->get_active_requests( [ Request::STATE_ENQUEUED ] )
 		);
 
 		if(count($this->handleMap) === 0) {
@@ -61,15 +69,11 @@ class CurlClient extends Client {
 		}
 
 		$this->poll_active_curl_requests();
-		
-		$this->handle_redirects(
-			$this->get_active_requests( [ Request::STATE_RECEIVED ] )
-		);
 
-		$this->finalize_requests(
-			$this->get_active_requests( [ Request::STATE_RECEIVED ] )
-		);
-		
+		foreach ( $this->state->get_active_requests( [ Request::STATE_RECEIVED ] ) as $request ) {
+			$this->mark_finished( $request );
+		}
+
 		return true;
 	}
 
@@ -87,7 +91,7 @@ class CurlClient extends Client {
 				$this->set_error( $request, new HttpError('Failed to add cURL handle to multi handle', $request) );
 				continue;
 			}
-            $this->connections[ $request->id ]->http_socket = $ch;
+            $this->state->connections[ $request->id ]->http_socket = $ch;
             $this->handleMap[ (int) $ch ] = $request->id;
         }
 	}
@@ -106,7 +110,7 @@ class CurlClient extends Client {
 				if ( $id === null ) {
 					throw new HttpClientException('Received completion event for an unknown request ' . ($ch ? (int) $ch : 'unknown'));
 				}
-				$request = $this->get_request_by_id($id);
+				$request = $this->state->get_request_by_id($id);
 				if ( $info['result'] !== CURLE_OK ) {
 					$this->set_error($request, new HttpError(sprintf('cURL error %d: %s', $info['result'], curl_error( $ch ))));
 					return;
@@ -142,14 +146,16 @@ class CurlClient extends Client {
         // Basic curl settings for the request
         curl_setopt( $ch, CURLOPT_URL, $request->url );
         curl_setopt( $ch, CURLOPT_FOLLOWLOCATION, false );
-        curl_setopt( $ch, CURLOPT_MAXREDIRS, 0 ); //$this->max_redirects );
-        curl_setopt( $ch, CURLOPT_TIMEOUT_MS, $this->request_timeout_ms );
+		// Redirects are handled in the Client.
+        curl_setopt( $ch, CURLOPT_MAXREDIRS, 0 );
+        curl_setopt( $ch, CURLOPT_TIMEOUT_MS, $this->state->request_timeout_ms );
         curl_setopt( $ch, CURLOPT_RETURNTRANSFER, false ); // use callbacks for data
         curl_setopt( $ch, CURLOPT_HEADER, false );         // headers via callback
 		curl_setopt($ch, CURLOPT_ENCODING, '');
-        // Set HTTP method and body if needed
+		// Set HTTP method and body if needed
 		curl_setopt( $ch, CURLOPT_CUSTOMREQUEST, $request->method );
 		if ( ! empty( $request->upload_body_stream ) ) {
+			curl_setopt( $ch, CURLOPT_UPLOAD, true );
 			curl_setopt( $ch, CURLOPT_READFUNCTION, function($ch, $fp, $length) use ($request) {
 				$stream = $request->upload_body_stream;
 				// Pull at most $length bytes until we either get some bytes
@@ -168,6 +174,9 @@ class CurlClient extends Client {
             $header_lines = array();
             foreach ( $request->headers as $name => $value ) {
                 $header_lines[] = "{$name}: {$value}";
+                if($name === 'content-length' && is_numeric($value)) {
+                    curl_setopt($ch, CURLOPT_INFILESIZE, (int) $value);
+                }
             }
             curl_setopt( $ch, CURLOPT_HTTPHEADER, $header_lines );
         }
@@ -198,7 +207,7 @@ class CurlClient extends Client {
 		if(null === $request) {
 			throw new HttpClientException('Received header data for an unknown request ' . ($ch ? (int) $ch : 'unknown'));
         }
-		$connection = $this->connections[ $request->id ];
+		$connection = $this->state->connections[ $request->id ];
 		if(strlen($connection->response_buffer) === 0) {
             $request->state = Request::STATE_RECEIVING_HEADERS;
 		}
@@ -216,7 +225,7 @@ class CurlClient extends Client {
 				$this->set_error( $request, new HttpError('Failed to parse headers', $request) );
 				return strlen( $header_line );
 			}
-            $this->events[$request->id][self::EVENT_GOT_HEADERS] = true;
+            $this->state->events[$request->id][Client::EVENT_GOT_HEADERS] = true;
             $request->state = Request::STATE_RECEIVING_BODY;
 			return strlen( $header_line );
         }
@@ -237,23 +246,34 @@ class CurlClient extends Client {
 		if(null === $request) {
 			throw new HttpClientException('Received body data for an unknown request ' . ($ch ? (int) $ch : 'unknown'));
         }
-		$this->connections[ $request->id ]->response_buffer .= $data;
-		$this->events[$request->id][self::EVENT_BODY_CHUNK_AVAILABLE] = true;
+		$this->state->connections[ $request->id ]->response_buffer .= $data;
+		$this->state->events[$request->id][Client::EVENT_BODY_CHUNK_AVAILABLE] = true;
 
         return strlen( $data );
     }
 
 	private function get_request_by_handle( $handle ) {
 		$request_id = $this->handleMap[ (int) $handle ] ?? null;
-		return $this->get_request_by_id($request_id);
+		return $this->state->get_request_by_id($request_id);
 	}
 
-	protected function close_connection( Request $request ) {
-		$handle = $this->connections[ $request->id ]->http_socket;
+	private function mark_finished( Request $request ) {
+		$this->state->set_request_finished( $request );
+		$this->close_connection( $request );
+	}
+
+	private function set_error( Request $request, $error ) {
+		$this->state->set_request_error( $request, $error );
+		$this->close_connection( $request );
+	}
+
+	private function close_connection( Request $request ) {
+		$handle = $this->state->connections[ $request->id ]->http_socket;
 		if(null !== $handle) {
 			curl_multi_remove_handle( $this->multi_handle, $handle );
 			curl_close( $handle );
 		}
 		unset( $this->handleMap[ (int) $handle ] );
 	}
+
 }

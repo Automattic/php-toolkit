@@ -2,12 +2,11 @@
 
 namespace WordPress\HttpClient\Tests;
 
-use WordPress\HttpClient\Client\Client;
-use WordPress\HttpClient\Client\CurlClient;
+use WordPress\HttpClient\Client;
 use WordPress\HttpClient\HttpError;
 use WordPress\HttpClient\Request;
 
-class CurlClientTest extends AbstractClientTest {
+class CurlTransportTest extends ClientTestBase {
 
     public function test_unsupported_encoding() {
         $this->withServer(function (string $base) {
@@ -75,7 +74,6 @@ class CurlClientTest extends AbstractClientTest {
         });
     }
 
-
     public function test_invalid_chunk_size() {
         $body = "Z\r\nHELLO\r\n0\r\n\r\n";
         $this->withRawResponse("HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n$body", function (string $base) {
@@ -118,9 +116,9 @@ class CurlClientTest extends AbstractClientTest {
             $this->assertEmpty( $body ); // Body should be empty for HEAD
         }, 'edge-cases' );
     }
-	
+
     protected function createClient( array $options = [] ): Client {
-        return new CurlClient( $options );
+        return new Client( array_merge( $options, [ 'transport' => 'curl' ] ) );
     }
 
     /**
@@ -141,13 +139,32 @@ class CurlClientTest extends AbstractClientTest {
             'Invalid Response' => [ 'invalid-response', 'cURL error 1: Received HTTP/0.9 when not allowed' ],
             'Timeout' => [ 'timeout', 'cURL error' ],
             'Timeout Read Body' => [ 'timeout-read-body', 'cURL error' ],
-			
+
 			// cURL ignores unsupported transfer encodings
             // 'Unsupported Transfer Encoding' => [ 'unsupported-encoding', 'Unsupported transfer encoding received from the server: unsupported' ],
 
             'Incomplete Status Line' => [ 'incomplete-status-line', 'cURL error 1: Unsupported HTTP' ],
             'Early EOF Headers' => [ 'early-eof-headers', ['Connection closed while reading response headers.', 'cURL error', 'Request timed out' ]],
         ];
+    }
+
+    /**
+     * Test Arrived at /new-path/resource.html.
+     */
+    public function test_relative_path_redirect() {
+        $this->withServer( function ( $url ) {
+            $client  = $this->createClient();
+            $request = new Request( "$url/redirect/relative-path-redirect" );
+
+            $body = $this->consume_entire_body( $client, $request );
+            $this->assertEquals( 'Redirecting to new-path/resource.html', $body );
+            $this->assertEquals( 302, $request->response->status_code );
+            $this->assertStringContainsString( '/redirect/new-path/resource.html', $request->redirected_to->url );
+
+            $redirected_body = $this->consume_entire_body( $client, $request->redirected_to );
+            $this->assertEquals( 'Arrived at /redirect/new-path/resource.html.', $redirected_body );
+            $this->assertEquals( 200, $request->redirected_to->response->status_code );
+        }, 'redirect' );
     }
 
     protected function getClientSpecificErrorMessages(): array {
@@ -181,4 +198,4 @@ class CurlClientTest extends AbstractClientTest {
             ],
         ];
     }
-} 
+}
