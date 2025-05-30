@@ -10,7 +10,7 @@ use WordPress\HttpClient\Response;
 
 class CacheMiddlewareTest extends TestCase {
 
-	private string $cache_dir;
+	private $cache_dir;
 	private $state;
 	private $next_middleware;
 	private $cache_middleware;
