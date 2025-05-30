@@ -297,6 +297,198 @@ $server->set_handler( function ( IncomingRequest $request, TcpResponseWriteStrea
 				$response->append_bytes( 'Not Found' );
 			}
 			break;
+		case 'cache':
+			$type = basename( $path );
+			if ( $type === 'max-age' ) {
+				$response->send_http_code( 200 );
+				$response->send_header( 'Cache-Control', 'max-age=3600' );
+				$response->send_header( 'Content-Type', 'text/plain' );
+				$response->append_bytes( 'Cached for 1 hour' );
+			} elseif ( $type === 'no-cache' ) {
+				$response->send_http_code( 200 );
+				$response->send_header( 'Cache-Control', 'no-cache' );
+				$response->send_header( 'Content-Type', 'text/plain' );
+				$response->append_bytes( 'Not cached' );
+			} elseif ( $type === 'no-store' ) {
+				$response->send_http_code( 200 );
+				$response->send_header( 'Cache-Control', 'no-store' );
+				$response->send_header( 'Content-Type', 'text/plain' );
+				$response->append_bytes( 'Never stored' );
+			} elseif ( $type === 'expires' ) {
+				$response->send_http_code( 200 );
+				$response->send_header( 'Expires', gmdate( 'D, d M Y H:i:s', time() + 3600 ) . ' GMT' );
+				$response->send_header( 'Content-Type', 'text/plain' );
+				$response->append_bytes( 'Expires in 1 hour' );
+			} elseif ( $type === 'etag' ) {
+				$etag = '"test-etag-123"';
+				// Try both case variations
+				$if_none_match = $request->get_header( 'if-none-match' ) ?: $request->get_header( 'If-None-Match' );
+				
+
+				
+				if ( $if_none_match === $etag ) {
+					$response->send_http_code( 304 );
+					$response->send_header( 'ETag', $etag );
+					// No body for 304
+				} else {
+					$response->send_http_code( 200 );
+					$response->send_header( 'ETag', $etag );
+					$response->send_header( 'Cache-Control', 'must-revalidate' );
+					$response->send_header( 'Content-Type', 'text/plain' );
+					$response->append_bytes( 'ETag response' );
+				}
+			} elseif ( $type === 'last-modified' ) {
+				$last_modified = 'Wed, 01 Jan 2020 00:00:00 GMT';
+				// Try both case variations
+				$if_modified_since = $request->get_header( 'if-modified-since' ) ?: $request->get_header( 'If-Modified-Since' );
+				if ( $if_modified_since === $last_modified ) {
+					$response->send_http_code( 304 );
+					$response->send_header( 'Last-Modified', $last_modified );
+					// No body for 304
+				} else {
+					$response->send_http_code( 200 );
+					$response->send_header( 'Last-Modified', $last_modified );
+					$response->send_header( 'Cache-Control', 'must-revalidate' );
+					$response->send_header( 'Content-Type', 'text/plain' );
+					$response->append_bytes( 'Last-Modified response' );
+				}
+			} elseif ( $type === 'vary-accept' ) {
+				$accept = $request->get_header( 'accept' );
+				$response->send_http_code( 200 );
+				$response->send_header( 'Vary', 'Accept' );
+				$response->send_header( 'Cache-Control', 'max-age=3600' );
+				$response->send_header( 'Content-Type', 'text/plain' );
+				if ( $accept === 'application/json' ) {
+					$response->append_bytes( '{"message": "JSON response"}' );
+				} else {
+					$response->append_bytes( 'Text response' );
+				}
+			} elseif ( $type === 'vary-user-agent' ) {
+				$user_agent = $request->get_header( 'user-agent' );
+				$response->send_http_code( 200 );
+				$response->send_header( 'Vary', 'User-Agent' );
+				$response->send_header( 'Cache-Control', 'max-age=3600' );
+				$response->send_header( 'Content-Type', 'text/plain' );
+				if ( strpos( $user_agent, 'Mobile' ) !== false ) {
+					$response->append_bytes( 'Mobile response' );
+				} else {
+					$response->append_bytes( 'Desktop response' );
+				}
+			} elseif ( $type === 'redirect-301' ) {
+				$response->send_http_code( 301 );
+				$response->send_header( 'Location', '/cache/redirect-target' );
+				$response->send_header( 'Cache-Control', 'max-age=3600' );
+				$response->append_bytes( 'Permanent redirect' );
+			} elseif ( $type === 'redirect-target' ) {
+				$response->send_http_code( 200 );
+				$response->send_header( 'Cache-Control', 'max-age=3600' );
+				$response->send_header( 'Content-Type', 'text/plain' );
+				$response->append_bytes( 'Redirect target content' );
+			} elseif ( $type === 'heuristic' ) {
+				$response->send_http_code( 200 );
+				$response->send_header( 'Last-Modified', 'Wed, 01 Jan 2020 00:00:00 GMT' );
+				$response->send_header( 'Content-Type', 'text/plain' );
+				$response->append_bytes( 'Heuristic caching' );
+			} elseif ( $type === 'post-invalidate' ) {
+				if ( $request->method === 'POST' ) {
+					$response->send_http_code( 200 );
+					$response->send_header( 'Content-Type', 'text/plain' );
+					$response->append_bytes( 'POST response - cache invalidated' );
+				} else {
+					$response->send_http_code( 200 );
+					$response->send_header( 'Cache-Control', 'max-age=3600' );
+					$response->send_header( 'Content-Type', 'text/plain' );
+					$response->append_bytes( 'GET response - cacheable' );
+				}
+			} elseif ( $type === 's-maxage' ) {
+				$response->send_http_code( 200 );
+				$response->send_header( 'Cache-Control', 's-maxage=7200, max-age=3600' );
+				$response->send_header( 'Content-Type', 'text/plain' );
+				$response->append_bytes( 'Shared cache for 2 hours, private cache for 1 hour' );
+			} elseif ( $type === 'must-revalidate' ) {
+				$response->send_http_code( 200 );
+				$response->send_header( 'Cache-Control', 'max-age=3600, must-revalidate' );
+				$response->send_header( 'ETag', '"must-revalidate-123"' );
+				$response->send_header( 'Content-Type', 'text/plain' );
+				$response->append_bytes( 'Must revalidate when stale' );
+			} elseif ( $type === 'large-body' ) {
+				$response->send_http_code( 200 );
+				$response->send_header( 'Cache-Control', 'max-age=3600' );
+				$response->send_header( 'Content-Type', 'text/plain' );
+				// Create a response larger than 64KB to test chunking
+				$response->append_bytes( str_repeat( 'Large response body content. ', 5000 ) ); // ~150KB
+			} elseif ( $type === 'vary-multiple' ) {
+				$accept = $request->get_header( 'accept' );
+				$encoding = $request->get_header( 'accept-encoding' );
+				$response->send_http_code( 200 );
+				$response->send_header( 'Vary', 'Accept, Accept-Encoding' );
+				$response->send_header( 'Cache-Control', 'max-age=3600' );
+				$response->send_header( 'Content-Type', 'text/plain' );
+				$response->append_bytes( "Accept: {$accept}, Accept-Encoding: {$encoding}" );
+			} elseif ( $type === 'private' ) {
+				$response->send_http_code( 200 );
+				$response->send_header( 'Cache-Control', 'private, max-age=3600' );
+				$response->send_header( 'Content-Type', 'text/plain' );
+				$response->append_bytes( 'Private cache only' );
+			} elseif ( $type === 'both-validators' ) {
+				$etag = '"both-validators-123"';
+				$last_modified = 'Wed, 01 Jan 2020 00:00:00 GMT';
+				$if_none_match = $request->get_header( 'if-none-match' ) ?: $request->get_header( 'If-None-Match' );
+				$if_modified_since = $request->get_header( 'if-modified-since' ) ?: $request->get_header( 'If-Modified-Since' );
+				
+				if ( $if_none_match === $etag || $if_modified_since === $last_modified ) {
+					$response->send_http_code( 304 );
+					$response->send_header( 'ETag', $etag );
+					$response->send_header( 'Last-Modified', $last_modified );
+				} else {
+					$response->send_http_code( 200 );
+					$response->send_header( 'ETag', $etag );
+					$response->send_header( 'Last-Modified', $last_modified );
+					$response->send_header( 'Cache-Control', 'max-age=3600' );
+					$response->send_header( 'Content-Type', 'text/plain' );
+					$response->append_bytes( 'Response with both ETag and Last-Modified' );
+				}
+			} elseif ( $type === 'expired' ) {
+				$response->send_http_code( 200 );
+				$response->send_header( 'Expires', gmdate( 'D, d M Y H:i:s', time() - 3600 ) . ' GMT' ); // Expired 1 hour ago
+				$response->send_header( 'Content-Type', 'text/plain' );
+				$response->append_bytes( 'Already expired response' );
+			} elseif ( $type === 'zero-max-age' ) {
+				$response->send_http_code( 200 );
+				$response->send_header( 'Cache-Control', 'max-age=0' );
+				$response->send_header( 'Content-Type', 'text/plain' );
+				$response->append_bytes( 'Zero max-age response' );
+			} elseif ( $type === 'no-explicit-cache' ) {
+				$response->send_http_code( 200 );
+				$response->send_header( 'Last-Modified', 'Wed, 01 Jan 2020 00:00:00 GMT' );
+				$response->send_header( 'Content-Type', 'text/plain' );
+				$response->append_bytes( 'No explicit cache headers, only Last-Modified for heuristic caching' );
+			} elseif ( $type === 'counter' ) {
+				// Simple counter to test cache hit/miss
+				$counter_file = sys_get_temp_dir() . '/http_cache_test_counter.txt';
+				if ( ! file_exists( $counter_file ) ) {
+					file_put_contents( $counter_file, '0' );
+				}
+				$count = (int) file_get_contents( $counter_file );
+				$count++;
+				file_put_contents( $counter_file, (string) $count );
+				
+				$response->send_http_code( 200 );
+				$response->send_header( 'Cache-Control', 'max-age=3600' );
+				$response->send_header( 'Content-Type', 'text/plain' );
+				$response->append_bytes( "Request count: {$count}" );
+			} elseif ( $type === 'reset-counter' ) {
+				// Reset counter for testing
+				$counter_file = sys_get_temp_dir() . '/http_cache_test_counter.txt';
+				file_put_contents( $counter_file, '0' );
+				$response->send_http_code( 200 );
+				$response->send_header( 'Content-Type', 'text/plain' );
+				$response->append_bytes( 'Counter reset' );
+			} else {
+				$response->send_http_code( 404 );
+				$response->append_bytes( 'Cache endpoint not found' );
+			}
+			break;
 		case 'edge-cases':
 			$type = basename( $path );
 			if ( $type === 'no-body-204' ) {
