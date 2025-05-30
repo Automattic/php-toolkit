@@ -55,6 +55,10 @@ class TcpServer {
 				continue;
 			}
 
+			// Initialize to null to avoid undefined variable errors
+			$socket_write_stream = null;
+			$response_writer = null;
+
 			try {
 				$request = IncomingRequest::from_resource( $client );
 				if ( ! is_callable( $this->handler ) ) {
@@ -72,7 +76,7 @@ class TcpServer {
 				error_log( "Error: " . $e->getMessage() );
 			} finally {
 				try {
-					if ( ! $response_writer->is_writing_closed() ) {
+					if ( $response_writer && ! $response_writer->is_writing_closed() ) {
 						$response_writer->close_writing();
 					}
 				} catch ( Exception $e ) {
@@ -80,11 +84,15 @@ class TcpServer {
 				}
 
 				try {
-					$socket_write_stream->close_writing();
+					if ( $socket_write_stream ) {
+						$socket_write_stream->close_writing();
+					}
 				} catch ( Exception $e ) {
 					error_log( "Error closing socket write stream: " . $e->getMessage() );
 				}
-				echo "[" . date( 'Y-m-d H:i:s' ) . "] " . $response_writer->http_code . ' ' . $request->method . ' ' . $request->get_parsed_url()->pathname . "\n";
+				if ( isset($response_writer, $request) && $response_writer ) {
+					echo "[" . date( 'Y-m-d H:i:s' ) . "] " . $response_writer->http_code . ' ' . $request->method . ' ' . $request->get_parsed_url()->pathname . "\n";
+				}
 			}
 		}
 	}

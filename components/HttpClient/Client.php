@@ -4,11 +4,11 @@ namespace WordPress\HttpClient;
 
 use WordPress\DataLiberation\URL\WPURL;
 use WordPress\HttpClient\ByteStream\RequestReadStream;
+use WordPress\HttpClient\Middleware\CacheMiddleware;
 use WordPress\HttpClient\Middleware\HttpMiddleware;
 use WordPress\HttpClient\Middleware\RedirectionMiddleware;
 use WordPress\HttpClient\Transport\CurlTransport;
 use WordPress\HttpClient\Transport\SocketTransport;
-use WordPress\HttpClient\Transport\TransportInterface;
 
 class Client {
 
@@ -18,13 +18,21 @@ class Client {
 	const EVENT_FINISHED = 'EVENT_FINISHED';
 
 	/**
-	 * @var ClientState
-	 */
-	private $state;
-	/**
+	 * All the HTTP requests ever enqueued with this Client.
+	 *
+	 * Each Request may have a different state, and this Client will manage them
+	 * asynchronously, moving them through the various states as the network
+	 * operations progress.
+	 *
+	 * @since Next Release
 	 * @var MiddlewareInterface
 	 */
 	private $middleware;
+
+	/**
+	 * @var ClientState
+	 */
+	private $state;
 
 	public function __construct( $options = array() ) {
 		$this->state = new ClientState( $options );
@@ -43,9 +51,17 @@ class Client {
 				throw new HttpClientException( "Invalid transport: {$options['transport']}" );
 		}
 
+		$middleware = new HttpMiddleware( $this->state, array( 'transport' => $transport ) );
+		if(isset($options['cache_dir'])) {
+			$middleware = new CacheMiddleware( $this->state, $middleware, [
+				'cache_dir' => $options['cache_dir'],
+			] );
+		}
+
 		$this->middleware = new RedirectionMiddleware( 
-			new HttpMiddleware( array( 'state' => $this->state, 'transport' => $transport ) ),
-			array( 'client' => $this, 'state' => $this->state, 'max_redirects' => 5 )
+			$this->state,
+			$middleware,
+			array( 'client' => $this, 'max_redirects' => 5 )
 		);
 	}
 
@@ -54,10 +70,11 @@ class Client {
 	 * given request.
 	 *
 	 * @param  Request  $request  The request to stream.
+	 * @param  array    $options  Options for the request.
 	 *
 	 * @return RequestReadStream
 	 */
-	public function fetch( $request, $options = array() ) {
+	public function fetch( Request $request, array $options = [] ) {
 		return new RequestReadStream(
 			$request,
 			array_merge( [ 'client' => $this ],
@@ -70,10 +87,11 @@ class Client {
 	 * of the given requests.
 	 *
 	 * @param  Request[]  $requests  The requests to stream.
+	 * @param  array      $options   Options for the requests.
 	 *
 	 * @return RequestReadStream[]
 	 */
-	public function fetch_many( array $requests, $options = array() ) {
+	public function fetch_many( array $requests, array $options = [] ) {
 		$streams = array();
 
 		foreach ( $requests as $request ) {
@@ -89,11 +107,11 @@ class Client {
 	 * an internal queue. Network transmission is delayed until one of the returned
 	 * streams is read from.
 	 *
-	 * @param  Request|Request[]  $requests  The HTTP request(s) to enqueue. Can be a single request or an array of requests.
+	 * @param  Request[]|Request|string|string[]  $requests  The HTTP request(s) to enqueue.
 	 */
 	public function enqueue( $requests ) {
-		if ( ! is_array( $requests ) ) {
-			$requests = array( $requests );
+		if(!is_array($requests)) {
+			$requests = [$requests];
 		}
 
 		foreach ( $requests as $request ) {
@@ -161,7 +179,7 @@ class Client {
 	 * $request = new Request( "https://w.org" );
 	 *
 	 * $client = new HttpClientClient();
-	 * $client->enqueue( $request );
+	 * $client->enqueue( [$request] );
 	 * $event = $client->await_next_event( [
 	 *    'request_id' => $request->id,
 	 * ] );
@@ -173,11 +191,11 @@ class Client {
 	 * request #1 has finished before you started awaiting
 	 * events for request #2.
 	 *
-	 * @param $query
+	 * @param array $query Query parameters for filtering events.
 	 *
 	 * @return bool
 	 */
-	public function await_next_event( $query = array() ) {
+	public function await_next_event( array $query = [] ) {
 		$requests_ids = array();
 		if(empty($query['requests'])) {
 			$requests_ids = array_keys( $this->state->events );
@@ -189,7 +207,7 @@ class Client {
 		return $this->middleware->await_next_event( $requests_ids );
 	}
 
-	public function has_pending_event( $request, $event_type ) {
+	public function has_pending_event( Request $request, string $event_type ) {
 		return $this->state->has_pending_event( $request, $event_type );
 	}
 
@@ -218,6 +236,10 @@ class Client {
 		}
 
 		return $this->state->request;
+	}
+
+	public function get_response() {
+		return $this->get_request()->response;
 	}
 
 	/**
