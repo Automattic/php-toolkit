@@ -82,7 +82,7 @@ final class CacheMiddleware implements MiddlewareInterface {
 	/*============ CACHE REPLAY ============*/
 	private function startReplay( Request $request, array $meta ): void {
 		$id                  = spl_object_hash( $request );
-		$file_handle         = fopen( $this->bodyPath( $request->cache_key ), 'rb' );
+		$file_handle         = fopen( $this->bodyPath( $request->cache_key, $request->url ), 'rb' );
 		$this->replay[ $id ] = [
 			'req'        => $request,
 			'meta'       => $meta,
@@ -94,12 +94,12 @@ final class CacheMiddleware implements MiddlewareInterface {
 
 	private function start304Replay( Request $request, array $meta ): void {
 		$id                  = spl_object_hash( $request );
-		$file_handle         = fopen( $this->bodyPath( $request->cache_key ), 'rb' );
+		$file_handle         = fopen( $this->bodyPath( $request->cache_key, $request->url ), 'rb' );
 		$this->replay[ $id ] = [
 			'req'        => $request,
 			'meta'       => $meta,
 			'file'       => $file_handle,
-			'headerDone' => true, // Skip header emission for 304
+			'headerDone' => false, // Still emit headers for 304 replay
 			'done'       => false,
 			'is304'      => true, // Mark as 304 replay
 		];
@@ -111,7 +111,12 @@ final class CacheMiddleware implements MiddlewareInterface {
 		
 		if ( ! $context['headerDone'] ) {
 			$resp                  = new Response( $request );
-			$resp->status_code     = $context['meta']['status'];
+			// For 304 replays, return 200 status with cached headers
+			if ( isset( $context['is304'] ) && $context['is304'] ) {
+				$resp->status_code = 200; // Convert 304 to 200 for the client
+			} else {
+				$resp->status_code = $context['meta']['status'];
+			}
 			$resp->headers         = $context['meta']['headers'];
 			
 			$request->response = $resp;
@@ -195,11 +200,19 @@ final class CacheMiddleware implements MiddlewareInterface {
 	}
 
 	/*============ CACHE UTILITIES ============*/
-	private function metaPath( string $key ): string {
+	private function metaPath( string $key, ?string $url = null ): string {
+		if ( $url ) {
+			$url_hash = sha1( $url );
+			return "$this->dir/{$url_hash}_{$key}.json";
+		}
 		return "$this->dir/{$key}.json";
 	}
 
-	private function bodyPath( string $key ): string {
+	private function bodyPath( string $key, ?string $url = null ): string {
+		if ( $url ) {
+			$url_hash = sha1( $url );
+			return "$this->dir/{$url_hash}_{$key}.body";
+		}
 		return "$this->dir/{$key}.body";
 	}
 
@@ -210,25 +223,37 @@ final class CacheMiddleware implements MiddlewareInterface {
 	private function varyKey( Request $request, ?array $vary_keys ): string {
 		$parts = [ $request->url ];
 		if ( $vary_keys ) {
+			// Build a lowercased map of headers for case-insensitive lookup
+			$header_map = [];
+			foreach ($request->headers as $k => $v) {
+				$header_map[strtolower($k)] = $v;
+			}
 			foreach ( $vary_keys as $header_name ) {
-				$header_value = $request->get_header( strtolower( $header_name ) );
-				$parts[] = strtolower( $header_name ) . ':' . ( $header_value ?? '' );
+				$header_lc = strtolower( $header_name );
+				$header_value = $header_map[$header_lc] ?? '';
+				$parts[] = $header_lc . ':' . $header_value;
 			}
 		}
-
 		return sha1( implode( '|', $parts ) );
 	}
 
 	/** @return array{string,array|null} */
-	private function lookup( Request $request, ?string $forced = null ): array {
-		if ( $forced && is_file( $this->metaPath( $forced ) ) ) {
-			return [ $forced, json_decode( file_get_contents( $this->metaPath( $forced ) ), true ) ];
+	public function lookup( Request $request, ?string $forced = null ): array {
+		if ( $forced && is_file( $this->metaPath( $forced, $request->url ) ) ) {
+			return [ $forced, json_decode( file_get_contents( $this->metaPath( $forced, $request->url ) ), true ) ];
 		}
-		$glob = glob( $this->dir . '/' . sha1( $request->url ) . '*.json' );
+		
+		// Look for cache files that match this URL
+		$url_hash = sha1( $request->url );
+		$glob = glob( $this->dir . '/' . $url_hash . '_*.json' );
 		foreach ( $glob as $meta_path ) {
 			$meta = json_decode( file_get_contents( $meta_path ), true );
-			if ( basename( $meta_path, '.json' ) === $this->varyKey( $request, $meta['vary'] ?? [] ) ) {
-				return [ basename( $meta_path, '.json' ), $meta ];
+			$expected_key = $this->varyKey( $request, $meta['vary'] ?? [] );
+			$actual_filename = basename( $meta_path, '.json' );
+			$expected_filename = $url_hash . '_' . $expected_key;
+			
+			if ( $actual_filename === $expected_filename ) {
+				return [ $expected_key, $meta ];
 			}
 		}
 
@@ -244,15 +269,18 @@ final class CacheMiddleware implements MiddlewareInterface {
 		if ( isset( $directives['must-revalidate'] ) ) {
 			// With must-revalidate, only consider fresh if we have explicit expiry info
 			if ( isset( $meta['max_age'] ) && isset( $meta['stored_at'] ) ) {
-				return ($meta['stored_at'] + (int)$meta['max_age']) > $now;
+				$fresh = ($meta['stored_at'] + (int)$meta['max_age']) > $now;
+				return $fresh;
 			}
 			if ( isset( $meta['s_maxage'] ) && isset( $meta['stored_at'] ) ) {
-				return ($meta['stored_at'] + (int)$meta['s_maxage']) > $now;
+				$fresh = ($meta['stored_at'] + (int)$meta['s_maxage']) > $now;
+				return $fresh;
 			}
 			if ( isset( $meta['expires'] ) ) {
 				$expires = is_numeric( $meta['expires'] ) ? (int)$meta['expires'] : strtotime( $meta['expires'] );
 				if ( $expires !== false ) {
-					return $expires > $now;
+					$fresh = $expires > $now;
+					return $fresh;
 				}
 			}
 			// With must-revalidate, don't use heuristic caching
@@ -263,25 +291,29 @@ final class CacheMiddleware implements MiddlewareInterface {
 		if ( isset( $meta['expires'] ) ) {
 			$expires = is_numeric( $meta['expires'] ) ? (int)$meta['expires'] : strtotime( $meta['expires'] );
 			if ( $expires !== false ) {
-				return $expires > $now;
+				$fresh = $expires > $now;
+				return $fresh;
 			}
 		}
 
 		// If explicit TTL (absolute timestamp) is set, use it
 		if ( isset( $meta['ttl'] ) ) {
 			if ( is_numeric( $meta['ttl'] ) ) {
-				return (int)$meta['ttl'] > $now;
+				$fresh = (int)$meta['ttl'] > $now;
+				return $fresh;
 			}
+		}
+
+		// If s-maxage is set, check if still valid (takes precedence over max-age)
+		if ( isset( $meta['s_maxage'] ) && isset( $meta['stored_at'] ) ) {
+			$fresh = ($meta['stored_at'] + (int)$meta['s_maxage']) > $now;
+			return $fresh;
 		}
 
 		// If max_age is set, check if still valid
 		if ( isset( $meta['max_age'] ) && isset( $meta['stored_at'] ) ) {
-			return ($meta['stored_at'] + (int)$meta['max_age']) > $now;
-		}
-
-		// If s-maxage is set, check if still valid
-		if ( isset( $meta['s_maxage'] ) && isset( $meta['stored_at'] ) ) {
-			return ($meta['stored_at'] + (int)$meta['s_maxage']) > $now;
+			$fresh = ($meta['stored_at'] + (int)$meta['max_age']) > $now;
+			return $fresh;
 		}
 
 		// Heuristic: if Last-Modified is present, cache for 10% of its age at storage time
@@ -290,7 +322,8 @@ final class CacheMiddleware implements MiddlewareInterface {
 			if ( $lm !== false ) {
 				$age = $meta['stored_at'] - $lm;
 				$heuristic_lifetime = (int) max( 0, $age / 10 );
-				return ($meta['stored_at'] + $heuristic_lifetime) > $now;
+				$fresh = ($meta['stored_at'] + $heuristic_lifetime) > $now;
+				return $fresh;
 			}
 		}
 
@@ -304,10 +337,10 @@ final class CacheMiddleware implements MiddlewareInterface {
 
 	private function addValidators( Request $request, array $meta ): void {
 		if ( ! empty( $meta['etag'] ) ) {
-			$request->headers['If-None-Match'] = $meta['etag'];
+			$request->headers['if-none-match'] = $meta['etag'];
 		}
 		if ( ! empty( $meta['last_modified'] ) ) {
-			$request->headers['If-Modified-Since'] = $meta['last_modified'];
+			$request->headers['if-modified-since'] = $meta['last_modified'];
 		}
 	}
 
@@ -342,8 +375,8 @@ final class CacheMiddleware implements MiddlewareInterface {
 
 		// Determine file paths
 		$key      = $request->cache_key;
-		$bodyFile = $this->bodyPath( $key );
-		$metaFile = $this->metaPath( $key );
+		$bodyFile = $this->bodyPath( $key, $url );
+		$metaFile = $this->metaPath( $key, $url );
 
 		// Atomically replace/rename the temp body file to final cache file
 		if ( ! rename( $tempFile, $bodyFile ) ) {
@@ -373,8 +406,8 @@ final class CacheMiddleware implements MiddlewareInterface {
 		}
 		
 		$key      = $request->cache_key;
-		$bodyFile = $this->bodyPath( $key );
-		$metaFile = $this->metaPath( $key );
+		$bodyFile = $this->bodyPath( $key, $request->url );
+		$metaFile = $this->metaPath( $key, $request->url );
 
 		// Optionally, acquire lock on meta file to prevent concurrent writes
 		if ( $fp = @fopen( $metaFile, 'c' ) ) {
@@ -461,7 +494,30 @@ final class CacheMiddleware implements MiddlewareInterface {
 		if ( isset( $d['no-store'] ) ) {
 			return false;
 		}
-		if ( $r->get_header( 'expires' ) || isset( $d['max-age'] ) || isset( $d['s-maxage'] ) ) {
+		
+		// Check for explicit freshness indicators, but also validate they're not expired
+		if ( isset( $d['max-age'] ) ) {
+			// Don't cache responses with max-age=0
+			if ( is_int( $d['max-age'] ) && $d['max-age'] <= 0 ) {
+				return false;
+			}
+			return true;
+		}
+		
+		if ( isset( $d['s-maxage'] ) ) {
+			// Don't cache responses with s-maxage=0
+			if ( is_int( $d['s-maxage'] ) && $d['s-maxage'] <= 0 ) {
+				return false;
+			}
+			return true;
+		}
+		
+		if ( $r->get_header( 'expires' ) ) {
+			// Check if expires header indicates an already expired response
+			$expires = strtotime( $r->get_header( 'expires' ) );
+			if ( $expires !== false && $expires <= time() ) {
+				return false; // Don't cache already expired responses
+			}
 			return true;
 		}
 
@@ -470,7 +526,6 @@ final class CacheMiddleware implements MiddlewareInterface {
 			return true;
 		}
 
-		// Not cacheable by any rule
 		return false;
 	}
 }
