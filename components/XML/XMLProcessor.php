@@ -2,6 +2,7 @@
 
 namespace WordPress\XML;
 
+use WordPress\ByteStream\ReadStream\ByteReadStream;
 use WP_HTML_Attribute_Token;
 use WP_HTML_Span;
 use WP_HTML_Text_Replacement;
@@ -355,6 +356,13 @@ class XMLProcessor {
 	 * @var string
 	 */
 	public $xml;
+
+	/**
+	 * Optional byte stream source for automatic data pulling.
+	 *
+	 * @var ByteReadStream|null
+	 */
+	protected $stream;
 
 	/**
 	 * Specifies mode of operation of the parser at any given time.
@@ -722,11 +730,11 @@ class XMLProcessor {
 		return $processor;
 	}
 
-	public static function create_for_streaming( $xml = '', $cursor = null, $known_definite_encoding = 'UTF-8' ) {
+	public static function create_for_streaming( $source = '', $cursor = null, $known_definite_encoding = 'UTF-8' ) {
 		if ( 'UTF-8' !== $known_definite_encoding ) {
 			return false;
 		}
-		$processor = new XMLProcessor( $xml, self::CONSTRUCTOR_UNLOCK_CODE );
+		$processor = new XMLProcessor( $source, self::CONSTRUCTOR_UNLOCK_CODE );
 		if ( null !== $cursor && true !== $processor->initialize_from_cursor( $cursor ) ) {
 			return false;
 		}
@@ -824,7 +832,7 @@ class XMLProcessor {
 	 *
 	 * @see XMLProcessor::create_fragment()
 	 */
-	protected function __construct( $xml, $use_the_static_create_methods_instead = null ) {
+	protected function __construct( $xml_or_stream, $use_the_static_create_methods_instead = null ) {
 		if ( self::CONSTRUCTOR_UNLOCK_CODE !== $use_the_static_create_methods_instead ) {
 			_doing_it_wrong(
 				__METHOD__,
@@ -836,7 +844,12 @@ class XMLProcessor {
 				'6.4.0'
 			);
 		}
-		$this->xml = $xml;
+		if ( $xml_or_stream instanceof ByteReadStream ) {
+			$this->stream = $xml_or_stream;
+			$this->xml    = '';
+		} else {
+			$this->xml = $xml_or_stream;
+		}
 	}
 
 	/**
@@ -3000,6 +3013,17 @@ class XMLProcessor {
 		return $decoded;
 	}
 
+	public function get_all_modifiable_text_until_next_tag() {
+		$text = $this->get_modifiable_text();
+		while ( $this->next_token() ) {
+			if ( '#text' !== $this->get_token_type() && '#cdata-section' !== $this->get_token_type() ) {
+				return $text;
+			}
+			$text .= $this->get_modifiable_text();
+		}
+		return $text;
+	}
+
 	public function set_modifiable_text( $new_value ) {
 		switch ( $this->parser_state ) {
 			case self::STATE_TEXT_NODE:
@@ -3267,6 +3291,21 @@ class XMLProcessor {
 		return $this->step();
 	}
 
+	private function step( $node_to_process = self::PROCESS_NEXT_NODE ) {
+		while ( true ) {
+			$result = $this->do_step( $node_to_process );
+			if ( true === $result ) {
+				return true;
+			}
+			if ( ! $this->is_paused_at_incomplete_input() ) {
+				return false;
+			}
+			if ( ! $this->pull_from_stream() ) {
+				return false;
+			}
+		}
+	}
+
 	/**
 	 * Moves the internal cursor to the next token in the XML document
 	 * according to the XML specification.
@@ -3283,7 +3322,7 @@ class XMLProcessor {
 	 * @access private
 	 *
 	 */
-	private function step( $node_to_process = self::PROCESS_NEXT_NODE ) {
+	private function do_step( $node_to_process = self::PROCESS_NEXT_NODE ) {
 		// Refuse to proceed if there was a previous error.
 		if ( null !== $this->last_error ) {
 			return false;
@@ -3323,6 +3362,30 @@ class XMLProcessor {
 			 */
 			return false;
 		}
+	}
+
+	protected function pull_from_stream(): bool {
+		if ( ! $this->stream ) {
+			return false;
+		}
+
+		try {
+			$pulled = $this->stream->pull( 65536 );
+		} catch ( \Exception $e ) {
+			$pulled = 0;
+		}
+
+		if ( $pulled > 0 ) {
+			$this->append_bytes( $this->stream->consume( $pulled ) );
+
+			return true;
+		}
+
+		if ( $this->stream->reached_end_of_data() ) {
+			$this->input_finished();
+		}
+
+		return false;
 	}
 
 	/**
