@@ -2,9 +2,7 @@
 
 namespace WordPress\Blueprints;
 
-use Exception;
 use Psr\Log\LoggerInterface;
-use RuntimeException;
 use Symfony\Component\Process\Process;
 use WordPress\Blueprints\DataReference\DataReference;
 use WordPress\Blueprints\DataReference\DataReferenceResolver;

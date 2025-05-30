@@ -22,7 +22,6 @@ while ( $client->await_next_event() ) {
 			echo $request->response->received_bytes . '/' . $request->response->total_bytes . ' bytes received';
 			file_put_contents( 'downloads/' . $request->id, $client->get_response_body_chunk(), FILE_APPEND );
 			break;
-		case Client::EVENT_REDIRECT:
 		case Client::EVENT_GOT_HEADERS:
 		case Client::EVENT_FINISHED:
 			break;

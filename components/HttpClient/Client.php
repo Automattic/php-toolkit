@@ -2,74 +2,19 @@
 
 namespace WordPress\HttpClient;
 
-use WordPress\ByteStream\ByteTransformer\InflateTransformer;
-use WordPress\ByteStream\ReadStream\FileReadStream;
-use WordPress\ByteStream\ReadStream\TransformedReadStream;
 use WordPress\DataLiberation\URL\WPURL;
-use WordPress\HttpClient\ByteStream\ChunkedDecoderReadStream;
-use WordPress\HttpClient\ByteStream\ChunkedEncoderByteTransformer;
 use WordPress\HttpClient\ByteStream\RequestReadStream;
+use WordPress\HttpClient\Middleware\HttpMiddleware;
+use WordPress\HttpClient\Middleware\RedirectionMiddleware;
+use WordPress\HttpClient\Transport\CurlTransport;
+use WordPress\HttpClient\Transport\SocketTransport;
 
-/**
- * An asynchronous HTTP client library.
- *
- * This class makes non-blocking HTTP requests using just native PHP streams.
- * It uses an event-driven architecture.
- *
- * ### Key Features
- *
- * - **Streaming support:** Enables efficient handling of large response bodies.
- * - **Progress monitoring:** Track the progress of requests and responses.
- * - **Concurrency limits:** Control the number of simultaneous connections.
- * - **PHP 7.2+ support and no dependencies:** Works on vanilla PHP without external libraries.
- *
- * ### Usage Example
- *
- * ```php
- * $requests = [
- *     new Request("[https://wordpress.org/latest.zip](https://wordpress.org/latest.zip)"),
- *     new Request("[https://raw.githubusercontent.com/wpaccessibility/a11y-theme-unit-test/master/a11y-theme-unit-test-data.xml](https://raw.githubusercontent.com/wpaccessibility/a11y-theme-unit-test/master/a11y-theme-unit-test-data.xml)"),
- * ];
- *
- * $client = new Client();
- * $client->enqueue($requests);
- *
- * while ($client->await_next_event()) {
- *     $event = $client->get_event();
- *     $request = $client->get_request();
- *
- *     if ($event === Client::EVENT_BODY_CHUNK_AVAILABLE) {
- *         $chunk = $client->get_response_body_chunk();
- *         // Process the chunk...
- *     }
- *     // Handle other events...
- * }
- * ```
- *
- * @TODO
- * * Request headers – accept string lines such as "Content-type: text/plain" instead of key-value pairs. K/V pairs
- *   are confusing and lead to accidental errors such as `0: Content-type: text/plain`. They also diverge from the
- *   format that curl accepts.
- * * Response caching – add a custom cache handler for easy caching of the same URLs
- * * Response caching – support HTTP cache-control headers
- *
- * @since    Next Release
- * @package  WordPress
- * @subpackage Async_HTTP
- */
-class Client implements ClientInterface {
+class Client {
 
-	/**
-	 * The maximum number of concurrent connections allowed.
-	 *
-	 * This is as a safeguard against:
-	 * * Spreading our network bandwidth too thin and not making any real progress on any
-	 *   request.
-	 * * Overwhelming the server with too many requests.
-	 *
-	 * @var int
-	 */
-	protected $concurrency;
+	const EVENT_GOT_HEADERS = 'EVENT_GOT_HEADERS';
+	const EVENT_BODY_CHUNK_AVAILABLE = 'EVENT_BODY_CHUNK_AVAILABLE';
+	const EVENT_FAILED = 'EVENT_FAILED';
+	const EVENT_FINISHED = 'EVENT_FINISHED';
 
 	/**
 	 * All the HTTP requests ever enqueued with this Client.
@@ -79,32 +24,36 @@ class Client implements ClientInterface {
 	 * operations progress.
 	 *
 	 * @since Next Release
-	 * @var Request[]
+	 * @var MiddlewareInterface
 	 */
-	protected $requests;
+	private $middleware;
 
 	/**
-	 * Network connection details managed privately by this Client.
-	 *
-	 * Each Request has a corresponding Connection object that contains
-	 * the network socket, response buffer, and other connection-specific details.
-	 *
-	 * These are internal, will change, and should not be exposed to the outside world.
-	 *
-	 * @var array
+	 * @var ClientState
 	 */
-	protected $connections = array();
-	protected $events = array();
-	protected $event;
-	protected $request;
-	protected $response_body_chunk;
-	protected $request_timeout_ms;
-	protected $requests_started_at = array();
+	private $state;
 
 	public function __construct( $options = array() ) {
-		$this->concurrency        = $options['concurrency'] ?? 10;
-		$this->request_timeout_ms = $options['timeout_ms'] ?? 30000;
-		$this->requests           = array();
+		$this->state = new ClientState( $options );
+		if(empty($options['transport']) || $options['transport'] === 'auto') {
+			$options['transport'] = extension_loaded( 'curl' ) ? 'curl' : 'socket';
+		}
+
+		switch ( $options['transport'] ) {
+			case 'curl':
+				$transport = new CurlTransport( $this->state );
+				break;
+			case 'socket':
+				$transport = new SocketTransport( $this->state );
+				break;
+			default:
+				throw new HttpClientException( "Invalid transport: {$options['transport']}" );
+		}
+
+		$this->middleware = new RedirectionMiddleware( 
+			new HttpMiddleware( array( 'state' => $this->state, 'transport' => $transport ) ),
+			array( 'client' => $this, 'state' => $this->state, 'max_redirects' => 5 )
+		);
 	}
 
 	/**
@@ -117,8 +66,11 @@ class Client implements ClientInterface {
 	 * @return RequestReadStream
 	 */
 	public function fetch( Request $request, array $options = [] ) {
-		return new RequestReadStream( $request,
-			array_merge( [ 'client' => $this ], $options ) );
+		return new RequestReadStream(
+			$request,
+			array_merge( [ 'client' => $this ],
+				is_array( $options ) ? $options : iterator_to_array( $options ) )
+		);
 	}
 
 	/**
@@ -146,7 +98,7 @@ class Client implements ClientInterface {
 	 * an internal queue. Network transmission is delayed until one of the returned
 	 * streams is read from.
 	 *
-	 * @param  Request[]  $requests  The HTTP request(s) to enqueue.
+	 * @param  Request[]|Request|string|string[]  $requests  The HTTP request(s) to enqueue.
 	 */
 	public function enqueue( $requests ) {
 		if(!is_array($requests)) {
@@ -154,26 +106,27 @@ class Client implements ClientInterface {
 		}
 
 		foreach ( $requests as $request ) {
-			if ( array_key_exists( $request->id, $this->connections ) ) {
-				throw new HttpClientException("Request {$request->id} is already enqueued.");
+			if ( is_string( $request ) ) {
+				$request = new Request( $request );
+			}
+			if ( array_key_exists( $request->id, $this->state->connections ) ) {
+				throw new HttpClientException( "Request {$request->id} is already enqueued." );
 			}
 
-			if($request->state !== Request::STATE_CREATED) {
-				throw new HttpClientException("Request {$request->id} is not in the created state.");
+			if ( $request->state !== Request::STATE_CREATED ) {
+				throw new HttpClientException( "Request {$request->id} is not in the created state." );
 			}
 
-			$request->state = Request::STATE_ENQUEUED;
-			$this->requests[]                          = apply_filters( 'wp_http_client_request', $request );
-			$this->events[ $request->id ]              = array();
-			$this->connections[ $request->id ]         = new Connection( $request );
+			$this->middleware->enqueue( $request );
 
-			$parsed = WPURL::parse($request->url);
-			if(false === $parsed) {
-				$this->set_error( $request, new HttpError( sprintf( 'Invalid URL: %s', $request->url ) ) );
+			$parsed = WPURL::parse( $request->url );
+			if ( false === $parsed ) {
+				$this->state->set_request_error( $request, new HttpError( sprintf( 'Invalid URL: %s', $request->url ) ) );
 				continue;
 			}
-			if($parsed->protocol !== 'http:' && $parsed->protocol !== 'https:') {
-				$this->set_error( $request, new HttpError( sprintf( 'Invalid URL – only HTTP and HTTPS URLs are supported: %s', $parsed->toString() ) ) );
+			if ( $parsed->protocol !== 'http:' && $parsed->protocol !== 'https:' ) {
+				$this->state->set_request_error( $request,
+					new HttpError( sprintf( 'Invalid URL – only HTTP and HTTPS URLs are supported: %s', $parsed->toString() ) ) );
 				continue;
 			}
 		}
@@ -234,67 +187,19 @@ class Client implements ClientInterface {
 	 * @return bool
 	 */
 	public function await_next_event( array $query = [] ) {
-		$ordered_events            = array(
-			self::EVENT_GOT_HEADERS,
-			self::EVENT_BODY_CHUNK_AVAILABLE,
-			self::EVENT_FAILED,
-			self::EVENT_FINISHED,
-		);
-		$this->event               = null;
-		$this->request             = null;
-		$this->response_body_chunk = null;
-
-		$start_time = microtime( true );
-		$timeout_ms = isset( $query['timeout_ms'] ) 
-			? $query['timeout_ms']
-			// Give the requests an opportunity to time out
-			: $this->request_timeout_ms * 1.1
-		;
-
-		do {
-			if ( empty( $query['requests'] ) ) {
-				$events = array_keys( $this->events );
-			} else {
-				$events = array();
-				foreach ( $query['requests'] as $query_request ) {
-					$events[] = $query_request->id;
-				}
-			}
-
-			foreach ( $events as $request_id ) {
-				foreach ( $ordered_events as $considered_event ) {
-					$needs_emitting = $this->events[ $request_id ][ $considered_event ] ?? false;
-					if ( ! $needs_emitting ) {
-						continue;
-					}
-
-					$this->events[ $request_id ][ $considered_event ] = false;
-
-					$this->event   = $considered_event;
-					$this->request = $this->get_request_by_id( $request_id );
-					if ( $this->event === self::EVENT_BODY_CHUNK_AVAILABLE ) {
-						$this->response_body_chunk = $this->next_response_body_bytes();
-					}
-
-					return true;
-				}
-			}
-			
-			// After we've checked for any available events, see if we've run out of time.
-			// This way, we always return any events that were ready before worrying about the timeout.
-			// If we checked the timeout first, we might miss events that were already waiting for us
-			// when the timeout is set to zero.
-			$time_elapsed_ms = (microtime( true ) - $start_time) * 1000;
-			if ( $timeout_ms && $time_elapsed_ms >= $timeout_ms ) {
-				return false;
-			}
-		} while ( $this->event_loop_tick() );
-
-		return false;
+		$requests_ids = array();
+		if(empty($query['requests'])) {
+			$requests_ids = array_keys( $this->state->events );
+		} else {
+			$requests_ids = array_map( function( $request ) {
+				return $request->id;
+			}, $query['requests'] );
+		}
+		return $this->middleware->await_next_event( $requests_ids );
 	}
 
-	public function has_pending_event( Request $request, string $event_type ): bool {
-		return $this->events[ $request->id ][ $event_type ] ?? false;
+	public function has_pending_event( Request $request, string $event_type ) {
+		return $this->state->has_pending_event( $request, $event_type );
 	}
 
 	/**
@@ -303,11 +208,11 @@ class Client implements ClientInterface {
 	 * @return string|bool The next event, or false if no event is set.
 	 */
 	public function get_event() {
-		if ( null === $this->event ) {
+		if ( null === $this->state->event ) {
 			return false;
 		}
 
-		return $this->event;
+		return $this->state->event;
 	}
 
 	/**
@@ -317,11 +222,11 @@ class Client implements ClientInterface {
 	 * @return Request
 	 */
 	public function get_request() {
-		if ( null === $this->request ) {
+		if ( null === $this->state->request ) {
 			return false;
 		}
 
-		return $this->request;
+		return $this->state->request;
 	}
 
 	public function get_response() {
@@ -335,699 +240,15 @@ class Client implements ClientInterface {
 	 * @return string|false
 	 */
 	public function get_response_body_chunk() {
-		if ( null === $this->response_body_chunk ) {
+		if ( null === $this->state->response_body_chunk ) {
 			return false;
 		}
 
-		return $this->response_body_chunk;
-	}
-
-	/**
-	 * Asynchronously moves the enqueued Request objects through the
-	 * various states of the HTTP request-response lifecycle.
-	 *
-	 * @return bool Whether any active requests were processed.
-	 */
-	protected function event_loop_tick() {
-		if ( count( $this->get_active_requests() ) === 0 ) {
-			return false;
-		}
-
-		foreach ( $this->get_active_requests([ 
-			Request::STATE_WILL_ENABLE_CRYPTO,
-			Request::STATE_WILL_SEND_HEADERS,
-			Request::STATE_WILL_SEND_BODY,
-			Request::STATE_SENT,
-			Request::STATE_RECEIVING_HEADERS,
-			Request::STATE_RECEIVING_BODY,
-			Request::STATE_RECEIVED,
-		]) as $request ) {
-			$time_elapsed_ms = (microtime( true ) - $this->requests_started_at[ $request->id ]) * 1000;
-			if ( $time_elapsed_ms > $this->request_timeout_ms ) {
-				$this->set_error( $request, new HttpError( sprintf( 'Request timed out after %s seconds.', $time_elapsed_ms ) ) );
-			}
-		}
-
-		$this->open_nonblocking_http_sockets(
-			$this->get_active_requests( Request::STATE_ENQUEUED )
-		);
-
-		$this->enable_crypto(
-			$this->get_active_requests( Request::STATE_WILL_ENABLE_CRYPTO )
-		);
-
-		$this->send_request_headers(
-			$this->get_active_requests( Request::STATE_WILL_SEND_HEADERS )
-		);
-
-		$this->send_request_body(
-			$this->get_active_requests( Request::STATE_WILL_SEND_BODY )
-		);
-
-		$nb_headers_received = $this->receive_response_headers(
-			$this->get_active_requests( Request::STATE_RECEIVING_HEADERS )
-		);
-
-		$this->receive_response_body(
-			$this->get_active_requests( Request::STATE_RECEIVING_BODY )
-		);
-
-		$this->mark_requests_finished(
-			$this->get_active_requests( Request::STATE_RECEIVED )
-		);
-
-		/**
-		 * Allows the caller to consume the headers before we start polling
-		 * for the body of those requests.
-		 *
-		 * This prevents the following scenario:
-		 *
-		 * 1. The consumer calls await_next_event() and they're only interested in
-		 *    the EVENT_GOT_HEADERS event.
-		 * 2. In the same event_loop_tick:
-		 *    * The headers arrive
-		 *    * The request is promoted to STATE_RECEIVING_BODY
-		 *    * We poll for the response body
-		 *    * We wait 10 more seconds before the body starts arriving
-		 * 3. The consumer gets the EVENT_GOT_HEADERS event 10 seconds later
-		 *    than they could have.
-		 */
-		if ( $nb_headers_received > 0 ) {
-			return true;
-		}
-
-		return true;
-	}
-
-	/**
-	 * Consumes $length bytes received in response to a given request.
-	 *
-	 * @return string
-	 */
-	protected function next_response_body_bytes() {
-		if ( null === $this->request ) {
-			return false;
-		}
-		$request    = $this->request;
-		$connection = $this->connections[ $request->id ];
-		if (
-			$request->state === Request::STATE_RECEIVING_BODY ||
-			$request->state === Request::STATE_FINISHED
-		) {
-			return $connection->consume_buffer();
-		}
-
-		$end_of_data = $request->state === Request::STATE_FINISHED && (
-				! is_resource( $this->connections[ $request->id ]->http_socket ) ||
-				$this->connections[ $request->id ]->decoded_response_stream->reached_end_of_data()
-			);
-		if ( $end_of_data ) {
-			return false;
-		}
-
-		return '';
-	}
-
-	protected function mark_finished( Request $request ) {
-		$request->state                                       = Request::STATE_FINISHED;
-		$this->events[ $request->id ][ self::EVENT_FINISHED ] = true;
-
-		$this->close_connection( $request );
-	}
-
-	protected function set_error( Request $request, $error ) {
-		$request->error                                     = $error;
-		$request->state                                     = Request::STATE_FAILED;
-		$this->events[ $request->id ][ self::EVENT_FAILED ] = true;
-		$this->close_connection( $request );
-	}
-
-	protected function close_connection( Request $request ) {
-		unset( $this->requests_started_at[ $request->id ] );
-		$socket = $this->connections[ $request->id ]->http_socket;
-		if ( $socket && is_resource( $socket ) ) {
-			// Close the TCP socket
-			if ( $this->connections[ $request->id ]->decoded_response_stream ) {
-				$stream = $this->connections[ $request->id ]->decoded_response_stream;
-				$stream->close_reading();
-				$this->connections[ $request->id ]->decoded_response_stream = null;
-			} else {
-				@fclose( $socket );
-			}
-		}
+		return $this->state->response_body_chunk;
 	}
 
 	public function get_active_requests( $states = null ) {
-		$processed_requests = $this->get_requests(
-			array(
-				Request::STATE_WILL_ENABLE_CRYPTO,
-				Request::STATE_WILL_SEND_HEADERS,
-				Request::STATE_WILL_SEND_BODY,
-				Request::STATE_SENT,
-				Request::STATE_RECEIVING_HEADERS,
-				Request::STATE_RECEIVING_BODY,
-				Request::STATE_RECEIVED,
-			)
-		);
-		$available_slots    = $this->concurrency - count( $processed_requests );
-		$enqueued_requests  = $this->get_requests( Request::STATE_ENQUEUED );
-		for ( $i = 0; $i < $available_slots; $i ++ ) {
-			if ( ! isset( $enqueued_requests[ $i ] ) ) {
-				break;
-			}
-			$processed_requests[] = $enqueued_requests[ $i ];
-		}
-		if ( $states !== null ) {
-			$processed_requests = static::filter_requests( $processed_requests, $states );
-		}
-
-		return $processed_requests;
+		return $this->state->get_active_requests( $states );
 	}
 
-	public function get_failed_requests() {
-		return $this->get_requests( Request::STATE_FAILED );
-	}
-
-	protected function get_requests( $states ) {
-		if ( ! is_array( $states ) ) {
-			$states = array( $states );
-		}
-
-		return static::filter_requests( $this->requests, $states );
-	}
-
-	protected function get_request_by_id( $request_id ) {
-		foreach ( $this->requests as $request ) {
-			if ( $request->id === $request_id ) {
-				return $request;
-			}
-		}
-	}
-
-	/**
-	 * Handle transfer encodings.
-	 *
-	 * @param  Request  $request
-	 *
-	 * @return false|resource
-	 */
-	protected function decode_and_monitor_response_body_stream( Request $request ) {
-		$transfer_encodings = array();
-
-		$transfer_encoding = $request->response->get_header( 'transfer-encoding' );
-		if ( $transfer_encoding ) {
-			$transfer_encodings = array_map( 'trim', explode( ',', $transfer_encoding ) );
-		}
-
-		$content_encoding = $request->response->get_header( 'content-encoding' );
-		if ( $content_encoding && ! in_array( $content_encoding, $transfer_encodings ) ) {
-			$transfer_encodings[] = $content_encoding;
-		}
-
-		$body_stream = FileReadStream::from_resource(
-			$this->connections[ $request->id ]->http_socket
-		);
-
-		$transformers = array();
-		foreach ( $transfer_encodings as $transfer_encoding ) {
-			switch ( $transfer_encoding ) {
-				case 'chunked':
-					$body_stream = new ChunkedDecoderReadStream( $body_stream );
-					break;
-				case 'gzip':
-					$transformers[] = new InflateTransformer(
-						$transfer_encoding === 'gzip' ? ZLIB_ENCODING_GZIP : ZLIB_ENCODING_RAW
-					);
-					break;
-				case 'deflate':
-					$transformers[] = new InflateTransformer( ZLIB_ENCODING_DEFLATE );
-					break;
-				case 'identity':
-					// No-op
-					break;
-				default:
-					$this->set_error(
-						$request,
-						new HttpError( 'Unsupported transfer encoding received from the server: ' . $transfer_encoding )
-					);
-					break;
-			}
-		}
-
-		return new TransformedReadStream(
-			$body_stream,
-			$transformers
-		);
-	}
-
-	/**
-	 * Sends HTTP requests using streams.
-	 *
-	 * Enables crypto on the $requests HTTP socksts and sends the request body asynchronously.
-	 *
-	 * @param  Request[]  $requests  An array of HTTP requests.
-	 */
-	protected function enable_crypto( array $requests ) {
-		foreach ( $this->stream_select( $requests, static::STREAM_SELECT_WRITE ) as $request ) {
-			@stream_set_timeout( $this->connections[ $request->id ]->http_socket, 1 );
-			$enabled_crypto = stream_socket_enable_crypto(
-				$this->connections[ $request->id ]->http_socket,
-				true,
-				STREAM_CRYPTO_METHOD_TLS_CLIENT
-			);
-			if ( false === $enabled_crypto ) {
-				$last_error = error_get_last();
-				$this->set_error( $request,
-					new HttpError( 'Failed to enable crypto: ' . ( is_array( $last_error ) ? $last_error['message'] : 'unknown' ) )
-				);
-				continue;
-			} elseif ( 0 === $enabled_crypto ) {
-				// The SSL handshake isn't finished yet, let's skip it
-				// for now and try again on the next event loop pass.
-				continue;
-			}
-			// SSL connection established, let's send the headers.
-			$request->state = Request::STATE_WILL_SEND_HEADERS;
-		}
-	}
-
-	/**
-	 * Sends HTTP request headers.
-	 *
-	 * @param  Request[]  $requests  An array of HTTP requests.
-	 */
-	protected function send_request_headers( array $requests ) {
-		foreach ( $this->stream_select( $requests, static::STREAM_SELECT_WRITE ) as $request ) {
-			$header_bytes = static::prepare_request_headers( $request );
-			if ( false === @fwrite( $this->connections[ $request->id ]->http_socket, $header_bytes ) ) {
-				$last_error = error_get_last();
-				$last_error_message = is_array( $last_error ) ? $last_error['message'] : 'unknown';
-				$this->set_error( $request,
-					new HttpError( 'Failed to write request bytes - ' . $last_error_message )
-				);
-				continue;
-			}
-
-			if ( $request->upload_body_stream ) {
-				$request->state = Request::STATE_WILL_SEND_BODY;
-
-				if ( $request->get_header( 'transfer-encoding' ) === 'chunked' ) {
-					$request->upload_body_stream = new TransformedReadStream(
-						$request->upload_body_stream,
-						array( new ChunkedEncoderByteTransformer() )
-					);
-				}
-			} else {
-				$request->state = Request::STATE_RECEIVING_HEADERS;
-			}
-		}
-	}
-
-	/**
-	 * Sends HTTP request body.
-	 *
-	 * @param  Request[]  $requests  An array of HTTP requests.
-	 */
-	protected function send_request_body( array $requests ) {
-		foreach ( $this->stream_select( $requests, self::STREAM_SELECT_WRITE ) as $request ) {
-			if ( $request->upload_body_stream->reached_end_of_data() ) {
-				$request->upload_body_stream->close_reading();
-				$request->upload_body_stream = null;
-				$request->state              = Request::STATE_RECEIVING_HEADERS;
-				continue;
-			}
-
-			$available_bytes = $request->upload_body_stream->pull( 65536 );
-			if ( $available_bytes === 0 ) {
-				// Not all pull() calls must yield bytes, maybe we just need to wait for the next chunk.
-				// Let's continue and keep trying.
-				// @TODO: Implement a generic timeout mechanism for pull() calls.
-				continue;
-			}
-
-			$chunk = $request->upload_body_stream->consume( $available_bytes );
-			if ( ! @fwrite( $this->connections[ $request->id ]->http_socket, $chunk ) ) {
-				$last_error = error_get_last();
-				$last_error_message = is_array( $last_error ) ? $last_error['message'] : 'unknown';
-				$this->set_error( $request, new HttpError( 'Failed to write request bytes: ' . $last_error_message ) );
-				continue;
-			}
-		}
-	}
-
-	/**
-	 * Reads the next received portion of HTTP response headers for multiple requests.
-	 *
-	 * @param  array  $requests  An array of requests.
-	 */
-	protected function receive_response_headers( $requests ) {
-		$nb_headers_received = 0;
-
-		foreach ( $this->stream_select( $requests, static::STREAM_SELECT_READ ) as $request ) {
-			if ( ! $request->response ) {
-				$request->response = new Response( $request );
-			}
-			$connection = $this->connections[ $request->id ];
-			$response   = $request->response;
-
-			while ( true ) {
-				// @TODO: Use a larger chunk size here and then scan for \r\n\r\n.
-				// 1 seems slow and overly conservative.
-				if (
-					!$this->connections[ $request->id ]->http_socket ||
-					!is_resource($this->connections[ $request->id ]->http_socket) ||
-					@feof($this->connections[ $request->id ]->http_socket)
-				) {
-					$this->set_error($request, new HttpError('Connection closed while reading response headers.'));
-					break;
-				}
-
-				$header_byte = fread( $this->connections[ $request->id ]->http_socket, 1 );
-
-				if ( false === $header_byte || '' === $header_byte ) {
-					if (
-						!$this->connections[ $request->id ]->http_socket ||
-						!is_resource($this->connections[ $request->id ]->http_socket) ||
-						@feof($this->connections[ $request->id ]->http_socket)
-					) {
-						$this->set_error($request, new HttpError('Connection closed while reading response headers.'));
-						break;
-					}
-					break;
-				}
-				$connection->response_buffer .= $header_byte;
-
-				$buffer_size = strlen( $connection->response_buffer );
-				if (
-					$buffer_size < 4 ||
-					$connection->response_buffer[ $buffer_size - 4 ] !== "\r" ||
-					$connection->response_buffer[ $buffer_size - 3 ] !== "\n" ||
-					$connection->response_buffer[ $buffer_size - 2 ] !== "\r" ||
-					$connection->response_buffer[ $buffer_size - 1 ] !== "\n"
-				) {
-					continue;
-				}
-
-				$parsed = static::parse_http_headers( $connection->response_buffer );
-				if ( false === $parsed ) {
-					$this->set_error( $request, new HttpError( 'Malformed HTTP headers received from the server.' ) );
-					break;
-				}
-				$connection->response_buffer = '';
-
-				$response->headers        = $parsed['headers'];
-				$response->status_code    = $parsed['status']['code'];
-				$response->status_message = $parsed['status']['message'];
-				$response->protocol       = $parsed['status']['protocol'];
-
-				$total = $request->response->get_header( 'content-length' );
-				if ( null !== $total ) {
-					$response->total_bytes = (int) $total;
-				}
-
-				$this->events[ $request->id ][ self::EVENT_GOT_HEADERS ] = true;
-				$nb_headers_received ++;
-
-				if ( $response->total_bytes === 0 ) {
-					$request->state = Request::STATE_RECEIVED;
-					break;
-				}
-
-				$request->state = Request::STATE_RECEIVING_BODY;
-				$this->connections[ $request->id ]->decoded_response_stream = $this->decode_and_monitor_response_body_stream( $request );
-				break;
-			}
-		}
-
-		return $nb_headers_received;
-	}
-
-	/**
-	 * @param  array  $requests  An array of requests.
-	 */
-	protected function receive_response_body( $requests ) {
-		// @TODO: Assume body is fully received when either
-		// * Content-Length is reached
-		// * The last chunk in Transfer-Encoding: chunked is received
-		// * The connection is closed
-		foreach ( $this->stream_select( $requests, static::STREAM_SELECT_READ ) as $request ) {
-			$stream = $this->connections[ $request->id ]->decoded_response_stream;
-
-			while ( true ) {
-				$available_bytes = $stream->pull( 65536 );
-				if ( $available_bytes > 0 ) {
-					$body_chunk                                         = $stream->consume( $available_bytes );
-					$request->response->received_bytes                  += $available_bytes;
-					$this->connections[ $request->id ]->response_buffer .= $body_chunk;
-					$this->events[ $request->id ][ self::EVENT_BODY_CHUNK_AVAILABLE ] = true;
-					break; // Process one chunk per loop iteration
-				} elseif ( $stream->reached_end_of_data() ) {
-					$request->state = Request::STATE_RECEIVED;
-					break;
-				}
-			}
-		}
-	}
-
-	/**
-	 * Parses an HTTP headers string into an array containing the status and headers.
-	 *
-	 * @param  string  $headers  The HTTP headers to parse.
-	 *
-	 * @return array An array containing the parsed status and headers.
-	 */
-	protected function parse_http_headers( string $headers ) {
-		$lines  = explode( "\r\n", $headers );
-		$status = array_shift( $lines );
-		$status = explode( ' ', $status );
-		if ( count( $status ) < 3 ) {
-			return false;
-		}
-		$status  = array(
-			'protocol' => $status[0],
-			'code'     => (int) $status[1],
-			'message'  => $status[2],
-		);
-		$headers = array();
-		foreach ( $lines as $line ) {
-			if ( strpos( $line, ': ' ) === false ) {
-				// @TODO: Error, not a valid response
-				continue;
-			}
-			$line = explode( ': ', $line );
-			/**
-			 * Headers names are case-insensitive.
-			 *
-			 * RFC 7230 states:
-			 *
-			 * > Each header field consists of a case-insensitive field name followed by a colon (":"),
-			 * > optional leading whitespace, the field value, and optional trailing whitespace."
-			 */
-			$headers[ strtolower( $line[0] ) ] = $line[1];
-		}
-
-		return array(
-			'status'  => $status,
-			'headers' => $headers,
-		);
-	}
-
-	/**
-	 * Opens HTTP or HTTPS streams using stream_socket_client() without blocking,
-	 * and returns nearly immediately.
-	 *
-	 * The act of opening a stream is non-blocking itself. This function uses
-	 * a tcp:// stream wrapper, because both https:// and ssl:// wrappers would block
-	 * until the SSL handshake is complete.
-	 * The actual socket it then switched to non-blocking mode using stream_set_blocking().
-	 *
-	 * @param  Request  $request  The Request to open the socket for.
-	 *
-	 * @return bool Whether the stream was opened successfully.
-	 */
-	protected function open_nonblocking_http_sockets( $requests ) {
-		foreach ( $requests as $request ) {
-			$url    = $request->url;
-			$parts  = parse_url( $url );
-			$scheme = $parts['scheme'];
-			if ( ! in_array( $scheme, array( 'http', 'https' ) ) ) {
-				$this->set_error(
-					$request,
-					new HttpError( 'stream_http_open_nonblocking: Invalid scheme in URL ' . $url . ' – only http:// and https:// URLs are supported' )
-				);
-				continue;
-			}
-
-			$is_ssl = $scheme === 'https';
-			$port   = $parts['port'] ?? ( $scheme === 'https' ? 443 : 80 );
-			$host   = $parts['host'];
-
-			// Create stream context
-			$context = stream_context_create(
-				array(
-					'socket' => array(
-						'isSsl'       => $is_ssl,
-						'originalUrl' => $url,
-						'socketUrl'   => 'tcp://' . $host . ':' . $port,
-					),
-				)
-			);
-
-			$this->requests_started_at[ $request->id ] = microtime( true );
-			$stream = @stream_socket_client(
-				'tcp://' . $host . ':' . $port,
-				$errno,
-				$errstr,
-				$this->request_timeout_ms,
-				STREAM_CLIENT_CONNECT | STREAM_CLIENT_ASYNC_CONNECT,
-				$context
-			);
-
-			if ( $stream === false ) {
-				$this->set_error(
-					$request,
-					new HttpError( "stream_http_open_nonblocking: stream_socket_client() was unable to open a stream to $url. $errno: $errstr" )
-				);
-				continue;
-			}
-
-			stream_set_blocking( $stream, false );
-
-			$this->connections[ $request->id ]->http_socket = $stream;
-			if ( $is_ssl ) {
-				$request->state = Request::STATE_WILL_ENABLE_CRYPTO;
-			} else {
-				$request->state = Request::STATE_WILL_SEND_HEADERS;
-			}
-		}
-
-		return true;
-	}
-
-	/**
-	 * Prepares an HTTP request string for a given URL.
-	 *
-	 * @param  Request  $request  The Request to prepare the HTTP headers for.
-	 *
-	 * @return string The prepared HTTP request string.
-	 */
-	protected static function prepare_request_headers( Request $request ) {
-		$url   = $request->url;
-		$parts = parse_url( $url );
-		$path  = ( isset( $parts['path'] ) ? $parts['path'] : '/' ) . ( isset( $parts['query'] ) ? '?' . $parts['query'] : '' );
-
-		$headers = $request->headers;
-
-		/**
-		 * Disable the gzip transfer compression when requesting a byte range.
-		 *
-		 * When we're requesting a byte range AND gzipped transfer encoding,
-		 * our intention is to get compressed bytes 0-X of the original file.
-		 *
-		 * However, some servers will compress the file first, and then return
-		 * the compressed bytes 0-X. The result is both unpredictable and impossible
-		 * to decompress.
-		 */
-		if ( ! array_key_exists( 'range', $headers ) && ! array_key_exists( 'accept-encoding', $headers ) ) {
-			$headers['accept-encoding'] = 'gzip';
-		}
-
-		$request_parts = array(
-			"$request->method $path HTTP/$request->http_version",
-		);
-
-		foreach ( $headers as $name => $value ) {
-			$request_parts[] = "$name: $value";
-		}
-
-		return implode( "\r\n", $request_parts ) . "\r\n\r\n";
-	}
-
-	protected function filter_requests( array $requests, $states ) {
-		if ( ! is_array( $states ) ) {
-			$states = array( $states );
-		}
-		$results = array();
-		foreach ( $requests as $request ) {
-			if ( in_array( $request->state, $states ) ) {
-				$results[] = $request;
-			}
-		}
-
-		return $results;
-	}
-
-
-	protected function stream_select( $requests, $mode ) {
-		if ( empty( $requests ) ) {
-			return array();
-		}
-
-		$read  = array();
-		$write = array();
-		foreach ( $requests as $k => $request ) {
-			if ( $mode & static::STREAM_SELECT_READ ) {
-				$read[ $k ] = $this->connections[ $request->id ]->http_socket;
-			}
-			if ( $mode & static::STREAM_SELECT_WRITE ) {
-				$write[ $k ] = $this->connections[ $request->id ]->http_socket;
-			}
-		}
-		$except = null;
-		if ( count( $read ) === 0 && count( $write ) === 0 ) {
-			return array();
-		}
-
-		// phpcs:disable WordPress.PHP.NoSilencedErrors.Discouraged
-		$ready = @stream_select( $read, $write, $except, 0, static::NONBLOCKING_TIMEOUT_MICROSECONDS );
-		if ( $ready === false ) {
-			foreach ( $requests as $request ) {
-				$this->set_error( $request, new HttpError( 'Error: ' . error_get_last()['message'] ) );
-			}
-
-			return array();
-		} elseif ( $ready <= 0 ) {
-			// @TODO allow at most X stream_select attempts per request
-			// foreach ( $unprocessed_requests as $request ) {
-			// $this->>set_error($request, new HttpError( 'stream_select timed out' ));
-			// }
-			return array();
-		}
-
-		$selected_requests = array();
-		foreach ( array_keys( $read ) as $k ) {
-			$selected_requests[ $k ] = $requests[ $k ];
-		}
-		foreach ( array_keys( $write ) as $k ) {
-			$selected_requests[ $k ] = $requests[ $k ];
-		}
-
-		return $selected_requests;
-	}
-
-	protected const STREAM_SELECT_READ = 1;
-	protected const STREAM_SELECT_WRITE = 2;
-
-	const EVENT_GOT_HEADERS = 'EVENT_GOT_HEADERS';
-	const EVENT_BODY_CHUNK_AVAILABLE = 'EVENT_BODY_CHUNK_AVAILABLE';
-	const EVENT_FAILED = 'EVENT_FAILED';
-	const EVENT_FINISHED = 'EVENT_FINISHED';
-
-	/**
-	 * Microsecond is 1 millionth of a second.
-	 *
-	 * @var int
-	 */
-	const MICROSECONDS_TO_SECONDS = 1000000;
-
-	/**
-	 * 5/100th of a second
-	 */
-	const NONBLOCKING_TIMEOUT_MICROSECONDS = 0.05 * self::MICROSECONDS_TO_SECONDS;
-
-	protected function mark_requests_finished( $requests ) {
-		foreach ( $requests as $request ) {
-			$this->mark_finished( $request );
-		}
-	}
 }

@@ -75,7 +75,6 @@ while ( $client->await_next_event() ) {
 				echo 'Failed request to ' . $request->url . ' – ' . $request->error;
 			}
 			break;
-		case Client::EVENT_REDIRECT:
 		case Client::EVENT_FINISHED:
 			break;
 	}

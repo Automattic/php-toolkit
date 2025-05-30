@@ -3,12 +3,12 @@
 namespace WordPress\HttpClient\Tests;
 
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\Process\Process;
 use WordPress\ByteStream\ByteStreamException;
 use WordPress\HttpClient\ByteStream\RequestReadStream;
 use WordPress\HttpClient\Client;
 use WordPress\HttpClient\Request;
 use WordPress\HttpClient\Response;
-use Symfony\Component\Process\Process;
 
 trait WithTestServer {
 	protected function withServer( callable $callback, $scenario = 'default', $host = '127.0.0.1', $port = 8950 ) {
@@ -137,6 +137,27 @@ class RequestReadStreamTest extends TestCase {
 			$this->assertNotEmpty( $all_content );
 			$this->assertStringContainsString( 'Professor of Phonetics', $all_content );
 		});
+	}
+
+	public function testRedirects() {
+		$this->withServer(function($url) {
+			$test_url = $url . '/redirect/relative-path-redirect';
+			$stream = new RequestReadStream( $test_url );
+			$response = $stream->await_response();
+			
+			// Should follow redirects and get the final response
+			$this->assertInstanceOf( Response::class, $response );
+			$this->assertEquals( 200, $response->status_code );
+			
+			// Should be able to read the final content
+			$content = $stream->consume_all();
+			$this->assertStringContainsString( 'Arrived at /redirect/new-path/resource.html.', $content );
+			
+			// Check that the request was redirected
+			$request = $stream->get_request();
+			$this->assertNotNull( $request->redirected_to );
+			$this->assertStringContainsString( '/redirect/new-path/resource.html', $request->redirected_to->url );
+		}, 'redirect');
 	}
 
 	public function testTell() {

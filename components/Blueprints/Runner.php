@@ -652,16 +652,16 @@ class Runner {
 			case 'importContent':
 				/**
 				 * Flatten the content declaration from
-				 * 
+				 *
 				 *     "content": [
 				 *         {
 				 *             "type": "posts",
 				 *             "source": [ "post1.html", "post2.html" ]
 				 *         }
 				 *     ]
-				 * 
+				 *
 				 * into
-				 * 
+				 *
 				 *     "content": [
 				 *         {
 				 *             "type": "posts",

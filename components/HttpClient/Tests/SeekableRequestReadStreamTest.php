@@ -4,9 +4,7 @@ namespace WordPress\HttpClient\Tests;
 
 use PHPUnit\Framework\TestCase;
 use WordPress\HttpClient\ByteStream\SeekableRequestReadStream;
-use WordPress\HttpClient\Client;
 use WordPress\HttpClient\Request;
-use Symfony\Component\Process\Process;
 
 require_once __DIR__ . '/RequestReadStreamTest.php'; // for WithTestServer trait
 

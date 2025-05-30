@@ -98,7 +98,7 @@ class RequestReadStream extends BaseByteReadStream {
 
 		while ( $this->client->await_next_event(
 			array(
-				'requests' => array( $this->request ),
+				'requests' => array( $this->request->latest_redirect() ),
 			)
 		) ) {
 			$request = $this->client->get_request();

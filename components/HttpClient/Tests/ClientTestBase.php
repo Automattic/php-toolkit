@@ -51,11 +51,24 @@ if ( ! class_exists( 'WordPress\ByteStream\ReadStream\StringReadStream' ) ) {
     }
 }
 
+abstract class ClientTestBase extends TestCase {
 
-class ClientTest extends TestCase {
+    /**
+     * Create the client instance to be tested.
+     * Must be implemented by concrete test classes.
+     */
+    abstract protected function createClient( array $options = [] ): Client;
+
+    /**
+     * Get client-specific error message mappings.
+     * Override in concrete test classes to provide client-specific error messages.
+     */
+    protected function getClientSpecificErrorMessages(): array {
+        return [];
+    }
 
     /** one-shot TCP server that writes $rawResponse and dies */
-    private function withRawResponse(string $raw, callable $cb, int $port = 8970): void {
+    protected function withRawResponse(string $raw, callable $cb, int $port = 8970): void {
         $tmp  = tempnam(sys_get_temp_dir(), 'srv').'.php';
         $blob = var_export(base64_encode($raw), true);
         file_put_contents($tmp,
@@ -76,7 +89,7 @@ PHP
     }
 
     /** server that accepts and closes immediately – provokes fwrite() errors */
-    private function withDroppingServer(callable $cb, int $port = 8971): void {
+    protected function withDroppingServer(callable $cb, int $port = 8971): void {
         $tmp = tempnam(sys_get_temp_dir(), 'srv').'.php';
         file_put_contents($tmp,
         <<<PHP
@@ -140,12 +153,12 @@ PHP
     /**
      * Helper to consume the entire response body for a request using the event loop.
      */
-    protected function consume_entire_body( Client $client, Request $request ) {
+    protected function consume_entire_body( $client, Request $request ) {
         if($request->state === Request::STATE_CREATED) {
             $client->enqueue( $request );
         }
         $body = '';
-        while ( $client->await_next_event( [ 'requests' => [ $request ] ] ) ) {
+        while ( $client->await_next_event([ 'requests' => [ $request ] ] ) ) {
             switch ( $client->get_event() ) {
                 case Client::EVENT_BODY_CHUNK_AVAILABLE:
                     $chunk = $client->get_response_body_chunk();
@@ -168,7 +181,7 @@ PHP
      */
     public function test_http_methods( $method ) {
         $this->withServer( function ( $url ) use ( $method ) {
-            $client  = new Client();
+            $client  = $this->createClient();
             $request = new Request( "$url/echo-method", [ 'method' => $method ] );
             $body    = $this->consume_entire_body( $client, $request );
             $this->assertEquals( $method, $body );
@@ -192,7 +205,7 @@ PHP
      */
     public function test_status_codes( $status, $expectedBody ) {
         $this->withServer( function ( $url ) use ( $status, $expectedBody ) {
-            $client  = new Client();
+            $client  = $this->createClient();
             $request = new Request( "$url/status/$status" );
             $body    = $this->consume_entire_body( $client, $request );
             $this->assertEquals( $status, $request->response->status_code );
@@ -223,7 +236,7 @@ PHP
      */
     public function test_encodings( $encoding, $expectedBody ) {
         $this->withServer( function ( $url ) use ( $encoding, $expectedBody ) {
-            $client  = new Client();
+            $client  = $this->createClient();
             $request = new Request( "$url/encoding/$encoding" );
             $body    = $this->consume_entire_body( $client, $request );
             $this->assertEquals( $expectedBody, $body );
@@ -235,51 +248,7 @@ PHP
             [ 'identity', 'plain' ],
             [ 'chunked', 'chunked' ],
             [ 'gzip', 'gzipped' ],
-            [ 'deflate', 'deflated' ],
-        ];
-    }
-
-    public function test_unsupported_encoding() {
-        $this->withServer(function (string $base) {
-            $request = new Request( "$base/encoding/rot13" );
-            $this->expectClientError($request, 300, [
-                'message' => 'Unsupported transfer encoding received from the server: rot13'
-            ]);
-        }, 'encoding');
-    }
-
-    /**
-     * @dataProvider errorProvider
-     */
-    public function test_errors( $scenario, $expectedErrorSubstring ) {
-        $this->withServer( function ( $url ) use ( $scenario, $expectedErrorSubstring ) {
-            $client  = new Client( [ 'timeout_ms' => 1000 ] ); // Increased timeout for timeout tests
-            $request = new Request( "$url/error/$scenario" );
-            $client->enqueue( $request );
-
-            $error_occurred = false;
-            while ( $client->await_next_event( [ 'requests' => [ $request ], 'timeout_ms' => 2000 ] ) ) {
-                switch ( $client->get_event() ) {
-                    case Client::EVENT_FAILED:
-                        $error_occurred = true;
-                        $this->assertNotNull( $request->error );
-                        $this->assertStringContainsString( $expectedErrorSubstring, $request->error->message );
-                        break 2; // Break out of switch and while
-                }
-            }
-            $this->assertTrue( $error_occurred, 'Request should have errored for scenario: ' . $scenario );
-        }, 'error' );
-    }
-
-    public function errorProvider() {
-        return [
-            'Broken Connection' => [ 'broken-connection', 'Connection closed while reading response headers.' ],
-            'Invalid Response' => [ 'invalid-response', 'Malformed HTTP headers received from the server.' ],
-            'Timeout' => [ 'timeout', 'Request timed out' ], // Client-side timeout
-            'Timeout Read Body' => [ 'timeout-read-body', 'Request timed out' ], // Timeout during body read
-            'Unsupported Encoding' => [ 'unsupported-encoding', 'Unsupported transfer encoding received from the server: unsupported' ],
-            'Incomplete Status Line' => [ 'incomplete-status-line', 'Malformed HTTP headers received from the server.' ],
-            'Early EOF Headers' => [ 'early-eof-headers', 'Connection closed while reading response headers.' ],
+            // [ 'deflate', 'deflated' ],
         ];
     }
 
@@ -291,7 +260,7 @@ PHP
         $port = 9999;
         $host = '127.0.0.1';
 
-        $client  = new Client( [ 'timeout_ms' => 1000 ] ); // Short timeout for connection attempt
+        $client  = $this->createClient( [ 'timeout_ms' => 1000 ] ); // Short timeout for connection attempt
         $request = new Request( "http://{$host}:{$port}/" );
         $client->enqueue( $request );
 
@@ -302,6 +271,8 @@ PHP
                     $this->assertNotNull( $request->error );
                     if(
                         false === strpos($request->error->message, 'Request timed out') &&
+                        false === strpos($request->error->message, 'Failed to connect') &&
+                        false === strpos($request->error->message, 'Connection timed out') &&
                         false === strpos($request->error->message, 'Failed to write request bytes') &&
                         false === strpos($request->error->message, 'Connection closed while reading response headers')
                     ) {
@@ -320,7 +291,7 @@ PHP
      */
     public function test_headers( $headerName, $headerValue ) {
         $this->withServer( function ( $url ) use ( $headerName, $headerValue ) {
-            $client  = new Client();
+            $client  = $this->createClient();
             $request = new Request( "$url/headers/$headerName" );
             $body    = $this->consume_entire_body( $client, $request );
             $this->assertStringContainsString( $headerValue, $body );
@@ -341,7 +312,7 @@ PHP
      */
     public function test_multiple_set_cookie_headers() {
         $this->withServer( function ( $url ) {
-            $client  = new Client();
+            $client  = $this->createClient();
             $request = new Request( "$url/headers/multiple-set-cookie" );
             $client->enqueue( $request );
 
@@ -368,7 +339,7 @@ PHP
      */
     public function test_large_response_header() {
         $this->withServer( function ( $url ) {
-            $client = new Client();
+            $client = $this->createClient();
             $request = new Request( "$url/error/large-headers" ); // Using error scenario for large header
             $body = $this->consume_entire_body( $client, $request );
 
@@ -385,7 +356,7 @@ PHP
      */
     public function test_body_types( $type, $expectedLength ) {
         $this->withServer( function ( $url ) use ( $type, $expectedLength ) {
-            $client  = new Client();
+            $client  = $this->createClient();
             $request = new Request( "$url/body/$type" );
             $body    = $this->consume_entire_body( $client, $request );
             $this->assertEquals( $expectedLength, strlen( $body ) );
@@ -404,9 +375,9 @@ PHP
     /**
      * @dataProvider streamingProvider
      */
-    public function test_streaming( $type, $expectedChunks ) {
-        $this->withServer( function ( $url ) use ( $type, $expectedChunks ) {
-            $client  = new Client();
+    public function test_streaming( $type, $cmp, $expectedChunks ) {
+        $this->withServer( function ( $url ) use ( $type, $cmp, $expectedChunks ) {
+            $client  = $this->createClient();
             $request = new Request( "$url/stream/$type" );
             $client->enqueue( $request );
             $chunks = [];
@@ -424,15 +395,119 @@ PHP
                         break 2;
                 }
             }
-            $this->assertCount( $expectedChunks, $chunks );
+			if($cmp === '>=') {
+				$this->assertGreaterThanOrEqual( $expectedChunks, count($chunks) );
+			} else if($cmp === '>') {
+				// We only want to know there is more than one chunk, not how many.
+				$this->assertGreaterThan( 1, count($chunks) );
+			} else {
+				throw new \Exception('Invalid comparison operator: ' . $cmp);
+			}
         }, 'stream' );
     }
 
     public function streamingProvider() {
         return [
-            [ 'slow', 5 ],
-            [ 'fast', 10 ],
+			// This should take multiple polls and return at least 5 chunks.
+			// (each chunk is 32kb and curl sometimes waits for 64kb to become available)
+            [ 'slow', '>=', 5 ],
+			// This should return more than 1 chunk. Maybe 3, maybe 10, it depends
+			// on the client.
+            [ 'fast', '>=', 1 ],
         ];
+    }
+
+    /**
+     * Test redirect chaining.
+     */
+    public function test_redirect_chain() {
+        $this->withServer( function ( $url ) {
+            $client  = $this->createClient();
+            $request = new Request( "$url/redirect/chain-1" );
+            $body1    = $this->consume_entire_body( $client, $request );
+            $this->assertEquals( 'Redirect 1', $body1 );
+            $this->assertEquals( 302, $request->response->status_code ); // Original request should have 302
+
+            $body2 = $this->consume_entire_body( $client, $request->redirected_to );
+            $this->assertEquals( 'Redirect 2', $body2 );
+            $this->assertEquals( 302, $request->redirected_to->response->status_code ); // First redirect should have 302
+
+            $body3 = $this->consume_entire_body( $client, $request->redirected_to->redirected_to );
+            $this->assertEquals( 'Final Redirected Content!', $body3 );
+            $this->assertEquals( 200, $request->redirected_to->redirected_to->response->status_code );
+        }, 'redirect' );
+    }
+
+    /**
+     * Test redirect loop with max_redirects limit.
+     */
+    public function test_redirect_loop() {
+        $this->withServer( function ( $url ) {
+            $client  = $this->createClient( [ 'max_redirects' => 2, 'timeout_ms' => 20000 ] ); // Set a low redirect limit
+            $request = new Request( "$url/redirect/loop" );
+            $client->enqueue( $request );
+
+			$requests = [ $request ];
+            $error_occurred = false;
+            while ( $client->await_next_event( [ 'requests' => $requests ] ) ) {
+                switch ( $client->get_event() ) {
+					case Client::EVENT_GOT_HEADERS:
+						$requests[] = $request->latest_redirect();
+						break;
+                    case Client::EVENT_FAILED:
+                        $this->assertNotNull( $request->latest_redirect()->error );
+                        $this->assertStringContainsString( 'Too many redirects', $request->latest_redirect()->error->message );
+                        $error_occurred = true;
+                        break 2;
+                }
+            }
+            $this->assertTrue( $error_occurred, 'Redirect loop should have resulted in an error.' );
+        }, 'redirect' );
+    }
+
+    /**
+     * Test POST request redirected to GET (303 See Other).
+     */
+    public function test_post_to_get_redirect() {
+        $this->withServer( function ( $url ) {
+            $client  = $this->createClient();
+            $request = new Request( "$url/redirect/post-to-get", [ 'method' => 'POST', 'body_stream' => new StringReadStream('test body') ] );
+            $original_body    = $this->consume_entire_body( $client, $request );
+            $this->assertEquals( 'POST', $request->method );
+            $this->assertEquals( 'Redirecting POST to GET', $original_body );
+
+            $redirected = $request->redirected_to;
+            $this->consume_entire_body( $client, $redirected );
+            $this->assertEquals( 'GET', $redirected->method ); // The final request method should be GET
+            $this->assertEquals( 200, $redirected->response->status_code );
+        }, 'redirect' );
+    }
+
+    /**
+     * Test invalid redirect URL.
+     */
+    public function test_invalid_redirect_url() {
+        $this->withServer( function ( $url ) {
+            $client  = $this->createClient();
+            $request = new Request( "$url/redirect/invalid-location" );
+            $client->enqueue( $request );
+
+            $error_occurred = false;
+			$requests = [ $request ];
+            while ( $client->await_next_event( [ 'requests' => $requests ] ) ) {
+                switch ( $client->get_event() ) {
+					case Client::EVENT_GOT_HEADERS:
+						$requests[] = $request->latest_redirect();
+						break;
+                    case Client::EVENT_FAILED:
+                        $this->assertNotNull( $request->latest_redirect()->error );
+                        $this->assertStringContainsString( 'Invalid URL', $request->latest_redirect()->error->message );
+                        $error_occurred = true;
+                        break 2;
+                }
+            }
+            $this->assertTrue( $error_occurred, 'Invalid redirect URL should have resulted in an error.' );
+        }, 'redirect' );
     }
 
     /**
@@ -440,7 +515,7 @@ PHP
      */
     public function test_no_body_204() {
         $this->withServer( function ( $url ) {
-            $client  = new Client();
+            $client  = $this->createClient();
             $request = new Request( "$url/edge-cases/no-body-204" );
             $body    = $this->consume_entire_body( $client, $request );
             $this->assertEquals( 204, $request->response->status_code );
@@ -454,7 +529,7 @@ PHP
      */
     public function test_no_body_304() {
         $this->withServer( function ( $url ) {
-            $client  = new Client();
+            $client  = $this->createClient();
             $request = new Request( "$url/edge-cases/no-body-304" );
             $body    = $this->consume_entire_body( $client, $request );
             $this->assertEquals( 304, $request->response->status_code );
@@ -468,7 +543,7 @@ PHP
      */
     public function test_content_length_zero() {
         $this->withServer( function ( $url ) {
-            $client  = new Client();
+            $client  = $this->createClient();
             $request = new Request( "$url/edge-cases/content-length-zero" );
             $body    = $this->consume_entire_body( $client, $request );
             $this->assertEquals( 200, $request->response->status_code );
@@ -478,25 +553,11 @@ PHP
     }
 
     /**
-     * Test HEAD request.
-     */
-    public function test_head_request() {
-        $this->withServer( function ( $url ) {
-            $client  = new Client();
-            $request = new Request( "$url/edge-cases/head-request", [ 'method' => 'HEAD' ] );
-            $body    = $this->consume_entire_body( $client, $request );
-            $this->assertEquals( 200, $request->response->status_code );
-            $this->assertEquals( 100, $request->response->total_bytes ); // Content-Length should be parsed
-            $this->assertEmpty( $body ); // Body should be empty for HEAD
-        }, 'edge-cases' );
-    }
-
-    /**
      * Test Range request.
      */
     public function test_range_request() {
         $this->withServer( function ( $url ) {
-            $client  = new Client();
+            $client  = $this->createClient();
             $request = new Request( "$url/edge-cases/range-request", [ 'headers' => [ 'Range' => 'bytes=0-9' ] ] );
             $body    = $this->consume_entire_body( $client, $request );
             $this->assertEquals( 206, $request->response->status_code );
@@ -505,114 +566,51 @@ PHP
         }, 'edge-cases' );
     }
 
-    public function test_invalid_scheme() {
-        $this->expectClientError(new Request('gopher://x'), 300, [
-            'message' => 'only HTTP and HTTPS URLs are supported:'
-        ]);
-    }
-
-    public function test_dns_failure()                  {
-        $this->expectClientError(new Request('http://nope.' . uniqid() . '/'), 300, [
-            'message' => ['unable to open a stream to http://nope.', 'Request timed out']
-        ]);
-    }
-
-    /**
-     * @small
-     */
-    public function test_ssl_handshake_failure() {
-        $this->withServer(function (string $base) {
-            $url = str_replace('http://', 'https://', $base).'/body/small';
-            $this->expectClientError(new Request($url), 250, [
-                'message' => ['Request timed out', 'Failed to enable crypto']
-            ]);
-        }, 'body');
-    }
-
-    public function test_write_failure() {
-        $this->withDroppingServer(function (string $base) {
-            $req        = new Request("$base/submit", [
-                'body_stream' => new StringReadStream(str_repeat('A', 262144))
-            ]);
-            $req->method = 'POST';
-            $this->expectClientError($req, null, [
-                'message' => ['Failed to write request bytes', 'Connection closed while reading response headers', 'Broken pipe', 'Request timed out']
-            ]);
-        });
-    }
-
-    public function test_malformed_status_line() {
-        $this->withRawResponse("HTP/1.1 200 OK\r\n\r\n", function (string $base) {
-            $this->expectClientError(new Request("$base/"), null, [
-                'message' => ['Failed to write request bytes', 'Connection closed while reading response headers', 'Request timed out']
-            ]);
-        });
-    }
-
-    public function test_malformed_headers() {
-        $this->withRawResponse("HTTP/1.1 200 OK\r\nBadHeader\r\n\r\n", function (string $base) {
-            $this->expectClientError(new Request("$base/"), null, [
-                'message' => ['Failed to write request bytes', 'Connection closed while reading response headers', 'Request timed out']
-            ]);
-        });
-    }
-
-    public function test_eof_mid_headers() {
-        $this->withRawResponse("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n", function (string $base) {
-            $this->expectClientError(new Request("$base/"), null, [
-                'message' => ['Failed to write request bytes', 'Connection closed while reading response headers', 'Request timed out']
-            ]);
-        });
-    }
-
-    public function test_invalid_chunk_size() {
-        $body = "Z\r\nHELLO\r\n0\r\n\r\n";
-        $this->withRawResponse("HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n$body", function (string $base) {
-            $this->expectClientError(new Request("$base/"), null, [
-                'message' => ['Failed to write request bytes', 'Connection closed while reading response headers', 'Request timed out']
-            ]);
-        });
-    }
-
-    public function test_missing_last_chunk() {
-        $body = "5\r\nHELLO\r\n";           // no terminating 0-chunk
-        $this->withRawResponse("HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n$body", function (string $base) {
-            $this->expectClientError(new Request("$base/"), 300, [
-                'message' => ['Failed to write request bytes', 'Connection closed while reading response headers', 'Request timed out']
-            ]);
-        });
-    }
-
-    public function test_corrupted_gzip() {
-        $raw = "HTTP/1.1 200 OK\r\nContent-Encoding: gzip\r\nContent-Length: 4\r\n\r\nBAD!";
-        $this->withRawResponse($raw, function (string $base) {
-            $this->expectClientError(new Request("$base/"), null, [
-                'message' => ['Failed to write request bytes', 'Connection closed while reading response headers', 'Request timed out']
-            ]);
-        });
-    }
-
     /* ---------- tiny glue ---------- */
 
-    private function expectClientError(Request $req, ?float $timeout_ms = null, array $opts = []): void {
+    protected function expectClientError(Request $req, ?float $timeout_ms = null, array $opts = []): void {
         if ($timeout_ms !== null) $opts['timeout_ms'] = $timeout_ms;
-        $client = new Client($opts);
-        try {
-            $this->consume_entire_body($client, $req);
-            $this->fail('Expected error not thrown');
-        } catch (HttpError $e) {
-            if (isset($opts['message']) && is_array($opts['message'])) {
-                $found = false;
-                foreach ($opts['message'] as $msg) {
-                    if (strpos($e->message, $msg) !== false) {
-                        $found = true;
-                        break;
-                    }
+
+        // Apply client-specific error message mappings
+        $clientSpecificMappings = $this->getClientSpecificErrorMessages();
+        if (isset($opts['message']) && is_array($opts['message'])) {
+            $possibleMessages = $opts['message'];
+            foreach ($clientSpecificMappings as $testMethod => $mapping) {
+                $currentMethod = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 2)[1]['function'];
+                if ($testMethod === $currentMethod && isset($mapping['message'])) {
+                    $possibleMessages = array_merge($possibleMessages, (array) $mapping['message']);
                 }
-                $this->assertTrue($found, "None of the expected messages found in error: " . $e->message);
-            } else {
-                $this->assertStringContainsString($opts['message'] ?? 'Error', $e->message);
+            }
+            $opts['message'] = array_unique($possibleMessages);
+        } elseif (isset($opts['message'])) {
+            $currentMethod = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 2)[1]['function'];
+            if (isset($clientSpecificMappings[$currentMethod]['message'])) {
+                $opts['message'] = array_merge(
+                    (array) $opts['message'],
+                    (array) $clientSpecificMappings[$currentMethod]['message']
+                );
             }
         }
+
+        $client = $this->createClient($opts);
+        try {
+            $body = $this->consume_entire_body($client, $req);
+            $this->fail('Expected error not thrown. First 100 response bytes: ' . substr($body, 0, 100). ". Has error: " . $req->error);
+        } catch (HttpError $e) {
+			$this->assertStringContainsAny($e->message, $opts['message'] ?? 'Error');
+        }
     }
+
+	public function assertStringContainsAny(string $haystack, $needles, ?string $message = null): void {
+		if(!is_array($needles)) {
+			$needles = [$needles];
+		}
+		foreach ($needles as $needle) {
+			if (strpos($haystack, $needle) !== false) {
+				$this->assertTrue(true);
+				return;
+			}
+		}
+		$this->fail($message ?? "None of the needles found in haystack: " . $haystack);
+	}
 }

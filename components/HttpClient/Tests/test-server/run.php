@@ -284,12 +284,13 @@ $server->set_handler( function ( IncomingRequest $request, TcpResponseWriteStrea
 				$response->use_chunked_encoding();
 				for ( $i = 0; $i < 5; $i ++ ) {
 					$response->append_bytes( "s" );
-					usleep( 200000 ); // 200ms
+					usleep( 600000 ); // 600ms
 				}
 			} elseif ( $type === 'fast' ) {
 				$response->use_chunked_encoding();
 				for ( $i = 0; $i < 10; $i ++ ) {
-					$response->append_bytes( "f" );
+					// 32kb per chunk
+					$response->append_bytes( str_repeat("f", 32 * 1024) );
 				}
 			} else {
 				$response->send_http_code( 404 );

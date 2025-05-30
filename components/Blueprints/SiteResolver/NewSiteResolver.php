@@ -2,7 +2,6 @@
 
 namespace WordPress\Blueprints\SiteResolver;
 
-use Exception;
 use WordPress\Blueprints\DataReference\DataReference;
 use WordPress\Blueprints\DataReference\File;
 use WordPress\Blueprints\Exception\BlueprintExecutionException;
