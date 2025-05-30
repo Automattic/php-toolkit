@@ -53,6 +53,8 @@ if ( ! class_exists( 'WordPress\ByteStream\ReadStream\StringReadStream' ) ) {
 
 abstract class ClientTestBase extends TestCase {
 
+	use WithServerTrait;
+
     /**
      * Create the client instance to be tested.
      * Must be implemented by concrete test classes.
@@ -104,50 +106,6 @@ PHP
         for ($i = 0; $i < 20 && !@fsockopen('127.0.0.1', $port); $i++) usleep(50000);
         try   { $cb("http://127.0.0.1:$port"); }
         finally { $p->stop(0); @unlink($tmp); }
-    }
-
-    /** server that never answers – forces stream_select timeout */
-    private function withSilentServer(callable $cb, int $port = 8972): void {
-        $tmp = tempnam(sys_get_temp_dir(), 'srv').'.php';
-        file_put_contents($tmp,
-        <<<PHP
-        <?php
-        \$srv = stream_socket_server("tcp://127.0.0.1:$port", \$e, \$s);
-        @stream_socket_accept(\$srv, 10); sleep(10);
-PHP
-        );
-        $p = new Process(['php', $tmp]); $p->start();
-        for ($i = 0; $i < 20 && !@fsockopen('127.0.0.1', $port); $i++) usleep(50000);
-        try   { $cb("http://127.0.0.1:$port"); }
-        finally { $p->stop(0); @unlink($tmp); }
-    }
-
-    protected function withServer( callable $callback, $scenario = 'default', $host = '127.0.0.1', $port = 8950 ) {
-        $serverRoot = __DIR__ . '/test-server';
-        $server     = new Process( [
-            'php',
-            "$serverRoot/run.php",
-            $host,
-            $port,
-            $scenario,
-        ], $serverRoot );
-        $server->start();
-        try {
-            $attempts = 0;
-            while ( $server->isRunning() ) {
-                $output = $server->getIncrementalOutput();
-                if ( strncmp( $output, 'Server started on http://', strlen( 'Server started on http://' ) ) === 0 ) {
-                    break;
-                }
-                usleep( 40000 );
-                if ( ++ $attempts > 20 ) {
-                    $this->fail( 'Server did not start' );
-                }
-            }
-            $callback( "http://{$host}:{$port}" );
-        } finally {
-            $server->stop( 0 );
-        }
     }
 
     /**

@@ -11,9 +11,9 @@ use WordPress\HttpClient\Response;
 class CacheMiddlewareTest extends TestCase {
 
 	private string $cache_dir;
-	private MockClientState $state;
-	private MockMiddleware $next_middleware;
-	private CacheMiddleware $cache_middleware;
+	private $state;
+	private $next_middleware;
+	private $cache_middleware;
 
 	protected function setUp(): void {
 		// Create temporary cache directory
@@ -513,17 +513,17 @@ class CacheMiddlewareTest extends TestCase {
 }
 
 class MockClientState {
-	public string $event = '';
-	public ?Request $request = null;
-	public string $response_body_chunk = '';
+	public $event = '';
+	public $request = null;
+	public $response_body_chunk = '';
 }
 
 class MockMiddleware {
-	public bool $was_called = false;
-	public ?Request $last_request = null;
-	public ?Response $mock_response = null;
-	public bool $should_return_304 = false;
-	public bool $should_return_true_from_await = false;
+	public $was_called = false;
+	public $last_request = null;
+	public $mock_response = null;
+	public $should_return_304 = false;
+	public $should_return_true_from_await = false;
 
 	public function enqueue( Request $request ) {
 		$this->was_called = true;
