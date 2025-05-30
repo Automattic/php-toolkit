@@ -20,6 +20,12 @@ use WordPress\ByteStream\ReadStream\ByteReadStream;
 use WordPress\Filesystem\Filesystem;
 use WordPress\HttpClient\Client;
 
+class TestRunner extends \WordPress\Blueprints\Runner {
+	public function doCreateStepObject(string $stepType, array $data) {
+		return parent::createStepObject($stepType, $data);
+	}
+};
+
 class DataReferenceResolverTest extends TestCase {
 	/** @var Client&MockObject */
 	protected $client;
@@ -118,6 +124,93 @@ class DataReferenceResolverTest extends TestCase {
 		$reference = $this->getMockForAbstractClass( DataReference::class );
 		$this->expectException( Exception::class );
 		$this->resolver->resolve( $reference );
+	}
+
+	/**
+	 * @dataProvider runnerInvalidPathPrefixProvider
+	 */
+	public function testRunnerEnforcesPathPrefix($step, $invalidData) {
+		$config = new \WordPress\Blueprints\RunnerConfiguration([]);
+		$runner = new TestRunner($config);
+
+		// Invalid path should throw
+		$this->expectException(\InvalidArgumentException::class);
+		$this->expectExceptionMessageMatches('/must start with allowed prefix/');
+		$runner->doCreateStepObject($step, $invalidData);
+	}
+
+	public function runnerInvalidPathPrefixProvider() {
+		return [
+			// Plugins
+			[
+				'installPlugin',
+				[ 'source' => './wp-content/themes/my-theme.zip' ],
+			],
+			// Themes
+			[
+				'installTheme',
+				[ 'source' => './wp-content/plugins/my-plugin.zip' ],
+			],
+			[
+				'createPostTypes',
+				[ 'postTypes' => [ 'foo' => './wp-content/mu-plugins/foo.php' ] ],
+			],
+			// Content
+			[
+				'importContent',
+				[ 'content' => [ [ 'source' => './wp-content/plugins/my-plugin.php' ] ] ],
+			],
+			// Uploads
+			[
+				'importMedia',
+				[ 'media' => [ 'img.jpg' => './wp-content/plugins/img.jpg' ] ],
+			],
+		];
+	}
+	/**
+	 * @dataProvider runnerValidPathPrefixProvider
+	 */
+	public function testRunnerAcceptsValidPath($step, $validData) {
+		$config = new \WordPress\Blueprints\RunnerConfiguration([]);
+		$runner = new TestRunner($config);
+
+		// Valid path should not throw
+		try {
+			$runner->doCreateStepObject($step, $validData);
+			$this->assertTrue(true);
+		} catch (\InvalidArgumentException $e) {
+			$this->fail('Should not throw for valid path');
+		}
+
+	}
+
+	public function runnerValidPathPrefixProvider() {
+		return [
+			// Plugins
+			[
+				'installPlugin',
+				[ 'source' => './wp-content/plugins/my-plugin.zip' ],
+			],
+			// Themes
+			[
+				'installTheme',
+				[ 'source' => './wp-content/themes/my-theme.zip' ],
+			],
+			[
+				'createPostTypes',
+				[ 'postTypes' => [ 'books' => './wp-content/posts/books/post-type.json' ] ],
+			],
+			// Content
+			[
+				'importContent',
+				[ 'content' => [ [ 'source' => './wp-content/content/my-post.html' ] ] ],
+			],
+			// Uploads
+			[
+				'importMedia',
+				[ 'media' => [ 'img.jpg' => './wp-content/uploads/img.jpg' ] ],
+			],
+		];
 	}
 
 }

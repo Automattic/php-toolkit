@@ -111,7 +111,6 @@ class Runner {
 
 	public function __construct( RunnerConfiguration $configuration ) {
 		$this->configuration = $configuration;
-		$this->validateConfiguration( $configuration );
 
 		$this->client      = new Client();
 		$this->mainTracker = new Tracker();
@@ -193,6 +192,8 @@ class Runner {
 	}
 
 	public function run(): void {
+		$this->validateConfiguration( $this->configuration );
+
 		$tempRoot = wp_unix_sys_get_temp_dir() . '/wp-blueprints-runtime-' . uniqid();
 		// TODO: Are there cases where we should not have these permissions?
 		mkdir( $tempRoot, 0777, true );
@@ -639,7 +640,7 @@ class Runner {
 	 * @return mixed A Step object instance.
 	 * @throws InvalidArgumentException If the step type is unknown or data is invalid.
 	 */
-	private function createStepObject( string $stepType, array $data ) {
+	protected function createStepObject( string $stepType, array $data ) {
 		switch ( $stepType ) {
 			case 'activatePlugin':
 				return new ActivatePluginStep( $data['pluginPath'] );
@@ -650,29 +651,6 @@ class Runner {
 			case 'defineConstants':
 				return new DefineConstantsStep( $data['constants'] );
 			case 'importContent':
-				/**
-				 * Flatten the content declaration from
-				 *
-				 *     "content": [
-				 *         {
-				 *             "type": "posts",
-				 *             "source": [ "post1.html", "post2.html" ]
-				 *         }
-				 *     ]
-				 *
-				 * into
-				 *
-				 *     "content": [
-				 *         {
-				 *             "type": "posts",
-				 *             "source": "post1.html"
-				 *         },
-				 *         {
-				 *             "type": "posts",
-				 *             "source": "post2.html"
-				 *         }
-				 *     ]
-				 */
 				$content = [];
 				foreach($data['content'] as $contentDefinition) {
 					$source = $contentDefinition['source'];
@@ -681,32 +659,30 @@ class Runner {
 						$source = [$source];
 					}
 					foreach($source as $source_item) {
+						$ref = $this->createDataReference( $source_item, [ ExecutionContextPath::class ] );
+						// Content files must be in ./wp-content/content or subdirs
+						$this->assert_bundle_path_prefix($ref, './wp-content/content');
 						$content[] = array_merge(
 							$contentDefinition,
-							[ 'source' => $this->createDataReference( $source_item, [ ExecutionContextPath::class ] ) ]
+							[ 'source' => $ref ]
 						);
 					}
 				}
-
 				return new ImportContentStep( $content );
 			case 'importThemeStarterContent':
 				return new ImportThemeStarterContentStep( $data['themeSlug'] ?? null );
 			case 'installPlugin':
-				$source  = $this->createDataReference( $data['source'], [
-					ExecutionContextPath::class,
-					WordPressOrgPlugin::class,
-				] );
+				$source  = $this->createDataReference( $data['source'], [ ExecutionContextPath::class, WordPressOrgPlugin::class ] );
+				// Plugins must be in ./wp-content/plugins or subdirs
+				$this->assert_bundle_path_prefix($source, './wp-content/plugins');
 				$active  = $data['active'] ?? true;
 				$options = $data['activationOptions'] ?? null;
 				$onError = isset( $pluginDef['onError'] ) ? $pluginDef['onError'] : 'throw';
-
 				return new InstallPluginStep( $source, $active, $options, $onError );
 			case 'installTheme':
-				$source = $this->createDataReference( $data['source'], [
-					ExecutionContextPath::class,
-					WordPressOrgTheme::class,
-				] );
-
+				$source = $this->createDataReference( $data['source'], [ ExecutionContextPath::class, WordPressOrgTheme::class ] );
+				// Themes must be in ./wp-content/themes or subdirs
+				$this->assert_bundle_path_prefix($source, './wp-content/themes');
 				return new InstallThemeStep(
 					$source,
 					$data['active'] ?? false,
@@ -722,23 +698,20 @@ class Runner {
 			case 'rmdir':
 				return new RmDirStep( $data['path'] );
 			case 'runPHP':
-				return new RunPHPStep(
-					$this->createDataReference( $data['code'], [ ExecutionContextPath::class ] ),
-					$data['env'] ?? []
-				);
+				$ref = $this->createDataReference( [ 'filename' => 'run-php.php', 'content' => $data['code'] ] );
+				// Custom PHP code is not restricted by bundle spec
+				return new RunPHPStep( $ref, $data['env'] ?? [] );
 			case 'runSQL':
 				$source = $this->createDataReference( $data['source'], [ ExecutionContextPath::class ] );
+				// SQL files must be in ./wp-content/content or subdirs
+				$this->assert_bundle_path_prefix($source, './wp-content/content');
 				return new RunSqlStep( $source );
 			case 'setSiteLanguage':
 				return new SetSiteLanguageStep( $data['language'] );
 			case 'setSiteOptions':
 				return new SetSiteOptionsStep( $data['options'] );
-
 			case 'createRoles':
-				if ( empty( $data['roles'] ) || ! is_array( $data['roles'] ) ) {
-					throw new InvalidArgumentException( 'Invalid roles data: must be a non-empty array.' );
-				}
-
+				// No file resource
 				$code = '<?php
 				require_once(getenv("DOCROOT") . "/wp-load.php");
 				$roles = getenv("ROLES");
@@ -775,18 +748,12 @@ class Runner {
             ';
 
 				return new RunPHPStep(
-					$this->createDataReference( [
-						'filename' => 'create-roles.php',
-						'content'  => $code,
-					] ),
+					$this->createDataReference( [ 'filename' => 'create-roles.php', 'content' => $code ] ),
 					[ 'ROLES' => $data['roles'] ]
 				);
 
 			case 'createUsers':
-				if ( empty( $data['users'] ) || ! is_array( $data['users'] ) ) {
-					throw new InvalidArgumentException( 'Invalid users data: must be a non-empty array.' );
-				}
-
+				// No file resource
 				$code = '<?php
                 require_once(getenv("DOCROOT") . "/wp-load.php");
                 $users = getenv("USERS");
@@ -824,44 +791,36 @@ class Runner {
                 }';
 
 				return new RunPHPStep(
-					$this->createDataReference( [
-						'filename' => 'create-users.php',
-						'content'  => $code,
-					] ),
+					$this->createDataReference( [ 'filename' => 'create-users.php', 'content' => $code ] ),
 					[ 'USERS' => $data['users'] ]
 				);
 
 			case 'createPostTypes':
-				if ( empty( $data['postTypes'] ) || ! is_array( $data['postTypes'] ) ) {
-					throw new InvalidArgumentException( 'Invalid postTypes data: must be a non-empty array.' );
-				}
-
-				// @TODO: Do we need a separate step here? To make sure we're not overwriting existing post types?
-				//        Or would WriteFilesStep be enough, perhaps with a "no override" flag?
-				// @TODO: Install SCF and use it to register post types.
-
 				$files = [];
 				foreach ( $data['postTypes'] as $slug => $args ) {
 					if ( ! is_string( $slug ) || $slug === '' ) {
 						continue;
 					}
-
-					// Ensure $args is an array.
-					if ( ! is_array( $args ) ) {
-						$args = [];
+					// @TODO: Validate a full pattern – posts/<postType>/post-type.json
+					try {
+						$args_ref = $this->createDataReference($args, [ ExecutionContextPath::class ]);
+					} catch (InvalidArgumentException $e) {
+						$args_ref = InlineFile::from_blueprint_data([
+							'filename' => './wp-content/content/posts/' . $slug . '/post-type.json',
+							'content' => $args,
+						]);
 					}
-
-					// Build a safe file name for the MU-plugin.
+					$this->assert_bundle_path_prefix($args_ref, './wp-content/content/posts/');
 					$fileSlug   = preg_replace( '/[^a-z0-9\-]+/i', '-', strtolower( $slug ) );
 					$pluginPath = "wp-content/mu-plugins/blueprint-post-type-{$fileSlug}.php";
-
-					// Human-friendly default label.
 					$defaultLabel = addslashes( ucwords( str_replace( [ '-', '_' ], ' ', $slug ) ) );
 					if ( ! isset( $args['label'] ) ) {
 						$args['label'] = $defaultLabel;
 					}
 
-					// Compose the plugin source.
+					// @TODO: Create a new step class object for this and only resolve the post type definition
+					//        when it runs.
+					$post_type_definition = $args_ref->get_stream()->json();
 					$pluginCode = sprintf(
 						<<<'PHP'
 <?php
@@ -880,61 +839,62 @@ register_post_type(%1$s, %2$s);
 PHP
 						,
 						var_export( $slug, true ),
-						var_export( $args, true )
+						var_export( $args->resolve(), true )
 					);
-
-					$files[ $pluginPath ] = $this->createDataReference( [
-						'filename' => $pluginPath,
-						'content'  => $pluginCode,
-					] );
+					$ref = $this->createDataReference( [ 'filename' => $pluginPath, 'content' => $pluginCode ] );
+					$files[ $pluginPath ] = $ref;
 				}
-
 				if ( empty( $files ) ) {
 					throw new InvalidArgumentException( 'No valid post types to register.' );
 				}
-
 				return new WriteFilesStep( $files );
-
-			case 'runPHP':
-				return new RunPHPStep(
-					$this->createDataReference( [
-						'filename' => 'run-php.php',
-						'content'  => $data['code'],
-					] ),
-					$data['env'] ?? []
-				);
 			case 'unzip':
 				$zipFile = $this->createDataReference( $data['zipFile'], [ ExecutionContextPath::class ] );
-
+				// Unzipped files must be in ./wp-content/uploads or ./wp-content/content (by context)
+				$this->assert_bundle_path_prefix($zipFile, './wp-content/uploads');
 				return new UnzipStep( $zipFile, $data['extractToPath'] );
 			case 'wp-cli':
 				return new WPCLIStep( $data['command'], $data['wpCliPath'] ?? null );
 			case 'writeFiles':
 				$files = [];
 				foreach ( $data['files'] as $path => $content ) {
-					$files[ $path ] = $this->createDataReference( $content, [ ExecutionContextPath::class ] );
+					$ref = $this->createDataReference( $content, [ ExecutionContextPath::class ] );
+					// General files: restrict by path
+					if ( strpos( $path, 'wp-content/mu-plugins/' ) === 0 ) {
+						$this->assert_bundle_path_prefix($ref, './wp-content/mu-plugins');
+					} elseif ( strpos( $path, 'wp-content/plugins/' ) === 0 ) {
+						$this->assert_bundle_path_prefix($ref, './wp-content/plugins');
+					} elseif ( strpos( $path, 'wp-content/themes/' ) === 0 ) {
+						$this->assert_bundle_path_prefix($ref, './wp-content/themes');
+					} elseif ( strpos( $path, 'wp-content/languages/' ) === 0 ) {
+						$this->assert_bundle_path_prefix($ref, './wp-content/languages');
+					} elseif ( strpos( $path, 'wp-content/uploads/' ) === 0 ) {
+						$this->assert_bundle_path_prefix($ref, './wp-content/uploads');
+					} elseif ( strpos( $path, 'wp-content/content/' ) === 0 ) {
+						$this->assert_bundle_path_prefix($ref, './wp-content/content');
+					}
+					$files[ $path ] = $ref;
 				}
-
 				return new WriteFilesStep( $files );
 			case 'importMedia':
 				$media = [];
 				foreach ( $data['media'] as $path => $content ) {
 					if ( is_string( $content ) ) {
-						$media[ $path ] = MediaFileDefinition::fromArray( [
-							'source' => $this->createDataReference( $content, [ ExecutionContextPath::class ] ),
-						] );
+						$ref = $this->createDataReference( $content, [ ExecutionContextPath::class ] );
+						$this->assert_bundle_path_prefix($ref, './wp-content/uploads');
+						$media[ $path ] = MediaFileDefinition::fromArray( [ 'source' => $ref ] );
 						continue;
 					}
-
+					$ref = $this->createDataReference( $content['source'], [ ExecutionContextPath::class ] );
+					$this->assert_bundle_path_prefix($ref, './wp-content/uploads');
 					$media[ $path ] = MediaFileDefinition::fromArray( [
-						'source'      => $this->createDataReference( $content['source'], [ ExecutionContextPath::class ] ),
+						'source'      => $ref,
 						'title'       => $content['title'] ?? null,
 						'description' => $content['description'] ?? null,
 						'alt'         => $content['alt'] ?? null,
 						'caption'     => $content['caption'] ?? null,
 					] );
 				}
-
 				return new ImportMediaStep( $media );
 			default:
 				throw new InvalidArgumentException( "Unknown step type: {$stepType}" );
@@ -1035,5 +995,24 @@ PHP
 		}
 
 		return $results;
+	}
+
+	/**
+	 * Assert that an ExecutionContextPath-based DataReference starts with the allowed bundle prefix.
+	 * Throws InvalidArgumentException if not.
+	 *
+	 * @param DataReference $reference
+	 * @param string $allowed_prefix
+	 * @throws \InvalidArgumentException
+	 */
+	private function assert_bundle_path_prefix( $reference, string $allowed_prefix ) : void {
+		if ( $reference instanceof \WordPress\Blueprints\DataReference\ExecutionContextPath ) {
+			$path = $reference->get_path();
+			if ( strpos( $path, $allowed_prefix ) !== 0 ) {
+				throw new \InvalidArgumentException(
+					"ExecutionContextPath: Path '$path' must start with allowed prefix '$allowed_prefix' as per bundle spec."
+				);
+			}
+		}
 	}
 }
