@@ -2,7 +2,6 @@
 
 namespace WordPress\XML;
 
-use WP_HTML_Attribute_Token;
 use WP_HTML_Span;
 use WP_HTML_Text_Replacement;
 
@@ -81,9 +80,9 @@ use function WordPress\Encoding\utf8_codepoint_at;
  *
  * Example:
  *
- *     $tags = new XMLProcessor( $xml );
- *     if ( $tags->next_tag( 'wp:option' ) ) {
- *         $tags->set_attribute( 'selected', 'yes' );
+ *     $processor = XMLProcessor::create_from_string( $xml );
+ *     if ( $processor->next_tag( 'option' ) ) {
+ *         $processor->set_attribute( '', 'selected', 'yes' );
  *     }
  *
  * ### Finding tags
@@ -96,26 +95,39 @@ use function WordPress\Encoding\utf8_codepoint_at;
  *
  * If you want to _find whatever the next tag is_:
  *
- *     $tags->next_tag();
+ *     $processor->next_tag();
  *
- * | Goal                                                      | Query                                                                           |
- * |-----------------------------------------------------------|---------------------------------------------------------------------------------|
- * | Find any tag.                                             | `$tags->next_tag();`                                                            |
- * | Find next image tag.                                      | `$tags->next_tag( array( 'tag_name' => 'wp:image' ) );`                              |
- * | Find next image tag (without passing the array).          | `$tags->next_tag( 'wp:image' );`                                                     |
+ * | Goal                                                     | Query                                                    |
+ * |----------------------------------------------------------|----------------------------------------------------------|
+ * | Find any tag.                                            | `$processor->next_tag();`                                |
+ * | Find next image tag.                                     | `$processor->next_tag( array( 'tag_name' => 'image' ) );`|
+ * | Find next image tag (shorthand).                         | `$processor->next_tag( 'image' );`                       |
+ * | Find next image tag in the "wp.org" namespace.           | `$processor->next_tag( array( 'wp.org', 'image' ) );`    |
+ *
+ * #### Namespace Examples
+ *
+ * To work with namespaces, you can use the `breadcrumbs` query format, where each breadcrumb is a tuple of (namespace prefix, local name):
+ *
+ *     $xml = '<root xmlns:wp="http://wordpress.org/export/1.2/"><wp:image src="cat.jpg" /></root>';
+ *     $processor = XMLProcessor::create_from_string( $xml );
+ *     // Find the <wp:image> tag
+ *     if ( $processor->next_tag( array( 'http://wordpress.org/export/1.2/', 'image' ) ) ) {
+ *         // Get the namespace URI of the matched tag
+ *         $ns = $processor->get_tag_namespace(); // 'http://wordpress.org/export/1.2/'
+ *         // Get the value of the 'src' attribute
+ *         $src = $processor->get_attribute( $ns, 'src' );
+ *         // Set a new attribute in the same namespace
+ *         $processor->set_attribute( $ns, 'alt', 'A cat' );
+ *     }
  *
  * If a tag was found meeting your criteria then `next_tag()`
  * will return `true` and you can proceed to modify it. If it
- * returns `false`, however, it failed to find the tag and
- * moved the cursor to the end of the file.
+ * returns `false`, it failed to find the tag and moved the cursor to the end of the file.
  *
  * Once the cursor reaches the end of the file the processor
  * is done and if you want to reach an earlier tag you will
  * need to recreate the processor and start over, as it's
- * unable to back up or move in reverse.
- *
- * See the section on bookmarks for an exception to this
- * no-backing-up rule.
+ * unable to back up or move in reverse (except via bookmarks).
  *
  * #### Custom queries
  *
@@ -126,14 +138,15 @@ use function WordPress\Encoding\utf8_codepoint_at;
  *
  * Example:
  *
- *     // Paint up to the first five `wp:musician` or `wp:actor` tags marked with the "jazzy" style.
+ *     // Paint up to the first five `musician` or `actor` tags marked with the "jazzy" style.
  *     $remaining_count = 5;
- *     while ( $remaining_count > 0 && $tags->next_tag() ) {
+ *     while ( $remaining_count > 0 && $processor->next_tag() ) {
+ *         $tag = $processor->get_tag_local_name();
  *         if (
- *              ( 'wp:musician' === $tags->get_tag() || 'wp:actor' === $tags->get_tag() ) &&
- *              'jazzy' === $tags->get_attribute( 'data-style' )
+ *              ( 'musician' === $tag || 'actor' === $tag ) &&
+ *              'jazzy' === $processor->get_attribute( '', 'data-style' )
  *         ) {
- *             $tags->set_attribute( 'wp:theme-style', 'theme-style-everest-jazz' );
+ *             $processor->set_attribute( '', 'theme-style', 'theme-style-everest-jazz' );
  *             $remaining_count--;
  *         }
  *     }
@@ -159,7 +172,7 @@ use function WordPress\Encoding\utf8_codepoint_at;
  *
  * Example:
  *
- *     $processor = new XMLProcessor( 'This <wp:content is="a" partial="token' );
+ *     $processor = XMLProcessor::create_from_string( 'This <content is="a" partial="token' );
  *     false === $processor->next_tag();
  *
  * If a special element (see next section) is encountered but no closing tag
@@ -168,23 +181,23 @@ use function WordPress\Encoding\utf8_codepoint_at;
  *
  * Example:
  *
- *     $processor = new XMLProcessor( '<style>// there could be more styling to come' );
+ *     $processor = XMLProcessor::create_from_string( '<style>// there could be more styling to come' );
  *     false === $processor->next_tag();
  *
- *     $processor = new XMLProcessor( '<style>// this is everything</style><wp:content>' );
- *     true === $processor->next_tag( 'DIV' );
+ *     $processor = XMLProcessor::create_from_string( '<style>// this is everything</style><content>' );
+ *     true === $processor->next_tag( 'content' );
  *
  * #### Special elements
  *
  * All XML elements are handled in the same way, except when you mark
- * them as PCdata elements. These are special because their contents
- * is treated as text, even if it looks like XML tags.
+ * them as PCData elements. These are special because their contents
+ * are treated as text, even if it looks like XML tags.
  *
  * Example:
  *
- *    $processor = new XMLProcessor( '<root><wp:post-content>Text inside</input></wp:post-content><</root>' );
- *    $processor->declare_element_as_pcdata('wp:post-content');
- *    $processor->next_tag('wp:post-content');
+ *    $processor = XMLProcessor::create_from_string( '<root><post-content>Text inside</input></post-content></root>' );
+ *    $processor->declare_element_as_pcdata('post-content');
+ *    $processor->next_tag('post-content');
  *    $processor->next_token();
  *    echo $processor->get_modifiable_text(); // Text inside</input>
  *
@@ -197,9 +210,9 @@ use function WordPress\Encoding\utf8_codepoint_at;
  *
  * Example:
  *
- *     if ( $tags->next_tag( 'wp:user-group' ) ) {
- *         $tags->set_attribute( 'name', 'Content editors' );
- *         $tags->remove_attribute( 'data-test-id' );
+ *     if ( $processor->next_tag( 'user-group' ) ) {
+ *         $processor->set_attribute( '', 'name', 'Content editors' );
+ *         $processor->remove_attribute( '', 'data-test-id' );
  *     }
  *
  * If `set_attribute()` is called for an existing attribute it will
@@ -207,6 +220,18 @@ use function WordPress\Encoding\utf8_codepoint_at;
  * for a non-existing attribute has no effect on the document. Both
  * of these methods are safe to call without knowing if a given attribute
  * exists beforehand.
+ *
+ * #### Namespaced attribute example
+ * 
+ *     $processor = XMLProcessor::from_string( '<root xmlns:wp="http://wordpress.org/export/1.2/"><image /></root>' );
+ *
+ *     $ns = 'http://wordpress.org/export/1.2/';
+ *     if ( $processor->next_tag( 'image' ) ) {
+ *         $processor->set_attribute( $ns, 'src', 'cat.jpg' );
+ *     }
+ * 
+ *     echo $processor->get_modifiable_text();
+ *     // <root xmlns:wp="http://wordpress.org/export/1.2/"><image wp:src="cat.jpg" /></root>
  *
  * ### Bookmarks
  *
@@ -222,25 +247,24 @@ use function WordPress\Encoding\utf8_codepoint_at;
  * bookmark and update it frequently, such as within a loop.
  *
  *     $total_todos = 0;
- *     while ( $p->next_tag( array( 'tag_name' => 'wp:todo-list' ) ) ) {
- *         $p->set_bookmark( 'list-start' );
- *         while ( $p->next_tag( array( 'tag_closers' => 'visit' ) ) ) {
- *             if ( 'wp:todo' === $p->get_tag() && $p->is_tag_closer() ) {
- *                 $p->set_bookmark( 'list-end' );
- *                 $p->seek( 'list-start' );
- *                 $p->set_attribute( 'data-contained-todos', (string) $total_todos );
+ *     while ( $processor->next_tag( array( 'tag_name' => 'todo-list' ) ) ) {
+ *         $processor->set_bookmark( 'list-start' );
+ *         while ( $processor->next_tag() ) {
+ *             if ( 'todo' === $processor->get_tag_local_name() && $processor->is_tag_closer() ) {
+ *                 $processor->set_bookmark( 'list-end' );
+ *                 $processor->seek( 'list-start' );
+ *                 $processor->set_attribute( '', 'data-contained-todos', (string) $total_todos );
  *                 $total_todos = 0;
- *                 $p->seek( 'list-end' );
+ *                 $processor->seek( 'list-end' );
  *                 break;
  *             }
- *
- *             if ( 'wp:todo-item' === $p->get_tag() && ! $p->is_tag_closer() ) {
+ *             if ( 'todo-item' === $processor->get_tag_local_name() && ! $processor->is_tag_closer() ) {
  *                 $total_todos++;
  *             }
  *         }
  *     }
  *
- * ## Tokens and finer-grained processing.
+ * ## Tokens and finer-grained processing
  *
  * It's possible to scan through every lexical token in the
  * XML document using the `next_token()` function. This
@@ -256,21 +280,17 @@ use function WordPress\Encoding\utf8_codepoint_at;
  *              case '#text':
  *                  $text .= $processor->get_modifiable_text();
  *                  break;
- *
- *              case 'wp:new-line':
+ *              case 'new-line':
  *                  $text .= "\n";
  *                  break;
- *
- *              case 'wp:title':
+ *              case 'title':
  *                  $title = $processor->get_modifiable_text();
  *                  break;
  *          }
  *      }
  *      return trim( "# {$title}\n\n{$text}" );
  *
- * ### Tokens and _modifiable text_.
- *
- * #### Other tokens with modifiable text.
+ * ### Tokens and _modifiable text_
  *
  * There are also non-elements which are void/self-closing in nature and contain
  * modifiable text that is part of that individual syntax token itself.
@@ -288,7 +308,7 @@ use function WordPress\Encoding\utf8_codepoint_at;
  *
  * ## Design and limitations
  *
- * The Tag Processor is designed to linearly scan XML documents and tokenize
+ * The XMLProcessor is designed to linearly scan XML documents and tokenize
  * XML tags and their attributes. It's designed to do this as efficiently as
  * possible without compromising parsing integrity. Therefore it will be
  * slower than some methods of modifying XML, such as those incorporating
@@ -301,26 +321,26 @@ use function WordPress\Encoding\utf8_codepoint_at;
  *
  * The performance characteristics are maintained by avoiding tree construction.
  *
- * The Tag Processor's checks the most important aspects of XML integrity as it scans
- * through the document. It verifies that a single root element exists, that are
+ * The XMLProcessor checks the most important aspects of XML integrity as it scans
+ * through the document. It verifies that a single root element exists, that there are
  * no unclosed tags, and that each opener tag has a corresponding closer. It also
  * ensures no duplicate attributes exist on a single tag.
  *
- * At the same time, The Tag Processor also skips expensive validation of XML entities
- * in the document. The Tag Processor will initially pass through the invalid entity references
+ * At the same time, the XMLProcessor also skips expensive validation of XML entities
+ * in the document. The processor will initially pass through invalid entity references
  * and only fail when the developer attempts to read their value. If that doesn't happen,
  * the invalid values will be left untouched in the final document.
  *
- * Most operations within the Tag Processor are designed to minimize the difference
+ * Most operations within the XMLProcessor are designed to minimize the difference
  * between an input and output document for any given change. For example, the
- * `set_attribure` and `remove_attribute` methods preserve whitespace and the attribute
+ * `set_attribute` and `remove_attribute` methods preserve whitespace and the attribute
  * ordering within the element definition. An exception to this rule is that all attribute
  * updates store their values as double-quoted strings, meaning that attributes on input with
  * single-quoted or unquoted values will appear in the output with double-quotes.
  *
  * ### Text Encoding
  *
- * The Tag Processor assumes that the input XML document is encoded with a
+ * The XMLProcessor assumes that the input XML document is encoded with a
  * UTF-8 encoding and will refuse to process documents that declare other encodings.
  *
  * @since WP_VERSION
@@ -359,8 +379,8 @@ class XMLProcessor {
 	/**
 	 * Specifies mode of operation of the parser at any given time.
 	 *
-	 * | State           | Meaning                                                                |
-	 * | ----------------|------------------------------------------------------------------------|
+	 * | State             | Meaning                                                              |
+	 * | ------------------|----------------------------------------------------------------------|
 	 * | *Ready*           | The parser is ready to run.                                          |
 	 * | *Complete*        | There is nothing left to parse.                                      |
 	 * | *Incomplete*      | The XML ended in the middle of a token; nothing more can be parsed.  |
@@ -416,13 +436,13 @@ class XMLProcessor {
 	public $upstream_bytes_forgotten = 0;
 
 	/**
-	 * Byte offset in input document where current token starts.
+	 * Byte offset in the current `$xml` string where the currently recognized token starts.
+	 * `null` if no token is currently active.
 	 *
 	 * Example:
 	 *
-	 *     <wp:content id="test">...
-	 *     01234
-	 *     - token starts at 0
+	 *     <content id="test">...
+	 *     ^-- token_starts_at = 0
 	 *
 	 * @since WP_VERSION
 	 *
@@ -435,7 +455,7 @@ class XMLProcessor {
 	 *
 	 * Example:
 	 *
-	 *     <wp:content id="test">...
+	 *     <content id="test">...
 	 *     012345678901234
 	 *     - token length is 14 - 0 = 14
 	 *
@@ -450,11 +470,18 @@ class XMLProcessor {
 	private $token_length;
 
 	/**
+	 * Currently matched XML element object.
+	 *
+	 * @var XMLElement|null
+	 */
+	private $element;
+
+	/**
 	 * Byte offset in input document where current tag name starts.
 	 *
 	 * Example:
 	 *
-	 *     <wp:content id="test">...
+	 *     <content id="test">...
 	 *     01234
 	 *      - tag name starts at 1
 	 *
@@ -469,7 +496,7 @@ class XMLProcessor {
 	 *
 	 * Example:
 	 *
-	 *     <wp:content id="test">...
+	 *     <content id="test">...
 	 *     01234
 	 *      --- tag name length is 3
 	 *
@@ -498,7 +525,7 @@ class XMLProcessor {
 	private $text_length;
 
 	/**
-	 * Whether the current tag is an opening tag, e.g. <wp:content>, or a closing tag, e.g. </wp:content>.
+	 * Whether the current tag is an opening tag, e.g. <content>, or a closing tag, e.g. </content>.
 	 *
 	 * @var bool
 	 */
@@ -525,27 +552,34 @@ class XMLProcessor {
 	private $exception = null;
 
 	/**
-	 * Lazily-built index of attributes found within an XML tag, keyed by the attribute name.
+	 * Temporary index of attributes found within an XML tag, keyed by the qualified
+	 * attribute name. It is only used during the initial attributes parsing phase and
+	 * discarded once all the attributes have been parsed.
+	 *
+	 * @since WP_VERSION
+	 * @var XMLAttributeToken[]
+	 */
+	private $qualified_attributes = array();
+
+	/**
+	 * Stores the attributes found within an XML tag, keyed by their namespace
+	 * and local name combination.
 	 *
 	 * Example:
 	 *
-	 *     // Supposing the parser is working through this content
-	 *     // and stops after recognizing the `id` attribute.
-	 *     // <wp:content id="test-4" class=outline title="data:text/plain;base64=asdk3nk1j3fo8">
-	 *     //                 ^ parsing will continue from this point.
+	 *     // Supposing the parser just finished parsing the wp:content tag:
+	 *     // <channel xmlns:wp="http://wordpress.org/export/1.2/">
+	 *     //   <wp:content wp:id="test-4" class="outline">
+	 *     // </channel>
+	 *     //
+	 *     // Then, the attributes array would be:
 	 *     $this->attributes = array(
-	 *         'id' => new WP_HTML_Attribute_Token( 'id', 9, 6, 5, 11, false )
-	 *     );
-	 *
-	 *     // When picking up parsing again, or when asking to find the
-	 *     // `class` attribute we will continue and add to this array.
-	 *     $this->attributes = array(
-	 *         'id'    => new WP_HTML_Attribute_Token( 'id', 9, 6, 5, 11, false ),
-	 *         'class' => new WP_HTML_Attribute_Token( 'class', 23, 7, 17, 13, false )
+	 *         '{http://wordpress.org/export/1.2/}id' => new XMLAttributeToken( 9, 6, 5, 14, 'wp', 'id' ),
+	 *         'class' => new XMLAttributeToken( 23, 7, 17, 13, '', 'class', '' )
 	 *     );
 	 *
 	 * @since WP_VERSION
-	 * @var WP_HTML_Attribute_Token[]
+	 * @var XMLAttributeToken[]
 	 */
 	private $attributes = array();
 
@@ -701,19 +735,17 @@ class XMLProcessor {
 	protected $parser_context = self::IN_PROLOG_CONTEXT;
 
 	/**
-	 * Tracks open elements while scanning XML.
-	 *
-	 * @since WP_VERSION
-	 *
-	 * @var string[]
+	 * Top-level namespaces for the currently parsed document.
 	 */
-	public $stack_of_open_elements = array();
+	private $document_namespaces;
 
 	/**
-	 *
+	 * Tracks open elements and their namespaces while scanning XML.
 	 */
-	public static function create_from_string( $xml, $cursor = null, $known_definite_encoding = 'UTF-8' ) {
-		$processor = static::create_for_streaming( $xml, $cursor, $known_definite_encoding );
+	private $stack_of_open_elements = [];
+
+	public static function create_from_string( $xml, $cursor = null, $known_definite_encoding = 'UTF-8', $document_namespaces = array() ) {
+		$processor = static::create_for_streaming( $xml, $cursor, $known_definite_encoding, $document_namespaces );
 		if ( null === $processor ) {
 			return false;
 		}
@@ -722,11 +754,11 @@ class XMLProcessor {
 		return $processor;
 	}
 
-	public static function create_for_streaming( $xml = '', $cursor = null, $known_definite_encoding = 'UTF-8' ) {
+	public static function create_for_streaming( $xml = '', $cursor = null, $known_definite_encoding = 'UTF-8', $document_namespaces = array() ) {
 		if ( 'UTF-8' !== $known_definite_encoding ) {
 			return false;
 		}
-		$processor = new XMLProcessor( $xml, self::CONSTRUCTOR_UNLOCK_CODE );
+		$processor = new XMLProcessor( $xml, $document_namespaces, self::CONSTRUCTOR_UNLOCK_CODE );
 		if ( null !== $cursor && true !== $processor->initialize_from_cursor( $cursor ) ) {
 			return false;
 		}
@@ -749,14 +781,20 @@ class XMLProcessor {
 	 * `set_bookmark()` and `seek()`.
 	 */
 	public function get_reentrancy_cursor() {
+		$stack_of_open_elements = [];
+		foreach ( $this->stack_of_open_elements as $element ) {
+			$stack_of_open_elements[] = $element->to_array();
+		}
+
 		return base64_encode(
 			json_encode(
 				array(
 					'is_finished'              => $this->is_finished(),
 					'upstream_bytes_forgotten' => $this->upstream_bytes_forgotten,
 					'parser_context'           => $this->parser_context,
-					'stack_of_open_elements'   => $this->stack_of_open_elements,
+					'stack_of_open_elements'   => $stack_of_open_elements,
 					'expecting_more_input'     => $this->expecting_more_input,
+					'document_namespaces'      => $this->document_namespaces
 				)
 			)
 		);
@@ -801,9 +839,13 @@ class XMLProcessor {
 		// Assume the input stream will start from the last known byte offset.
 		$this->bytes_already_parsed     = 0;
 		$this->upstream_bytes_forgotten = $cursor['upstream_bytes_forgotten'];
-		$this->stack_of_open_elements   = $cursor['stack_of_open_elements'];
-		$this->parser_context           = $cursor['parser_context'];
-		$this->expecting_more_input     = $cursor['expecting_more_input'];
+		$this->stack_of_open_elements   = [];
+		foreach ( $cursor['stack_of_open_elements'] as $element ) {
+			array_push( $this->stack_of_open_elements, XMLElement::from_array( $element ) );
+		}
+		$this->document_namespaces  = $cursor['document_namespaces'];
+		$this->parser_context       = $cursor['parser_context'];
+		$this->expecting_more_input = $cursor['expecting_more_input'];
 
 		return true;
 	}
@@ -824,7 +866,7 @@ class XMLProcessor {
 	 *
 	 * @see XMLProcessor::create_fragment()
 	 */
-	protected function __construct( $xml, $use_the_static_create_methods_instead = null ) {
+	protected function __construct( $xml, $document_namespaces=[], $use_the_static_create_methods_instead = null ) {
 		if ( self::CONSTRUCTOR_UNLOCK_CODE !== $use_the_static_create_methods_instead ) {
 			_doing_it_wrong(
 				__METHOD__,
@@ -836,7 +878,16 @@ class XMLProcessor {
 				'6.4.0'
 			);
 		}
-		$this->xml = $xml;
+		$this->xml                    = $xml;
+		$this->document_namespaces    = array_merge(
+			$document_namespaces,
+			// These initial namespaces cannot be overridden.
+			array(
+				'xml'   => 'http://www.w3.org/XML/1998/namespace', // Predefined, cannot be unbound or changed
+				'xmlns' => 'http://www.w3.org/2000/xmlns/',        // Reserved for xmlns attributes, not a real namespace for elements/attributes
+				''      => '', // Default namespace is initially empty (no namespace)
+			)
+		);
 	}
 
 	/**
@@ -872,21 +923,12 @@ class XMLProcessor {
 	}
 
 	/**
-	 * Indicates that all the XML document bytes have been provided.
-	 *
-	 * After calling this method, the processor will emit errors where
-	 * previously it would have entered the STATE_INCOMPLETE_INPUT state.
+	 * Forgets the XML bytes that have been processed and are no longer needed to
+	 * avoid high memory usage.
+	 * 
+	 * @return string The flushed bytes.
 	 */
-	public function input_finished() {
-		$this->expecting_more_input = false;
-		$this->parser_state         = self::STATE_READY;
-	}
-
-	public function is_expecting_more_input() {
-		return $this->expecting_more_input;
-	}
-
-	public function flush_processed_xml() {
+	private function flush_processed_xml() {
 		// Flush updates
 		$this->get_updated_xml();
 
@@ -913,6 +955,28 @@ class XMLProcessor {
 		$this->upstream_bytes_forgotten += $unreferenced_bytes;
 
 		return $flushed_bytes;
+	}
+
+	/**
+	 * Indicates that all the XML document bytes have been provided.
+	 *
+	 * After calling this method, the processor will emit errors where
+	 * previously it would have entered the STATE_INCOMPLETE_INPUT state.
+	 */
+	public function input_finished() {
+		$this->expecting_more_input = false;
+		$this->parser_state         = self::STATE_READY;
+	}
+
+	/**
+	 * Indicates if the processor is expecting more data bytes.
+	 * If not, the processor will expect the remaining XML bytes to form
+	 * a valid document and will not stop on incomplete input.
+	 * 
+	 * @return bool Whether the processor is expecting more data bytes.
+	 */
+	public function is_expecting_more_input() {
+		return $this->expecting_more_input;
 	}
 
 	/**
@@ -1035,6 +1099,136 @@ class XMLProcessor {
 		$this->bytes_already_parsed = $tag_ends_at + 1;
 		$this->token_length         = $this->bytes_already_parsed - $this->token_starts_at;
 
+		/**
+		 * Resolve the namespaces defined in opening tags.
+		 */
+		if ( ! $this->is_closing_tag ) {
+			/**
+			 * By default, inherit all namespaces from the parent element.
+			 */
+			$namespaces = $this->get_tag_namespaces_in_scope();
+			foreach ( $this->qualified_attributes as $attribute ) {
+				/**
+				 * xmlns attribute is the default namespace
+				 * xmlns:<prefix> declares a namespace prefix scoped to the current element and its descendants
+				 *
+				 * @see https://www.w3.org/TR/2006/REC-xml-names11-20060816/#ns-decl
+				 */
+				if ( 'xmlns' === $attribute->qualified_name ) {
+					$value          = $this->get_qualified_attribute( $attribute->qualified_name );
+					// Update the default namespace.
+					$namespaces[''] = $value;
+					continue;
+				}
+
+				if ( 'xmlns' === $attribute->namespace_prefix ) {
+					$value = $this->get_qualified_attribute( $attribute->qualified_name );
+
+					/**
+					 * @see https://www.w3.org/TR/2006/REC-xml-names11-20060816/#xmlReserved
+					 */
+					if ( 'xml' === $attribute->namespace_prefix && 'http://www.w3.org/XML/1998/namespace' !== $value ) {
+						$this->bail( 'The `xml` namespace prefix is by definition bound to the namespace name http://www.w3.org/XML/1998/namespace and must not be overridden.',
+							self::ERROR_SYNTAX );
+
+						return false;
+					}
+					/**
+					 * The attribute value in a namespace declaration for a prefix MAY be empty.
+					 * This has the effect, within the scope of the declaration, of removing any
+					 * association of the prefix with a namespace name. Further declarations MAY
+					 * re-declare the prefix again.
+					 */
+					if ( '' === $value ) {
+						unset( $namespaces[ $attribute->namespace_prefix ] );
+						continue;
+					}
+
+					$namespaces[ $attribute->local_name ] = $value;
+					continue;
+				}
+			}
+
+			/**
+			 * Confirm the tag name is valid with respect to XML namespaces.
+			 * @see https://www.w3.org/TR/2006/REC-xml-names11-20060816/#Conformance
+			 */
+			$tag_name = $this->get_tag_name_qualified();
+			if ( false === $this->validate_qualified_name( $tag_name ) ) {
+				return false;
+			}
+
+			list( $tag_namespace_prefix, $tag_local_name ) = $this->parse_qualified_name( $tag_name );
+
+			/**
+			 * Validate the element namespace.
+			 */
+			if ( ! array_key_exists( $tag_namespace_prefix, $namespaces ) ) {
+				$this->bail(
+					sprintf(
+						'Namespace prefix "%s" does not resolve to any namespace in the current element\'s scope.',
+						$tag_namespace_prefix
+					),
+					self::ERROR_SYNTAX
+				);
+			}
+
+			/**
+			 * Compute fully qualified attributes and assert:
+			 *
+			 * * All attributes have valid namespaces.
+			 * * No two attributes have the same (local name, namespace) pair.
+			 *
+			 * @see https://www.w3.org/TR/2006/REC-xml-names11-20060816/#uniqAttrs
+			 */
+			$namespaced_attributes = array();
+			foreach ( $this->qualified_attributes as $attribute ) {
+				list( $attribute_namespace_prefix, $attribute_local_name ) = $this->parse_qualified_name( $attribute->qualified_name );
+				if ( ! array_key_exists( $attribute_namespace_prefix, $namespaces ) ) {
+					$this->bail(
+						sprintf(
+							'Attribute "%s" has an invalid namespace prefix "%s".',
+							$attribute->qualified_name,
+							$attribute_namespace_prefix
+						),
+						self::ERROR_SYNTAX
+					);
+
+					return false;
+				}
+				$namespace_reference = $attribute_namespace_prefix ? $namespaces[ $attribute_namespace_prefix ] : '';
+
+				/**
+				 * It looks supicious but it's safe – $local_name is guaranteed to not contain
+				 * curly braces at this point.
+				 */
+				$attribute_full_name = $namespace_reference ? '{' . $namespace_reference . '}' . $attribute_local_name : $attribute_local_name;
+				if ( isset( $namespaced_attributes[ $attribute_full_name ] ) ) {
+					$this->bail(
+						sprintf(
+							'Duplicate attribute "%s" with namespace "%s" found in the same element.',
+							$attribute_local_name,
+							$namespace_reference
+						),
+						self::ERROR_SYNTAX
+					);
+
+					return false;
+				}
+				$namespaced_attributes[ $attribute_full_name ] = $attribute;
+				$attribute->namespace = $namespace_reference;
+			}
+
+			// Store attributes with their namespaces and discard the temporary
+			// qualified attributes array.
+			$this->attributes = $namespaced_attributes;
+			$this->qualified_attributes = array();
+
+			$this->element = new XMLElement( $tag_local_name, $tag_namespace_prefix, $namespaces[ $tag_namespace_prefix ], $namespaces );
+			// Closers assume $this->element is the element created for the opener.
+			// @see step_in_element
+		}
+
 		/*
 		 * If we are in a PCData element, everything until the closer
 		 * is considered text.
@@ -1052,9 +1246,9 @@ class XMLProcessor {
 		$tag_name_starts_at = $this->tag_name_starts_at;
 		$tag_name_length    = $this->tag_name_length;
 		$tag_ends_at        = $this->token_starts_at + $this->token_length;
-		$attributes         = $this->attributes;
+		$attributes         = $this->qualified_attributes;
 
-		$found_closer = $this->skip_pcdata( $this->get_tag() );
+		$found_closer = $this->skip_pcdata( $this->get_tag_local_name() );
 
 		// Closer not found, the document is incomplete.
 		if ( false === $found_closer ) {
@@ -1077,9 +1271,72 @@ class XMLProcessor {
 		$this->text_length        = $this->tag_name_starts_at - $this->text_starts_at;
 		$this->tag_name_starts_at = $tag_name_starts_at;
 		$this->tag_name_length    = $tag_name_length;
-		$this->attributes         = $attributes;
+		$this->qualified_attributes         = $attributes;
 
 		return true;
+	}
+
+	private function get_tag_namespaces_in_scope() {
+		$top = $this->top_element();
+		if ( null === $top ) {
+			// Namespaces defined by default in every XML document.
+			return $this->document_namespaces;
+		}
+		return $top->namespaces_in_scope;
+	}
+
+	/**
+	 * Returns the namespace prefix of the matched tag or, when the $namespace
+	 * argument is given, the prefix of the requested fully-qualified namespace .
+	 *
+	 * Examples:
+	 *
+	 *     $p = new XMLProcessor( '<wp:content xmlns:xhtml="http://www.w3.org/1999/xhtml">Test</wp:content>' );
+	 *     $p->next_tag() === true;
+	 *     $p->get_tag_namespace_prefix() === 'xhtml';
+	 * 
+	 *     $p = new XMLProcessor( '
+	 *         <wp:content 
+	 *             xmlns:xhtml="http://www.w3.org/1999/xhtml"
+	 *             xmlns:wp="http://wordpress.org/export/1.2/"
+	 *         >
+	 *             Test
+	 *         </wp:content>
+	 *     ' );
+	 *     $p->next_tag() === true;
+	 *     $p->get_tag_namespace_prefix('http://wordpress.org/export/1.2/') === 'wp';
+	 *
+	 * @internal
+	 * @param string|null $namespace Fully-qualified namespace to return the prefix for.
+	 * @return string|null The namespace prefix of the matched tag, or null if not available.
+	 */
+	private function get_tag_namespace_prefix($namespace=null) {
+		if ( null === $namespace ) {
+			if ( self::STATE_MATCHED_TAG !== $this->parser_state ) {
+				return null;
+			}
+			return $this->element->namespace_prefix;
+		} else {
+			$namespaces_in_scope = $this->get_tag_namespaces_in_scope();
+			foreach($namespaces_in_scope as $prefix => $uri) {
+				if($uri === $namespace) {
+					return $prefix;
+				}
+			}
+			return false;
+		}
+	}
+
+	/**
+	 * Returns the top XMLElement on the stack without removing it.
+	 *
+	 * @return XMLElement|null Returns the top element, or null if stack is empty.
+	 */
+	private function top_element() {
+		if ( empty( $this->stack_of_open_elements ) ) {
+			return null;
+		}
+		return $this->stack_of_open_elements[ count( $this->stack_of_open_elements ) - 1 ];
 	}
 
 	/**
@@ -1146,7 +1403,7 @@ class XMLProcessor {
 	 *     $p = new XMLProcessor( $xml );
 	 *     $in_list = false;
 	 *     while ( $p->next_tag( array( 'tag_closers' => $in_list ? 'visit' : 'skip' ) ) ) {
-	 *         if ( 'UL' === $p->get_tag() ) {
+	 *         if ( 'UL' === $p->get_qualified_tag() ) {
 	 *             if ( $p->is_tag_closer() ) {
 	 *                 $in_list = false;
 	 *                 $p->set_bookmark( 'resume' );
@@ -1161,7 +1418,7 @@ class XMLProcessor {
 	 *             }
 	 *         }
 	 *
-	 *         if ( 'LI' === $p->get_tag() ) {
+	 *         if ( 'LI' === $p->get_qualified_tag() ) {
 	 *             $p->set_bookmark( 'last-li' );
 	 *         }
 	 *     }
@@ -1270,8 +1527,8 @@ class XMLProcessor {
 			/*
 			 * Ensure that the tag name terminates to avoid matching on
 			 * substrings of a longer tag name. For example, the sequence
-			 * "</wp:contentrug" should not match for "</wp:content" even
-			 * though "wp:content" is found within the text.
+			 * "</contentrug" should not match for "</content" even
+			 * though "content" is found within the text.
 			 */
 			if ( $at >= strlen( $xml ) ) {
 				return false;
@@ -1298,7 +1555,7 @@ class XMLProcessor {
 	 *
 	 * Example
 	 *
-	 *     $processor = XMLProcessor::create_fragment( '<wp:content invalid-attr></wp:content>' );
+	 *     $processor = XMLProcessor::create_fragment( '<content invalid-attr></content>' );
 	 *     false === $processor->next_tag();
 	 *     XMLProcessor::ERROR_SYNTAX === $processor->get_last_error();
 	 *
@@ -1380,6 +1637,8 @@ class XMLProcessor {
 	 *      $processor->get_modifiable_text();
 	 *
 	 * @param  string  $element_name  The name of the element to declare as PCDATA.
+	 * 
+	 * @TODO: Reconsider whether this method is needed.
 	 *
 	 * @return void
 	 */
@@ -1395,7 +1654,7 @@ class XMLProcessor {
 	 *
 	 */
 	public function is_pcdata_element() {
-		return array_key_exists( $this->get_tag(), $this->pcdata_elements );
+		return array_key_exists( $this->get_tag_local_name(), $this->pcdata_elements );
 	}
 
 
@@ -1420,8 +1679,8 @@ class XMLProcessor {
 	 * @since WP_VERSION
 	 *
 	 */
-	public function next_tag( $query = null ) {
-		if ( null === $query ) {
+	public function next_tag( $query_or_ns = null, $null_or_local_name = null ) {
+		if ( null === $query_or_ns && null === $null_or_local_name ) {
 			while ( $this->step() ) {
 				if ( '#tag' !== $this->get_token_type() ) {
 					continue;
@@ -1435,8 +1694,14 @@ class XMLProcessor {
 			return false;
 		}
 
-		if ( is_string( $query ) ) {
-			$query = array( 'breadcrumbs' => array( $query ) );
+		if ( is_string( $query_or_ns ) ) {
+			if ( is_string( $null_or_local_name ) ) {
+				$query = array( 'breadcrumbs' => array( array( $query_or_ns, $null_or_local_name ) ) );
+			} else {
+				$query = array( 'breadcrumbs' => array( array( '', $query_or_ns ) ) );
+			}
+		} else {
+			$query = $query_or_ns;
 		}
 
 		if ( ! is_array( $query ) ) {
@@ -1447,6 +1712,10 @@ class XMLProcessor {
 			);
 
 			return false;
+		}
+
+		if ( array_keys($query) === array(0, 1) && is_string($query[0]) && is_string($query[1]) ) {
+			$query = array( 'breadcrumbs' => array( $query ) );
 		}
 
 		if ( ! ( array_key_exists( 'breadcrumbs', $query ) && is_array( $query['breadcrumbs'] ) ) ) {
@@ -1473,7 +1742,22 @@ class XMLProcessor {
 			return false;
 		}
 
-		$breadcrumbs  = $query['breadcrumbs'];
+
+		$namespaced_breadcrumbs = array();
+		foreach($query['breadcrumbs'] as $breadcrumb) {
+			if(is_array($breadcrumb) && count($breadcrumb) === 2) {
+				$namespaced_breadcrumbs[] = $breadcrumb;
+			} else if(is_string($breadcrumb)) {
+				$namespaced_breadcrumbs[] = array('', $breadcrumb);
+			} else {
+				_doing_it_wrong(
+					__METHOD__,
+					__( 'Breadcrumbs must be an array of strings or two-tuples of (namespace, local name).' ),
+					'WP_VERSION'
+				);
+			}
+		}
+		$breadcrumbs  = $namespaced_breadcrumbs;
 		$match_offset = isset( $query['match_offset'] ) ? (int) $query['match_offset'] : 1;
 
 		while ( $match_offset > 0 && $this->step() ) {
@@ -1842,7 +2126,7 @@ class XMLProcessor {
 				'm' === $xml[ $at + 3 ] &&
 				'l' === $xml[ $at + 4 ]
 			) {
-				// Setting the parser state early for the get_attribute() calls later in this
+				// Setting the parser state early for the get_attribute_by_qualified_name() calls later in this
 				// branch.
 				$this->parser_state = self::STATE_XML_DECLARATION;
 
@@ -1873,14 +2157,16 @@ class XMLProcessor {
 					return false;
 				}
 
-				foreach ( $this->attributes as $name => $attribute ) {
+				foreach ( $this->qualified_attributes as $name => $attribute ) {
 					if ( 'version' !== $name && 'encoding' !== $name && 'standalone' !== $name ) {
 						$this->bail( 'Invalid attribute found in XML declaration.', self::ERROR_SYNTAX );
+						return false;
 					}
 				}
 
-				if ( '1.0' !== $this->get_attribute( 'version' ) ) {
+				if ( '1.0' !== $this->get_qualified_attribute( 'version' ) ) {
 					$this->bail( 'Unsupported XML version declared', self::ERROR_UNSUPPORTED );
+					return false;
 				}
 
 				/**
@@ -1889,15 +2175,18 @@ class XMLProcessor {
 				 *
 				 * See https://www.w3.org/TR/xml/#sec-predefined-ent.
 				 */
-				if ( null !== $this->get_attribute( 'encoding' )
-				     && 'UTF-8' !== strtoupper( $this->get_attribute( 'encoding' ) )
+				if ( null !== $this->get_qualified_attribute( 'encoding' )
+				     && 'UTF-8' !== strtoupper( $this->get_qualified_attribute( 'encoding' ) )
 				) {
 					$this->bail( 'Unsupported XML encoding declared, only UTF-8 is supported.', self::ERROR_UNSUPPORTED );
+					return false;
 				}
-				if ( null !== $this->get_attribute( 'standalone' )
-				     && 'YES' !== strtoupper( $this->get_attribute( 'standalone' ) )
+
+				if ( null !== $this->get_qualified_attribute( 'standalone' )
+				     && 'YES' !== strtoupper( $this->get_qualified_attribute( 'standalone' ) )
 				) {
 					$this->bail( 'Standalone XML documents are not supported.', self::ERROR_UNSUPPORTED );
+					return false;
 				}
 
 				$at = $this->bytes_already_parsed;
@@ -1912,6 +2201,7 @@ class XMLProcessor {
 					'>' === $xml[ $at + 1 ]
 				) ) {
 					$this->bail( 'XML declaration closer not found.', self::ERROR_SYNTAX );
+					return false;
 				}
 
 				$this->token_length         = $at + 2 - $this->token_starts_at;
@@ -1919,6 +2209,12 @@ class XMLProcessor {
 				$this->text_length          = $at - $this->text_starts_at;
 				$this->bytes_already_parsed = $at + 2;
 				$this->parser_state         = self::STATE_XML_DECLARATION;
+
+				// Processing instructions don't have namespaces. We can just
+				// copy the qualified attributes to the attributes array without
+				// resolving anything.
+				$this->attributes           = $this->qualified_attributes;
+				$this->qualified_attributes = array();
 
 				return true;
 			}
@@ -2029,12 +2325,12 @@ class XMLProcessor {
 		}
 
 		$attribute_start       = $this->bytes_already_parsed;
-		$attribute_name_length = $this->parse_name( $this->bytes_already_parsed );
-		if ( 0 === $attribute_name_length ) {
+		$attribute_qname_length = $this->parse_name( $this->bytes_already_parsed );
+		if ( 0 === $attribute_qname_length ) {
 			$this->bail( 'Invalid attribute name encountered.', self::ERROR_SYNTAX );
 		}
-		$this->bytes_already_parsed += $attribute_name_length;
-		$attribute_name             = substr( $this->xml, $attribute_start, $attribute_name_length );
+		$this->bytes_already_parsed += $attribute_qname_length;
+		$attribute_qname             = substr( $this->xml, $attribute_start, $attribute_qname_length );
 		$this->skip_whitespace();
 
 		// Parse attribute value.
@@ -2091,17 +2387,37 @@ class XMLProcessor {
 			return true;
 		}
 
-		if ( array_key_exists( $attribute_name, $this->attributes ) ) {
+		if ( array_key_exists( $attribute_qname, $this->qualified_attributes ) ) {
 			$this->bail( 'Duplicate attribute found in an XML tag.', self::ERROR_SYNTAX );
 		}
 
-		$this->attributes[ $attribute_name ] = new WP_HTML_Attribute_Token(
-			$attribute_name,
+		/**
+		 * Confirm the tag name is valid with respect to XML namespaces.
+		 * @see https://www.w3.org/TR/2006/REC-xml-names11-20060816/#Conformance
+		 */
+		if ( false === $this->validate_qualified_name( $attribute_qname ) ) {
+			return false;
+		}
+
+		/**
+		 * We must compute the namespace prefix and local name for each attribute
+		 * to assert there are no duplicate (local name, namespace) pairs in any
+		 * element. Note we must still keep track of string indices to support
+		 * replacements.
+		 */
+		list( $namespace_prefix, $local_name ) = $this->parse_qualified_name( $attribute_qname );
+
+		$this->qualified_attributes[ $attribute_qname ] = new XMLAttributeToken(
 			$value_start,
 			$value_length,
 			$attribute_start,
 			$attribute_end - $attribute_start,
-			false
+			$namespace_prefix,
+			$local_name
+			/**
+			 * The full namespace is resolved in parse_next_token() once
+			 * all the attributes have been consumed.
+			 */
 		);
 
 		return true;
@@ -2293,6 +2609,7 @@ class XMLProcessor {
 			unset( $this->lexical_updates[ $name ] );
 		}
 
+		$this->element            = null;
 		$this->token_starts_at    = null;
 		$this->token_length       = null;
 		$this->tag_name_starts_at = null;
@@ -2303,6 +2620,7 @@ class XMLProcessor {
 		$this->pubid_literal      = null;
 		$this->system_literal     = null;
 		$this->attributes         = array();
+		$this->qualified_attributes = array();
 	}
 
 	/**
@@ -2573,22 +2891,26 @@ class XMLProcessor {
 	 *
 	 * Example:
 	 *
-	 *     $p = new XMLProcessor( '<wp:content enabled class="test" data-test-id="14">Test</wp:content>' );
+	 *     $p = new XMLProcessor(
+	 *        '<root xmlns:wp="http://www.w3.org/1999/xhtml">
+	 *            <content enabled="true" class="test" data-test-id="14" wp:enabled="true">Test</content>
+	 *         </root>'
+	 *     );
 	 *     $p->next_tag( array( 'class_name' => 'test' ) ) === true;
-	 *     $p->get_attribute( 'data-test-id' ) === '14';
-	 *     $p->get_attribute( 'enabled' ) === true;
+	 *     $p->get_attribute( '', 'data-test-id' ) === '14';
+	 *     $p->get_attribute( '', 'enabled' ) === "true";
+	 *     $p->get_attribute( 'wp', 'enabled' ) === null;
+	 *     $p->get_attribute( 'http://www.w3.org/1999/xhtml', 'enabled' ) === "true";
 	 *     $p->get_attribute( 'aria-label' ) === null;
 	 *
-	 *     $p->next_tag() === false;
-	 *     $p->get_attribute( 'class' ) === null;
-	 *
-	 * @param  string  $name  Name of attribute whose value is requested.
+	 * @param  string  $namespace_reference  Full namespace of the requested attribute, e.g. "http://wordpress.org/export/1.2/"
+	 * @param  string  $local_name           Name of attribute whose value is requested, e.g. data-test-id
 	 *
 	 * @return string|true|null Value of attribute or `null` if not available. Boolean attributes return `true`.
 	 * @since WP_VERSION
 	 *
 	 */
-	public function get_attribute( $name ) {
+	public function get_attribute( $namespace_reference, $local_name ) {
 		if (
 			self::STATE_MATCHED_TAG !== $this->parser_state &&
 			self::STATE_XML_DECLARATION !== $this->parser_state
@@ -2596,17 +2918,19 @@ class XMLProcessor {
 			return null;
 		}
 
+		$full_name = $namespace_reference ? '{' . $namespace_reference . '}' . $local_name : $local_name;
+
 		// Return any enqueued attribute value updates if they exist.
-		$enqueued_value = $this->get_enqueued_attribute_value( $name );
+		$enqueued_value = $this->get_enqueued_attribute_value( $full_name );
 		if ( false !== $enqueued_value ) {
 			return $enqueued_value;
 		}
 
-		if ( ! isset( $this->attributes[ $name ] ) ) {
+		if ( ! isset( $this->attributes[ $full_name ] ) ) {
 			return null;
 		}
 
-		$attribute = $this->attributes[ $name ];
+		$attribute = $this->attributes[ $full_name ];
 		$raw_value = substr( $this->xml, $attribute->value_starts_at, $attribute->value_length );
 
 		$decoded = XMLDecoder::decode( $raw_value );
@@ -2631,25 +2955,86 @@ class XMLProcessor {
 	}
 
 	/**
-	 * Gets names of all attributes matching a given prefix in the current tag.
+	 * Gets a value from a qualified attribute name if it exists in the
+	 * matched tag.
 	 *
-	 * Note that matching is case-sensitive. This is in accordance with the spec.
+	 * It's for internal use only to source values of raw attributes
+	 * after they're parsed but before the namespaces are resolved.
 	 *
-	 * Example:
+	 * @param string $qname The qualified attribute name.
+	 * @return string|null The attribute value, or null if not found.
+	 */
+	private function get_qualified_attribute( $qname ) {
+		if(!isset($this->qualified_attributes[$qname])) {
+			return null;
+		}
+
+		$attribute = $this->qualified_attributes[ $qname ];
+		$raw_value = substr( $this->xml, $attribute->value_starts_at, $attribute->value_length );
+
+		$decoded = XMLDecoder::decode( $raw_value );
+		if ( ! isset( $decoded ) ) {
+			/**
+			 * If the attribute contained an invalid value, it's
+			 * a fatal error.
+			 *
+			 * @see WP_XML_Decoder::decode()
+			 */
+			$this->last_error = self::ERROR_SYNTAX;
+			_doing_it_wrong(
+				__METHOD__,
+				__( 'Invalid attribute value encountered.' ),
+				'WP_VERSION'
+			);
+
+			return false;
+		}
+
+		return $decoded;
+	}
+
+	/**
+	 * Gets  names of all attributes matching a given namespace prefix and local name prefix in the current tag.
 	 *
-	 *     $p = new XMLProcessor( '<wp:content data-ENABLED="1" class="test" DATA-test-id="14">Test</wp:content>' );
+	 * This method allows you to filter attributes by both their namespace prefix (e.g., 'wp') and the start of their local name (e.g., 'data-').
+	 * Matching is case-sensitive for both namespace and local name prefixes, in accordance with the XML specification.
+	 *
+	 * Each returned attribute is represented as a two-element array: [namespace_prefix, local_name].
+	 *
+	 * Examples:
+	 *
+	 *     // No namespace, local name prefix only
+	 *     $p = new XMLProcessor( '<content data-ENABLED="1" class="test" DATA-test-id="14">Test</content>' );
 	 *     $p->next_tag( array( 'class_name' => 'test' ) ) === true;
-	 *     $p->get_attribute_names_with_prefix( 'data-' ) === array( 'data-ENABLED' );
-	 *     $p->get_attribute_names_with_prefix( 'DATA-' ) === array( 'DATA-test-id' );
-	 *     $p->get_attribute_names_with_prefix( 'DAta-' ) === array();
+	 *     $p->get_attribute_names_with_prefix( '', 'data-' );
+	 *     // Returns: array( array( '', 'data-ENABLED' ), array( '', 'DATA-test-id' ) )
 	 *
-	 * @param  string  $prefix  Prefix of requested attribute names.
+	 *     // With namespace prefix
+	 *     $p = new XMLProcessor( '<content xmlns:wp="http://wordpress.org/export/1.2/" wp:data-foo="bar" wp:data-bar="baz" data-no-namespace="true" />' );
+	 *     $p->next_tag();
+	 *     $p->get_attribute_names_with_prefix( 'http://wordpress', 'data-' );
+	 *     // Returns: array( array( 'http://wordpress.org/export/1.2/', 'data-foo' ), array( 'http://wordpress.org/export/1.2/', 'data-bar' ) )
 	 *
-	 * @return array|null List of attribute names, or `null` when no tag opener is matched.
+	 *     // Empty string namespace prefix matches all attributes.
+	 *     $p->get_attribute_names_with_prefix( '', 'data-' );
+	 *     // Returns: array( array( 'http://wordpress.org/export/1.2/', 'data-foo' ), array( 'http://wordpress.org/export/1.2/', 'data-bar' ), array( '', 'data-no-namespace' ) )
+	 * 
+	 *     // Null namespace prefix matches attributes with no namespace.
+	 *     $p->get_attribute_names_with_prefix( null, 'data-' );
+	 *     // Returns: array( array( '', 'data-no-namespace' ) )
+	 *
+	 *     // No match for wrong namespace prefix
+	 *     $p->get_attribute_names_with_prefix( 'other', 'data-' );
+	 *     // Returns: array()
+	 *
+	 * @param  string $full_namespace_prefix   Prefix of the fully qualified namespace to match on (e.g., 'http://wordpress.org/'). Use '' for no namespace prefix.
+	 * @param  string $local_name_prefix       Local name prefix to match (e.g., 'data-').
+	 *
+	 * @return array|null List of [namespace, local_name] pairs, or `null` when no tag opener is matched.
 	 * @since WP_VERSION
 	 *
 	 */
-	public function get_attribute_names_with_prefix( $prefix ) {
+	public function get_attribute_names_with_prefix( $full_namespace_prefix, $local_name_prefix ) {
 		if (
 			self::STATE_MATCHED_TAG !== $this->parser_state ||
 			$this->is_closing_tag
@@ -2658,9 +3043,16 @@ class XMLProcessor {
 		}
 
 		$matches = array();
-		foreach ( array_keys( $this->attributes ) as $attr_name ) {
-			if ( strncmp( $attr_name, $prefix, strlen( $prefix ) ) === 0 ) {
-				$matches[] = $attr_name;
+		foreach ( $this->attributes as $attr ) {
+			if ( 
+				0 === strncmp( $attr->local_name, $local_name_prefix, strlen( $local_name_prefix ) ) && 
+				(
+				    // Distinguish between no namespace and empty namespace.
+				    (null === $full_namespace_prefix && '' === $attr->namespace) ||
+					(null !== $full_namespace_prefix && 0 === strncmp( $attr->namespace, $full_namespace_prefix, strlen( $full_namespace_prefix ) ) )
+				)
+			) {
+				$matches[] = [$attr->namespace, $attr->local_name];
 			}
 		}
 
@@ -2668,33 +3060,113 @@ class XMLProcessor {
 	}
 
 	/**
-	 * Returns the uppercase name of the matched tag.
+	 * Returns the local name of the matched tag.
 	 *
-	 * Example:
+	 * Example without namespaces:
 	 *
-	 *     $p = new XMLProcessor( '<wp:content class="test">Test</wp:content>' );
+	 *     $p = new XMLProcessor( '<content class="test">Test</content>' );
 	 *     $p->next_tag() === true;
-	 *     $p->get_tag() === 'DIV';
+	 *     $p->get_tag_local_name() === 'content';
+	 * 
+	 * Example with namespaces:
 	 *
-	 *     $p->next_tag() === false;
-	 *     $p->get_tag() === null;
-	 *
+	 *     $p = new XMLProcessor( '<root xmlns:wp="http://www.w3.org/1999/xhtml"><wp:content>Test</wp:content></root>' );
+	 *     $p->next_tag() === true;
+	 *     $p->get_tag_local_name() === 'content';
+	 * 
 	 * @return string|null Name of currently matched tag in input XML, or `null` if none found.
 	 * @since WP_VERSION
-	 *
 	 */
-	public function get_tag() {
+	public function get_tag_local_name() {
+		if ( null !== $this->element ) {
+			// Return cached name if we already have it.
+			return $this->element->local_name;
+		}
+
+		$qualified_tag_name = $this->get_tag_name_qualified();
+		if ( null === $qualified_tag_name ) {
+			return null;
+		}
+
+		list( $_, $local_name ) = $this->parse_qualified_name( $qualified_tag_name );
+
+		return $local_name;
+	}
+
+	/**
+	 * Returns the namespace prefix and the local name of the matched tag.
+	 *
+	 * Example without namespaces:
+	 * 
+	 *     $p = new XMLProcessor( '<content>Test</content>' );
+	 *     $p->next_tag() === true;
+	 *     $p->get_tag_name_qualified() === 'content';
+	 * 
+	 * Example with namespaces:
+	 * 
+	 *     $p = new XMLProcessor( '<root xmlns:wp="http://www.w3.org/1999/xhtml"><wp:content>Test</wp:content></root>' );
+	 *     $p->next_tag() === true;
+	 *     $p->get_tag_name_qualified() === 'wp:content';
+	 * 
+	 * @return string|null The namespace prefix and the local name of the matched tag, or null if not available.
+	 */
+	private function get_tag_name_qualified() {
+		if ( null !== $this->element ) {
+			// Return cached name if we already have it.
+			return $this->element->qualified_name;
+		}
+
 		if ( null === $this->tag_name_starts_at ) {
 			return null;
 		}
 
 		$tag_name = substr( $this->xml, $this->tag_name_starts_at, $this->tag_name_length );
-
-		if ( self::STATE_MATCHED_TAG === $this->parser_state ) {
-			return $tag_name;
+		if ( self::STATE_MATCHED_TAG !== $this->parser_state ) {
+			return null;
 		}
 
-		return null;
+		return $tag_name;
+	}
+
+	/**
+	 * Returns a string with the fully qualified namespace and local name of the matched tag
+	 * in the following format: "{namespace}local_name".
+	 *
+	 * Example:
+	 *
+	 *     $p = new XMLProcessor( '<root xmlns:wp="http://www.w3.org/1999/xhtml"><wp:content>Test</wp:content></root>' );
+	 *     $p->next_tag() === true;
+	 *     $p->get_tag_namespace_and_local_name() === '{http://www.w3.org/1999/xhtml"}content';
+	 *
+	 * @return string|null The namespace and local name of the matched tag, or null if not available.
+	 */
+	public function get_tag_namespace_and_local_name() {
+		$namespace = $this->get_tag_namespace();
+		if ( ! $namespace ) {
+			return $this->get_tag_local_name();
+		}
+
+		return '{' . $namespace . '}' . $this->get_tag_local_name();
+	}
+
+	/**
+	 * Returns the namespace reference of the matched tag.
+	 *
+	 * Example:
+	 *
+	 *     $p = new XMLProcessor( '<root xmlns:wp="http://www.w3.org/1999/xhtml"><wp:content>Test</wp:content></root>' );
+	 *     $p->next_tag() === true;
+	 *     $p->next_tag() === true;
+	 *     $p->get_tag_namespace() === 'http://www.w3.org/1999/xhtml';
+	 *
+	 * @return string|null The namespace reference of the matched tag, or null if not available.
+	 */
+	public function get_tag_namespace() {
+		if ( self::STATE_MATCHED_TAG !== $this->parser_state ) {
+			return null;
+		}
+
+		return $this->element->namespace;
 	}
 
 	/**
@@ -2807,11 +3279,11 @@ class XMLProcessor {
 	 *
 	 * Example:
 	 *
-	 *     $p = new XMLProcessor( '<wp:content></wp:content>' );
-	 *     $p->next_tag( array( 'tag_name' => 'wp:content', 'tag_closers' => 'visit' ) );
+	 *     $p = new XMLProcessor( '<content></content>' );
+	 *     $p->next_tag( array( 'tag_name' => 'content', 'tag_closers' => 'visit' ) );
 	 *     $p->is_tag_closer() === false;
 	 *
-	 *     $p->next_tag( array( 'tag_name' => 'wp:content', 'tag_closers' => 'visit' ) );
+	 *     $p->next_tag( array( 'tag_name' => 'content', 'tag_closers' => 'visit' ) );
 	 *     $p->is_tag_closer() === true;
 	 *
 	 * @return bool Whether the current tag is a tag closer.
@@ -2830,7 +3302,7 @@ class XMLProcessor {
 	 *
 	 * Example:
 	 *
-	 *     $p = new XMLProcessor( '<wp:content></wp:content>' );
+	 *     $p = new XMLProcessor( '<content></content>' );
 	 *     $p->next_token();
 	 *     $p->is_tag_opener() === true;
 	 *
@@ -2901,7 +3373,7 @@ class XMLProcessor {
 	public function get_token_name() {
 		switch ( $this->parser_state ) {
 			case self::STATE_MATCHED_TAG:
-				return $this->get_tag();
+				return $this->get_tag_local_name();
 
 			case self::STATE_TEXT_NODE:
 				return '#text';
@@ -2937,11 +3409,10 @@ class XMLProcessor {
 	 *
 	 * Modifiable text is text content that may be read and changed without
 	 * changing the XML structure of the document around it. This includes
-	 * the contents of `#text` nodes in the XML as well as the inner
-	 * contents of XML comments, Processing Instructions, and others, even
-	 * though these nodes aren't part of a parsed DOM tree. They also contain
-	 * the contents of SCRIPT and STYLE tags, of TEXTAREA tags, and of any
-	 * other section in an XML document which cannot contain XML markup (DATA).
+	 * the contents of `#text` and `#cdata-section` nodes in the XML as well
+	 * as the inner contents of XML comments, Processing Instructions, and others.
+	 * They also contain of PCdata tags any other section in an XML document which
+	 * cannot contain XML markup (DATA).
 	 *
 	 * If a token has no modifiable text then an empty string is returned to
 	 * avoid needless crashing or type errors. An empty string does not mean
@@ -3000,6 +3471,22 @@ class XMLProcessor {
 		return $decoded;
 	}
 
+	/**
+	 * Updates the modifiable text for a matched token.
+	 *
+	 * Modifiable text is text content that may be read and changed without
+	 * changing the XML structure of the document around it. This includes
+	 * the contents of `#text` and `#cdata-section` nodes in the XML as well
+	 * as the inner contents of XML comments, Processing Instructions, and others.
+	 * They also contain of PCdata tags any other section in an XML document which
+	 * cannot contain XML markup (DATA).
+	 *
+	 * If a token has no modifiable text then false is returned to avoid needless
+	 * crashing or type errors.
+	 *
+	 * @param $new_value New modifiable text for the current node.
+	 * @return string
+	 */
 	public function set_modifiable_text( $new_value ) {
 		switch ( $this->parser_state ) {
 			case self::STATE_TEXT_NODE:
@@ -3007,7 +3494,7 @@ class XMLProcessor {
 				$this->lexical_updates[] = new WP_HTML_Text_Replacement(
 					$this->text_starts_at,
 					$this->text_length,
-					// @TODO This is naive, let's rethink this.
+					// @TODO: Audit this in details. Is this too naive? Or is it actually safe?
 					htmlspecialchars( $new_value, ENT_XML1, 'UTF-8' )
 				);
 
@@ -3017,7 +3504,7 @@ class XMLProcessor {
 				$this->lexical_updates[] = new WP_HTML_Text_Replacement(
 					$this->text_starts_at,
 					$this->text_length,
-					// @TODO This is naive, let's rethink this.
+					// @TODO: Audit this in details. Is this too naive? Or is it actually safe?
 					str_replace( ']]>', ']]&gt;', $new_value )
 				);
 
@@ -3049,7 +3536,7 @@ class XMLProcessor {
 	 * @since WP_VERSION
 	 *
 	 */
-	public function set_attribute( $name, $value ) {
+	public function set_attribute( $namespace, $local_name, $value ) {
 		if ( ! is_string( $value ) ) {
 			_doing_it_wrong(
 				__METHOD__,
@@ -3057,6 +3544,13 @@ class XMLProcessor {
 				'WP_VERSION'
 			);
 
+			return false;
+		}
+		if ( 'xmlns' === $namespace ) {
+			$this->bail(
+				__( 'Setting attributes in the xmlns namespace is not yet supported by set_attribute().' ),
+				$namespace
+			);
 			return false;
 		}
 		if (
@@ -3067,6 +3561,20 @@ class XMLProcessor {
 		}
 
 		$value             = htmlspecialchars( $value, ENT_XML1, 'UTF-8' );
+
+		if($namespace !== '') {
+			$prefix = $this->get_tag_namespace_prefix($namespace);
+			if(false === $prefix) {
+				$this->bail(
+					__( 'The namespace "%1$s" is not in the current element\'s scope.' ),
+					$namespace
+				);
+				return false;
+			}
+			$name = $prefix . ':' . $local_name;
+		} else {
+			$name = $local_name;
+		}
 		$updated_attribute = "{$name}=\"{$value}\"";
 
 		/*
@@ -3080,14 +3588,14 @@ class XMLProcessor {
 			/*
 			 * Update an existing attribute.
 			 *
-			 * Example – set attribute id to "new" in <wp:content id="initial_id" />:
+			 * Example – set attribute id to "new" in <content id="initial_id" />:
 			 *
-			 *     <wp:content id="initial_id"/>
-			 *          ^-------------^
-			 *          start         end
+			 *     <content id="initial_id"/>
+			 *              ^-------------^
+			 *             start         end
 			 *     replacement: `id="new"`
 			 *
-			 *     Result: <wp:content id="new"/>
+			 *     Result: <content id="new"/>
 			 */
 			$existing_attribute             = $this->attributes[ $name ];
 			$this->lexical_updates[ $name ] = new WP_HTML_Text_Replacement(
@@ -3099,14 +3607,14 @@ class XMLProcessor {
 			/*
 			 * Create a new attribute at the tag's name end.
 			 *
-			 * Example – add attribute id="new" to <wp:content />:
+			 * Example – add attribute id="new" to <content />:
 			 *
-			 *     <wp:content/>
-			 *         ^
+			 *     <content />
+			 *             ^
 			 *         start and end
 			 *     replacement: ` id="new"`
 			 *
-			 *     Result: <wp:content id="new"/>
+			 *     Result: <content id="new"/>
 			 */
 			$this->lexical_updates[ $name ] = new WP_HTML_Text_Replacement(
 				$this->tag_name_starts_at + $this->tag_name_length,
@@ -3121,19 +3629,22 @@ class XMLProcessor {
 	/**
 	 * Remove an attribute from the currently-matched tag.
 	 *
-	 * @param  string  $name  The attribute name to remove.
+	 * @param  string  $namespace  The attribute's namespace.
+	 * @param  string  $name       The attribute name to remove.
 	 *
 	 * @return bool Whether an attribute was removed.
 	 * @since WP_VERSION
 	 *
 	 */
-	public function remove_attribute( $name ) {
+	public function remove_attribute( $namespace, $local_name ) {
 		if (
 			self::STATE_MATCHED_TAG !== $this->parser_state ||
 			$this->is_closing_tag
 		) {
 			return false;
 		}
+
+		$name = $namespace ? '{' . $namespace . '}' . $local_name : $local_name;
 
 		/*
 		 * If updating an attribute that didn't exist in the input
@@ -3154,13 +3665,13 @@ class XMLProcessor {
 		/*
 		 * Removes an existing tag attribute.
 		 *
-		 * Example – remove the attribute id from <wp:content id="main"/>:
-		 *    <wp:content id="initial_id"/>
-		 *         ^-------------^
-		 *         start         end
+		 * Example – remove the attribute id from <content id="main"/>:
+		 *    <content id="initial_id"/>
+		 *             ^-------------^
+		 *           start          end
 		 *    replacement: ``
 		 *
-		 *    Result: <wp:content />
+		 *    Result: <content />
 		 */
 		$this->lexical_updates[ $name ] = new WP_HTML_Text_Replacement(
 			$this->attributes[ $name ]->start,
@@ -3299,9 +3810,10 @@ class XMLProcessor {
 
 		if ( self::PROCESS_NEXT_NODE === $node_to_process ) {
 			if ( $this->is_empty_element() ) {
-				$this->pop_open_element();
+				array_pop( $this->stack_of_open_elements );
 			}
 		}
+		
 
 		try {
 			switch ( $this->parser_context ) {
@@ -3415,16 +3927,25 @@ class XMLProcessor {
 				return true;
 			case '#tag':
 				// Update the stack of open elements
-				$tag_name = $this->get_tag();
+				$tag_qname = $this->get_tag_name_qualified();
 				if ( $this->is_tag_closer() ) {
-					$popped = $this->pop_open_element();
-					if ( $popped !== $tag_name ) {
+					if(!count($this->stack_of_open_elements)) {
+						$this->bail(
+							__( 'The closing tag "%1$s" did not match the opening tag "%2$s".' ),
+							$tag_qname,
+							$tag_qname
+						);
+						return false;
+					}
+					$this->element = array_pop( $this->stack_of_open_elements );
+					$popped_qname = $this->element->qualified_name;
+					if ( $popped_qname !== $tag_qname ) {
 						$this->bail(
 							sprintf(
 							// translators: %1$s is the name of the closing HTML tag, %2$s is the name of the opening HTML tag.
 								__( 'The closing tag "%1$s" did not match the opening tag "%2$s".' ),
-								$tag_name,
-								$popped
+								$tag_qname,
+								$popped_qname
 							),
 							self::ERROR_SYNTAX
 						);
@@ -3433,7 +3954,8 @@ class XMLProcessor {
 						$this->parser_context = self::IN_MISC_CONTEXT;
 					}
 				} else {
-					$this->push_open_element( $tag_name );
+					array_push( $this->stack_of_open_elements, $this->element );
+					$this->element = $this->top_element();
 				}
 
 				return true;
@@ -3515,7 +4037,12 @@ class XMLProcessor {
 	 *
 	 */
 	public function get_breadcrumbs() {
-		return $this->stack_of_open_elements;
+		return array_map(
+			function( $element ) {
+				return array( $element->namespace, $element->local_name );
+			},
+			$this->stack_of_open_elements
+		);
 	}
 
 	/**
@@ -3530,15 +4057,15 @@ class XMLProcessor {
 	 *
 	 * Example:
 	 *
-	 *     $processor = new XMLProcessor( '<root><wp:post><content><image /></content></wp:post></root>' );
+	 *     $processor = new XMLProcessor( '<root><post><content><image /></content></post></root>' );
 	 *     $processor->next_tag( 'img' );
 	 *     true  === $processor->matches_breadcrumbs( array( 'content', 'image' ) );
-	 *     true  === $processor->matches_breadcrumbs( array( 'wp:post', 'content', 'image' ) );
-	 *     false === $processor->matches_breadcrumbs( array( 'wp:post', 'image' ) );
-	 *     true  === $processor->matches_breadcrumbs( array( 'wp:post', '*', 'image' ) );
+	 *     true  === $processor->matches_breadcrumbs( array( 'post', 'content', 'image' ) );
+	 *     false === $processor->matches_breadcrumbs( array( 'post', 'image' ) );
+	 *     true  === $processor->matches_breadcrumbs( array( 'post', '*', 'image' ) );
 	 *
 	 * @param  string[]  $breadcrumbs  DOM sub-path at which element is found, e.g. `array( 'content', 'image' )`.
-	 *                              May also contain the wildcard `*` which matches a single element, e.g. `array( 'wp:post', '*' )`.
+	 *                              May also contain the wildcard `*` which matches a single element, e.g. `array( 'post', '*' )`.
 	 *
 	 * @return bool Whether the currently-matched tag is found at the given nested structure.
 	 * @since WP_VERSION
@@ -3553,28 +4080,44 @@ class XMLProcessor {
 		// Start at the last crumb.
 		$crumb = end( $breadcrumbs );
 
-		if (
-			'#tag' === $this->get_token_type() &&
-			'*' !== $crumb &&
-			$this->get_tag() !== $crumb
-		) {
+		if ( '#tag' !== $this->get_token_type() ) {
 			return false;
 		}
 
-		for ( $i = count( $this->stack_of_open_elements ) - 1; $i >= 0; $i -- ) {
-			$tag_name = $this->stack_of_open_elements[ $i ];
-			$crumb    = current( $breadcrumbs );
+		$open_elements = $this->stack_of_open_elements;
+		$crumb_count   = count( $breadcrumbs );
+		$elem_count    = count( $open_elements );
 
-			if ( '*' !== $crumb && $tag_name !== $crumb ) {
+		// Walk backwards through both arrays, matching each crumb to the corresponding open element.
+		for ( $j = 1; $j <= $crumb_count; $j++ ) {
+			$crumb = $breadcrumbs[ $crumb_count - $j ];
+			$element = $open_elements[ $elem_count - $j ] ?? null;
+
+			if ( ! $element ) {
 				return false;
 			}
 
-			if ( false === prev( $breadcrumbs ) ) {
-				return true;
+			// Normalize crumb to [namespace, local_name]
+			if ( ! is_array( $crumb ) ) {
+				if ( '*' === $crumb ) {
+					$crumb = ['*', '*'];
+				} else {
+					$crumb = array( '*', $crumb );
+				}
+			}
+			list( $namespace, $local_name ) = $crumb;
+
+			// Match local name, respecting wildcard '*'
+			if ( '*' !== $local_name && $local_name !== $element->local_name ) {
+				return false;
+			}
+
+			// Match namespace, respecting wildcard '*'
+			if ( '*' !== $namespace && $namespace !== $element->namespace ) {
+				return false;
 			}
 		}
-
-		return false;
+		return true;
 	}
 
 	/**
@@ -3582,18 +4125,18 @@ class XMLProcessor {
 	 *
 	 * Example:
 	 *
-	 *     $processor = new XMLProcessor( '<?xml version="1.0" ?><root><wp:text></wp:text></root>' );
+	 *     $processor = new XMLProcessor( '<?xml version="1.0" ?><root><text></text></root>' );
 	 *     0 === $processor->get_current_depth();
 	 *
 	 *     // Opening the root element increases the depth.
 	 *     $processor->next_tag();
 	 *     1 === $processor->get_current_depth();
 	 *
-	 *     // Opening the wp:text element increases the depth.
+	 *     // Opening the text element increases the depth.
 	 *     $processor->next_tag();
 	 *     2 === $processor->get_current_depth();
 	 *
-	 *     // The wp:text element is closed during `next_token()` so the depth is decreased to reflect that.
+	 *     // The text element is closed during `next_token()` so the depth is decreased to reflect that.
 	 *     $processor->next_token();
 	 *     1 === $processor->get_current_depth();
 	 *
@@ -3605,15 +4148,60 @@ class XMLProcessor {
 		return count( $this->stack_of_open_elements );
 	}
 
-	private function pop_open_element() {
-		return array_pop( $this->stack_of_open_elements );
+	/**
+	 * Parses a qualified name into a namespace prefix and local name.
+	 *
+	 * Example:
+	 *
+	 *     $this->parse_qualified_name( 'wp:post' ); // Returns array( 'wp.org', 'post' )
+	 *     $this->parse_qualified_name( 'image' ); // Returns array( '', 'image' )
+	 *
+	 * @param  string  $qualified_name  The qualified name to parse.
+	 *
+	 * @return array<string, string> The namespace prefix and local name.
+	 */
+	private function parse_qualified_name( $qualified_name ) {
+		$namespace_prefix = '';
+		$local_name       = $qualified_name;
+
+		$prefix_length = strcspn( $qualified_name, ':' );
+		if ( null !== $prefix_length && $prefix_length !== strlen( $qualified_name ) ) {
+			$namespace_prefix = substr( $qualified_name, 0, $prefix_length );
+			$local_name       = substr( $qualified_name, $prefix_length + 1 );
+		}
+
+		return array( $namespace_prefix, $local_name );
 	}
 
-	private function push_open_element( $tag_name ) {
-		array_push(
-			$this->stack_of_open_elements,
-			$tag_name
-		);
+	/**
+	 * Asserts a qualified tag name is syntactically valid according to the
+	 * XML specification.
+	 *
+	 * @param  string  $qualified_name  The qualified name to validate.
+	 * @return bool Whether the qualified name is syntactically valid.
+	 */
+	private function validate_qualified_name( $qualified_name ) {
+		if ( substr_count( $qualified_name, ':' ) > 1 ) {
+			$this->bail(
+				sprintf( 'Invalid identifier "%s" – more than one ":" in tag name. Every tag name must contain either zero or one colon.',
+					$qualified_name ),
+				self::ERROR_SYNTAX
+			);
+
+			return false;
+		}
+
+		$prefix_length = strcspn( $qualified_name, ':' );
+		if ( $prefix_length === 0 && strlen( $qualified_name ) > 0 ) {
+			$this->bail(
+				sprintf( 'Invalid identifier "%s" – namespace qualifier must not have zero length.', $qualified_name ),
+				self::ERROR_SYNTAX
+			);
+
+			return false;
+		}
+
+		return true;
 	}
 
 	private function mark_incomplete_input(

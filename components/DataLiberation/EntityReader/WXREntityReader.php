@@ -171,15 +171,7 @@ class WXREntityReader implements EntityReader {
 	 * @since WP_VERSION
 	 * @var int
 	 */
-	private $last_xml_byte_offset_outside_of_entity;
-
-	/**
-	 * The XML processor cursor of the last entity opener.
-	 *
-	 * @since WP_VERSION
-	 * @var string|null
-	 */
-	private $last_xml_cursor_outside_of_entity;
+	private $entity_opener_byte_offset;
 
 	/**
 	 * Whether the current entity has been emitted.
@@ -250,11 +242,7 @@ class WXREntityReader implements EntityReader {
 	 * @since WP_VERSION
 	 * @var array
 	 */
-	const KNOWN_SITE_OPTIONS = array(
-		'wp:base_blog_url' => 'home',
-		'wp:base_site_url' => 'siteurl',
-		'title'            => 'blogname',
-	);
+	private $KNOWN_SITE_OPTIONS = [];
 
 	/**
 	 * Mapping of WXR tags to their corresponding entity types and field mappings.
@@ -262,106 +250,7 @@ class WXREntityReader implements EntityReader {
 	 * @since WP_VERSION
 	 * @var array
 	 */
-	const KNOWN_ENITIES = array(
-		'wp:comment'     => array(
-			'type'   => 'comment',
-			'fields' => array(
-				'wp:comment_id'           => 'comment_id',
-				'wp:comment_author'       => 'comment_author',
-				'wp:comment_author_email' => 'comment_author_email',
-				'wp:comment_author_url'   => 'comment_author_url',
-				'wp:comment_author_IP'    => 'comment_author_IP',
-				'wp:comment_date'         => 'comment_date',
-				'wp:comment_date_gmt'     => 'comment_date_gmt',
-				'wp:comment_content'      => 'comment_content',
-				'wp:comment_approved'     => 'comment_approved',
-				'wp:comment_type'         => 'comment_type',
-				'wp:comment_parent'       => 'comment_parent',
-				'wp:comment_user_id'      => 'comment_user_id',
-			),
-		),
-		'wp:commentmeta' => array(
-			'type'   => 'comment_meta',
-			'fields' => array(
-				'wp:meta_key'   => 'meta_key',
-				'wp:meta_value' => 'meta_value',
-			),
-		),
-		'wp:author'      => array(
-			'type'   => 'user',
-			'fields' => array(
-				'wp:author_id'           => 'ID',
-				'wp:author_login'        => 'user_login',
-				'wp:author_email'        => 'user_email',
-				'wp:author_display_name' => 'display_name',
-				'wp:author_first_name'   => 'first_name',
-				'wp:author_last_name'    => 'last_name',
-			),
-		),
-		'item'           => array(
-			'type'   => 'post',
-			'fields' => array(
-				'title'                => 'post_title',
-				'link'                 => 'link',
-				'guid'                 => 'guid',
-				'description'          => 'post_excerpt',
-				'pubDate'              => 'post_published_at',
-				'dc:creator'           => 'post_author',
-				'content:encoded'      => 'post_content',
-				'excerpt:encoded'      => 'post_excerpt',
-				'wp:post_id'           => 'post_id',
-				'wp:status'            => 'post_status',
-				'wp:post_date'         => 'post_date',
-				'wp:post_date_gmt'     => 'post_date_gmt',
-				'wp:post_modified'     => 'post_modified',
-				'wp:post_modified_gmt' => 'post_modified_gmt',
-				'wp:comment_status'    => 'comment_status',
-				'wp:ping_status'       => 'ping_status',
-				'wp:post_name'         => 'post_name',
-				'wp:post_parent'       => 'post_parent',
-				'wp:menu_order'        => 'menu_order',
-				'wp:post_type'         => 'post_type',
-				'wp:post_password'     => 'post_password',
-				'wp:is_sticky'         => 'is_sticky',
-				'wp:attachment_url'    => 'attachment_url',
-			),
-		),
-		'wp:postmeta'    => array(
-			'type'   => 'post_meta',
-			'fields' => array(
-				'wp:meta_key'   => 'meta_key',
-				'wp:meta_value' => 'meta_value',
-			),
-		),
-		'wp:term'        => array(
-			'type'   => 'term',
-			'fields' => array(
-				'wp:term_id'       => 'term_id',
-				'wp:term_taxonomy' => 'taxonomy',
-				'wp:term_slug'     => 'slug',
-				'wp:term_parent'   => 'parent',
-				'wp:term_name'     => 'name',
-			),
-		),
-		'wp:tag'         => array(
-			'type'   => 'tag',
-			'fields' => array(
-				'wp:term_id'         => 'term_id',
-				'wp:tag_slug'        => 'slug',
-				'wp:tag_name'        => 'name',
-				'wp:tag_description' => 'description',
-			),
-		),
-		'wp:category'    => array(
-			'type'   => 'category',
-			'fields' => array(
-				'wp:category_nicename'    => 'slug',
-				'wp:category_parent'      => 'parent',
-				'wp:cat_name'             => 'name',
-				'wp:category_description' => 'description',
-			),
-		),
-	);
+	private $KNOWN_ENITIES = [];
 
 	public static function create( ?ByteReadStream $upstream = null, $cursor = null ) {
 		$xml_cursor = null;
@@ -412,6 +301,138 @@ class WXREntityReader implements EntityReader {
 	 */
 	protected function __construct( XMLProcessor $xml ) {
 		$this->xml = $xml;
+
+		// Every XML element is a combination of a long-form namespace and a
+		// local element name, e.g. a syntax <wp:post_id> could actually refer
+		// to a (https://wordpress.org/export/1.0/, post_id) element.
+		// 
+		// Namespaces are paramount for parsing XML and cannot be ignored. Elements
+		// element must be matched based on both their namespace and local name.
+		//
+		// Unfortunately, different WXR files defined the `wp` namespace in a different way.
+		// Folks use a mixture of HTTP vs HTTPS protocols and version numbers. We must
+		// account for all possible options to parse these documents correctly.
+		$wxr_namespaces = [
+			'http://wordpress.org/export/1.0/',
+			'https://wordpress.org/export/1.0/',
+			'http://wordpress.org/export/1.1/',
+			'https://wordpress.org/export/1.1/',
+			'http://wordpress.org/export/1.2/',
+			'https://wordpress.org/export/1.2/',
+		];
+		$this->KNOWN_ENITIES = [
+			'item'           => array(
+				'type'   => 'post',
+				'fields' => array(
+					'title'                => 'post_title',
+					'link'                 => 'link',
+					'guid'                 => 'guid',
+					'description'          => 'post_excerpt',
+					'pubDate'              => 'post_published_at',
+					'{http://purl.org/dc/elements/1.1/}creator'           => 'post_author',
+					'{http://purl.org/rss/1.0/modules/content/}encoded'   => 'post_content',
+					'{http://wordpress.org/export/1.0/excerpt/}encoded'  => 'post_excerpt',
+					'{http://wordpress.org/export/1.1/excerpt/}encoded'  => 'post_excerpt',
+					'{http://wordpress.org/export/1.2/excerpt/}encoded'  => 'post_excerpt',
+				)
+			)
+		];
+		foreach($wxr_namespaces as $wxr_namespace) {
+			$this->KNOWN_SITE_OPTIONS = array_merge($this->KNOWN_SITE_OPTIONS, array(
+				'{'.$wxr_namespace.'}base_blog_url' => 'home',
+				'{'.$wxr_namespace.'}base_site_url' => 'siteurl',
+				'title'            => 'blogname',
+			));
+			$this->KNOWN_ENITIES['item']['fields'] = array_merge($this->KNOWN_ENITIES['item']['fields'], array(
+					'{'.$wxr_namespace.'}post_id'           => 'post_id',
+					'{'.$wxr_namespace.'}status'            => 'post_status',
+					'{'.$wxr_namespace.'}post_date'         => 'post_date',
+					'{'.$wxr_namespace.'}post_date_gmt'     => 'post_date_gmt',
+					'{'.$wxr_namespace.'}post_modified'     => 'post_modified',
+					'{'.$wxr_namespace.'}post_modified_gmt' => 'post_modified_gmt',
+					'{'.$wxr_namespace.'}comment_status'    => 'comment_status',
+					'{'.$wxr_namespace.'}ping_status'       => 'ping_status',
+					'{'.$wxr_namespace.'}post_name'         => 'post_name',
+					'{'.$wxr_namespace.'}post_parent'       => 'post_parent',
+					'{'.$wxr_namespace.'}menu_order'        => 'menu_order',
+					'{'.$wxr_namespace.'}post_type'         => 'post_type',
+					'{'.$wxr_namespace.'}post_password'     => 'post_password',
+					'{'.$wxr_namespace.'}is_sticky'         => 'is_sticky',
+					'{'.$wxr_namespace.'}attachment_url'    => 'attachment_url',
+			));
+			$this->KNOWN_ENITIES = array_merge($this->KNOWN_ENITIES, array(
+				'{'.$wxr_namespace.'}comment'     => array(
+					'type'   => 'comment',
+					'fields' => array(
+						'{'.$wxr_namespace.'}comment_id'           => 'comment_id',
+						'{'.$wxr_namespace.'}comment_author'       => 'comment_author',
+						'{'.$wxr_namespace.'}comment_author_email' => 'comment_author_email',
+						'{'.$wxr_namespace.'}comment_author_url'   => 'comment_author_url',
+						'{'.$wxr_namespace.'}comment_author_IP'    => 'comment_author_IP',
+						'{'.$wxr_namespace.'}comment_date'         => 'comment_date',
+						'{'.$wxr_namespace.'}comment_date_gmt'     => 'comment_date_gmt',
+						'{'.$wxr_namespace.'}comment_content'      => 'comment_content',
+						'{'.$wxr_namespace.'}comment_approved'     => 'comment_approved',
+						'{'.$wxr_namespace.'}comment_type'         => 'comment_type',
+						'{'.$wxr_namespace.'}comment_parent'       => 'comment_parent',
+						'{'.$wxr_namespace.'}comment_user_id'      => 'comment_user_id',
+					),
+				),
+				'{'.$wxr_namespace.'}commentmeta' => array(
+					'type'   => 'comment_meta',
+					'fields' => array(
+						'{'.$wxr_namespace.'}meta_key'   => 'meta_key',
+						'{'.$wxr_namespace.'}meta_value' => 'meta_value',
+					),
+				),
+				'{'.$wxr_namespace.'}author'      => array(
+					'type'   => 'user',
+					'fields' => array(
+						'{'.$wxr_namespace.'}author_id'           => 'ID',
+						'{'.$wxr_namespace.'}author_login'        => 'user_login',
+						'{'.$wxr_namespace.'}author_email'        => 'user_email',
+						'{'.$wxr_namespace.'}author_display_name' => 'display_name',
+						'{'.$wxr_namespace.'}author_first_name'   => 'first_name',
+						'{'.$wxr_namespace.'}author_last_name'    => 'last_name',
+					),
+				),
+				'{'.$wxr_namespace.'}postmeta'    => array(
+					'type'   => 'post_meta',
+					'fields' => array(
+						'{'.$wxr_namespace.'}meta_key'   => 'meta_key',
+						'{'.$wxr_namespace.'}meta_value' => 'meta_value',
+					),
+				),
+				'{'.$wxr_namespace.'}term'        => array(
+					'type'   => 'term',
+					'fields' => array(
+						'{'.$wxr_namespace.'}term_id'       => 'term_id',
+						'{'.$wxr_namespace.'}term_taxonomy' => 'taxonomy',
+						'{'.$wxr_namespace.'}term_slug'     => 'slug',
+						'{'.$wxr_namespace.'}term_parent'   => 'parent',
+						'{'.$wxr_namespace.'}term_name'     => 'name',
+					),
+				),
+				'{'.$wxr_namespace.'}tag'         => array(
+					'type'   => 'tag',
+					'fields' => array(
+						'{'.$wxr_namespace.'}term_id'         => 'term_id',
+						'{'.$wxr_namespace.'}tag_slug'        => 'slug',
+						'{'.$wxr_namespace.'}tag_name'        => 'name',
+						'{'.$wxr_namespace.'}tag_description' => 'description',
+					),
+				),
+				'{'.$wxr_namespace.'}category'    => array(
+					'type'   => 'category',
+					'fields' => array(
+						'{'.$wxr_namespace.'}category_nicename'    => 'slug',
+						'{'.$wxr_namespace.'}category_parent'      => 'parent',
+						'{'.$wxr_namespace.'}cat_name'             => 'name',
+						'{'.$wxr_namespace.'}category_description' => 'description',
+					),
+				),
+			));
+		}
 	}
 
 	public function get_reentrancy_cursor() {
@@ -423,13 +444,13 @@ class WXREntityReader implements EntityReader {
 		 */
 		$xml_cursor                             = $this->xml->get_reentrancy_cursor();
 		$xml_cursor                             = json_decode( base64_decode( $xml_cursor ), true );
-		$xml_cursor['upstream_bytes_forgotten'] = $this->last_xml_byte_offset_outside_of_entity;
+		$xml_cursor['upstream_bytes_forgotten'] = $this->entity_opener_byte_offset;
 		$xml_cursor                             = base64_encode( json_encode( $xml_cursor ) );
 
 		return json_encode(
 			array(
 				'xml'             => $xml_cursor,
-				'upstream'        => $this->last_xml_byte_offset_outside_of_entity,
+				'upstream'        => $this->entity_opener_byte_offset,
 				'last_post_id'    => $this->last_post_id,
 				'last_comment_id' => $this->last_comment_id,
 			)
@@ -467,11 +488,11 @@ class WXREntityReader implements EntityReader {
 		if ( null === $this->entity_tag ) {
 			return false;
 		}
-		if ( ! array_key_exists( $this->entity_tag, static::KNOWN_ENITIES ) ) {
+		if ( ! array_key_exists( $this->entity_tag, $this->KNOWN_ENITIES ) ) {
 			return false;
 		}
 
-		return static::KNOWN_ENITIES[ $this->entity_tag ]['type'];
+		return $this->KNOWN_ENITIES[ $this->entity_tag ]['type'];
 	}
 
 	/**
@@ -629,8 +650,8 @@ class WXREntityReader implements EntityReader {
 			// Don't process anything outside the <rss> <channel> hierarchy.
 			if (
 				count( $breadcrumbs ) < 2 ||
-				$breadcrumbs[0] !== 'rss' ||
-				$breadcrumbs[1] !== 'channel'
+				$breadcrumbs[0] !== ['', 'rss'] ||
+				$breadcrumbs[1] !== ['', 'channel']
 			) {
 				continue;
 			}
@@ -655,11 +676,11 @@ class WXREntityReader implements EntityReader {
 			}
 
 			if ( count( $breadcrumbs ) <= 2 && $this->xml->is_tag_opener() ) {
-				$this->last_xml_byte_offset_outside_of_entity = $this->xml->get_token_byte_offset_in_the_input_stream();
-				$this->last_xml_cursor_outside_of_entity      = $this->xml->get_reentrancy_cursor();
+				$this->entity_opener_byte_offset = $this->xml->get_token_byte_offset_in_the_input_stream();
 			}
 
-			$tag = $this->xml->get_tag();
+			$tag_with_namespace = $this->xml->get_tag_namespace_and_local_name();
+
 			/**
 			 * Custom adjustment: the Accessibility WXR file uses a non-standard
 			 * wp:wp_author tag.
@@ -668,8 +689,8 @@ class WXREntityReader implements EntityReader {
 			 *        the regular WXR importer would ignore them? Perhaps a warning
 			 *        and an upstream PR would be a better solution.
 			 */
-			if ( $tag === 'wp:wp_author' ) {
-				$tag = 'wp:author';
+			if ( $tag_with_namespace === '{http://wordpress.org/export/1.2/}wp_author' ) {
+				$tag_with_namespace = '{http://wordpress.org/export/1.2/}author';
 			}
 
 			/**
@@ -677,7 +698,7 @@ class WXREntityReader implements EntityReader {
 			 * finished, emit it, and start processing the new entity the next
 			 * time this function is called.
 			 */
-			if ( array_key_exists( $tag, static::KNOWN_ENITIES ) ) {
+			if ( array_key_exists( $tag_with_namespace, $this->KNOWN_ENITIES ) ) {
 				if ( $this->entity_type && ! $this->entity_finished ) {
 					$this->emit_entity();
 
@@ -687,9 +708,8 @@ class WXREntityReader implements EntityReader {
 				// Only tag openers indicate a new entity. Closers just mean
 				// the previous entity is finished.
 				if ( $this->xml->is_tag_opener() ) {
-					$this->set_entity_tag( $tag );
-					$this->last_xml_byte_offset_outside_of_entity = $this->xml->get_token_byte_offset_in_the_input_stream();
-					$this->last_xml_cursor_outside_of_entity      = $this->xml->get_reentrancy_cursor();
+					$this->set_entity_tag( $tag_with_namespace );
+					$this->entity_opener_byte_offset = $this->xml->get_token_byte_offset_in_the_input_stream();
 				}
 				continue;
 			}
@@ -732,20 +752,22 @@ class WXREntityReader implements EntityReader {
 			 */
 			if ( $this->xml->is_tag_opener() ) {
 				$this->last_opener_attributes = array();
-				$names                        = $this->xml->get_attribute_names_with_prefix( '' );
-				foreach ( $names as $name ) {
-					$this->last_opener_attributes[ $name ] = $this->xml->get_attribute( $name );
+				// Get non-namespaced attributes.
+				$names                        = $this->xml->get_attribute_names_with_prefix( '', '' );
+				foreach ( $names as list($namespace, $name) ) {
+					$this->last_opener_attributes[ $name ] = $this->xml->get_attribute( $namespace, $name );
 				}
 				$this->text_buffer = '';
 
 				$is_site_option_opener = (
 					count( $this->xml->get_breadcrumbs() ) === 3 &&
 					$this->xml->matches_breadcrumbs( array( 'rss', 'channel', '*' ) ) &&
-					array_key_exists( $this->xml->get_tag(), static::KNOWN_SITE_OPTIONS )
+					array_key_exists( $this->xml->get_tag_namespace_and_local_name(), $this->KNOWN_SITE_OPTIONS )
 				);
-				if ( $is_site_option_opener ) {
-					$this->last_xml_byte_offset_outside_of_entity = $this->xml->get_token_byte_offset_in_the_input_stream();
+				if ( $is_site_option_opener ) {		
+					$this->entity_opener_byte_offset = $this->xml->get_token_byte_offset_in_the_input_stream();
 				}
+
 				continue;
 			}
 
@@ -759,7 +781,7 @@ class WXREntityReader implements EntityReader {
 
 			if (
 				! $this->entity_finished &&
-				$this->xml->get_breadcrumbs() === array( 'rss', 'channel' )
+				$this->xml->get_breadcrumbs() === array( array( '', 'rss' ), array( '', 'channel' ) )
 			) {
 				// Look for site options in children of the <channel> tag.
 				if ( $this->parse_site_option() ) {
@@ -790,7 +812,7 @@ class WXREntityReader implements EntityReader {
 			 */
 			if (
 				$this->entity_type === 'post' &&
-				$tag === 'category' &&
+				$this->xml->get_tag_local_name() === 'category' &&
 				array_key_exists( 'domain', $this->last_opener_attributes ) &&
 				array_key_exists( 'nicename', $this->last_opener_attributes )
 			) {
@@ -805,18 +827,18 @@ class WXREntityReader implements EntityReader {
 
 			/**
 			 * Store the text content of known tags as the value of the corresponding
-			 * entity attribute as defined by the KNOWN_ENITIES mapping.
+			 * entity attribute as defined by the $KNOWN_ENITIES mapping.
 			 *
-			 * Ignores tags unlisted in the KNOWN_ENITIES mapping.
+			 * Ignores tags unlisted in the $KNOWN_ENITIES mapping.
 			 *
 			 * The WXR format is extensible so this reader could potentially
 			 * support registering custom handlers for unknown tags in the future.
 			 */
-			if ( ! isset( static::KNOWN_ENITIES[ $this->entity_tag ]['fields'][ $tag ] ) ) {
+			if ( ! isset( $this->KNOWN_ENITIES[ $this->entity_tag ]['fields'][ $tag_with_namespace ] ) ) {
 				continue;
 			}
 
-			$key                       = static::KNOWN_ENITIES[ $this->entity_tag ]['fields'][ $tag ];
+			$key                       = $this->KNOWN_ENITIES[ $this->entity_tag ]['fields'][ $tag_with_namespace ];
 			$this->entity_data[ $key ] = $this->text_buffer;
 			$this->text_buffer         = '';
 		} while ( $this->xml->next_token() );
@@ -848,13 +870,13 @@ class WXREntityReader implements EntityReader {
 	 * @return bool Whether a site_option entity was emitted.
 	 */
 	private function parse_site_option() {
-		if ( ! array_key_exists( $this->xml->get_tag(), static::KNOWN_SITE_OPTIONS ) ) {
+		if ( ! array_key_exists( $this->xml->get_tag_namespace_and_local_name(), $this->KNOWN_SITE_OPTIONS ) ) {
 			return false;
 		}
 
 		$this->entity_type = 'site_option';
 		$this->entity_data = array(
-			'option_name'  => static::KNOWN_SITE_OPTIONS[ $this->xml->get_tag() ],
+			'option_name'  => $this->KNOWN_SITE_OPTIONS[ $this->xml->get_tag_namespace_and_local_name() ],
 			'option_value' => $this->text_buffer,
 		);
 		$this->emit_entity();
@@ -924,10 +946,10 @@ class WXREntityReader implements EntityReader {
 	 * @since WP_VERSION
 	 *
 	 */
-	private function set_entity_tag( string $tag ) {
-		$this->entity_tag = $tag;
-		if ( array_key_exists( $tag, static::KNOWN_ENITIES ) ) {
-			$this->entity_type = static::KNOWN_ENITIES[ $tag ]['type'];
+	private function set_entity_tag( string $tag_with_namespace ) {
+		$this->entity_tag = $tag_with_namespace;
+		if ( array_key_exists( $tag_with_namespace, $this->KNOWN_ENITIES ) ) {
+			$this->entity_type = $this->KNOWN_ENITIES[ $tag_with_namespace ]['type'];
 		}
 	}
 
