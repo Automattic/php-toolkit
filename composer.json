@@ -56,6 +56,7 @@
         ],
         "psr-4": {
             "WordPress\\Blueprints\\": "components/Blueprints/",
+            "WordPress\\CLI\\": "components/CLI/",
             "WordPress\\DataLiberation\\": "components/DataLiberation/",
             "Rowbot\\": "components/DataLiberation/vendor-patched/",
             "Brick\\": "components/DataLiberation/vendor-patched/",
@@ -72,7 +73,8 @@
         }
     },
     "scripts": {
-        "build-blueprints-phar": "box compile -c phar-box.json",
+        "build-php-toolkit-phar": "bash bin/build-libraries-phar.sh",
+        "build-blueprints-phar": "box compile -c phar-blueprints.json",
         "regenerate-json-schema": "node components/Blueprints/Versions/Version2/json-schema/regenerate-schema.ts",
         "test": "phpunit -c phpunit.xml",
         "lint": "phpcs --standard=WordPress .",

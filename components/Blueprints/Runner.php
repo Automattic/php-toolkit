@@ -73,7 +73,7 @@ class Runner {
 	 */
 	private $assets;
 	/**
-	 * @var Filesystem
+	 * @var LocalFilesystem
 	 */
 	private $blueprintExecutionContext;
 	/**
@@ -83,7 +83,7 @@ class Runner {
 	/**
 	 * @var mixed[]
 	 */
-	private $dataReferences = [];
+	private $dataReferencesToAutoResolve = [];
 	/**
 	 * @var VersionConstraint|null
 	 */
@@ -225,6 +225,10 @@ class Runner {
 			$progress['targetResolution']->setCaption( 'Resolving target site' );
 			$targetSiteFs   = LocalFilesystem::create( $this->configuration->getTargetSiteRoot() );
 			$wpCliReference = DataReference::create( 'https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar' );
+
+			$execution_context_root = $this->blueprintExecutionContext->get_meta()['root'];
+			assert(is_string($execution_context_root) && strlen($execution_context_root) > 0, 'Assertion failed: Execution context root was empty.');
+
 			$this->runtime  = new Runtime(
 				$targetSiteFs,
 				$this->configuration,
@@ -232,7 +236,8 @@ class Runner {
 				$this->client,
 				$this->blueprintArray,
 				$tempRoot,
-				$wpCliReference
+				$wpCliReference,
+				$execution_context_root
 			);
 			$this->progressObserver->setRuntime( $this->runtime );
 			$progress['wpCli']->setCaption( 'Downloading WP-CLI' );
@@ -249,7 +254,7 @@ class Runner {
 			$progress['targetResolution']->finish();
 
 			$progress['data']->setCaption( 'Resolving data references' );
-			$this->assets->startEagerResolution( $this->dataReferences, $progress['data'] );
+			$this->assets->startEagerResolution( $this->dataReferencesToAutoResolve, $progress['data'] );
 			$this->executePlan( $progress['execution'], $plan, $this->runtime );
 			$progress->finish();
 		} finally {
@@ -618,10 +623,29 @@ class Runner {
 		}
 
 		foreach ( $plan as $step ) {
-			// @TODO: Make sure this doesn't get included twice in the execution plan.
+			// @TODO: Make sure this doesn't get included twice in the execution plan,
+			//        e.g. if the Blueprint specified this step manually.
 			if ( $step instanceof ImportContentStep ) {
-				array_unshift( $plan, $this->createStepObject( 'installPlugin', [
-					'source' => $this->createDataReference( 'https://playground.wordpress.net/wordpress-importer.zip' ),
+				if($this->configuration->isRunningAsPhar()) {
+					throw new InvalidArgumentException( '@TODO: Importing content is not supported when running as phar.' );
+				} else {
+					$libraries_phar_path = __DIR__ . '/../../dist/php-toolkit.phar';
+					if(!file_exists($libraries_phar_path)) {
+						throw new InvalidArgumentException(
+							'In development, you must run `bash bin/build-libraries-phar.sh` to bundle importer libraries before importing content via a Blueprint. '.
+							'It generates a `dist/php-toolkit.phar` file bundling all the libraries required for importing content.'
+						);
+					}
+					$this->configuration->getLogger()->info( 'Loading importer libraries from ' . $libraries_phar_path );
+					$source = $this->createDataReference( new InlineFile( [
+						'filename' => 'php-toolkit.phar',
+						'content' => file_get_contents( $libraries_phar_path )
+					] ) );
+				}
+				array_unshift( $plan, $this->createStepObject( 'writeFiles', [
+					'files' => [
+						'php-toolkit.phar' => $source,
+					],
 				] ) );
 				break;
 			}
@@ -681,9 +705,10 @@ class Runner {
 						$source = [$source];
 					}
 					foreach($source as $source_item) {
+						$data_reference = $this->createDataReference( $source_item, [ ExecutionContextPath::class ], [ 'auto_resolve' => false ] );
 						$content[] = array_merge(
 							$contentDefinition,
-							[ 'source' => $this->createDataReference( $source_item, [ ExecutionContextPath::class ] ) ]
+							[ 'source' => $data_reference ]
 						);
 					}
 				}
@@ -944,7 +969,7 @@ PHP
 	/**
 	 * @param  mixed  $data
 	 */
-	private function createDataReference( $data, array $additional_reference_classes = [] ): DataReference {
+	private function createDataReference( $data, array $additional_reference_classes = [], $options = [] ): DataReference {
 		$reference = $data instanceof DataReference ? $data : DataReference::create( $data, $additional_reference_classes );
 
 		/**
@@ -969,8 +994,9 @@ PHP
 			);
 		}
 
-		// @TODO: Ensure we're not creating an ExecutionContextPath based on contents of a remote resource file.
-		$this->dataReferences[ $reference->id ] = $reference;
+		if($options['auto_resolve'] ?? true) {
+			$this->dataReferencesToAutoResolve[ $reference->id ] = $reference;
+		}
 
 		return $reference;
 	}
