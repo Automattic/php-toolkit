@@ -8,7 +8,7 @@
 	],
     "check-requirements": false,
 	"annotations": false,
-    "shebang": "#!/usr/bin/env php",
+    "shebang": false,
 	"compression": "GZ",
     "finder": [
           {
