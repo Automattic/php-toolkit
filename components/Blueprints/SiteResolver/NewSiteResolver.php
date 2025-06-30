@@ -9,6 +9,7 @@ use WordPress\Blueprints\Progress\Tracker;
 use WordPress\Blueprints\Runtime;
 use WordPress\Blueprints\VersionStrings\VersionConstraint;
 use WordPress\HttpClient\Client;
+use WordPress\HttpClient\Request;
 use WordPress\Zip\ZipFilesystem;
 
 use function WordPress\Filesystem\copy_between_filesystems;
@@ -160,7 +161,7 @@ PHP
 			return 'https://wordpress.org/nightly-builds/wordpress-latest.zip';
 		}
 
-		$latestVersions = $client->fetch( 'https://api.wordpress.org/core/version-check/1.7/?channel=beta' )->json();
+		$latestVersions = $client->fetch( new Request( 'https://api.wordpress.org/core/version-check/1.7/?channel=beta' ) )->json();
 
 		$latestVersions = array_filter( $latestVersions['offers'], function ( $v ) {
 			return $v['response'] === 'autoupdate';

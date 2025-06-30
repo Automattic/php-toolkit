@@ -229,7 +229,7 @@ class SetSiteLanguageStep implements StepInterface {
 	private function getWordPressTranslationUrl( Runtime $runtime, string $wpVersion, string $language, Client $client ) {
 		try {
 			$api_url           = "https://api.wordpress.org/translations/core/1.0/?version={$wpVersion}";
-			$translations_data = $client->fetch( $api_url )->json();
+			$translations_data = $client->fetch( new Request( $api_url ) )->json();
 
 			if ( ! isset( $translations_data['translations'] ) || ! is_array( $translations_data['translations'] ) ) {
 				throw new Exception( "Invalid response from WordPress.org translations API" );
