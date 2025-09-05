@@ -43,15 +43,21 @@ class StreamImporter {
 
 	/**
 	 * Populated from the WXR file's <wp:base_blog_url> tag.
+	 *
+	 * @var string
 	 */
 	protected $source_site_url;
 	/**
 	 * A list of [original_url, migrated_url] pairs for rewriting the URLs
 	 * in the imported content.
+	 *
+	 * @var array
 	 */
 	protected $site_url_mapping = array();
 	/**
 	 * A list of URLs to frontload the media files from.
+	 *
+	 * @var array
 	 */
 	protected $source_media_root_urls = array();
 	/**
@@ -78,10 +84,17 @@ class StreamImporter {
 	 *
 	 * Once the API consumer decides on the mapping, it can call
 	 * add_url_mapping() to tell the importer what to map that domain to.
+	 *
+	 * @var array
 	 */
 	protected $site_url_mapping_candidates = array();
+
+	/**
+	 * @var callable
+	 */
 	protected $entity_reader_factory;
 	/**
+	 * @var array
 	 * @param  array|string|null  $query  {
 	 *
 	 * @type string $uploads_path The directory to download the media attachments to.
@@ -128,8 +141,14 @@ class StreamImporter {
 
 	/**
 	 * Iterator that streams entities to import.
+	 *
+	 * @var EntityReaderIterator|null
 	 */
 	protected $entity_iterator;
+
+	/**
+	 * @var string|null
+	 */
 	protected $resume_at_entity;
 
 	/**
@@ -158,6 +177,10 @@ class StreamImporter {
 	 * @var array<string,array<string,bool>>
 	 */
 	protected $active_downloads = array();
+
+	/**
+	 * @var AttachmentDownloader|null
+	 */
 	protected $downloader;
 
 	public static function create_for_wxr_file( $wxr_path, $options = array(), $cursor = null ) {
@@ -593,6 +616,7 @@ class StreamImporter {
 			if ( ! $downloads_completed ) {
 				break;
 			}
+			// Process completed downloads.
 			// Advance the cursor to the next entity.
 			$this->resume_at_entity = $oldest_download_cursor;
 			unset( $this->active_downloads[ $oldest_download_cursor ] );
@@ -868,9 +892,9 @@ class StreamImporter {
 		$post_id = $this->entity_sink->import_entity( $entity );
 		if ( false !== $post_id ) {
 			$this->count_imported_entity( $entity->get_type() );
-		} else {
-			// @TODO: Store error.
 		}
+		// @TODO: Store error.
+		// For now, we continue processing other entities.
 		foreach ( $attachments as $filepath ) {
 			// @TODO: Monitor failures.
 			$attachment_id = $this->entity_sink->import_attachment( $filepath, $post_id );

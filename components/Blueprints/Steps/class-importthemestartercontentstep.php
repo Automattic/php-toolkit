@@ -25,7 +25,7 @@ class ImportThemeStarterContentStep implements StepInterface {
 		$tracker->setCaption( 'Importing theme starter content' . ( $this->theme_slug ? ' for ' . $this->theme_slug : '' ) );
 		// Inline PHP script to avoid reading a static script.php file via.
 		// file_get_contents() inside the built blueprints.phar file.
-		$runtime->evalPhpCodeInSubProcess(
+		$runtime->eval_php_code_in_subprocess(
 			<<<'PHP'
 <?php
 
@@ -79,7 +79,6 @@ $wp_customize->import_theme_starter_content();
 wp_publish_post( $wp_customize->changeset_post_id() );
 
 PHP
-			,
 		);
 	}
 }

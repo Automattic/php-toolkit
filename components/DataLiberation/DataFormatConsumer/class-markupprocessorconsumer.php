@@ -78,7 +78,7 @@ class MarkupProcessorConsumer implements DataFormatConsumer {
 				} else {
 					$exception = null;
 				}
-				throw new DataLiberationException( $this->markup_processor->get_last_error(), 0, $exception );
+				throw new DataLiberationException( esc_html( $this->markup_processor->get_last_error() ), 0, $exception );
 			}
 
 			$this->close_ephemeral_paragraph();
@@ -133,7 +133,7 @@ class MarkupProcessorConsumer implements DataFormatConsumer {
 						}
 					}
 					/**
-					 *
+					 * Set the image template with updated HTML.
 					 */
 					$this->append_rich_text( $template->get_updated_html() );
 					break;
@@ -219,7 +219,7 @@ class MarkupProcessorConsumer implements DataFormatConsumer {
 						$template->set_attribute( 'href', $this->get_attribute( 'href' ) );
 					}
 					/**
-					 *
+					 * Set the link template with updated HTML.
 					 */
 					$this->append_rich_text( $template->get_updated_html() );
 					break;
@@ -228,9 +228,8 @@ class MarkupProcessorConsumer implements DataFormatConsumer {
 				default:
 					if ( $this->should_preserve_tag_in_rich_text( $tag ) ) {
 						$this->append_rich_text( '<' . $tag_lowercase . '>' );
-					} else {
-						// @TODO: What to do with other tags? Just insert an HTML block or what?
 					}
+					// @TODO: What to do with other tags? Just insert an HTML block or what?
 					break;
 			}
 		} elseif ( $html->is_tag_closer() ) {

@@ -25,11 +25,11 @@ class RmStep implements StepInterface {
 	public function run( Runtime $runtime, Tracker $tracker ) {
 		$tracker->setCaption( 'Removing ' . $this->path );
 
-		$filesystem = $runtime->getTargetFilesystem();
+		$filesystem = $runtime->get_target_filesystem();
 		$path       = $this->path;
 
 		if ( ! $filesystem->exists( $path ) ) {
-			throw new FilesystemException( sprintf( 'Path does not exist: %s', $path ) );
+			throw new FilesystemException( sprintf( 'Path does not exist: %s', esc_html( $path ) ) );
 		}
 
 		if ( $filesystem->is_dir( $path ) ) {

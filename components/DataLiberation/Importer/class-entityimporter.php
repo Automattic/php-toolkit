@@ -2,6 +2,7 @@
 /**
  * Based on https://github.com/humanmade/WordPress-Importer
  *
+ * @package WordPress\DataLiberation\Importer
  * @TODO
  * * Handle missing fields. Some WXR files have comments, but no author information.
  *   Some others have posts, but no content. What should the importer do in these
@@ -58,15 +59,35 @@ class EntityImporter {
 			)[\'"]
 		)!ix';
 
-	// information to import from WXR file.
+	/**
+	 * Information to import from WXR file.
+	 *
+	 * @var array
+	 */
 	protected $categories = array();
-	protected $tags       = array();
-	protected $base_url   = '';
+
+	/**
+	 * Information to import from WXR file.
+	 *
+	 * @var array
+	 */
+	protected $tags = array();
+
+	/**
+	 * Information to import from WXR file.
+	 *
+	 * @var string
+	 */
+	protected $base_url = '';
 
 	protected $logger;
 	protected $options = array();
 
-	// NEW STYLE.
+	/**
+	 * NEW STYLE.
+	 *
+	 * @var array
+	 */
 	protected $mapping            = array();
 	protected $requires_remapping = array();
 	protected $exists             = array();
@@ -141,7 +162,7 @@ class EntityImporter {
 			case ImportEntity::TYPE_SITE_OPTION:
 				return $this->import_site_option( $data );
 			default:
-				throw new InvalidArgumentException( "Unknown entity type: $type" );
+				throw new InvalidArgumentException( sprintf( 'Unknown entity type: %s', esc_html( $type ) ) );
 		}
 	}
 
@@ -717,7 +738,7 @@ class EntityImporter {
 	 * represents doesn't exist then the menu item will not be imported (waits until the
 	 * end of the import to retry again before discarding).
 	 *
-	 * @param  array $item  Menu item details from WXR file
+	 * @param  int $post_id  Post ID
 	 */
 	protected function process_menu_item_meta( $post_id, $data, $meta ) {
 		$item_type          = get_post_meta( $post_id, '_menu_item_type', true );
@@ -767,7 +788,8 @@ class EntityImporter {
 			return;
 		}
 
-		$this->logger->debug( sprintf( 'Menu item %d mapped to %d', $original_object_id, $object_id ) );
+		// translators: %1$d is the original menu item ID, %2$d is the new mapped ID.
+		$this->logger->debug( sprintf( esc_html__( 'Menu item %1$d mapped to %2$d', 'wordpress-components' ), $original_object_id, $object_id ) );
 		update_post_meta( $post_id, '_menu_item_object_id', wp_slash( $object_id ) );
 	}
 
@@ -781,7 +803,7 @@ class EntityImporter {
 	 */
 	protected function process_attachment( $post, $meta ) {
 		if ( ! isset( $post['local_file_path'] ) || ! file_exists( $post['local_file_path'] ) ) {
-			throw new DataLiberationException( 'attachment_processing_error', __( 'File does not exist', 'wordpress-importer' ) );
+			throw new DataLiberationException( 'attachment_processing_error', esc_html__( 'File does not exist', 'wordpress-importer' ) );
 		}
 
 		// try to use _wp_attached file for upload folder placement to ensure the same location as the export site.
@@ -800,7 +822,7 @@ class EntityImporter {
 
 		$info = wp_check_filetype( $post['local_file_path'] );
 		if ( ! $info ) {
-			throw new DataLiberationException( 'attachment_processing_error', __( 'Invalid file type', 'wordpress-importer' ) );
+			throw new DataLiberationException( 'attachment_processing_error', esc_html__( 'Invalid file type', 'wordpress-importer' ) );
 		}
 
 		$post['post_mime_type'] = $info['type'];
@@ -865,9 +887,8 @@ class EntityImporter {
 	/**
 	 * Process and import post meta items.
 	 *
-	 * @param  array $meta  List of meta data arrays
+	 * @param  array $meta_item  List of meta data arrays
 	 * @param  int   $post_id  Post to associate with
-	 * @param  array $post  Post data
 	 *
 	 * @return int|WP_Error Number of meta items imported on success, error otherwise.
 	 */
@@ -879,7 +900,7 @@ class EntityImporter {
 		/**
 		 * Pre-process post meta data.
 		 *
-		 * @param  array  $meta_item  Meta data. (Return empty to skip.)
+		 * @param  array  $meta  Meta data. (Return empty to skip.)
 		 * @param  int  $post_id  Post the meta is attached to.
 		 */
 		$meta_item = apply_filters( 'wxr_importer_pre_process_post_meta', $meta_item, $post_id );
@@ -923,9 +944,9 @@ class EntityImporter {
 	/**
 	 * Process and import comment data.
 	 *
-	 * @param  array $comments  List of comment data arrays.
+	 * @param  array $comment  List of comment data arrays.
 	 * @param  int   $post_id  Post to associate with.
-	 * @param  array $post  Post data.
+	 * @param  array $post_just_imported  Post data.
 	 *
 	 * @return int|WP_Error Number of comments imported on success, error otherwise.
 	 */

@@ -17,7 +17,7 @@ class BlocksWithMetadata {
 		$this->metadata     = $metadata;
 		foreach ( $this->metadata as $key => $values ) {
 			if ( ! is_array( $values ) ) {
-				throw new DataLiberationException( 'Metadata values for the key ' . $key . ' must be an array but was ' . gettype( $values ) );
+				throw new DataLiberationException( sprintf( 'Metadata values for the key %s must be an array but was %s', esc_html( $key ), esc_html( gettype( $values ) ) ) );
 			}
 		}
 	}
@@ -51,7 +51,7 @@ class BlocksWithMetadata {
 	 * Gets all the metadata sourced from the input document by the convert() method.
 	 * The data format is:
 	 *
-	 * array(
+	 * Array(
 	 *     'post_title' => array( 'The Name of the Wind' ),
 	 *     'post_author' => array( 'Patrick Rothfuss', 'Betsy Wollheim' )
 	 * )
@@ -59,6 +59,7 @@ class BlocksWithMetadata {
 	 * Note each meta key may have multiple values. The consumer of this interface
 	 * must account for this.
 	 *
+	 * @param array $options Optional parameters.
 	 * @return array The metadata sourced from the input document.
 	 */
 	public function get_all_metadata( array $options = array() ) {
