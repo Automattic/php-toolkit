@@ -1,5 +1,5 @@
 {
-	"name": "wordpress/filesystem",
+	"name": "wp-php-toolkit/filesystem",
 	"description": "Filesystem component for WordPress.",
 	"type": "library",
 	"authors": [
@@ -13,7 +13,8 @@
 		}
 	],
 	"require": {
-		"php": ">=7.2"
+		"php": ">=7.2",
+		"wp-php-toolkit/bytestream": "dev-trunk"
 	},
 	"autoload": {
 		"psr-4": {
@@ -28,5 +29,12 @@
 	},
 	"require-dev": {
 		"phpunit/phpunit": "^9.5"
+	},
+	"archive": {
+		"exclude": [
+			"**/.github/",
+			"**/Tests/",
+			"**/bin/"
+		]
 	}
 }

@@ -1,5 +1,5 @@
 {
-	"name": "wordpress/http-server",
+	"name": "wp-php-toolkit/http-server",
 	"description": "HttpServer component for WordPress.",
 	"type": "library",
 	"authors": [
@@ -13,7 +13,10 @@
 		}
 	],
 	"require": {
-		"php": ">=7.2"
+		"php": ">=7.2",
+		"wp-php-toolkit/bytestream": "dev-trunk",
+		"wp-php-toolkit/data-liberation": "dev-trunk",
+		"wp-php-toolkit/http-client": "dev-trunk"
 	},
 	"autoload": {
 		"psr-4": {
@@ -25,5 +28,12 @@
 	},
 	"require-dev": {
 		"phpunit/phpunit": "^9.5"
+	},
+	"archive": {
+		"exclude": [
+			"**/.github/",
+			"**/Tests/",
+			"**/bin/"
+		]
 	}
 }

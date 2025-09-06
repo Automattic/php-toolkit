@@ -1,5 +1,5 @@
 {
-	"name": "wordpress/polyfill",
+	"name": "wp-php-toolkit/polyfill",
 	"description": "Polyfill component for WordPress.",
 	"type": "library",
 	"authors": [
@@ -22,6 +22,13 @@
 		],
 		"exclude-from-classmap": [
 			"/Tests/"
+		]
+	},
+	"archive": {
+		"exclude": [
+			"**/.github/",
+			"**/Tests/",
+			"**/bin/"
 		]
 	}
 }

@@ -1,5 +1,5 @@
 {
-	"name": "wordpress/blockparser",
+	"name": "wp-php-toolkit/blockparser",
 	"description": "BlockParser component for WordPress.",
 	"type": "library",
 	"require": {
@@ -25,5 +25,12 @@
 	},
 	"require-dev": {
 		"phpunit/phpunit": "^9.5"
+	},
+	"archive": {
+		"exclude": [
+			"**/.github/",
+			"**/Tests/",
+			"**/bin/"
+		]
 	}
 }
