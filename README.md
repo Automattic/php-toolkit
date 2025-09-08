@@ -28,42 +28,22 @@ compatible with web and CLI environments on PHP 7.2+. There's not much technical
 at this point but you can refer to the [blueprints.php file](https://github.com/WordPress/php-toolkit/blob/219dc4e846af270a5009e523244d0ec23baaa32a/components/Blueprints/bin/blueprint.php#L226) to see
 how the runner is implemented.
 
-### Using the libraries
+### Using the components
 
-Use composer to install the libraries in a non-WordPress project.
+The individual components are now distributed via Composer at [https://packagist.org/packages/wp-php-toolkit](https://packagist.org/packages/wp-php-toolkit). You can install specific components you need rather than the entire toolkit.
 
-This is the minimal composer.json file you need to consume the libraries:
+To install a specific component, use composer:
 
-```json
-{
-	"name": "my-namespace/my-package",
-	"require": {
-		"WordPress/php-toolkit": "^v0.0.21-alpha"
-	},
-	"repositories": [
-		{
-			"type": "github",
-			"url": "https://github.com/WordPress/php-toolkit"
-		}
-	]
-}
+```bash
+composer require wp-php-toolkit/http-client
+composer require wp-php-toolkit/data-liberation
+composer require wp-php-toolkit/git
+# ... and so on for other components
 ```
 
-You can also lock it in to a specific commit or tag:
+#### PHAR distribution
 
-```json
-{
-	"require": {
-		"WordPress/php-toolkit": "dev-trunk#122b547"
-	}
-}
-```
-
-For now, there is no way to cherry-pick just the one library you need. It's all or nothing.
-
-Note that the composer.json example above downloads more files than the required minimum, e.g. markdowns, unit tests, the `plugins` directory, etc. That's about 50MB of code in total and, most likely, it's not a big deal for your project. If you want a smaller package, the Data Liberation plugin referenced above ships a minified phar file that's about ~500KB compressed.
-
-If you'd like to install just a single library, you'll need to contribute a PR to distribute each library as a separate package. Most likely, though, you don't really need that. If you have doubts, open a new issue and we'll figure it out together.
+For convenience, a standalone Blueprints runner and other tools from this repository are shipped as phar files available in the [GitHub releases](https://github.com/WordPress/php-toolkit/releases).
 
 ### Design goals
 
