@@ -42,11 +42,11 @@ jobs:
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git config --global user.name "github-actions[bot]"
 
-      - name: Run MonorepoBuilder release
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          $(composer global config bin-dir --absolute)/monorepo-builder release ${{ github.event.inputs.bump }} 
+      # - name: Run MonorepoBuilder release
+      #   env:
+      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      #   run: |
+      #     $(composer global config bin-dir --absolute)/monorepo-builder release ${{ github.event.inputs.bump }} 
 
       - name: Ensure GitHub CLI and jq are installed
         run: |
