@@ -2,6 +2,7 @@
     "name": "wp-php-toolkit/corsproxy",
     "description": "CORSProxy component for WordPress.",
     "type": "library",
+    "license": "GPL-2.0-or-later",
     "authors": [
         {
             "name": "Adam Zielinski",

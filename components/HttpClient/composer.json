@@ -2,6 +2,7 @@
     "name": "wp-php-toolkit/http-client",
     "description": "HttpClient component for WordPress.",
     "type": "library",
+    "license": "GPL-2.0-or-later",
     "authors": [
         {
             "name": "Adam Zielinski",

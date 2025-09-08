@@ -2,6 +2,7 @@
     "name": "wp-php-toolkit/data-liberation",
     "description": "Data Liberation component for WordPress.",
     "type": "library",
+    "license": "GPL-2.0-or-later",
     "authors": [
         {
             "name": "Adam Zielinski",
