@@ -50,11 +50,15 @@ create_repo_if_needed() {
 
 split_and_push() {
   local pkg_dir="$1" org="$2" repo_name="$3"
-  local repo_url
-  
-  # Use HTTPS with token if GH_TOKEN is available, otherwise fall back to SSH
-  if [[ -n "${GH_TOKEN:-}" ]]; then
-    repo_url="https://${GH_TOKEN}@github.com/${org}/${repo_name}.git"
+  local repo_url token
+
+  # Prefer GH_TOKEN; fall back to GITHUB_TOKEN for GitHub Actions
+  token="${GH_TOKEN:-${GITHUB_TOKEN:-}}"
+
+  if [[ -n "$token" ]]; then
+    # Configure git to inject token for any https://github.com URLs
+    git config --global url."https://x-access-token:${token}@github.com/".insteadOf "https://github.com/" || true
+    repo_url="https://github.com/${org}/${repo_name}.git"
   else
     repo_url="git@github.com:${org}/${repo_name}.git"
   fi
