@@ -1,0 +1,7006 @@
+[
+	"Truncate matched domain at whitespaces",
+	{
+		"input": "http://example\t.\norg",
+		"base": "http://example",
+		"href": "http://example/",
+		"origin": "http://example",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "example",
+		"hostname": "example",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"input": "http://user:pass@foo:21/bar;par?b#c",
+		"base": "http://example.org/foo/bar",
+		"failure": true,
+		"description": "URLs with authentication credentials are inappropriate for inline URL detection"
+	},
+	{
+		"input": "https://test:@test",
+		"base": null,
+		"failure": true,
+		"description": "URLs with authentication credentials are inappropriate for inline URL detection"
+	},
+	{
+		"input": "https://:@test",
+		"base": null,
+		"href": "https://test/",
+		"origin": "https://test",
+		"protocol": "https:",
+		"username": "",
+		"password": "",
+		"host": "test",
+		"hostname": "test",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"input": "non-special://test:@test/x",
+		"base": null,
+		"description": "non-special protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "non-special://:@test/x",
+		"base": null,
+		"description": "non-special protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "http:foo.com",
+		"base": "http://example.org/foo/bar",
+		"href": "http://example.org/foo/foo.com",
+		"origin": "http://example.org",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "example.org",
+		"hostname": "example.org",
+		"port": "",
+		"pathname": "/foo/foo.com",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"input": "\t   :foo.com   \n",
+		"base": "http://example.org/foo/bar",
+		"href": "http://foo.com/",
+		"origin": "http://foo.com",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "foo.com",
+		"hostname": "foo.com",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"input": " foo.com  ",
+		"base": "http://example.org/foo/bar",
+		"href": "http://foo.com/",
+		"origin": "http://foo.com",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "foo.com",
+		"hostname": "foo.com",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"input": "a:\t foo.com",
+		"base": "http://example.org/foo/bar",
+		"href": "http://foo.com/",
+		"origin": "http://foo.com",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "foo.com",
+		"hostname": "foo.com",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	"Do not match whitespace as part of the URL",
+	{
+		"input": "http://f:21/ b ? d # e ",
+		"base": "http://f:21",
+		"href": "http://f:21/",
+		"origin": "http://f:21",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "f:21",
+		"hostname": "f",
+		"port": "21",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"input": "lolscheme:x x#x x",
+		"base": null,
+		"description": "lolscheme protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	"Finish matching the URL at the colon and missing port number \u2013 it :/c is unlikely to be a part of the URL when matching inline in text.",
+	{
+		"input": "http://f:/c",
+		"base": "http://example.org/foo/bar",
+		"href": "http://f/",
+		"origin": "http://f",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "f",
+		"hostname": "f",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"input": "http://f:0/c",
+		"base": "http://example.org/foo/bar",
+		"href": "http://f:0/c",
+		"origin": "http://f:0",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "f:0",
+		"hostname": "f",
+		"port": "0",
+		"pathname": "/c",
+		"search": "",
+		"hash": ""
+	},
+	"While :00000000000000 is technically valid in URLs, matching it in inline text is unlikely to be the intent.",
+	{
+		"input": "http://f:00000000000000/c",
+		"base": "http://example.org/foo/bar",
+		"href": "http://f/",
+		"origin": "http://f",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "f",
+		"hostname": "f",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	"While :00000000000000000000080 is technically valid in URLs, matching it all from text is unlikely to be the intent.",
+	{
+		"input": "http://f:00000000000000000000080/c",
+		"base": "http://example.org/foo/bar",
+		"href": "http://f/",
+		"origin": "http://f",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "f",
+		"hostname": "f",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"input": "http://f:b/c",
+		"base": "http://example.org/foo/bar",
+		"href": "http://f/",
+		"origin": "http://f",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "f",
+		"hostname": "f",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"input": "http://f: /c",
+		"base": "http://example.org/foo/bar",
+		"href": "http://f/",
+		"origin": "http://f",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "f",
+		"hostname": "f",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"input": "http://f:\n/c",
+		"base": "http://example.org/foo/bar",
+		"href": "http://f/",
+		"origin": "http://f",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "f",
+		"hostname": "f",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"input": "http://f:fifty-two/c",
+		"base": "http://example.org/foo/bar",
+		"href": "http://f/",
+		"origin": "http://f",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "f",
+		"hostname": "f",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"description": "Trade-off: Match the URL up until the first non-URL-like part",
+		"input": "http://f:999999/c",
+		"base": "http://example.org/foo/bar",
+		"href": "http://f/",
+		"origin": "http://f",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "f",
+		"hostname": "f",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"input": "http://f: 21 / b ? d # e ",
+		"base": "http://example.org/foo/bar",
+		"href": "http://f/",
+		"origin": "http://f",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "f",
+		"hostname": "f",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"input": "",
+		"base": "http://example.org/foo/bar",
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "  \t",
+		"base": "http://example.org/foo/bar",
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": ":foo.com/",
+		"base": "http://example.org/foo/bar",
+		"href": "http://foo.com/",
+		"origin": "http://foo.com",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "foo.com",
+		"hostname": "foo.com",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"input": ":foo.com\\",
+		"base": "http://example.org/foo/bar",
+		"href": "http://foo.com/",
+		"origin": "http://foo.com",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "foo.com",
+		"hostname": "foo.com",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"input": ":",
+		"base": "http://example.org/foo/bar",
+		"failure": true
+	},
+	{
+		"input": ":a",
+		"base": "http://example.org/foo/bar",
+		"failure": true
+	},
+	{
+		"input": ":/",
+		"base": "http://example.org/foo/bar",
+		"failure": true
+	},
+	{
+		"input": ":\\",
+		"base": "http://example.org/foo/bar",
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": ":#",
+		"base": "http://example.org/foo/bar",
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "#",
+		"base": "http://example.org/foo/bar",
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "#/",
+		"base": "http://example.org/foo/bar",
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "#\\",
+		"base": "http://example.org/foo/bar",
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "#;?",
+		"base": "http://example.org/foo/bar",
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "?",
+		"base": "http://example.org/foo/bar",
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "/",
+		"base": "http://example.org/foo/bar",
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": ":23",
+		"base": "http://example.org/foo/bar",
+		"failure": true,
+		"description": "Test case marked as expected failure"		
+	},
+	{
+		"input": "/:23",
+		"base": "http://example.org/foo/bar",
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "\\x",
+		"base": "http://example.org/foo/bar",
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "\\\\x\\hello",
+		"base": "http://example.org/foo/bar",
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "::",
+		"base": "http://example.org/foo/bar",
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "::23",
+		"base": "http://example.org/foo/bar",
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "foo://",
+		"base": "http://example.org/foo/bar",
+		"description": "foo protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "http://a:b@c:29/d",
+		"base": "http://example.org/foo/bar",
+		"failure": true,
+		"description": "URLs with authentication credentials are inappropriate for inline URL detection"
+	},
+	{
+		"input": "http::@c:29",
+		"base": "http://example.org/foo/bar",
+		"href": "http://example.org/foo/:@c:29",
+		"origin": "http://example.org",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "example.org",
+		"hostname": "example.org",
+		"port": "",
+		"pathname": "/foo/:@c:29",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"input": "http://&a:foo(b]c@d:2/",
+		"base": "http://example.org/foo/bar",
+		"failure": true,
+		"description": "URLs with authentication credentials are inappropriate for inline URL detection"
+	},
+	{
+		"input": "http://foo.com:b@d/",
+		"base": "http://example.org/foo/bar",
+		"failure": true,
+		"description": "URLs with authentication credentials are inappropriate for inline URL detection"
+	},
+	{
+		"input": "http://foo.com/\\@",
+		"base": "http://example.org/foo/bar",
+		"href": "http://foo.com//@",
+		"origin": "http://foo.com",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "foo.com",
+		"hostname": "foo.com",
+		"port": "",
+		"pathname": "//@",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"input": "http:\\\\foo.com\\",
+		"base": "http://example.org/foo/bar",
+		"href": "http://foo.com/",
+		"origin": "http://foo.com",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "foo.com",
+		"hostname": "foo.com",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"description": "In this scenario, http:\\\\ is ignored and only the a\\b:c\\d@foo.com is matched. `a` becomes the hostname and the rest of the URL is the pathname. It is only slightly inconsistent with the WHATWG spec in the hostname resolution. The actual transforming backslashes to slashes is also done in the WHATWG spec.",
+		"input": "http:\\\\a\\b:c\\d@foo.com\\",
+		"base": "http://example.org/foo/bar",
+		"href": "http://a/b:c/d@foo.com",
+		"origin": "http://a",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "a",
+		"hostname": "a",
+		"port": "",
+		"pathname": "/b:c/d@foo.com",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"input": "http://a:b@c\\",
+		"base": null,
+		"failure": true,
+		"description": "URLs with authentication credentials are inappropriate for inline URL detection"
+	},
+	{
+		"input": "ws://a@b\\c",
+		"base": null,
+		"description": "WebSocket protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "foo:/",
+		"base": "http://example.org/foo/bar",
+		"description": "foo protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "foo:/bar.com/",
+		"base": "http://example.org/foo/bar",
+		"description": "foo protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "foo://///////",
+		"base": "http://example.org/foo/bar",
+		"description": "foo protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "foo://///////bar.com/",
+		"base": "http://example.org/foo/bar",
+		"description": "foo protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "foo:////://///",
+		"base": "http://example.org/foo/bar",
+		"description": "foo protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "c:/foo",
+		"base": "http://example.org/foo/bar",
+		"description": "c protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "//foo/bar",
+		"base": "http://example.org/foo/bar",
+		"href": "http://foo/bar",
+		"origin": "http://foo",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "foo",
+		"hostname": "foo",
+		"port": "",
+		"pathname": "/bar",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"input": "http://foo/path;a??e#f#g",
+		"base": "http://example.org/foo/bar",
+		"href": "http://foo/path;a??e#f#g",
+		"origin": "http://foo",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "foo",
+		"hostname": "foo",
+		"port": "",
+		"pathname": "/path;a",
+		"search": "??e",
+		"hash": "#f#g"
+	},
+	{
+		"input": "http://foo/abcd?efgh?ijkl",
+		"base": "http://example.org/foo/bar",
+		"href": "http://foo/abcd?efgh?ijkl",
+		"origin": "http://foo",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "foo",
+		"hostname": "foo",
+		"port": "",
+		"pathname": "/abcd",
+		"search": "?efgh?ijkl",
+		"hash": ""
+	},
+	{
+		"input": "http://foo/abcd#foo?bar",
+		"base": "http://example.org/foo/bar",
+		"href": "http://foo/abcd#foo?bar",
+		"origin": "http://foo",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "foo",
+		"hostname": "foo",
+		"port": "",
+		"pathname": "/abcd",
+		"search": "",
+		"hash": "#foo?bar"
+	},
+	{
+		"input": "[61:24:74]:98",
+		"base": "http://example.org/foo/bar",
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"description": "While it's technically a valid WHATWG URL, matching it from inline text in this form is unlikely to be the intent.",
+		"input": "http:[61:27]/:foo",
+		"base": "http://example.org/foo/bar",
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "http://[1::2]:3:4",
+		"base": "http://example.org/foo/bar",
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "http://2001::1",
+		"base": "http://example.org/foo/bar",
+		"hash": "",
+		"host": "0.0.7.209",
+		"hostname": "0.0.7.209",
+		"href": "http://0.0.7.209/",
+		"origin": "http://0.0.7.209",
+		"password": "",
+		"pathname": "/",
+		"port": "",
+		"protocol": "http:",
+		"search": "",
+		"username": ""
+	},
+	{
+		"input": "http://2001::1]",
+		"base": "http://example.org/foo/bar",
+		"hash": "",
+		"host": "0.0.7.209",
+		"hostname": "0.0.7.209",
+		"href": "http://0.0.7.209/",
+		"origin": "http://0.0.7.209",
+		"password": "",
+		"pathname": "/",
+		"port": "",
+		"protocol": "http:",
+		"search": "",
+		"username": ""
+	},
+	{
+		"input": "http://2001::1]:80",
+		"base": "http://example.org/foo/bar",
+		"hash": "",
+		"host": "0.0.7.209",
+		"hostname": "0.0.7.209",
+		"href": "http://0.0.7.209/",
+		"origin": "http://0.0.7.209",
+		"password": "",
+		"pathname": "/",
+		"port": "",
+		"protocol": "http:",
+		"search": "",
+		"username": ""
+	},
+	"Trade-off: do not match trailing square brackets ']'. They can technically be a part of the URL, but they are more likely to be a part of the text or syntax",
+	{
+		"input": "http://[2001::1]",
+		"base": "http://example.org/foo/bar",
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "http://[::127.0.0.1]",
+		"base": "http://example.org/foo/bar",
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "http://[::127.0.0.1.]",
+		"base": "http://example.org/foo/bar",
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "http://[0:0:0:0:0:0:13.1.68.3]",
+		"base": "http://example.org/foo/bar",
+		"failure": true
+	},
+	{
+		"input": "http://[2001::1]:80",
+		"base": "http://example.org/foo/bar",
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "http:/example.com/",
+		"base": "http://example.org/foo/bar",
+		"href": "http://example.org/example.com/",
+		"origin": "http://example.org",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "example.org",
+		"hostname": "example.org",
+		"port": "",
+		"pathname": "/example.com/",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"input": "ftp:/example.com/",
+		"base": "http://example.org/foo/bar",
+		"description": "FTP protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "https:/example.com/",
+		"base": "http://example.org/foo/bar",
+		"href": "https://example.com/",
+		"origin": "https://example.com",
+		"protocol": "https:",
+		"username": "",
+		"password": "",
+		"host": "example.com",
+		"hostname": "example.com",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"input": "madeupscheme:/example.com/",
+		"base": "http://example.org/foo/bar",
+		"description": "madeupscheme protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "file:/example.com/",
+		"base": "http://example.org/foo/bar",
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	{
+		"input": "file://example:1/",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "file://example:test/",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "file://example%/",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "file://[example]/",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "ftps:/example.com/",
+		"base": "http://example.org/foo/bar",
+		"description": "FTPS protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "gopher:/example.com/",
+		"base": "http://example.org/foo/bar",
+		"description": "Gopher protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "ws:/example.com/",
+		"base": "http://example.org/foo/bar",
+		"description": "WebSocket protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "wss:/example.com/",
+		"base": "http://example.org/foo/bar",
+		"description": "Secure WebSocket protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "data:/example.com/",
+		"base": "http://example.org/foo/bar",
+		"description": "Data URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "javascript:/example.com/",
+		"base": "http://example.org/foo/bar",
+		"description": "JavaScript URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "mailto:/example.com/",
+		"base": "http://example.org/foo/bar",
+		"description": "Mailto URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "http:example.com/",
+		"base": "http://example.org/foo/bar",
+		"href": "http://example.org/foo/example.com/",
+		"origin": "http://example.org",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "example.org",
+		"hostname": "example.org",
+		"port": "",
+		"pathname": "/foo/example.com/",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"input": "ftp:example.com/",
+		"base": "http://example.org/foo/bar",
+		"description": "FTP protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "madeupscheme:example.com/",
+		"base": "http://example.org/foo/bar",
+		"description": "madeupscheme protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "ftps:example.com/",
+		"base": "http://example.org/foo/bar",
+		"description": "FTPS protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "gopher:example.com/",
+		"base": "http://example.org/foo/bar",
+		"description": "Gopher protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "ws:example.com/",
+		"base": "http://example.org/foo/bar",
+		"description": "WebSocket protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "wss:example.com/",
+		"base": "http://example.org/foo/bar",
+		"description": "Secure WebSocket protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "data:example.com/",
+		"base": "http://example.org/foo/bar",
+		"description": "Data URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "javascript:example.com/",
+		"base": "http://example.org/foo/bar",
+		"description": "JavaScript URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "mailto:example.com/",
+		"base": "http://example.org/foo/bar",
+		"description": "Mailto URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"description": "Trade-off: Do not match simple path-like fragments as URLs.",
+		"input": "/a/b/c",
+		"base": "http://example.org/foo/bar",
+		"failure": true
+	},
+	{
+		"description": "Trade-off: Do not match simple path-like fragments as URLs.",
+		"input": "/a/ /c",
+		"base": "http://example.org/foo/bar",
+		"failure": true
+	},
+	{
+		"description": "Trade-off: Do not match simple path-like fragments as URLs.",
+		"input": "/a%2fc",
+		"base": "http://example.org/foo/bar",
+		"failure": true
+	},
+	{
+		"description": "Trade-off: Do not match simple path-like fragments as URLs.",
+		"input": "/a/%2f/c",
+		"base": "http://example.org/foo/bar",
+		"failure": true
+	},
+	{
+		"description": "Trade-off: Do not match simple path-like fragments as URLs.",
+		"input": "#\u03b2",
+		"base": "http://example.org/foo/bar",
+		"failure": true
+	},
+	{
+		"input": "data:text/html,test#test",
+		"base": "http://example.org/foo/bar",
+		"description": "Data URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "tel:1234567890",
+		"base": "http://example.org/foo/bar",
+		"description": "Telephone URLs are not supported for inline detection",
+		"failure": true
+	},
+	"# Based on https://felixfbecker.github.io/whatwg-url-custom-host-repro/",
+	{
+		"input": "ssh://example.com/foo/bar.git",
+		"base": "http://example.org/",
+		"description": "SSH protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	"# Based on http://trac.webkit.org/browser/trunk/LayoutTests/fast/url/file.html",
+	{
+		"input": "file:c:\\foo\\bar.html",
+		"base": "file:///tmp/mock/path",
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	{
+		"input": "  File:c|////foo\\bar.html",
+		"base": "file:///tmp/mock/path",
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	{
+		"input": "C|/foo/bar",
+		"base": "file:///tmp/mock/path",
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	{
+		"input": "/C|\\foo\\bar",
+		"base": "file:///tmp/mock/path",
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	{
+		"input": "//C|/foo/bar",
+		"base": "file:///tmp/mock/path",
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	{
+		"input": "//server/file",
+		"base": "file:///tmp/mock/path",
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	{
+		"input": "\\\\server\\file",
+		"base": "file:///tmp/mock/path",
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	{
+		"input": "/\\server/file",
+		"base": "file:///tmp/mock/path",
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	{
+		"input": "file:///foo/bar.txt",
+		"base": "file:///tmp/mock/path",
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	{
+		"input": "file:///home/me",
+		"base": "file:///tmp/mock/path",
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	{
+		"description": "Only consider HTTP and HTTPS URLs for matching",
+		"input": "//",
+		"base": "file:///tmp/mock/path",
+		"failure": true
+	},
+	{
+		"input": "///",
+		"base": "file:///tmp/mock/path",
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "///test",
+		"base": "file:///tmp/mock/path",
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	{
+		"input": "file://test",
+		"base": "file:///tmp/mock/path",
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	{
+		"input": "file://localhost",
+		"base": "file:///tmp/mock/path",
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	{
+		"input": "file://localhost/",
+		"base": "file:///tmp/mock/path",
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	{
+		"input": "file://localhost/test",
+		"base": "file:///tmp/mock/path",
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	{
+		"input": "test",
+		"base": "file:///tmp/mock/path",
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	{
+		"input": "file:test",
+		"base": "file:///tmp/mock/path",
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	{
+		"input": "file:///w|m",
+		"base": null,
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	{
+		"input": "file:///w||m",
+		"base": null,
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	{
+		"input": "file:///w|/m",
+		"base": null,
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	{
+		"input": "file:C|/m/",
+		"base": null,
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	{
+		"input": "file:C||/m/",
+		"base": null,
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	"# Based on http://trac.webkit.org/browser/trunk/LayoutTests/fast/url/script-tests/path.js",
+	{
+		"input": "http://example.com/././foo",
+		"base": null,
+		"href": "http://example.com/foo",
+		"origin": "http://example.com",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "example.com",
+		"hostname": "example.com",
+		"port": "",
+		"pathname": "/foo",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"input": "http://example.com/./.foo",
+		"base": null,
+		"href": "http://example.com/.foo",
+		"origin": "http://example.com",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "example.com",
+		"hostname": "example.com",
+		"port": "",
+		"pathname": "/.foo",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"input": "http://example.com/foo/.",
+		"base": null,
+		"href": "http://example.com/foo/",
+		"origin": "http://example.com",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "example.com",
+		"hostname": "example.com",
+		"port": "",
+		"pathname": "/foo/",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"input": "http://example.com/foo/./",
+		"base": null,
+		"href": "http://example.com/foo/",
+		"origin": "http://example.com",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "example.com",
+		"hostname": "example.com",
+		"port": "",
+		"pathname": "/foo/",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"description": "Trade-off: Do not match the trailing '..' as a pathname segment. Treat it as a part of the surrounding text.",
+		"input": "http://example.com/foo/bar/..",
+		"base": null,
+		"href": "http://example.com/foo/bar/",
+		"origin": "http://example.com",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "example.com",
+		"hostname": "example.com",
+		"port": "",
+		"pathname": "/foo/bar/",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"description": "Match the non-trailing '..' as a pathname segment.",
+		"input": "http://example.com/foo/bar/../",
+		"base": null,
+		"href": "http://example.com/foo/",
+		"origin": "http://example.com",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "example.com",
+		"hostname": "example.com",
+		"port": "",
+		"pathname": "/foo/",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"input": "http://example.com/foo/..bar",
+		"base": null,
+		"href": "http://example.com/foo/..bar",
+		"origin": "http://example.com",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "example.com",
+		"hostname": "example.com",
+		"port": "",
+		"pathname": "/foo/..bar",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"input": "http://example.com/foo/bar/../ton",
+		"base": null,
+		"href": "http://example.com/foo/ton",
+		"origin": "http://example.com",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "example.com",
+		"hostname": "example.com",
+		"port": "",
+		"pathname": "/foo/ton",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"input": "http://example.com/foo/bar/../ton/../../a",
+		"base": null,
+		"href": "http://example.com/a",
+		"origin": "http://example.com",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "example.com",
+		"hostname": "example.com",
+		"port": "",
+		"pathname": "/a",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"input": "http://example.com/foo/../../..",
+		"base": null,
+		"href": "http://example.com/",
+		"origin": "http://example.com",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "example.com",
+		"hostname": "example.com",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"input": "http://example.com/foo/../../../ton",
+		"base": null,
+		"href": "http://example.com/ton",
+		"origin": "http://example.com",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "example.com",
+		"hostname": "example.com",
+		"port": "",
+		"pathname": "/ton",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"input": "http://example.com/foo/%2e",
+		"base": null,
+		"href": "http://example.com/foo/",
+		"origin": "http://example.com",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "example.com",
+		"hostname": "example.com",
+		"port": "",
+		"pathname": "/foo/",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"input": "http://example.com/foo/%2e%2",
+		"base": null,
+		"href": "http://example.com/foo/%2e%2",
+		"origin": "http://example.com",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "example.com",
+		"hostname": "example.com",
+		"port": "",
+		"pathname": "/foo/%2e%2",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"input": "http://example.com/foo/%2e./%2e%2e/.%2e/%2e.bar",
+		"base": null,
+		"href": "http://example.com/%2e.bar",
+		"origin": "http://example.com",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "example.com",
+		"hostname": "example.com",
+		"port": "",
+		"pathname": "/%2e.bar",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"description": "Trade-off: Do not match the trailing '..' as a pathname segment. Treat it as a part of the surrounding text. This means the final pathname contains 3 forward slashes.",
+		"input": "http://example.com////../..",
+		"base": null,
+		"href": "http://example.com///",
+		"origin": "http://example.com",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "example.com",
+		"hostname": "example.com",
+		"port": "",
+		"pathname": "///",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"input": "http://example.com/foo/bar//../..",
+		"base": null,
+		"href": "http://example.com/foo/bar/",
+		"origin": "http://example.com",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "example.com",
+		"hostname": "example.com",
+		"port": "",
+		"pathname": "/foo/bar/",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"description": "Trade-off: Do not match the trailing '..' as a pathname segment. Treat it as a part of the surrounding text. This means the final pathname ends with 2 forward slashes.",
+		"input": "http://example.com/foo/bar//..",
+		"base": null,
+		"href": "http://example.com/foo/bar//",
+		"origin": "http://example.com",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "example.com",
+		"hostname": "example.com",
+		"port": "",
+		"pathname": "/foo/bar//",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"input": "http://example.com/foo",
+		"base": null,
+		"href": "http://example.com/foo",
+		"origin": "http://example.com",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "example.com",
+		"hostname": "example.com",
+		"port": "",
+		"pathname": "/foo",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"input": "http://example.com/%20foo",
+		"base": null,
+		"href": "http://example.com/%20foo",
+		"origin": "http://example.com",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "example.com",
+		"hostname": "example.com",
+		"port": "",
+		"pathname": "/%20foo",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"input": "http://example.com/foo%",
+		"base": null,
+		"href": "http://example.com/foo%",
+		"origin": "http://example.com",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "example.com",
+		"hostname": "example.com",
+		"port": "",
+		"pathname": "/foo%",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"input": "http://example.com/foo%2",
+		"base": null,
+		"href": "http://example.com/foo%2",
+		"origin": "http://example.com",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "example.com",
+		"hostname": "example.com",
+		"port": "",
+		"pathname": "/foo%2",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"input": "http://example.com/foo%2zbar",
+		"base": null,
+		"href": "http://example.com/foo%2zbar",
+		"origin": "http://example.com",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "example.com",
+		"hostname": "example.com",
+		"port": "",
+		"pathname": "/foo%2zbar",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"input": "http://example.com/foo%2\u00c2\u00a9zbar",
+		"base": null,
+		"href": "http://example.com/foo%2%C3%82%C2%A9zbar",
+		"origin": "http://example.com",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "example.com",
+		"hostname": "example.com",
+		"port": "",
+		"pathname": "/foo%2%C3%82%C2%A9zbar",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"input": "http://example.com/foo%41%7a",
+		"base": null,
+		"href": "http://example.com/foo%41%7a",
+		"origin": "http://example.com",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "example.com",
+		"hostname": "example.com",
+		"port": "",
+		"pathname": "/foo%41%7a",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"description": "Trade-off: Truncate the matched URL at the first whitespace character.",
+		"input": "http://example.com/foo\t\u0091%91",
+		"base": null,
+		"href": "http://example.com/foo",
+		"origin": "http://example.com",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "example.com",
+		"hostname": "example.com",
+		"port": "",
+		"pathname": "/foo",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"input": "http://example.com/foo%00%51",
+		"base": null,
+		"href": "http://example.com/foo%00%51",
+		"origin": "http://example.com",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "example.com",
+		"hostname": "example.com",
+		"port": "",
+		"pathname": "/foo%00%51",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"description": "Trade-off: Do not match the trailing parenthesis as a pathname segment. Treat it as a part of the surrounding text \u2013 it's more likely to be that.",
+		"input": "http://example.com/(%28:%3A%29)",
+		"base": null,
+		"href": "http://example.com/(%28:%3A%29",
+		"origin": "http://example.com",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "example.com",
+		"hostname": "example.com",
+		"port": "",
+		"pathname": "/(%28:%3A%29",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"input": "http://example.com/%3A%3a%3C%3c",
+		"base": null,
+		"href": "http://example.com/%3A%3a%3C%3c",
+		"origin": "http://example.com",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "example.com",
+		"hostname": "example.com",
+		"port": "",
+		"pathname": "/%3A%3a%3C%3c",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"description": "Trade-off: Truncate the matched URL at the first whitespace character.",
+		"input": "http://example.com/foo\tbar",
+		"base": null,
+		"href": "http://example.com/foo",
+		"origin": "http://example.com",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "example.com",
+		"hostname": "example.com",
+		"port": "",
+		"pathname": "/foo",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"description": "Trade-off: Do not match initial \\ as a part of the pathname if it's not preceded by a forward slash. It is unlikely that anything starting with \\ is the intended pathname.",
+		"input": "http://example.com\\\\foo\\\\bar",
+		"base": null,
+		"href": "http://example.com/",
+		"origin": "http://example.com",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "example.com",
+		"hostname": "example.com",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"input": "http://example.com/%7Ffp3%3Eju%3Dduvgw%3Dd",
+		"base": null,
+		"href": "http://example.com/%7Ffp3%3Eju%3Dduvgw%3Dd",
+		"origin": "http://example.com",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "example.com",
+		"hostname": "example.com",
+		"port": "",
+		"pathname": "/%7Ffp3%3Eju%3Dduvgw%3Dd",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"input": "http://example.com/@asdf%40",
+		"base": null,
+		"href": "http://example.com/@asdf%40",
+		"origin": "http://example.com",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "example.com",
+		"hostname": "example.com",
+		"port": "",
+		"pathname": "/@asdf%40",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"input": "http://example.com/\u4f60\u597d\u4f60\u597d",
+		"base": null,
+		"href": "http://example.com/%E4%BD%A0%E5%A5%BD%E4%BD%A0%E5%A5%BD",
+		"origin": "http://example.com",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "example.com",
+		"hostname": "example.com",
+		"port": "",
+		"pathname": "/%E4%BD%A0%E5%A5%BD%E4%BD%A0%E5%A5%BD",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"input": "http://example.com/\u2025/foo",
+		"base": null,
+		"href": "http://example.com/%E2%80%A5/foo",
+		"origin": "http://example.com",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "example.com",
+		"hostname": "example.com",
+		"port": "",
+		"pathname": "/%E2%80%A5/foo",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"input": "http://example.com/\ufeff/foo",
+		"base": null,
+		"href": "http://example.com/%EF%BB%BF/foo",
+		"origin": "http://example.com",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "example.com",
+		"hostname": "example.com",
+		"port": "",
+		"pathname": "/%EF%BB%BF/foo",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"input": "http://example.com/\u202e/foo/\u202d/bar",
+		"base": null,
+		"href": "http://example.com/%E2%80%AE/foo/%E2%80%AD/bar",
+		"origin": "http://example.com",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "example.com",
+		"hostname": "example.com",
+		"port": "",
+		"pathname": "/%E2%80%AE/foo/%E2%80%AD/bar",
+		"search": "",
+		"hash": ""
+	},
+	"# Based on http://trac.webkit.org/browser/trunk/LayoutTests/fast/url/script-tests/relative.js",
+	{
+		"input": "http://www.google.com/foo?bar=baz#",
+		"base": null,
+		"href": "http://www.google.com/foo?bar=baz#",
+		"origin": "http://www.google.com",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "www.google.com",
+		"hostname": "www.google.com",
+		"port": "",
+		"pathname": "/foo",
+		"search": "?bar=baz",
+		"hash": ""
+	},
+	{
+		"description": "Trade-off: Truncate the matched URL at the first whitespace character.",
+		"input": "http://www.google.com/foo?bar=baz# \u00bb",
+		"base": null,
+		"href": "http://www.google.com/foo?bar=baz#",
+		"origin": "http://www.google.com",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "www.google.com",
+		"hostname": "www.google.com",
+		"port": "",
+		"pathname": "/foo",
+		"search": "?bar=baz",
+		"hash": ""
+	},
+	{
+		"input": "data:test# \u00bb",
+		"base": null,
+		"description": "Data URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "http://www.google.com",
+		"base": null,
+		"href": "http://www.google.com/",
+		"origin": "http://www.google.com",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "www.google.com",
+		"hostname": "www.google.com",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"input": "http://192.0x00A80001",
+		"base": null,
+		"href": "http://192.168.0.1/",
+		"origin": "http://192.168.0.1",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "192.168.0.1",
+		"hostname": "192.168.0.1",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"input": "http://www/foo%2Ehtml",
+		"base": null,
+		"href": "http://www/foo%2Ehtml",
+		"origin": "http://www",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "www",
+		"hostname": "www",
+		"port": "",
+		"pathname": "/foo%2Ehtml",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"input": "http://www/foo/%2E/html",
+		"base": null,
+		"href": "http://www/foo/html",
+		"origin": "http://www",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "www",
+		"hostname": "www",
+		"port": "",
+		"pathname": "/foo/html",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"description": "Trade-off: Match http://user, not the entire URL. This is not a valid WHATWG URL as a whole, but it helps us match fragments such as 'http://wp.org:the official WordPress.org site'",
+		"input": "http://user:pass@/",
+		"base": null,
+		"href": "http://user/",
+		"origin": "http://user",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "user",
+		"hostname": "user",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"input": "http://%25DOMAIN:foobar@foodomain.com/",
+		"base": null,
+		"failure": true,
+		"description": "URLs with authentication credentials are inappropriate for inline URL detection"
+	},
+	{
+		"description": "Trade-off: Assume a URL using backslashes is not meant for matching from text",
+		"input": "http:\\\\www.google.com\\foo",
+		"base": null,
+		"failure": true
+	},
+	{
+		"input": "http://foo:80/",
+		"base": null,
+		"href": "http://foo/",
+		"origin": "http://foo",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "foo",
+		"hostname": "foo",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"input": "http://foo:81/",
+		"base": null,
+		"href": "http://foo:81/",
+		"origin": "http://foo:81",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "foo:81",
+		"hostname": "foo",
+		"port": "81",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"description": "Trade-off: Do not consider non-http protocols for matching",
+		"input": "httpa://foo:80/",
+		"base": null,
+		"failure": true
+	},
+	{
+		"description": "Trade-off: Stop matching the URL at the non URL-like fragment that is :-80, but match everything before it",
+		"input": "http://foo:-80/",
+		"base": null,
+		"href": "http://foo/",
+		"origin": "http://foo",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "foo",
+		"hostname": "foo",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"input": "https://foo:443/",
+		"base": null,
+		"href": "https://foo/",
+		"origin": "https://foo",
+		"protocol": "https:",
+		"username": "",
+		"password": "",
+		"host": "foo",
+		"hostname": "foo",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"input": "https://foo:80/",
+		"base": null,
+		"href": "https://foo:80/",
+		"origin": "https://foo:80",
+		"protocol": "https:",
+		"username": "",
+		"password": "",
+		"host": "foo:80",
+		"hostname": "foo",
+		"port": "80",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"input": "ftp://foo:21/",
+		"base": null,
+		"description": "FTP protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "ftp://foo:80/",
+		"base": null,
+		"description": "FTP protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "gopher://foo:70/",
+		"base": null,
+		"description": "Gopher protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "gopher://foo:443/",
+		"base": null,
+		"description": "Gopher protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "ws://foo:80/",
+		"base": null,
+		"description": "WebSocket protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "ws://foo:81/",
+		"base": null,
+		"description": "WebSocket protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "ws://foo:443/",
+		"base": null,
+		"description": "WebSocket protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "ws://foo:815/",
+		"base": null,
+		"description": "WebSocket protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "wss://foo:80/",
+		"base": null,
+		"description": "Secure WebSocket protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "wss://foo:81/",
+		"base": null,
+		"description": "Secure WebSocket protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "wss://foo:443/",
+		"base": null,
+		"description": "Secure WebSocket protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "wss://foo:815/",
+		"base": null,
+		"description": "Secure WebSocket protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "http:/example.com/",
+		"base": null,
+		"href": "http://example.com/",
+		"origin": "http://example.com",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "example.com",
+		"hostname": "example.com",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"input": "ftp:/example.com/",
+		"base": null,
+		"description": "FTP protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "https:/example.com/",
+		"base": "http://example.org/foo/bar",
+		"href": "https://example.com/",
+		"origin": "https://example.com",
+		"protocol": "https:",
+		"username": "",
+		"password": "",
+		"host": "example.com",
+		"hostname": "example.com",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"input": "madeupscheme:/example.com/",
+		"base": null,
+		"description": "madeupscheme protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "file:/example.com/",
+		"base": null,
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	{
+		"input": "ftps:/example.com/",
+		"base": null,
+		"description": "FTPS protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "gopher:/example.com/",
+		"base": null,
+		"description": "Gopher protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "ws:/example.com/",
+		"base": null,
+		"description": "WebSocket protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "wss:/example.com/",
+		"base": null,
+		"description": "Secure WebSocket protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "data:/example.com/",
+		"base": null,
+		"description": "Data URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "javascript:/example.com/",
+		"base": null,
+		"description": "JavaScript URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "mailto:/example.com/",
+		"base": null,
+		"description": "Mailto URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "http:example.com/",
+		"base": null,
+		"href": "http://example.com/",
+		"origin": "http://example.com",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "example.com",
+		"hostname": "example.com",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"input": "ftp:example.com/",
+		"base": null,
+		"description": "FTP protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "madeupscheme:example.com/",
+		"base": null,
+		"description": "madeupscheme protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "ftps:example.com/",
+		"base": null,
+		"description": "FTPS protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "gopher:example.com/",
+		"base": null,
+		"description": "Gopher protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "ws:example.com/",
+		"base": null,
+		"description": "WebSocket protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "wss:example.com/",
+		"base": null,
+		"description": "Secure WebSocket protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "data:example.com/",
+		"base": null,
+		"description": "Data URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "javascript:example.com/",
+		"base": null,
+		"description": "JavaScript URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "mailto:example.com/",
+		"base": null,
+		"description": "Mailto URLs are not supported for inline detection",
+		"failure": true
+	},
+	"# Based on http://trac.webkit.org/browser/trunk/LayoutTests/fast/url/segments-userinfo-vs-host.html",
+	{
+		"input": "http:@www.example.com",
+		"base": null,
+		"href": "http://www.example.com/",
+		"origin": "http://www.example.com",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "www.example.com",
+		"hostname": "www.example.com",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"description": "Trade-off: Do not match hostnames starting with @",
+		"input": "http:/@www.example.com",
+		"base": null,
+		"failure": true
+	},
+	{
+		"description": "Trade-off: Do not match hostnames starting with @",
+		"input": "http://@www.example.com",
+		"base": null,
+		"failure": true
+	},
+	{
+		"input": "http:a:b@www.example.com",
+		"base": null,
+		"failure": true,
+		"description": "URLs with authentication credentials are inappropriate for inline URL detection"
+	},
+	{
+		"input": "http:/a:b@www.example.com",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "http://a:b@www.example.com",
+		"base": null,
+		"failure": true,
+		"description": "URLs with authentication credentials are inappropriate for inline URL detection"
+	},
+	{
+		"input": "http://@pple.com",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "http::b@www.example.com",
+		"base": null,
+		"failure": true,
+		"description": "URLs with authentication credentials are inappropriate for inline URL detection"
+	},
+	{
+		"input": "http:/:b@www.example.com",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "http://:b@www.example.com",
+		"base": null,
+		"failure": true,
+		"description": "URLs with authentication credentials are inappropriate for inline URL detection"
+	},
+	{
+		"input": "http:/:@/www.example.com",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "http:@/www.example.com",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "http:/@/www.example.com",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "http://@/www.example.com",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "https:@/www.example.com",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "http:a:b@/www.example.com",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "http:/a:b@/www.example.com",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "http::@/www.example.com",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "http:a:@www.example.com",
+		"base": null,
+		"failure": true,
+		"description": "URLs with authentication credentials are inappropriate for inline URL detection"
+	},
+	{
+		"description": "Trade-off: Do not match hostnames starting with @",
+		"input": "http:/a:@www.example.com",
+		"base": null,
+		"failure": true
+	},
+	{
+		"input": "http://a:@www.example.com",
+		"base": null,
+		"failure": true,
+		"description": "URLs with authentication credentials are inappropriate for inline URL detection"
+	},
+	{
+		"input": "http://www.@pple.com",
+		"base": null,
+		"failure": true,
+		"description": "URLs with authentication credentials are inappropriate for inline URL detection"
+	},
+	{
+		"input": "http:@:www.example.com",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "http:/@:www.example.com",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "http://@:www.example.com",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "http://:@www.example.com",
+		"base": null,
+		"href": "http://www.example.com/",
+		"origin": "http://www.example.com",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "www.example.com",
+		"hostname": "www.example.com",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	"# Others",
+	{
+		"description": "Trade-off: Do not match short path fragments as URLs.",
+		"input": "/",
+		"base": "http://www.example.com/test",
+		"failure": true
+	},
+	{
+		"description": "Trade-off: Do not match short path fragments as URLs.",
+		"input": "/test.txt",
+		"base": "http://www.example.com/test",
+		"failure": true
+	},
+	{
+		"description": "Trade-off: Do not match short path fragments as URLs.",
+		"input": ".",
+		"base": "http://www.example.com/test",
+		"failure": true
+	},
+	{
+		"description": "Trade-off: Do not match short path fragments as URLs.",
+		"input": "..",
+		"base": "http://www.example.com/test",
+		"failure": true
+	},
+	{
+		"description": "Trade-off: Do not match short path fragments as URLs.",
+		"input": "test.txt",
+		"base": "http://www.example.com/test",
+		"failure": true
+	},
+	{
+		"description": "Trade-off: Do not match short path fragments as URLs.",
+		"input": "./test.txt",
+		"base": "http://www.example.com/test",
+		"failure": true
+	},
+	{
+		"description": "Trade-off: Do not match short path fragments as URLs.",
+		"input": "../test.txt",
+		"base": "http://www.example.com/test",
+		"failure": true
+	},
+	{
+		"description": "Trade-off: Do not match short path fragments as URLs.",
+		"input": "../aaa/test.txt",
+		"base": "http://www.example.com/test",
+		"failure": true
+	},
+	{
+		"description": "Trade-off: Do not match short path fragments as URLs.",
+		"input": "../../test.txt",
+		"base": "http://www.example.com/test",
+		"failure": true
+	},
+	{
+		"description": "Trade-off: Do not match short path fragments as URLs.",
+		"input": "\u4e2d/test.txt",
+		"base": "http://www.example.com/test",
+		"failure": true
+	},
+	{
+		"input": "http://www.example2.com",
+		"base": "http://www.example.com/test",
+		"href": "http://www.example2.com/",
+		"origin": "http://www.example2.com",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "www.example2.com",
+		"hostname": "www.example2.com",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"input": "//www.example2.com",
+		"base": "http://www.example.com/test",
+		"href": "http://www.example2.com/",
+		"origin": "http://www.example2.com",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "www.example2.com",
+		"hostname": "www.example2.com",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"input": "file:...",
+		"base": "http://www.example.com/test",
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	{
+		"input": "file:..",
+		"base": "http://www.example.com/test",
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	{
+		"input": "file:a",
+		"base": "http://www.example.com/test",
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	{
+		"input": "file:.",
+		"base": null,
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	{
+		"input": "file:.",
+		"base": "http://www.example.com/test",
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	"# Based on http://trac.webkit.org/browser/trunk/LayoutTests/fast/url/host.html",
+	"Basic canonicalization, uppercase should be converted to lowercase",
+	{
+		"input": "http://ExAmPlE.CoM",
+		"base": "http://other.com/",
+		"href": "http://example.com/",
+		"origin": "http://example.com",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "example.com",
+		"hostname": "example.com",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"input": "http://Goo%20 goo%7C|.com",
+		"base": "http://other.com/",
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "http://[]",
+		"base": "http://other.com/",
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "http://[:]",
+		"base": "http://other.com/",
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	"Other types of space (no-break, zero-width, zero-width-no-break) are name-prepped away to nothing. U+200B, U+2060, and U+FEFF, are ignored",
+	{
+		"description": "Trade-off: Only treat goo.com as the URL. ",
+		"input": "http://GOO\u200b\u2060\ufeffgoo.com",
+		"base": "http://other.com/",
+		"href": "http://goo/",
+		"origin": "http://goo",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "goo",
+		"hostname": "goo",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	"Leading and trailing C0 control or space",
+	{
+		"input": "\u0000\u001b\u0004\u0012 http://example.com/\u001f \r ",
+		"base": null,
+		"href": "http://example.com/",
+		"origin": "http://example.com",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "example.com",
+		"hostname": "example.com",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	"Ideographic full stop (full-width period for Chinese, etc.) should be treated as a dot. U+3002 is mapped to U+002E (dot)",
+	{
+		"description": "Trade-off: Match the URL up until the first non-URL-like part",
+		"input": "http://www.foo\u3002bar.com",
+		"base": "http://other.com/",
+		"href": "http://www.foo/",
+		"origin": "http://www.foo",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "www.foo",
+		"hostname": "www.foo",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	"Invalid unicode characters should fail... U+FDD0 is disallowed; %ef%b7%90 is U+FDD0",
+	{
+		"description": "Trade-off: match the longest URL-like part. In this case, zyx.com gets matched and superseded by its base URL.",
+		"input": "http://\ufdd0zyx.com",
+		"base": "http://zyx.com/",
+		"host": "zyx.com",
+		"hostname": "zyx.com",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	"This is the same as previous but escaped",
+	{
+		"input": "http://%ef%b7%90zyx.com",
+		"base": "http://other.com/",
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	"U+FFFD",
+	{
+		"input": "https://\ufffd",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "https://%EF%BF%BD",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "https://x/\ufffd?\ufffd#\ufffd",
+		"base": null,
+		"href": "https://x/%EF%BF%BD?%EF%BF%BD#%EF%BF%BD",
+		"origin": "https://x",
+		"protocol": "https:",
+		"username": "",
+		"password": "",
+		"host": "x",
+		"hostname": "x",
+		"port": "",
+		"pathname": "/%EF%BF%BD",
+		"search": "?%EF%BF%BD",
+		"hash": "#%EF%BF%BD"
+	},
+	"Domain is ASCII, but a label is invalid IDNA",
+	{
+		"input": "http://a.b.c.xn--pokxncvks",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "http://10.0.0.xn--pokxncvks",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	"IDNA labels should be matched case-insensitively",
+	{
+		"input": "http://a.b.c.XN--pokxncvks",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "http://a.b.c.Xn--pokxncvks",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "http://10.0.0.XN--pokxncvks",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "http://10.0.0.xN--pokxncvks",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	"Test name prepping, fullwidth input should be converted to ASCII and NOT IDN-ized. This is 'Go' in fullwidth UTF-8/UTF-16.",
+	{
+		"input": "http://\uff27\uff4f.com",
+		"base": "http://other.com/",
+		"href": "http://go.com/",
+		"origin": "http://go.com",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "go.com",
+		"hostname": "go.com",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	"URL spec forbids the following. https://www.w3.org/Bugs/Public/show_bug.cgi?id=24257",
+	{
+		"description": "Trade-off: match the longest URL-like part. In this case, \uff14\uff11.com gets matched",
+		"input": "http://\uff05\uff14\uff11.com",
+		"base": "http://other.com/",
+		"href": "http://41.com/",
+		"origin": "http://41.com",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "41.com",
+		"hostname": "41.com",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"input": "http://%ef%bc%85%ef%bc%94%ef%bc%91.com",
+		"base": "http://other.com/",
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	"...%00 in fullwidth should fail (also as escaped UTF-8 input)",
+	{
+		"description": "Trade-off: match the longest URL-like part. In this case, \uff10\uff10.com gets matched",
+		"input": "http://\uff05\uff10\uff10.com",
+		"base": "http://other.com/",
+		"href": "http://00.com/",
+		"origin": "http://00.com",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "00.com",
+		"hostname": "00.com",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"input": "http://%ef%bc%85%ef%bc%90%ef%bc%90.com",
+		"base": "http://other.com/",
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	"Basic IDN support, UTF-8 and UTF-16 input should be converted to IDN",
+	{
+		"input": "http://\u4f60\u597d\u4f60\u597d",
+		"base": "http://other.com/",
+		"href": "http://xn--6qqa088eba/",
+		"origin": "http://xn--6qqa088eba",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "xn--6qqa088eba",
+		"hostname": "xn--6qqa088eba",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"input": "https://fa\u00df.ExAmPlE/",
+		"base": null,
+		"href": "https://xn--fa-hia.example/",
+		"origin": "https://xn--fa-hia.example",
+		"protocol": "https:",
+		"username": "",
+		"password": "",
+		"host": "xn--fa-hia.example",
+		"hostname": "xn--fa-hia.example",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"description": "Only consider HTTP and HTTPS URLs for matching",
+		"input": "sc://fa\u00df.ExAmPlE/",
+		"base": null,
+		"failure": true
+	},
+	"Invalid escaped characters should fail and the percents should be escaped. https://www.w3.org/Bugs/Public/show_bug.cgi?id=24191",
+	{
+		"input": "http://%zz%66%a.com",
+		"base": "http://other.com/",
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	"If we get an invalid character that has been escaped.",
+	{
+		"input": "http://%25",
+		"base": "http://other.com/",
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "http://hello%00",
+		"base": "http://other.com/",
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	"Escaped numbers should be treated like IP addresses if they are.",
+	{
+		"input": "http://%30%78%63%30%2e%30%32%35%30.01",
+		"base": "http://other.com/",
+		"href": "http://192.168.0.1/",
+		"origin": "http://192.168.0.1",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "192.168.0.1",
+		"hostname": "192.168.0.1",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"input": "http://%30%78%63%30%2e%30%32%35%30.01%2e",
+		"base": "http://other.com/",
+		"href": "http://192.168.0.1/",
+		"origin": "http://192.168.0.1",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "192.168.0.1",
+		"hostname": "192.168.0.1",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"input": "http://192.168.0.257",
+		"base": "http://other.com/",
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	"Invalid escaping in hosts causes failure",
+	{
+		"input": "http://%3g%78%63%30%2e%30%32%35%30%2E.01",
+		"base": "http://other.com/",
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"description": "Trade-off: Match the URL up until the first whitespace",
+		"input": "https://x x:12",
+		"base": null,
+		"href": "https://x/",
+		"origin": "https://x",
+		"protocol": "https:",
+		"username": "",
+		"password": "",
+		"host": "x",
+		"hostname": "x",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	"Fullwidth and escaped UTF-8 fullwidth should still be treated as IP",
+	{
+		"input": "http://\uff10\uff38\uff43\uff10\uff0e\uff10\uff12\uff15\uff10\uff0e\uff10\uff11",
+		"base": "http://other.com/",
+		"href": "http://0.0.0.192/",
+		"origin": "http://0.0.0.192",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "0.0.0.192",
+		"hostname": "0.0.0.192",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	"Domains with empty labels",
+	{
+		"description": "Trade-off: Do not match (almost) scheme-only as a URL. It's unlikely to be intended for matching from text.",
+		"input": "http://./",
+		"base": null,
+		"failure": true
+	},
+	{
+		"description": "Trade-off: Do not match (almost) scheme-only as a URL. It's unlikely to be intended for matching from text.",
+		"input": "http://../",
+		"base": null,
+		"failure": true
+	},
+	"Non-special domains with empty labels",
+	{
+		"input": "h://.",
+		"base": null,
+		"description": "h protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	"Broken IPv6",
+	{
+		"input": "http://[www.google.com]/",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"description": "Trade-off: Match the URL up until the first non-URL-like part",
+		"input": "http://[google.com]",
+		"base": "http://other.com/",
+		"href": "http://google.com/",
+		"origin": "http://google.com",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "google.com",
+		"hostname": "google.com",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"input": "http://[::1.2.3.4x]",
+		"base": "http://other.com/",
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "http://[::1.2.3.]",
+		"base": "http://other.com/",
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "http://[::1.2.]",
+		"base": "http://other.com/",
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "http://[::.1.2]",
+		"base": "http://other.com/",
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "http://[::1.]",
+		"base": "http://other.com/",
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "http://[::.1]",
+		"base": "http://other.com/",
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "http://[::%31]",
+		"base": "http://other.com/",
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "http://%5B::1]",
+		"base": "http://other.com/",
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	"Misc Unicode",
+	{
+		"input": "http://foo:\ud83d\udca9@example.com/bar",
+		"base": "http://other.com/",
+		"failure": true,
+		"description": "URLs with authentication credentials are inappropriate for inline URL detection"
+	},
+	"# resolving a fragment against any scheme succeeds",
+	{
+		"input": "#",
+		"base": "test:test",
+		"description": "test protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "#x",
+		"base": "mailto:x@x.com",
+		"description": "Mailto URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "#x",
+		"base": "data:,",
+		"description": "Data URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "#x",
+		"base": "about:blank",
+		"description": "About URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "#x:y",
+		"base": "about:blank",
+		"description": "About URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "#",
+		"base": "test:test?test",
+		"description": "test protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	"# multiple @ in authority state",
+	{
+		"description": "Trade-off: Do not match strings starting with unescaped @ as hostnames \u2013 they are unlikely to be intended for matching",
+		"input": "https://@test@test@example:800/",
+		"base": "http://doesnotmatter/",
+		"failure": true
+	},
+	{
+		"input": "https://@@@example",
+		"base": "http://doesnotmatter/",
+		"failure": true
+	},
+	"non-az-09 characters",
+	{
+		"input": "http://`{}:`{}@h/`{}?`{}",
+		"base": "http://doesnotmatter/",
+		"failure": true,
+		"description": "URLs with authentication credentials are inappropriate for inline URL detection"
+	},
+	"byte is ' and url is special",
+	{
+		"description": "Trade-off: Do not match the trailing ' character. It is more likely to be a part of the surrounding text or syntax.",
+		"input": "http://host/?'",
+		"base": null,
+		"href": "http://host/",
+		"origin": "http://host",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "host",
+		"hostname": "host",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"input": "notspecial://host/?'",
+		"base": null,
+		"description": "notspecial protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	"# Credentials in base",
+	{
+		"input": "/some/path",
+		"base": "http://user@example.org/smth",
+		"failure": true,
+		"description": "URLs with authentication credentials are inappropriate for inline URL detection"
+	},
+	{
+		"input": "",
+		"base": "http://user:pass@example.org:21/smth",
+		"failure": true,
+		"description": "URLs with authentication credentials are inappropriate for inline URL detection"
+	},
+	{
+		"input": "/some/path",
+		"base": "http://user:pass@example.org:21/smth",
+		"failure": true,
+		"description": "URLs with authentication credentials are inappropriate for inline URL detection"
+	},
+	"# a set of tests designed by zcorpan for relative URLs with unknown schemes",
+	{
+		"input": "i",
+		"base": "sc:sd",
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "i",
+		"base": "sc:sd/sd",
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "i",
+		"base": "sc:/pa/pa",
+		"description": "sc protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "i",
+		"base": "sc://ho/pa",
+		"description": "sc protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "i",
+		"base": "sc:///pa/pa",
+		"description": "sc protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "../i",
+		"base": "sc:sd",
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "../i",
+		"base": "sc:sd/sd",
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "../i",
+		"base": "sc:/pa/pa",
+		"description": "sc protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "../i",
+		"base": "sc://ho/pa",
+		"description": "sc protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "../i",
+		"base": "sc:///pa/pa",
+		"description": "sc protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "/i",
+		"base": "sc:sd",
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "/i",
+		"base": "sc:sd/sd",
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "/i",
+		"base": "sc:/pa/pa",
+		"description": "sc protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "/i",
+		"base": "sc://ho/pa",
+		"description": "sc protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "/i",
+		"base": "sc:///pa/pa",
+		"description": "sc protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "?i",
+		"base": "sc:sd",
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "?i",
+		"base": "sc:sd/sd",
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "?i",
+		"base": "sc:/pa/pa",
+		"description": "sc protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "?i",
+		"base": "sc://ho/pa",
+		"description": "sc protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "?i",
+		"base": "sc:///pa/pa",
+		"description": "sc protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "#i",
+		"base": "sc:sd",
+		"description": "sc protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "#i",
+		"base": "sc:sd/sd",
+		"description": "sc protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "#i",
+		"base": "sc:/pa/pa",
+		"description": "sc protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "#i",
+		"base": "sc://ho/pa",
+		"description": "sc protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "#i",
+		"base": "sc:///pa/pa",
+		"description": "sc protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	"# make sure that relative URL logic works on known typically non-relative schemes too",
+	{
+		"input": "about:/../",
+		"base": null,
+		"description": "About URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "data:/../",
+		"base": null,
+		"description": "Data URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "javascript:/../",
+		"base": null,
+		"description": "JavaScript URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "mailto:/../",
+		"base": null,
+		"description": "Mailto URLs are not supported for inline detection",
+		"failure": true
+	},
+	"# unknown schemes and their hosts",
+	{
+		"input": "sc://\u00f1.test/",
+		"base": null,
+		"description": "sc protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "sc://%/",
+		"base": null,
+		"description": "sc protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "sc://@/",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "sc://te@s:t@/",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "sc://:/",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "sc://:12/",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "x",
+		"base": "sc://\u00f1",
+		"description": "sc protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	"# unknown schemes and backslashes",
+	{
+		"input": "sc:\\../",
+		"base": null,
+		"description": "sc protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	"# unknown scheme with path looking like a password",
+	{
+		"input": "sc::a@example.net",
+		"base": null,
+		"description": "sc protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	"# unknown scheme with bogus percent-encoding",
+	{
+		"input": "wow:%NBD",
+		"base": null,
+		"description": "wow protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "wow:%1G",
+		"base": null,
+		"description": "wow protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	"# unknown scheme with non-URL characters",
+	{
+		"input": "wow:\uffff",
+		"base": null,
+		"description": "wow protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	"Forbidden host code points",
+	{
+		"input": "sc://a\u0000b/",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "sc://a b/",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "sc://a<b",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "sc://a>b",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "sc://a[b/",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "sc://a\\b/",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "sc://a]b/",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "sc://a^b",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "sc://a|b/",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	"Forbidden host codepoints: tabs and newlines are removed during preprocessing",
+	{
+		"input": "foo://ho\tst/",
+		"base": null,
+		"description": "foo protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "foo://ho\nst/",
+		"base": null,
+		"description": "foo protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "foo://ho\rst/",
+		"base": null,
+		"description": "foo protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	"Forbidden domain code-points",
+	{
+		"description": "Trade-off: Match the URL up until the first non-URL-like part",
+		"input": "http://a\u0000b/",
+		"base": null,
+		"href": "http://a/",
+		"origin": "http://a",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "a",
+		"hostname": "a",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"description": "Trade-off: Match the URL up until the first non-URL-like part",
+		"input": "http://a\u0001b/",
+		"base": null,
+		"href": "http://a/",
+		"origin": "http://a",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "a",
+		"hostname": "a",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"description": "Trade-off: Match the URL up until the first non-URL-like part",
+		"input": "http://a\u0002b/",
+		"base": null,
+		"href": "http://a/",
+		"origin": "http://a",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "a",
+		"hostname": "a",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"description": "Trade-off: Match the URL up until the first non-URL-like part",
+		"input": "http://a\u0003b/",
+		"base": null,
+		"href": "http://a/",
+		"origin": "http://a",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "a",
+		"hostname": "a",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"description": "Trade-off: Match the URL up until the first non-URL-like part",
+		"input": "http://a\u0004b/",
+		"base": null,
+		"href": "http://a/",
+		"origin": "http://a",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "a",
+		"hostname": "a",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"description": "Trade-off: Match the URL up until the first non-URL-like part",
+		"input": "http://a\u0005b/",
+		"base": null,
+		"href": "http://a/",
+		"origin": "http://a",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "a",
+		"hostname": "a",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"description": "Trade-off: Match the URL up until the first non-URL-like part",
+		"input": "http://a\u0006b/",
+		"base": null,
+		"href": "http://a/",
+		"origin": "http://a",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "a",
+		"hostname": "a",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"description": "Trade-off: Match the URL up until the first non-URL-like part",
+		"input": "http://a\u0007b/",
+		"base": null,
+		"href": "http://a/",
+		"origin": "http://a",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "a",
+		"hostname": "a",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"description": "Trade-off: Match the URL up until the first non-URL-like part",
+		"input": "http://a\bb/",
+		"base": null,
+		"href": "http://a/",
+		"origin": "http://a",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "a",
+		"hostname": "a",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"description": "Trade-off: Match the URL up until the first non-URL-like part",
+		"input": "http://a\u000bb/",
+		"base": null,
+		"href": "http://a/",
+		"origin": "http://a",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "a",
+		"hostname": "a",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"description": "Trade-off: Match the URL up until the first non-URL-like part",
+		"input": "http://a\fb/",
+		"base": null,
+		"href": "http://a/",
+		"origin": "http://a",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "a",
+		"hostname": "a",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"description": "Trade-off: Match the URL up until the first non-URL-like part",
+		"input": "http://a\u000eb/",
+		"base": null,
+		"href": "http://a/",
+		"origin": "http://a",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "a",
+		"hostname": "a",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"description": "Trade-off: Match the URL up until the first non-URL-like part",
+		"input": "http://a\u000fb/",
+		"base": null,
+		"href": "http://a/",
+		"origin": "http://a",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "a",
+		"hostname": "a",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"description": "Trade-off: Match the URL up until the first non-URL-like part",
+		"input": "http://a\u0010b/",
+		"base": null,
+		"href": "http://a/",
+		"origin": "http://a",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "a",
+		"hostname": "a",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"description": "Trade-off: Match the URL up until the first non-URL-like part",
+		"input": "http://a\u0011b/",
+		"base": null,
+		"href": "http://a/",
+		"origin": "http://a",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "a",
+		"hostname": "a",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"description": "Trade-off: Match the URL up until the first non-URL-like part",
+		"input": "http://a\u0012b/",
+		"base": null,
+		"href": "http://a/",
+		"origin": "http://a",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "a",
+		"hostname": "a",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"description": "Trade-off: Match the URL up until the first non-URL-like part",
+		"input": "http://a\u0013b/",
+		"base": null,
+		"href": "http://a/",
+		"origin": "http://a",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "a",
+		"hostname": "a",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"description": "Trade-off: Match the URL up until the first non-URL-like part",
+		"input": "http://a\u0014b/",
+		"base": null,
+		"href": "http://a/",
+		"origin": "http://a",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "a",
+		"hostname": "a",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"description": "Trade-off: Match the URL up until the first non-URL-like part",
+		"input": "http://a\u0015b/",
+		"base": null,
+		"href": "http://a/",
+		"origin": "http://a",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "a",
+		"hostname": "a",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"description": "Trade-off: Match the URL up until the first non-URL-like part",
+		"input": "http://a\u0016b/",
+		"base": null,
+		"href": "http://a/",
+		"origin": "http://a",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "a",
+		"hostname": "a",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"description": "Trade-off: Match the URL up until the first non-URL-like part",
+		"input": "http://a\u0017b/",
+		"base": null,
+		"href": "http://a/",
+		"origin": "http://a",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "a",
+		"hostname": "a",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"description": "Trade-off: Match the URL up until the first non-URL-like part",
+		"input": "http://a\u0018b/",
+		"base": null,
+		"href": "http://a/",
+		"origin": "http://a",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "a",
+		"hostname": "a",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"description": "Trade-off: Match the URL up until the first non-URL-like part",
+		"input": "http://a\u0019b/",
+		"base": null,
+		"href": "http://a/",
+		"origin": "http://a",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "a",
+		"hostname": "a",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"description": "Trade-off: Match the URL up until the first non-URL-like part",
+		"input": "http://a\u001ab/",
+		"base": null,
+		"href": "http://a/",
+		"origin": "http://a",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "a",
+		"hostname": "a",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"description": "Trade-off: Match the URL up until the first non-URL-like part",
+		"input": "http://a\u001bb/",
+		"base": null,
+		"href": "http://a/",
+		"origin": "http://a",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "a",
+		"hostname": "a",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"description": "Trade-off: Match the URL up until the first non-URL-like part",
+		"input": "http://a\u001cb/",
+		"base": null,
+		"href": "http://a/",
+		"origin": "http://a",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "a",
+		"hostname": "a",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"description": "Trade-off: Match the URL up until the first non-URL-like part",
+		"input": "http://a\u001db/",
+		"base": null,
+		"href": "http://a/",
+		"origin": "http://a",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "a",
+		"hostname": "a",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"description": "Trade-off: Match the URL up until the first non-URL-like part",
+		"input": "http://a\u001eb/",
+		"base": null,
+		"href": "http://a/",
+		"origin": "http://a",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "a",
+		"hostname": "a",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"description": "Trade-off: Match the URL up until the first non-URL-like part",
+		"input": "http://a\u001fb/",
+		"base": null,
+		"href": "http://a/",
+		"origin": "http://a",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "a",
+		"hostname": "a",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"description": "Trade-off: Match the URL up until the first non-URL-like part",
+		"input": "http://a b/",
+		"base": null,
+		"href": "http://a/",
+		"origin": "http://a",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "a",
+		"hostname": "a",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"input": "http://a%b/",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"description": "Trade-off: Match the URL up until the first non-URL-like part",
+		"input": "http://a<b",
+		"base": null,
+		"href": "http://a/",
+		"origin": "http://a",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "a",
+		"hostname": "a",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"description": "Trade-off: Match the URL up until the first non-URL-like part",
+		"input": "http://a>b",
+		"base": null,
+		"href": "http://a/",
+		"origin": "http://a",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "a",
+		"hostname": "a",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"description": "Trade-off: Match the URL up until the first non-URL-like part",
+		"input": "http://a[b/",
+		"base": null,
+		"href": "http://a/",
+		"origin": "http://a",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "a",
+		"hostname": "a",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"description": "Trade-off: Match the URL up until the first non-URL-like part",
+		"input": "http://a]b/",
+		"base": null,
+		"href": "http://a/",
+		"origin": "http://a",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "a",
+		"hostname": "a",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"description": "Trade-off: Match the URL up until the first non-URL-like part",
+		"input": "http://a^b",
+		"base": null,
+		"href": "http://a/",
+		"origin": "http://a",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "a",
+		"hostname": "a",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"description": "Trade-off: Match the URL up until the first non-URL-like part",
+		"input": "http://a|b/",
+		"base": null,
+		"href": "http://a/",
+		"origin": "http://a",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "a",
+		"hostname": "a",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"description": "Trade-off: Match the URL up until the first non-URL-like part",
+		"input": "http://a\u007fb/",
+		"base": null,
+		"href": "http://a/",
+		"origin": "http://a",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "a",
+		"hostname": "a",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	"Forbidden domain codepoints: tabs and newlines are removed during preprocessing",
+	{
+		"description": "Trade-off: Match the URL up until the first whitespace character",
+		"input": "http://ho\tst/",
+		"base": null,
+		"hash": "",
+		"host": "ho",
+		"hostname": "ho",
+		"href": "http://ho/",
+		"password": "",
+		"pathname": "/",
+		"port": "",
+		"protocol": "http:",
+		"search": "",
+		"username": ""
+	},
+	{
+		"description": "Trade-off: Match the URL up until the first whitespace character",
+		"input": "http://ho\nst/",
+		"base": null,
+		"hash": "",
+		"host": "ho",
+		"hostname": "ho",
+		"href": "http://ho/",
+		"password": "",
+		"pathname": "/",
+		"port": "",
+		"protocol": "http:",
+		"search": "",
+		"username": ""
+	},
+	{
+		"description": "Trade-off: Match the URL up until the first whitespace character",
+		"input": "http://ho\rst/",
+		"base": null,
+		"hash": "",
+		"host": "ho",
+		"hostname": "ho",
+		"href": "http://ho/",
+		"password": "",
+		"pathname": "/",
+		"port": "",
+		"protocol": "http:",
+		"search": "",
+		"username": ""
+	},
+	"Encoded forbidden domain codepoints in special URLs",
+	{
+		"input": "http://ho%00st/",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "http://ho%01st/",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "http://ho%02st/",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "http://ho%03st/",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "http://ho%04st/",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "http://ho%05st/",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "http://ho%06st/",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "http://ho%07st/",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "http://ho%08st/",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "http://ho%09st/",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "http://ho%0Ast/",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "http://ho%0Bst/",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "http://ho%0Cst/",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "http://ho%0Dst/",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "http://ho%0Est/",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "http://ho%0Fst/",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "http://ho%10st/",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "http://ho%11st/",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "http://ho%12st/",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "http://ho%13st/",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "http://ho%14st/",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "http://ho%15st/",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "http://ho%16st/",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "http://ho%17st/",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "http://ho%18st/",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "http://ho%19st/",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "http://ho%1Ast/",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "http://ho%1Bst/",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "http://ho%1Cst/",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "http://ho%1Dst/",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "http://ho%1Est/",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "http://ho%1Fst/",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "http://ho%20st/",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "http://ho%23st/",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "http://ho%25st/",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "http://ho%2Fst/",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "http://ho%3Ast/",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "http://ho%3Cst/",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "http://ho%3Est/",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "http://ho%3Fst/",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "http://ho%40st/",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "http://ho%5Bst/",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "http://ho%5Cst/",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "http://ho%5Dst/",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "http://ho%7Cst/",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "http://ho%7Fst/",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	"Allowed host/domain code points",
+	{
+		"description": "Trade-off: Don't match punctuation-based hostnames \u2013 they are unlikely to be intended for matching",
+		"input": "http://!\"$&'()*+,-.;=_`{}~/",
+		"base": null,
+		"failure": true
+	},
+	{
+		"input": "sc://\u0001\u0002\u0003\u0004\u0005\u0006\u0007\b\u000b\f\u000e\u000f\u0010\u0011\u0012\u0013\u0014\u0015\u0016\u0017\u0018\u0019\u001a\u001b\u001c\u001d\u001e\u001f\u007f!\"$%&'()*+,-.;=_`{}~/",
+		"base": null,
+		"description": "sc protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	"# Hosts and percent-encoding",
+	{
+		"input": "ftp://example.com%80/",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "ftp://example.com%A0/",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"description": "Trade-off: Match the URL up until the first non-URL-like part",
+		"input": "https://example.com%80/",
+		"base": null,
+		"href": "https://example.com/",
+		"origin": "https://example.com",
+		"protocol": "https:",
+		"username": "",
+		"password": "",
+		"host": "example.com",
+		"hostname": "example.com",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"description": "Trade-off: Match the URL up until the first non-URL-like part",
+		"input": "https://example.com%A0/",
+		"base": null,
+		"href": "https://example.com/",
+		"origin": "https://example.com",
+		"protocol": "https:",
+		"username": "",
+		"password": "",
+		"host": "example.com",
+		"hostname": "example.com",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"input": "ftp://%e2%98%83",
+		"base": null,
+		"description": "FTP protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "https://%e2%98%83",
+		"base": null,
+		"href": "https://xn--n3h/",
+		"origin": "https://xn--n3h",
+		"protocol": "https:",
+		"username": "",
+		"password": "",
+		"host": "xn--n3h",
+		"hostname": "xn--n3h",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	"# tests from jsdom/whatwg-url designed for code coverage",
+	{
+		"input": "http://127.0.0.1:10100/relative_import.html",
+		"base": null,
+		"href": "http://127.0.0.1:10100/relative_import.html",
+		"origin": "http://127.0.0.1:10100",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "127.0.0.1:10100",
+		"hostname": "127.0.0.1",
+		"port": "10100",
+		"pathname": "/relative_import.html",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"input": "http://facebook.com/?foo=%7B%22abc%22",
+		"base": null,
+		"href": "http://facebook.com/?foo=%7B%22abc%22",
+		"origin": "http://facebook.com",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "facebook.com",
+		"hostname": "facebook.com",
+		"port": "",
+		"pathname": "/",
+		"search": "?foo=%7B%22abc%22",
+		"hash": ""
+	},
+	{
+		"input": "https://localhost:3000/jqueryui@1.2.3",
+		"base": null,
+		"href": "https://localhost:3000/jqueryui@1.2.3",
+		"origin": "https://localhost:3000",
+		"protocol": "https:",
+		"username": "",
+		"password": "",
+		"host": "localhost:3000",
+		"hostname": "localhost",
+		"port": "3000",
+		"pathname": "/jqueryui@1.2.3",
+		"search": "",
+		"hash": ""
+	},
+	"# tab/LF/CR",
+	{
+		"input": "h\tt\nt\rp://h\to\ns\rt:9\t0\n0\r0/p\ta\nt\rh?q\tu\ne\rry#f\tr\na\rg",
+		"base": null,
+		"failure": true,
+		"description": "The URL is unlikely to be intended for matching."
+	},
+	"# Stringification of URL.searchParams",
+	{
+		"input": "?a=b&c=d",
+		"base": "http://example.org/foo/bar",
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "??a=b&c=d",
+		"base": "http://example.org/foo/bar",
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	"# Scheme only",
+	{
+		"description": "Trade-off: Do not match scheme-only as a URL. It's unlikely to be intended for matching from text.",
+		"input": "http:",
+		"base": "http://example.org/foo/bar",
+		"failure": true
+	},
+	{
+		"input": "http:",
+		"base": "https://example.org/foo/bar",
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "sc:",
+		"base": "https://example.org/foo/bar",
+		"description": "sc protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	"# Percent encoding of fragments",
+	{
+		"input": "http://foo.bar/baz?qux#foo\bbar",
+		"base": null,
+		"href": "http://foo.bar/baz?qux#foo%08bar",
+		"origin": "http://foo.bar",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "foo.bar",
+		"hostname": "foo.bar",
+		"port": "",
+		"pathname": "/baz",
+		"search": "?qux",
+		"searchParams": "qux=",
+		"hash": "#foo%08bar"
+	},
+	{
+		"input": "http://foo.bar/baz?qux#foo\"bar",
+		"base": null,
+		"href": "http://foo.bar/baz?qux#foo%22bar",
+		"origin": "http://foo.bar",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "foo.bar",
+		"hostname": "foo.bar",
+		"port": "",
+		"pathname": "/baz",
+		"search": "?qux",
+		"searchParams": "qux=",
+		"hash": "#foo%22bar"
+	},
+	{
+		"description": "Trade-off: Match the URL up until the first unescaped syntax-like character",
+		"input": "http://foo.bar/baz?qux#foo<bar",
+		"base": null,
+		"href": "http://foo.bar/baz?qux#foo",
+		"origin": "http://foo.bar",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "foo.bar",
+		"hostname": "foo.bar",
+		"port": "",
+		"pathname": "/baz",
+		"search": "?qux",
+		"searchParams": "qux=",
+		"hash": "#foo"
+	},
+	{
+		"description": "Trade-off: Match the URL up until the first unescaped syntax-like character",
+		"input": "http://foo.bar/baz?qux#foo>bar",
+		"base": null,
+		"href": "http://foo.bar/baz?qux#foo",
+		"origin": "http://foo.bar",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "foo.bar",
+		"hostname": "foo.bar",
+		"port": "",
+		"pathname": "/baz",
+		"search": "?qux",
+		"searchParams": "qux=",
+		"hash": "#foo"
+	},
+	{
+		"input": "http://foo.bar/baz?qux#foo`bar",
+		"base": null,
+		"href": "http://foo.bar/baz?qux#foo%60bar",
+		"origin": "http://foo.bar",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "foo.bar",
+		"hostname": "foo.bar",
+		"port": "",
+		"pathname": "/baz",
+		"search": "?qux",
+		"searchParams": "qux=",
+		"hash": "#foo%60bar"
+	},
+	"# IPv4 parsing (via https://github.com/nodejs/node/pull/10317)",
+	{
+		"input": "http://1.2.3.4/",
+		"base": "http://other.com/",
+		"href": "http://1.2.3.4/",
+		"origin": "http://1.2.3.4",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "1.2.3.4",
+		"hostname": "1.2.3.4",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"input": "http://1.2.3.4./",
+		"base": "http://other.com/",
+		"href": "http://1.2.3.4/",
+		"origin": "http://1.2.3.4",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "1.2.3.4",
+		"hostname": "1.2.3.4",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"input": "http://192.168.257",
+		"base": "http://other.com/",
+		"href": "http://192.168.1.1/",
+		"origin": "http://192.168.1.1",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "192.168.1.1",
+		"hostname": "192.168.1.1",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"input": "http://192.168.257.",
+		"base": "http://other.com/",
+		"href": "http://192.168.1.1/",
+		"origin": "http://192.168.1.1",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "192.168.1.1",
+		"hostname": "192.168.1.1",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"input": "http://192.168.257.com",
+		"base": "http://other.com/",
+		"href": "http://192.168.257.com/",
+		"origin": "http://192.168.257.com",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "192.168.257.com",
+		"hostname": "192.168.257.com",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"input": "http://256",
+		"base": "http://other.com/",
+		"href": "http://0.0.1.0/",
+		"origin": "http://0.0.1.0",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "0.0.1.0",
+		"hostname": "0.0.1.0",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"input": "http://256.com",
+		"base": "http://other.com/",
+		"href": "http://256.com/",
+		"origin": "http://256.com",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "256.com",
+		"hostname": "256.com",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"input": "http://999999999",
+		"base": "http://other.com/",
+		"href": "http://59.154.201.255/",
+		"origin": "http://59.154.201.255",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "59.154.201.255",
+		"hostname": "59.154.201.255",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"input": "http://999999999.",
+		"base": "http://other.com/",
+		"href": "http://59.154.201.255/",
+		"origin": "http://59.154.201.255",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "59.154.201.255",
+		"hostname": "59.154.201.255",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"input": "http://999999999.com",
+		"base": "http://other.com/",
+		"href": "http://999999999.com/",
+		"origin": "http://999999999.com",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "999999999.com",
+		"hostname": "999999999.com",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"input": "http://10000000000",
+		"base": "http://other.com/",
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "http://10000000000.com",
+		"base": "http://other.com/",
+		"href": "http://10000000000.com/",
+		"origin": "http://10000000000.com",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "10000000000.com",
+		"hostname": "10000000000.com",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"input": "http://4294967295",
+		"base": "http://other.com/",
+		"href": "http://255.255.255.255/",
+		"origin": "http://255.255.255.255",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "255.255.255.255",
+		"hostname": "255.255.255.255",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"input": "http://4294967296",
+		"base": "http://other.com/",
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "http://0xffffffff",
+		"base": "http://other.com/",
+		"href": "http://255.255.255.255/",
+		"origin": "http://255.255.255.255",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "255.255.255.255",
+		"hostname": "255.255.255.255",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"input": "http://0xffffffff1",
+		"base": "http://other.com/",
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "http://256.256.256.256",
+		"base": "http://other.com/",
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "https://0x.0x.0",
+		"base": null,
+		"href": "https://0.0.0.0/",
+		"origin": "https://0.0.0.0",
+		"protocol": "https:",
+		"username": "",
+		"password": "",
+		"host": "0.0.0.0",
+		"hostname": "0.0.0.0",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	"More IPv4 parsing (via https://github.com/jsdom/whatwg-url/issues/92)",
+	{
+		"input": "https://0x100000000/test",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "https://256.0.0.1/test",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	"# file URLs containing percent-encoded Windows drive letters (shouldn't work)",
+	{
+		"input": "file:///C%3A/",
+		"base": null,
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	{
+		"input": "file:///C%7C/",
+		"base": null,
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	{
+		"input": "file://%43%3A",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "file://%43%7C",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "file://%43|",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "file://C%7C",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "file://%43%7C/",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "https://%43%7C/",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "asdf://%43|/",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "asdf://%43%7C/",
+		"base": null,
+		"description": "asdf protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	"# file URLs relative to other file URLs (via https://github.com/jsdom/whatwg-url/pull/60)",
+	{
+		"input": "pix/submit.gif",
+		"base": "file:///C:/Users/Domenic/Dropbox/GitHub/tmpvar/jsdom/test/level2/html/files/anchor.html",
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	{
+		"input": "..",
+		"base": "file:///C:/",
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	{
+		"input": "..",
+		"base": "file:///",
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	"# More file URL tests by zcorpan and annevk",
+	{
+		"input": "/",
+		"base": "file:///C:/a/b",
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	{
+		"input": "/",
+		"base": "file://h/C:/a/b",
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	{
+		"input": "/",
+		"base": "file://h/a/b",
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	{
+		"input": "//d:",
+		"base": "file:///C:/a/b",
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	{
+		"input": "//d:/..",
+		"base": "file:///C:/a/b",
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	{
+		"input": "..",
+		"base": "file:///ab:/",
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	{
+		"input": "..",
+		"base": "file:///1:/",
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	{
+		"input": "",
+		"base": "file:///test?test#test",
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	{
+		"input": "file:",
+		"base": "file:///test?test#test",
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	{
+		"input": "?x",
+		"base": "file:///test?test#test",
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	{
+		"input": "file:?x",
+		"base": "file:///test?test#test",
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	{
+		"input": "#x",
+		"base": "file:///test?test#test",
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	{
+		"input": "file:#x",
+		"base": "file:///test?test#test",
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	"# File URLs and many (back)slashes",
+	{
+		"input": "file:\\\\//",
+		"base": null,
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	{
+		"input": "file:\\\\\\\\",
+		"base": null,
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	{
+		"input": "file:\\\\\\\\?fox",
+		"base": null,
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	{
+		"input": "file:\\\\\\\\#guppy",
+		"base": null,
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	{
+		"input": "file://spider///",
+		"base": null,
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	{
+		"input": "file:\\\\localhost//",
+		"base": null,
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	{
+		"input": "file:///localhost//cat",
+		"base": null,
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	{
+		"input": "file://\\/localhost//cat",
+		"base": null,
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	{
+		"input": "file://localhost//a//../..//",
+		"base": null,
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	{
+		"input": "/////mouse",
+		"base": "file:///elephant",
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	{
+		"input": "\\//pig",
+		"base": "file://lion/",
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	{
+		"input": "\\/localhost//pig",
+		"base": "file://lion/",
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	{
+		"input": "//localhost//pig",
+		"base": "file://lion/",
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	{
+		"input": "/..//localhost//pig",
+		"base": "file://lion/",
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	{
+		"input": "file://",
+		"base": "file://ape/",
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	"# File URLs with non-empty hosts",
+	{
+		"input": "/rooibos",
+		"base": "file://tea/",
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	{
+		"input": "/?chai",
+		"base": "file://tea/",
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	"# Windows drive letter handling with the 'file:' base URL",
+	{
+		"input": "C|",
+		"base": "file://host/dir/file",
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	{
+		"input": "C|",
+		"base": "file://host/D:/dir1/dir2/file",
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	{
+		"input": "C|#",
+		"base": "file://host/dir/file",
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	{
+		"input": "C|?",
+		"base": "file://host/dir/file",
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	{
+		"input": "C|/",
+		"base": "file://host/dir/file",
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	{
+		"input": "C|\n/",
+		"base": "file://host/dir/file",
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	{
+		"input": "C|\\",
+		"base": "file://host/dir/file",
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	{
+		"input": "C",
+		"base": "file://host/dir/file",
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	{
+		"input": "C|a",
+		"base": "file://host/dir/file",
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	"# Windows drive letter quirk in the file slash state",
+	{
+		"input": "/c:/foo/bar",
+		"base": "file:///c:/baz/qux",
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	{
+		"input": "/c|/foo/bar",
+		"base": "file:///c:/baz/qux",
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	{
+		"input": "file:\\c:\\foo\\bar",
+		"base": "file:///c:/baz/qux",
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	{
+		"input": "/c:/foo/bar",
+		"base": "file://host/path",
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	"# Do not drop the host in the presence of a drive letter",
+	{
+		"input": "file://example.net/C:/",
+		"base": null,
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	{
+		"input": "file://1.2.3.4/C:/",
+		"base": null,
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	{
+		"input": "file://[1::8]/C:/",
+		"base": null,
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	"# Copy the host from the base URL in the following cases",
+	{
+		"input": "C|/",
+		"base": "file://host/",
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	{
+		"input": "/C:/",
+		"base": "file://host/",
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	{
+		"input": "file:C:/",
+		"base": "file://host/",
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	{
+		"input": "file:/C:/",
+		"base": "file://host/",
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	"# Copy the empty host from the input in the following cases",
+	{
+		"input": "//C:/",
+		"base": "file://host/",
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	{
+		"input": "file://C:/",
+		"base": "file://host/",
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	{
+		"input": "///C:/",
+		"base": "file://host/",
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	{
+		"input": "file:///C:/",
+		"base": "file://host/",
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	"# Windows drive letter quirk (no host)",
+	{
+		"input": "file:/C|/",
+		"base": null,
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	{
+		"input": "file://C|/",
+		"base": null,
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	"# file URLs without base URL by Rimas Misevi\u010dius",
+	{
+		"input": "file:",
+		"base": null,
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	{
+		"input": "file:?q=v",
+		"base": null,
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	{
+		"input": "file:#frag",
+		"base": null,
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	"# file: drive letter cases from https://crbug.com/1078698",
+	{
+		"input": "file:///Y:",
+		"base": null,
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	{
+		"input": "file:///Y:/",
+		"base": null,
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	{
+		"input": "file:///./Y",
+		"base": null,
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	{
+		"input": "file:///./Y:",
+		"base": null,
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	{
+		"input": "\\\\\\.\\Y:",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	"# file: drive letter cases from https://crbug.com/1078698 but lowercased",
+	{
+		"input": "file:///y:",
+		"base": null,
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	{
+		"input": "file:///y:/",
+		"base": null,
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	{
+		"input": "file:///./y",
+		"base": null,
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	{
+		"input": "file:///./y:",
+		"base": null,
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	{
+		"input": "\\\\\\.\\y:",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	"# Additional file URL tests for (https://github.com/whatwg/url/issues/405)",
+	{
+		"input": "file://localhost//a//../..//foo",
+		"base": null,
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	{
+		"input": "file://localhost////foo",
+		"base": null,
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	{
+		"input": "file:////foo",
+		"base": null,
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	{
+		"input": "file:///one/two",
+		"base": "file:///",
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	{
+		"input": "file:////one/two",
+		"base": "file:///",
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	{
+		"input": "//one/two",
+		"base": "file:///",
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	{
+		"input": "///one/two",
+		"base": "file:///",
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	{
+		"input": "////one/two",
+		"base": "file:///",
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	{
+		"input": "file:///.//",
+		"base": "file:////",
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	"File URL tests for https://github.com/whatwg/url/issues/549",
+	{
+		"input": "file:.//p",
+		"base": null,
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	{
+		"input": "file:/.//p",
+		"base": null,
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	"# IPv6 tests",
+	{
+		"description": "Trade-off: Do not match Uncompressed IPv6 addresses from the text \u2013 the trailing ] is considered a part of the surrounding text, not the URL.",
+		"input": "http://[1:0::]",
+		"base": "http://example.net/",
+		"failure": true
+	},
+	{
+		"input": "http://[0:1:2:3:4:5:6:7:8]",
+		"base": "http://example.net/",
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "https://[0::0::0]",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "https://[0:.0]",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "https://[0:0:]",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "https://[0:1:2:3:4:5:6:7.0.0.0.1]",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "https://[0:1.00.0.0.0]",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "https://[0:1.290.0.0.0]",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "https://[0:1.23.23]",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	"# Empty host",
+	{
+		"input": "http://?",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "http://#",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	"Port overflow (2^32 + 81)",
+	{
+		"description": "Trade-off: Match the URL up until the first non-URL-like part (the port number in this case)",
+		"input": "http://f:4294967377/c",
+		"base": "http://example.org/",
+		"href": "http://f/",
+		"origin": "http://f",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "f",
+		"hostname": "f",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	"Port overflow (2^64 + 81)",
+	{
+		"description": "Trade-off: Match the URL up until the first non-URL-like part (the port number in this case)",
+		"input": "http://f:18446744073709551697/c",
+		"base": "http://example.org/",
+		"href": "http://f/",
+		"origin": "http://f",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "f",
+		"hostname": "f",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	"Port overflow (2^128 + 81)",
+	{
+		"description": "Trade-off: Match the URL up until the first non-URL-like part (the port number in this case)",
+		"input": "http://f:340282366920938463463374607431768211537/c",
+		"base": "http://example.org/",
+		"href": "http://f/",
+		"origin": "http://f",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "f",
+		"hostname": "f",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	"# Non-special-URL path tests",
+	{
+		"input": "sc://\u00f1",
+		"base": null,
+		"description": "sc protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "sc://\u00f1?x",
+		"base": null,
+		"description": "sc protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "sc://\u00f1#x",
+		"base": null,
+		"description": "sc protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "#x",
+		"base": "sc://\u00f1",
+		"description": "sc protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "?x",
+		"base": "sc://\u00f1",
+		"description": "sc protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "sc://?",
+		"base": null,
+		"description": "sc protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "sc://#",
+		"base": null,
+		"description": "sc protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"description": "Only consider HTTP and HTTPS URLs for matching",
+		"input": "///",
+		"base": "sc://x/",
+		"failure": true
+	},
+	{
+		"description": "Only consider HTTP and HTTPS URLs for matching",
+		"input": "////",
+		"base": "sc://x/",
+		"failure": true
+	},
+	{
+		"description": "Only consider HTTP and HTTPS URLs for matching",
+		"input": "////x/",
+		"base": "sc://x/",
+		"failure": true
+	},
+	{
+		"input": "tftp://foobar.com/someconfig;mode=netascii",
+		"base": null,
+		"description": "TFTP protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "telnet://user:pass@foobar.com:23/",
+		"base": null,
+		"description": "Telnet protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "ut2004://10.10.10.10:7777/Index.ut2",
+		"base": null,
+		"description": "UT2004 protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "redis://foo:bar@somehost:6379/0?baz=bam&qux=baz",
+		"base": null,
+		"description": "Redis protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "rsync://foo@host:911/sup",
+		"base": null,
+		"description": "Rsync protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "git://github.com/foo/bar.git",
+		"base": null,
+		"description": "Git protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "irc://myserver.com:6999/channel?passwd",
+		"base": null,
+		"description": "IRC protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "dns://fw.example.org:9999/foo.bar.org?type=TXT",
+		"base": null,
+		"description": "DNS protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "ldap://localhost:389/ou=People,o=JNDITutorial",
+		"base": null,
+		"description": "LDAP protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "git+https://github.com/foo/bar",
+		"base": null,
+		"description": "Git+HTTPS protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "urn:ietf:rfc:2648",
+		"base": null,
+		"description": "URN scheme URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "tag:joe@example.org,2001:foo/bar",
+		"base": null,
+		"description": "Tag scheme URLs are not supported for inline detection",
+		"failure": true
+	},
+	"Serialize /. in path",
+	{
+		"input": "non-spec:/.//",
+		"base": null,
+		"description": "non-spec protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "non-spec:/..//",
+		"base": null,
+		"description": "non-spec protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "non-spec:/a/..//",
+		"base": null,
+		"description": "non-spec protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "non-spec:/.//path",
+		"base": null,
+		"description": "non-spec protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "non-spec:/..//path",
+		"base": null,
+		"description": "non-spec protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "non-spec:/a/..//path",
+		"base": null,
+		"description": "non-spec protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "/.//path",
+		"base": "non-spec:/p",
+		"description": "non-spec protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "/..//path",
+		"base": "non-spec:/p",
+		"description": "non-spec protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "..//path",
+		"base": "non-spec:/p",
+		"description": "non-spec protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "a/..//path",
+		"base": "non-spec:/p",
+		"description": "non-spec protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "",
+		"base": "non-spec:/..//p",
+		"description": "non-spec protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "path",
+		"base": "non-spec:/..//p",
+		"description": "non-spec protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	"Do not serialize /. in path",
+	{
+		"input": "../path",
+		"base": "non-spec:/.//p",
+		"description": "non-spec protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	"# percent encoded hosts in non-special-URLs",
+	{
+		"input": "non-special://%E2%80%A0/",
+		"base": null,
+		"description": "non-special protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "non-special://H%4fSt/path",
+		"base": null,
+		"description": "non-special protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	"# IPv6 in non-special-URLs",
+	{
+		"input": "non-special://[1:2:0:0:5:0:0:0]/",
+		"base": null,
+		"description": "non-special protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "non-special://[1:2:0:0:0:0:0:3]/",
+		"base": null,
+		"description": "non-special protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "non-special://[1:2::3]:80/",
+		"base": null,
+		"description": "non-special protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "non-special://[:80/",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "blob:https://example.com:443/",
+		"base": null,
+		"href": "https://example.com/",
+		"protocol": "https:",
+		"username": "",
+		"password": "",
+		"host": "example.com",
+		"hostname": "example.com",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"input": "blob:http://example.org:88/",
+		"base": null,
+		"href": "http://example.org:88/",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "example.org:88",
+		"hostname": "example.org",
+		"port": "88",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"input": "blob:d3958f5c-0777-0845-9dcf-2cb28783acaf",
+		"base": null,
+		"description": "Blob URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "blob:",
+		"base": null,
+		"description": "Blob URLs are not supported for inline detection",
+		"failure": true
+	},
+	"blob: in blob:",
+	{
+		"input": "blob:blob:",
+		"base": null,
+		"description": "Blob URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "blob:blob:https://example.org/",
+		"base": null,
+		"href": "https://example.org/",
+		"protocol": "https:",
+		"username": "",
+		"password": "",
+		"host": "example.org",
+		"hostname": "example.org",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	"Non-http(s): in blob:",
+	{
+		"input": "blob:about:blank",
+		"base": null,
+		"description": "Blob URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "blob:file://host/path",
+		"base": null,
+		"description": "Blob URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "blob:ftp://host/path",
+		"base": null,
+		"description": "Blob URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "blob:ws://example.org/",
+		"base": null,
+		"description": "Blob URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "blob:wss://example.org/",
+		"base": null,
+		"description": "Blob URLs are not supported for inline detection",
+		"failure": true
+	},
+	"Percent-encoded http: in blob:",
+	{
+		"input": "blob:http%3a//example.org/",
+		"base": null,
+		"description": "Blob URLs are not supported for inline detection",
+		"failure": true
+	},
+	"Invalid IPv4 radix digits",
+	{
+		"input": "http://0x7f.0.0.0x7g",
+		"base": null,
+		"href": "http://0x7f.0.0.0x7g/",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "0x7f.0.0.0x7g",
+		"hostname": "0x7f.0.0.0x7g",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"input": "http://0X7F.0.0.0X7G",
+		"base": null,
+		"href": "http://0x7f.0.0.0x7g/",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "0x7f.0.0.0x7g",
+		"hostname": "0x7f.0.0.0x7g",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	"Invalid IPv4 portion of IPv6 address",
+	{
+		"input": "http://[::127.0.0.0.1]",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	"Uncompressed IPv6 addresses with 0",
+	{
+		"description": "Trade-off: Do not match Uncompressed IPv6 addresses from the text.",
+		"input": "http://[0:1:0:1:0:1:0:1]",
+		"base": null,
+		"failure": true
+	},
+	{
+		"description": "Trade-off: Do not match Uncompressed IPv6 addresses from the text.",
+		"input": "http://[1:0:1:0:1:0:1:0]",
+		"base": null,
+		"failure": true
+	},
+	"Percent-encoded query and fragment",
+	{
+		"description": "Trade-off: Truncate the matched URL at the first unescaped syntax-like character.",
+		"input": "http://example.org/test?\"",
+		"base": null,
+		"href": "http://example.org/test",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "example.org",
+		"hostname": "example.org",
+		"port": "",
+		"pathname": "/test",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"input": "http://example.org/test?#",
+		"base": null,
+		"href": "http://example.org/test?#",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "example.org",
+		"hostname": "example.org",
+		"port": "",
+		"pathname": "/test",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"description": "Trade-off: Truncate the matched URL at the first unescaped syntax-like character.",
+		"input": "http://example.org/test?<",
+		"base": null,
+		"href": "http://example.org/test",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "example.org",
+		"hostname": "example.org",
+		"port": "",
+		"pathname": "/test",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"description": "Trade-off: Truncate the matched URL at the first unescaped syntax-like character.",
+		"input": "http://example.org/test?>",
+		"base": null,
+		"href": "http://example.org/test",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "example.org",
+		"hostname": "example.org",
+		"port": "",
+		"pathname": "/test",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"input": "http://example.org/test?\u2323",
+		"base": null,
+		"href": "http://example.org/test?%E2%8C%A3",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "example.org",
+		"hostname": "example.org",
+		"port": "",
+		"pathname": "/test",
+		"search": "?%E2%8C%A3",
+		"hash": ""
+	},
+	{
+		"input": "http://example.org/test?%23%23",
+		"base": null,
+		"href": "http://example.org/test?%23%23",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "example.org",
+		"hostname": "example.org",
+		"port": "",
+		"pathname": "/test",
+		"search": "?%23%23",
+		"hash": ""
+	},
+	{
+		"input": "http://example.org/test?%GH",
+		"base": null,
+		"href": "http://example.org/test?%GH",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "example.org",
+		"hostname": "example.org",
+		"port": "",
+		"pathname": "/test",
+		"search": "?%GH",
+		"hash": ""
+	},
+	{
+		"input": "http://example.org/test?a#%EF",
+		"base": null,
+		"href": "http://example.org/test?a#%EF",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "example.org",
+		"hostname": "example.org",
+		"port": "",
+		"pathname": "/test",
+		"search": "?a",
+		"hash": "#%EF"
+	},
+	{
+		"input": "http://example.org/test?a#%GH",
+		"base": null,
+		"href": "http://example.org/test?a#%GH",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "example.org",
+		"hostname": "example.org",
+		"port": "",
+		"pathname": "/test",
+		"search": "?a",
+		"hash": "#%GH"
+	},
+	"URLs that require a non-about:blank base. (Also serve as invalid base tests.)",
+	{
+		"input": "a",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "a/",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "a//",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	"Bases that don't fail to parse but fail to be bases",
+	{
+		"input": "test-a-colon.html",
+		"base": "a:",
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "test-a-colon-b.html",
+		"base": "a:b",
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	"Other base URL tests, that must succeed",
+	{
+		"input": "test-a-colon-slash.html",
+		"base": "a:/",
+		"description": "a protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "test-a-colon-slash-slash.html",
+		"base": "a://",
+		"description": "a protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "test-a-colon-slash-b.html",
+		"base": "a:/b",
+		"description": "a protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "test-a-colon-slash-slash-b.html",
+		"base": "a://b",
+		"description": "a protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	"Null code point in fragment",
+	{
+		"input": "http://example.org/test?a#b\u0000c",
+		"base": null,
+		"href": "http://example.org/test?a#b%00c",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "example.org",
+		"hostname": "example.org",
+		"port": "",
+		"pathname": "/test",
+		"search": "?a",
+		"hash": "#b%00c"
+	},
+	{
+		"input": "non-spec://example.org/test?a#b\u0000c",
+		"base": null,
+		"description": "non-spec protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "non-spec:/test?a#b\u0000c",
+		"base": null,
+		"description": "non-spec protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	"First scheme char - not allowed: https://github.com/whatwg/url/issues/464",
+	{
+		"input": "10.0.0.7:8080/foo.html",
+		"base": "file:///some/dir/bar.html",
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	"Subsequent scheme chars - not allowed",
+	{
+		"input": "a!@$*=/foo.html",
+		"base": "file:///some/dir/bar.html",
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	"First and subsequent scheme chars - allowed",
+	{
+		"input": "a1234567890-+.:foo/bar",
+		"base": "http://example.com/dir/file",
+		"description": "a1234567890-+. protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	"IDNA ignored code points in file URLs hosts",
+	{
+		"input": "file://a\u00adb/p",
+		"base": null,
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	{
+		"input": "file://a%C2%ADb/p",
+		"base": null,
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	"IDNA hostnames which get mapped to 'localhost'",
+	{
+		"input": "file://loC\ud835\udc00\ud835\udc0b\ud835\udc07\ud835\udc28\ud835\udc2c\ud835\udc2d/usr/bin",
+		"base": null,
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	"Empty host after the domain to ASCII",
+	{
+		"input": "file://\u00ad/p",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "file://%C2%AD/p",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "file://xn--/p",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	"https://bugzilla.mozilla.org/show_bug.cgi?id=1647058",
+	{
+		"input": "#link",
+		"base": "https://example.org/##link",
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	"UTF-8 percent-encode of C0 control percent-encode set and supersets",
+	{
+		"input": "non-special:cannot-be-a-base-url-\u0000\u0001\u001f\u001e~\u007f\u0080",
+		"base": null,
+		"description": "non-special protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "https://user:pass[\u007f@foo/bar",
+		"base": "http://example.org",
+		"failure": true,
+		"description": "URLs with authentication credentials are inappropriate for inline URL detection"
+	},
+	"Truncate fragment at C0 control sequence \u2013 it's not typical for an inline URL",
+	{
+		"input": "https://www.example.com/path{\u007fpath.html?query'\u007f=query#fragment<\u007ffragment",
+		"base": null,
+		"hash": "#fragment",
+		"host": "www.example.com",
+		"hostname": "www.example.com",
+		"href": "https://www.example.com/path%7B%7Fpath.html?query%27%7F=query#fragment",
+		"origin": "https://www.example.com",
+		"password": "",
+		"pathname": "/path%7B%7Fpath.html",
+		"port": "",
+		"protocol": "https:",
+		"search": "?query%27%7F=query",
+		"username": ""
+	},
+	"Tests for the distinct percent-encode sets",
+	{
+		"input": "foo:// !\"$%&'()*+,-.;<=>@[\\]^_`{|}~@host/",
+		"base": null,
+		"description": "foo protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "wss:// !\"$%&'()*+,-.;<=>@[]^_`{|}~@host/",
+		"base": null,
+		"description": "Secure WebSocket protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "foo://joe: !\"$%&'()*+,-.:;<=>@[\\]^_`{|}~@host/",
+		"base": null,
+		"description": "foo protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "wss://joe: !\"$%&'()*+,-.:;<=>@[]^_`{|}~@host/",
+		"base": null,
+		"description": "Secure WebSocket protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "foo://!\"$%&'()*+,-.;=_`{}~/",
+		"base": null,
+		"description": "foo protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "wss://!\"$&'()*+,-.;=_`{}~/",
+		"base": null,
+		"description": "Secure WebSocket protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "foo://host/ !\"$%&'()*+,-./:;<=>@[\\]^_`{|}~",
+		"base": null,
+		"description": "foo protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "wss://host/ !\"$%&'()*+,-./:;<=>@[\\]^_`{|}~",
+		"base": null,
+		"description": "Secure WebSocket protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "foo://host/dir/? !\"$%&'()*+,-./:;<=>?@[\\]^_`{|}~",
+		"base": null,
+		"description": "foo protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "wss://host/dir/? !\"$%&'()*+,-./:;<=>?@[\\]^_`{|}~",
+		"base": null,
+		"description": "Secure WebSocket protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "foo://host/dir/# !\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~",
+		"base": null,
+		"description": "foo protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "wss://host/dir/# !\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~",
+		"base": null,
+		"description": "Secure WebSocket protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	"Ensure that input schemes are not ignored when resolving non-special URLs",
+	{
+		"input": "abc:rootless",
+		"base": "abc://host/path",
+		"description": "abc protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "abc:rootless",
+		"base": "abc:/path",
+		"description": "abc protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "abc:rootless",
+		"base": "abc:path",
+		"description": "abc protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "abc:/rooted",
+		"base": "abc://host/path",
+		"description": "abc protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	"Empty query and fragment with blank should throw an error",
+	{
+		"input": "#",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "?",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	"Last component looks like a number, but not valid IPv4. It's not on public suffix list and should not be matched",
+	{
+		"input": "http://1.2.3.4.5",
+		"base": "http://other.com/",
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "http://1.2.3.4.5.",
+		"base": "http://other.com/",
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "http://256.256.256.256.256",
+		"base": "http://other.com/",
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "http://256.256.256.256.256.",
+		"base": "http://other.com/",
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "http://1.2.3.08",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "http://1.2.3.08.",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "http://1.2.3.09",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "http://09.2.3.4",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "http://09.2.3.4.",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "http://01.2.3.4.5",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "http://01.2.3.4.5.",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "http://0x100.2.3.4",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "http://0x100.2.3.4.",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "http://0x1.2.3.4.5",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "http://0x1.2.3.4.5.",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "http://foo.1.2.3.4",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "http://foo.1.2.3.4.",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "http://foo.2.3.4",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "http://foo.2.3.4.",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	"TLDs not on public suffix list should not be matched",
+	{
+		"input": "http://foo.09",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "http://foo.09.",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "http://foo.0x4",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "http://foo.0x4.",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "http://foo.09..",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "http://0999999999999999999/",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "http://foo.0x",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "http://foo.0XFfFfFfFfFfFfFfFfFfAcE123",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "http://\ud83d\udca9.123/",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	"Trailing dots are treated as punctuation marks and truncate the hostname to '0', or '0.0.0.0'",
+	{
+		"input": "http://0..0x300/",
+		"base": null,
+		"href": "http://0.0.0.0/",
+		"origin": "http://0.0.0.0",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "0.0.0.0",
+		"hostname": "0.0.0.0",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"input": "http://0..0x300./",
+		"base": null,
+		"href": "http://0.0.0.0/",
+		"origin": "http://0.0.0.0",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "0.0.0.0",
+		"hostname": "0.0.0.0",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	"U+0000 and U+FFFF in various places",
+	{
+		"input": "https://\u0000y",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "https://x/\u0000y",
+		"base": null,
+		"hash": "",
+		"host": "x",
+		"hostname": "x",
+		"href": "https://x/%00y",
+		"password": "",
+		"pathname": "/%00y",
+		"port": "",
+		"protocol": "https:",
+		"search": "",
+		"username": ""
+	},
+	{
+		"input": "https://x/?\u0000y",
+		"base": null,
+		"hash": "",
+		"host": "x",
+		"hostname": "x",
+		"href": "https://x/?%00y",
+		"password": "",
+		"pathname": "/",
+		"port": "",
+		"protocol": "https:",
+		"search": "?%00y",
+		"username": ""
+	},
+	{
+		"input": "https://x/?#\u0000y",
+		"base": null,
+		"hash": "#%00y",
+		"host": "x",
+		"hostname": "x",
+		"href": "https://x/?#%00y",
+		"password": "",
+		"pathname": "/",
+		"port": "",
+		"protocol": "https:",
+		"search": "",
+		"username": ""
+	},
+	{
+		"input": "https://\uffffy",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "https://x/\uffffy",
+		"base": null,
+		"hash": "",
+		"host": "x",
+		"hostname": "x",
+		"href": "https://x/%EF%BF%BFy",
+		"password": "",
+		"pathname": "/%EF%BF%BFy",
+		"port": "",
+		"protocol": "https:",
+		"search": "",
+		"username": ""
+	},
+	{
+		"input": "https://x/?\uffffy",
+		"base": null,
+		"hash": "",
+		"host": "x",
+		"hostname": "x",
+		"href": "https://x/?%EF%BF%BFy",
+		"password": "",
+		"pathname": "/",
+		"port": "",
+		"protocol": "https:",
+		"search": "?%EF%BF%BFy",
+		"username": ""
+	},
+	{
+		"input": "https://x/?#\uffffy",
+		"base": null,
+		"hash": "#%EF%BF%BFy",
+		"host": "x",
+		"hostname": "x",
+		"href": "https://x/?#%EF%BF%BFy",
+		"password": "",
+		"pathname": "/",
+		"port": "",
+		"protocol": "https:",
+		"search": "",
+		"username": ""
+	},
+	{
+		"input": "non-special:\u0000y",
+		"base": null,
+		"description": "non-special protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "non-special:x/\u0000y",
+		"base": null,
+		"description": "non-special protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "non-special:x/?\u0000y",
+		"base": null,
+		"description": "non-special protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "non-special:x/?#\u0000y",
+		"base": null,
+		"description": "non-special protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "non-special:\uffffy",
+		"base": null,
+		"description": "non-special protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "non-special:x/\uffffy",
+		"base": null,
+		"description": "non-special protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "non-special:x/?\uffffy",
+		"base": null,
+		"description": "non-special protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "non-special:x/?#\uffffy",
+		"base": null,
+		"description": "non-special protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	"Trade-off: do not match trailing quotes. They can technically be a part of the URL, but they are more likely to be a part of the text or syntax",
+	{
+		"input": "https://example.com/\"quoted\"",
+		"base": null,
+		"hash": "",
+		"host": "example.com",
+		"hostname": "example.com",
+		"href": "https://example.com/%22quoted",
+		"origin": "https://example.com",
+		"password": "",
+		"pathname": "/%22quoted",
+		"port": "",
+		"protocol": "https:",
+		"search": "",
+		"username": ""
+	},
+	{
+		"input": "https://a%C2%ADb/",
+		"base": null,
+		"hash": "",
+		"host": "ab",
+		"hostname": "ab",
+		"href": "https://ab/",
+		"origin": "https://ab",
+		"password": "",
+		"pathname": "/",
+		"port": "",
+		"protocol": "https:",
+		"search": "",
+		"username": ""
+	},
+	{
+		"input": "https://\u00ad/",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "https://%C2%AD/",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "https://xn--/",
+		"base": null,
+		"href": "https://xn/",
+		"origin": "https://xn",
+		"protocol": "https:",
+		"username": "",
+		"password": "",
+		"host": "xn",
+		"hostname": "xn",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	"Non-special schemes that some implementations might incorrectly treat as special",
+	{
+		"input": "data://example.com:8080/pathname?search#hash",
+		"base": null,
+		"description": "Data URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "data:///test",
+		"base": null,
+		"description": "Data URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "data://test/a/../b",
+		"base": null,
+		"description": "Data URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "data://:443",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "data://test:test",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "data://[:1]",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "javascript://example.com:8080/pathname?search#hash",
+		"base": null,
+		"description": "JavaScript URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "javascript:///test",
+		"base": null,
+		"description": "JavaScript URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "javascript://test/a/../b",
+		"base": null,
+		"description": "JavaScript URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "javascript://:443",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "javascript://test:test",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "javascript://[:1]",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "mailto://example.com:8080/pathname?search#hash",
+		"base": null,
+		"description": "Mailto URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "mailto:///test",
+		"base": null,
+		"description": "Mailto URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "mailto://test/a/../b",
+		"base": null,
+		"description": "Mailto URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "mailto://:443",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "mailto://test:test",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "mailto://[:1]",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "intent://example.com:8080/pathname?search#hash",
+		"base": null,
+		"description": "Intent URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "intent:///test",
+		"base": null,
+		"description": "Intent URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "intent://test/a/../b",
+		"base": null,
+		"description": "Intent URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "intent://:443",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "intent://test:test",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "intent://[:1]",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "urn://example.com:8080/pathname?search#hash",
+		"base": null,
+		"description": "URN scheme URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "urn:///test",
+		"base": null,
+		"description": "URN scheme URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "urn://test/a/../b",
+		"base": null,
+		"description": "URN scheme URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "urn://:443",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "urn://test:test",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "urn://[:1]",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "turn://example.com:8080/pathname?search#hash",
+		"base": null,
+		"description": "TURN protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "turn:///test",
+		"base": null,
+		"description": "TURN protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "turn://test/a/../b",
+		"base": null,
+		"description": "TURN protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "turn://:443",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "turn://test:test",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "turn://[:1]",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "stun://example.com:8080/pathname?search#hash",
+		"base": null,
+		"description": "STUN protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "stun:///test",
+		"base": null,
+		"description": "STUN protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "stun://test/a/../b",
+		"base": null,
+		"description": "STUN protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "stun://:443",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "stun://test:test",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "stun://[:1]",
+		"base": null,
+		"failure": true,
+		"description": "Test case marked as expected failure"
+	},
+	{
+		"input": "w://x:0",
+		"base": null,
+		"description": "w protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	{
+		"input": "west://x:0",
+		"base": null,
+		"description": "west protocol URLs are not supported for inline detection",
+		"failure": true
+	},
+	"Scheme relative path starting with multiple slashes",
+	{
+		"input": "///test",
+		"base": "http://example.org/",
+		"href": "http://test/",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "test",
+		"hostname": "test",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"input": "///\\//\\//test",
+		"base": "http://example.org/",
+		"href": "http://test/",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "test",
+		"hostname": "test",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"input": "///example.org/path",
+		"base": "http://example.org/",
+		"href": "http://example.org/path",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "example.org",
+		"hostname": "example.org",
+		"port": "",
+		"pathname": "/path",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"input": "///example.org/../path",
+		"base": "http://example.org/",
+		"href": "http://example.org/path",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "example.org",
+		"hostname": "example.org",
+		"port": "",
+		"pathname": "/path",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"input": "///example.org/../../",
+		"base": "http://example.org/",
+		"href": "http://example.org/",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "example.org",
+		"hostname": "example.org",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"input": "///example.org/../path/../../",
+		"base": "http://example.org/",
+		"href": "http://example.org/",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "example.org",
+		"hostname": "example.org",
+		"port": "",
+		"pathname": "/",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"input": "///example.org/../path/../../path",
+		"base": "http://example.org/",
+		"href": "http://example.org/path",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "example.org",
+		"hostname": "example.org",
+		"port": "",
+		"pathname": "/path",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"input": "/\\/\\//example.org/../path",
+		"base": "http://example.org/",
+		"href": "http://example.org/path",
+		"protocol": "http:",
+		"username": "",
+		"password": "",
+		"host": "example.org",
+		"hostname": "example.org",
+		"port": "",
+		"pathname": "/path",
+		"search": "",
+		"hash": ""
+	},
+	{
+		"input": "///abcdef/../",
+		"base": "file:///",
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	{
+		"input": "/\\//\\/a/../",
+		"base": "file:///",
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	},
+	{
+		"input": "//a/../",
+		"base": "file:///",
+		"description": "File protocol URLs are not supported for inline detection in web content",
+		"failure": true
+	}
+]
