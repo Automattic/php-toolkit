@@ -143,7 +143,9 @@ function urldecode_n( $input, $decode_n ) {
 		);
 
 		if ( 2 === $decodable_length ) {
-			// Decode the hex sequence.
+			// Decodes the urlencoded hex sequence from URL.
+			// Note: This decodes bytes, not characters. It will return the original byte sequence
+			// and not necessarily any valid UTF-8 character.
 			$result .= chr( hexdec( $input[ $at ] . $input[ $at + 1 ] ) );
 			$at     += 2;
 		} else {
