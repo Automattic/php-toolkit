@@ -248,11 +248,7 @@ class URLInTextProcessor {
 	}
 
 	public function get_raw_url() {
-		if ( null === $this->raw_url ) {
-			return false;
-		}
-
-		return $this->raw_url;
+		return $this->raw_url ?? false;
 	}
 
 	public function get_parsed_url() {
