@@ -5,7 +5,7 @@
  */
 
 if ( file_exists( __DIR__ . '/php-toolkit.phar' ) ) {
-	require_once __DIR__ . '/php-toolkit.phar';
+	require_once __DIR__ . '/wp-origin-phar-bootstrap.php';
 } else {
 	require_once __DIR__ . '/wp-origin-dev-bootstrap.php';
 }
