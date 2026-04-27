@@ -24,7 +24,8 @@ class WP_Origin_Plugin {
 	const COMMITTER_META_KEY      = '_wp_origin_committer';
 	const COMMITTER_DATE_META     = '_wp_origin_committer_date';
 
-	private static $supported_post_types = array( 'post', 'page' );
+	private static $supported_post_types    = array( 'post', 'page' );
+	private static $supported_post_statuses = array( 'publish', 'draft', 'pending', 'private', 'future' );
 
 	public static function bootstrap() {
 		add_action( 'init', array( __CLASS__, 'register_commit_post_type' ) );
@@ -403,7 +404,7 @@ class WP_Origin_Plugin {
 		$posts = get_posts(
 			array(
 				'post_type'      => self::$supported_post_types,
-				'post_status'    => array( 'publish', 'draft', 'pending', 'private', 'future' ),
+				'post_status'    => self::$supported_post_statuses,
 				'posts_per_page' => -1,
 				'orderby'        => 'ID',
 				'order'          => 'ASC',
@@ -516,9 +517,21 @@ class WP_Origin_Plugin {
 	}
 
 	private static function apply_repository_changes_to_wordpress( GitRepository $repository, $old_commit, $new_commit ) {
+		$commit_plans      = self::build_push_plan( $repository, $old_commit, $new_commit );
+		$head_commit_post  = self::get_head_commit_post();
+		$previous_manifest = $head_commit_post ? self::get_commit_manifest_from_post( $head_commit_post ) : array();
+
+		foreach ( $commit_plans as $commit_plan ) {
+			$previous_manifest = self::apply_single_commit_plan_to_wordpress( $commit_plan, $previous_manifest );
+			self::persist_repository_commit( $repository, $commit_plan['commit_hash'], $previous_manifest );
+		}
+	}
+
+	private static function build_push_plan( GitRepository $repository, $old_commit, $new_commit ) {
 		$commit_hashes     = self::get_push_commit_hashes( $repository, $old_commit, $new_commit );
 		$head_commit_post  = self::get_head_commit_post();
 		$previous_manifest = $head_commit_post ? self::get_commit_manifest_from_post( $head_commit_post ) : array();
+		$commit_plans      = array();
 
 		foreach ( $commit_hashes as $index => $commit_hash ) {
 			$commit = $repository->read_object( $commit_hash )->as_commit();
@@ -528,15 +541,18 @@ class WP_Origin_Plugin {
 			$old_files   = Commit::is_null_hash( $parent_hash ) ? array() : self::read_markdown_files_from_commit( $repository, $parent_hash );
 			$new_files   = self::read_markdown_files_from_commit( $repository, $commit_hash );
 
-			$previous_manifest = self::apply_single_commit_to_wordpress(
+			$commit_plan                = self::build_single_commit_plan(
 				$old_files,
 				$new_files,
 				$previous_manifest,
 				0 !== $index
 			);
-
-			self::persist_repository_commit( $repository, $commit_hash, $previous_manifest );
+			$commit_plan['commit_hash'] = $commit_hash;
+			$commit_plans[]             = $commit_plan;
+			$previous_manifest          = $commit_plan['manifest'];
 		}
+
+		return $commit_plans;
 	}
 
 	private static function get_push_commit_hashes( GitRepository $repository, $old_commit, $new_commit ) {
@@ -582,24 +598,28 @@ class WP_Origin_Plugin {
 		}
 	}
 
-	private static function apply_single_commit_to_wordpress( $old_files, $new_files, $previous_manifest, $skip_modified_checks ) {
+	private static function build_single_commit_plan( $old_files, $new_files, $previous_manifest, $skip_modified_checks ) {
 		$next_manifest    = $previous_manifest;
 		$updated_post_ids = array();
+		$operations       = array();
 
 		foreach ( $new_files as $path => $contents ) {
 			if ( isset( $old_files[ $path ] ) && $old_files[ $path ] === $contents ) {
 				continue;
 			}
 
-			$post_id                      = self::upsert_post_from_markdown(
+			$operation              = self::plan_post_upsert_from_markdown(
 				$path,
 				$contents,
 				array(
 					'skip_modified_check' => $skip_modified_checks,
 				)
 			);
-			$updated_post_ids[ $post_id ] = true;
-			$next_manifest[ $path ]       = self::capture_post_snapshot( get_post( $post_id ), $contents );
+			$operations[]           = $operation;
+			$next_manifest[ $path ] = 0;
+			if ( $operation['post_id'] ) {
+				$updated_post_ids[ $operation['post_id'] ] = true;
+			}
 		}
 
 		foreach ( $old_files as $path => $contents ) {
@@ -615,20 +635,50 @@ class WP_Origin_Plugin {
 
 			unset( $next_manifest[ $path ] );
 
-			if ( ! $post_id || isset( $updated_post_ids[ $post_id ] ) ) {
+			if ( isset( $updated_post_ids[ $post_id ] ) ) {
 				continue;
 			}
 
-			if ( ! $skip_modified_checks && isset( $metadata['modified_gmt'] ) ) {
+			if ( $post_id && ! $skip_modified_checks && isset( $metadata['modified_gmt'] ) ) {
 				$current_modified = get_post_field( 'post_modified_gmt', $post_id );
 				if ( $current_modified && $current_modified !== $metadata['modified_gmt'] ) {
 					throw new Exception( 'Push rejected because a deleted post changed in WordPress. Pull the latest changes and try again.' );
 				}
 			}
-			self::assert_can_edit_post( $post_id );
+			if ( $post_id ) {
+				self::assert_can_edit_post( $post_id );
+			}
 
-			if ( false === wp_trash_post( $post_id ) ) {
-				throw new Exception( 'Push rejected because WordPress could not trash the deleted content.' );
+			$operations[] = array(
+				'type'     => 'delete',
+				'path'     => $path,
+				'metadata' => $metadata,
+			);
+		}
+
+		ksort( $next_manifest );
+
+		return array(
+			'manifest'   => $next_manifest,
+			'operations' => $operations,
+		);
+	}
+
+	private static function apply_single_commit_plan_to_wordpress( $commit_plan, $previous_manifest ) {
+		$next_manifest    = $previous_manifest;
+		$updated_post_ids = array();
+
+		foreach ( $commit_plan['operations'] as $operation ) {
+			if ( 'upsert' === $operation['type'] ) {
+				$post_id                             = self::apply_post_upsert_plan( $operation );
+				$updated_post_ids[ $post_id ]        = true;
+				$next_manifest[ $operation['path'] ] = self::capture_post_snapshot( get_post( $post_id ), $operation['contents'] );
+				continue;
+			}
+
+			if ( 'delete' === $operation['type'] ) {
+				unset( $next_manifest[ $operation['path'] ] );
+				self::apply_post_delete_plan( $operation, $updated_post_ids );
 			}
 		}
 
@@ -638,6 +688,12 @@ class WP_Origin_Plugin {
 	}
 
 	private static function upsert_post_from_markdown( $path, $markdown, $options = array() ) {
+		return self::apply_post_upsert_plan(
+			self::plan_post_upsert_from_markdown( $path, $markdown, $options )
+		);
+	}
+
+	private static function plan_post_upsert_from_markdown( $path, $markdown, $options = array() ) {
 		$post_type = self::path_to_post_type( $path );
 		$slug      = self::path_to_slug( $path );
 		$consumer  = new MarkdownConsumer( $markdown );
@@ -653,6 +709,7 @@ class WP_Origin_Plugin {
 		if ( isset( $metadata['slug'] ) && $metadata['slug'] !== $slug ) {
 			throw new Exception( 'Push rejected because the file slug does not match its filename.' );
 		}
+		self::validate_post_status( isset( $metadata['status'] ) ? $metadata['status'] : 'draft', $post_type );
 
 		$post_id = isset( $metadata['id'] ) ? intval( $metadata['id'] ) : 0;
 		if ( $post_id && get_post( $post_id ) ) {
@@ -689,6 +746,27 @@ class WP_Origin_Plugin {
 			$postarr['post_date_gmt'] = $metadata['date_gmt'];
 		}
 
+		return array(
+			'type'      => 'upsert',
+			'path'      => $path,
+			'contents'  => $markdown,
+			'metadata'  => $metadata,
+			'post_id'   => $post_id,
+			'postarr'   => $postarr,
+		);
+	}
+
+	private static function apply_post_upsert_plan( $operation ) {
+		$metadata = $operation['metadata'];
+		$postarr  = $operation['postarr'];
+		$post_id  = isset( $metadata['id'] ) ? intval( $metadata['id'] ) : 0;
+		if ( $post_id && get_post( $post_id ) ) {
+			$existing_post = get_post( $post_id );
+		} else {
+			$post_id       = self::find_post_id_by_path_metadata( $operation['path'], $metadata );
+			$existing_post = $post_id ? get_post( $post_id ) : null;
+		}
+
 		if ( $existing_post ) {
 			$postarr['ID'] = $existing_post->ID;
 			$post_id       = wp_update_post( wp_slash( $postarr ), true );
@@ -701,6 +779,22 @@ class WP_Origin_Plugin {
 		}
 
 		return $post_id;
+	}
+
+	private static function apply_post_delete_plan( $operation, $updated_post_ids ) {
+		$metadata = $operation['metadata'];
+		$post_id  = isset( $metadata['id'] ) ? intval( $metadata['id'] ) : 0;
+		if ( ! $post_id ) {
+			$post_id = self::find_post_id_by_path_metadata( $operation['path'], $metadata );
+		}
+
+		if ( ! $post_id || isset( $updated_post_ids[ $post_id ] ) ) {
+			return;
+		}
+
+		if ( false === wp_trash_post( $post_id ) ) {
+			throw new Exception( 'Push rejected because WordPress could not trash the deleted content.' );
+		}
 	}
 
 	private static function capture_post_snapshot( WP_Post $post, $markdown ) {
@@ -825,7 +919,7 @@ class WP_Origin_Plugin {
 			array(
 				'post_type'      => $post_type,
 				'name'           => $slug,
-				'post_status'    => array( 'publish', 'draft', 'pending', 'private', 'future', 'trash' ),
+				'post_status'    => array_merge( self::$supported_post_statuses, array( 'trash' ) ),
 				'posts_per_page' => 1,
 				'fields'         => 'ids',
 			)
@@ -867,6 +961,20 @@ class WP_Origin_Plugin {
 		return $metadata;
 	}
 
+	private static function validate_post_status( $post_status, $post_type ) {
+		if ( in_array( $post_status, self::$supported_post_statuses, true ) ) {
+			return;
+		}
+
+		throw new Exception(
+			sprintf(
+				'Push rejected because "%s" is not a supported %s status.',
+				$post_status,
+				$post_type
+			)
+		);
+	}
+
 	private static function read_markdown_files_from_commit( GitRepository $repository, $commit_hash ) {
 		$commit = $repository->read_object( $commit_hash )->as_commit();
 		$files  = array();
@@ -890,7 +998,7 @@ class WP_Origin_Plugin {
 				continue;
 			}
 			if ( 'md' !== pathinfo( $path, PATHINFO_EXTENSION ) ) {
-				continue;
+				throw new Exception( 'Push rejected because only Markdown files are supported.' );
 			}
 			$files[ $path ] = $repository->read_object( $entry->hash )->consume_all();
 		}
