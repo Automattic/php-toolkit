@@ -28,7 +28,7 @@ class GitTreeParserTest extends TestCase {
 		$this->assertTrue( $tree_parser->next() );
 		$entry = $tree_parser->get_tree_entry();
 		$this->assertEquals( '.github', $entry->name );
-		$this->assertEquals( '040000', $entry->get_mode_bucket() );
+		$this->assertEquals( '40000', $entry->get_mode_bucket() );
 		$this->assertEquals( '614260657b661e57774e4f9663c09d5e252079bd', $entry->hash );
 
 		$this->assertTrue( $tree_parser->next() );
