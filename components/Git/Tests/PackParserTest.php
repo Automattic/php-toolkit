@@ -111,7 +111,7 @@ BODY
 		$keys        = array_keys( $tree->entries );
 		$first_entry = $tree->entries[ $keys[0] ];
 		$this->assertEquals( '.github', $first_entry->name );
-		$this->assertEquals( '040000', $first_entry->get_mode_bucket() );
+		$this->assertEquals( '40000', $first_entry->get_mode_bucket() );
 		$this->assertEquals( '614260657b661e57774e4f9663c09d5e252079bd', $first_entry->hash );
 
 		$second_entry = $tree->entries[ $keys[1] ];

@@ -57,7 +57,7 @@ class TreeEntry {
 		}
 	}
 
-	const FILE_MODE_DIRECTORY              = '040000';
+	const FILE_MODE_DIRECTORY              = '40000';
 	const FILE_MODE_REGULAR_NON_EXECUTABLE = '100644';
 	const FILE_MODE_REGULAR_EXECUTABLE     = '100755';
 	const FILE_MODE_SYMBOLIC_LINK          = '120000';
