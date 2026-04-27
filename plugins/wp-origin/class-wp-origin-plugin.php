@@ -23,6 +23,8 @@ class WP_Origin_Plugin {
 	const COMMIT_AUTHOR_DATE_META = '_wp_origin_commit_author_date';
 	const COMMITTER_META_KEY      = '_wp_origin_committer';
 	const COMMITTER_DATE_META     = '_wp_origin_committer_date';
+	const EXACT_BYTES_ENCODING    = 'base64';
+	const COMMIT_SUBJECT_MAX_LEN  = 200;
 
 	private static $supported_post_types    = array( 'post', 'page' );
 	private static $supported_post_statuses = array( 'publish', 'draft', 'pending', 'private', 'future' );
@@ -255,11 +257,11 @@ class WP_Origin_Plugin {
 			$updates  = self::get_manifest_update_bytes( $previous_manifest, $manifest );
 			$deletes  = self::get_manifest_deletes( $previous_manifest, $manifest );
 			$commit   = array(
-				'message'        => (string) get_post_meta( $commit_post->ID, self::COMMIT_MESSAGE_META_KEY, true ),
-				'author'         => (string) get_post_meta( $commit_post->ID, self::COMMIT_AUTHOR_META_KEY, true ),
-				'author_date'    => (string) get_post_meta( $commit_post->ID, self::COMMIT_AUTHOR_DATE_META, true ),
-				'committer'      => (string) get_post_meta( $commit_post->ID, self::COMMITTER_META_KEY, true ),
-				'committer_date' => (string) get_post_meta( $commit_post->ID, self::COMMITTER_DATE_META, true ),
+				'message'        => self::get_stored_post_bytes( $commit_post->ID, self::COMMIT_MESSAGE_META_KEY ),
+				'author'         => self::get_stored_post_bytes( $commit_post->ID, self::COMMIT_AUTHOR_META_KEY ),
+				'author_date'    => self::get_stored_post_bytes( $commit_post->ID, self::COMMIT_AUTHOR_DATE_META ),
+				'committer'      => self::get_stored_post_bytes( $commit_post->ID, self::COMMITTER_META_KEY ),
+				'committer_date' => self::get_stored_post_bytes( $commit_post->ID, self::COMMITTER_DATE_META ),
 			);
 
 			$commit_oid = $repository->commit(
@@ -506,11 +508,11 @@ class WP_Origin_Plugin {
 			throw new Exception( $commit_post_id->get_error_message() );
 		}
 
-		update_post_meta( $commit_post_id, self::COMMIT_MESSAGE_META_KEY, $commit->message );
-		update_post_meta( $commit_post_id, self::COMMIT_AUTHOR_META_KEY, $commit->author );
-		update_post_meta( $commit_post_id, self::COMMIT_AUTHOR_DATE_META, $commit->author_date );
-		update_post_meta( $commit_post_id, self::COMMITTER_META_KEY, $commit->committer );
-		update_post_meta( $commit_post_id, self::COMMITTER_DATE_META, $commit->committer_date );
+		self::update_stored_post_bytes( $commit_post_id, self::COMMIT_MESSAGE_META_KEY, $commit->message );
+		self::update_stored_post_bytes( $commit_post_id, self::COMMIT_AUTHOR_META_KEY, $commit->author );
+		self::update_stored_post_bytes( $commit_post_id, self::COMMIT_AUTHOR_DATE_META, $commit->author_date );
+		self::update_stored_post_bytes( $commit_post_id, self::COMMITTER_META_KEY, $commit->committer );
+		self::update_stored_post_bytes( $commit_post_id, self::COMMITTER_DATE_META, $commit->committer_date );
 		update_option( self::HEAD_OPTION, $commit_post_id, false );
 
 		return $commit_post_id;
@@ -824,7 +826,7 @@ class WP_Origin_Plugin {
 			throw new Exception( 'WP Origin could not create a revision snapshot for this post.' );
 		}
 
-		update_metadata( 'post', $revision_id, self::MARKDOWN_META_KEY, $markdown );
+		self::update_stored_post_bytes( $revision_id, self::MARKDOWN_META_KEY, $markdown );
 
 		return intval( $revision_id );
 	}
@@ -857,12 +859,11 @@ class WP_Origin_Plugin {
 	}
 
 	private static function get_markdown_for_revision( $revision_id ) {
-		$markdown = get_metadata( 'post', $revision_id, self::MARKDOWN_META_KEY, true );
-		if ( ! is_string( $markdown ) ) {
-			throw new Exception( 'WP Origin is missing Markdown bytes for a stored revision snapshot.' );
-		}
-
-		return $markdown;
+		return self::get_stored_post_bytes(
+			$revision_id,
+			self::MARKDOWN_META_KEY,
+			'WP Origin is missing Markdown bytes for a stored revision snapshot.'
+		);
 	}
 
 	private static function manifests_are_equal( $left, $right ) {
@@ -890,7 +891,64 @@ class WP_Origin_Plugin {
 		$lines = preg_split( "/\r\n|\n|\r/", $message );
 		$line  = is_array( $lines ) && isset( $lines[0] ) ? trim( $lines[0] ) : '';
 
+		if ( function_exists( 'wp_check_invalid_utf8' ) ) {
+			$line = wp_check_invalid_utf8( $line, true );
+		}
+		if ( function_exists( 'mb_strlen' ) && function_exists( 'mb_substr' ) ) {
+			if ( mb_strlen( $line ) > self::COMMIT_SUBJECT_MAX_LEN ) {
+				$line = mb_substr( $line, 0, self::COMMIT_SUBJECT_MAX_LEN - 3 ) . '...';
+			}
+		} elseif ( strlen( $line ) > self::COMMIT_SUBJECT_MAX_LEN ) {
+			$line = substr( $line, 0, self::COMMIT_SUBJECT_MAX_LEN - 3 ) . '...';
+		}
+
 		return '' === $line ? 'WP Origin Commit' : $line;
+	}
+
+	private static function update_stored_post_bytes( $post_id, $meta_key, $bytes ) {
+		update_metadata( 'post', $post_id, $meta_key, self::encode_stored_bytes( $bytes ) );
+	}
+
+	private static function get_stored_post_bytes( $post_id, $meta_key, $missing_message = '' ) {
+		$stored_value = get_metadata( 'post', $post_id, $meta_key, true );
+
+		return self::decode_stored_bytes(
+			$stored_value,
+			'' !== $missing_message ? $missing_message : 'WP Origin is missing stored bytes.'
+		);
+	}
+
+	private static function encode_stored_bytes( $bytes ) {
+		return array(
+			'encoding' => self::EXACT_BYTES_ENCODING,
+			'data'     => base64_encode( $bytes ), // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode -- Persist exact Git-visible bytes through WordPress storage.
+		);
+	}
+
+	private static function decode_stored_bytes( $stored_value, $missing_message ) {
+		if ( is_array( $stored_value ) ) {
+			if (
+				! isset( $stored_value['encoding'] ) ||
+				self::EXACT_BYTES_ENCODING !== $stored_value['encoding'] ||
+				! isset( $stored_value['data'] ) ||
+				! is_string( $stored_value['data'] )
+			) {
+				throw new Exception( $missing_message );
+			}
+
+			$decoded = base64_decode( $stored_value['data'], true ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_decode -- Recover exact Git-visible bytes from WordPress storage.
+			if ( false === $decoded ) {
+				throw new Exception( $missing_message );
+			}
+
+			return $decoded;
+		}
+
+		if ( is_string( $stored_value ) ) {
+			return $stored_value;
+		}
+
+		throw new Exception( $missing_message );
 	}
 
 	private static function timestamp_from_gmt_string( $gmt_string ) {

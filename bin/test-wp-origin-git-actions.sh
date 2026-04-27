@@ -129,6 +129,28 @@ git pull --rebase origin trunk
 
 php -r '
 $path = $argv[1];
+$contents = file_get_contents($path);
+$contents .= "\nEscaped path literal: C:\\\\Temp\\\\wp-origin\nQuoted JSON literal: {\"windows\":\"C:\\\\\\\\Temp\\\\\\\\wp-origin\"}\n";
+file_put_contents($path, $contents);
+' "$CLONE_DIR/post/hello-world.md"
+
+EXACT_COMMIT_MESSAGE='Preserve C:\\Temp\\wp-origin in commit metadata'
+git add post/hello-world.md
+git commit -m "$EXACT_COMMIT_MESSAGE"
+git push origin trunk
+
+EXACT_CLONE_DIR="$WORK_DIR/exact-clone"
+git -c protocol.version=2 clone "$REMOTE_AUTH_URL" "$EXACT_CLONE_DIR"
+EXACT_COMMIT_HASH="$(git -C "$EXACT_CLONE_DIR" log --grep='Preserve' --format=%H -n 1)"
+[ -n "$EXACT_COMMIT_HASH" ]
+git -C "$EXACT_CLONE_DIR" show "$EXACT_COMMIT_HASH:post/hello-world.md" > "$WORK_DIR/exact-blob.md"
+grep -Fq 'Escaped path literal: C:\\Temp\\wp-origin' "$WORK_DIR/exact-blob.md"
+grep -Fq 'Quoted JSON literal: {"windows":"C:\\\\Temp\\\\wp-origin"}' "$WORK_DIR/exact-blob.md"
+ACTUAL_COMMIT_MESSAGE="$(git -C "$EXACT_CLONE_DIR" show -s --format=%B "$EXACT_COMMIT_HASH" | php -r 'echo rtrim(stream_get_contents(STDIN), "\r\n");')"
+[ "$ACTUAL_COMMIT_MESSAGE" = "$EXACT_COMMIT_MESSAGE" ]
+
+php -r '
+$path = $argv[1];
 $markdown = "---\n"
 	. "type: \"post\"\n"
 	. "slug: \"created-from-git\"\n"
