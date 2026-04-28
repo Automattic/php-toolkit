@@ -122,26 +122,6 @@ class WP_Origin_Admin {
 				</tbody>
 			</table>
 
-			<h2 style="margin-top: 1.5em;">Commit log</h2>
-			<p class="description">Most recent commits on the staging branch (or trunk after finalization). Newest first.</p>
-			<table class="widefat striped" style="max-width: 720px;">
-				<thead>
-					<tr><th style="width: 8em;">Hash</th><th>Subject</th></tr>
-				</thead>
-				<tbody id="wp-origin-commits">
-				<?php if ( empty( $progress['commits'] ) ) : ?>
-					<tr><td colspan="2"><em>No commits yet.</em></td></tr>
-				<?php else : ?>
-					<?php foreach ( $progress['commits'] as $commit ) : ?>
-					<tr>
-						<td><code><?php echo esc_html( $commit['oid'] ); ?></code></td>
-						<td><?php echo esc_html( $commit['subject'] ); ?></td>
-					</tr>
-					<?php endforeach; ?>
-				<?php endif; ?>
-				</tbody>
-			</table>
-
 			<p>
 				<button type="button" class="button" id="wp-origin-retry">Retry import</button>
 			</p>
@@ -157,7 +137,6 @@ class WP_Origin_Admin {
 			var percentEl = document.getElementById('wp-origin-percent');
 			var countsEl = document.getElementById('wp-origin-counts');
 			var messageEl = document.getElementById('wp-origin-message');
-			var commitsEl = document.getElementById('wp-origin-commits');
 
 			function render(data) {
 				stateEl.textContent = data.state;
@@ -165,20 +144,6 @@ class WP_Origin_Admin {
 				percentEl.textContent = data.percent;
 				countsEl.textContent = data.processed + ' / ' + data.total;
 				messageEl.textContent = data.message;
-
-				if (Array.isArray(data.commits) && data.commits.length > 0) {
-					var rows = '';
-					data.commits.forEach(function (c) {
-						var oid = document.createElement('code');
-						oid.textContent = c.oid;
-						var subject = document.createElement('span');
-						subject.textContent = c.subject;
-						rows += '<tr><td>' + oid.outerHTML + '</td><td>' + subject.outerHTML + '</td></tr>';
-					});
-					commitsEl.innerHTML = rows;
-				} else {
-					commitsEl.innerHTML = '<tr><td colspan="2"><em>No commits yet.</em></td></tr>';
-				}
 			}
 
 			function poll() {
