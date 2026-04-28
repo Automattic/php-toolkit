@@ -57,6 +57,18 @@ class WpdbFilesystem implements Filesystem {
 		return new ChrootLayer( $fs, '/' );
 	}
 
+	/**
+	 * Drop the two backing tables. Used by callers that want to wipe
+	 * the filesystem entirely — e.g. retrying a botched initial
+	 * import. The next call to `create()` will re-create the schema.
+	 */
+	public static function drop_tables( $wpdb, $table_prefix ) {
+		$files_table   = $table_prefix . 'files';
+		$entries_table = $table_prefix . 'directory_entries';
+		$wpdb->query( "DROP TABLE IF EXISTS {$files_table}" );
+		$wpdb->query( "DROP TABLE IF EXISTS {$entries_table}" );
+	}
+
 	private function __construct( $wpdb, $table_prefix ) {
 		$this->wpdb          = $wpdb;
 		$this->files_table   = $table_prefix . 'files';
@@ -185,6 +197,21 @@ class WpdbFilesystem implements Filesystem {
 		try {
 			$this->in_transaction(
 				function () use ( $from_path, $to_path ) {
+					// Make the rename idempotent. Git's atomic-write
+					// pattern (write to .tmp, rename to the
+					// content-addressed final path) can replay the same
+					// final path many times — once per identical blob.
+					// Without this DELETE the UPDATE would hit a PK
+					// collision and silently leave the .tmp row in
+					// place, corrupting the object store.
+					if ( $from_path !== $to_path ) {
+						$this->wpdb->delete(
+							$this->files_table,
+							array( 'path' => $to_path ),
+							array( '%s' )
+						);
+					}
+
 					$this->wpdb->update(
 						$this->files_table,
 						array( 'path' => $to_path ),
@@ -204,7 +231,7 @@ class WpdbFilesystem implements Filesystem {
 						),
 						array( '%s', '%s' )
 					);
-					$this->wpdb->insert(
+					$this->wpdb->replace(
 						$this->entries_table,
 						array(
 							'parent_path' => $new_parent,

@@ -1,0 +1,54 @@
+services:
+  db:
+    image: mysql:8
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: wp
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-uroot", "-proot", "--silent"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  wp:
+    image: wordpress:php8.2-apache
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "${WP_ORIGIN_DEMO_PORT:-8090}:80"
+    environment:
+      WORDPRESS_DB_HOST: db:3306
+      WORDPRESS_DB_USER: root
+      WORDPRESS_DB_PASSWORD: root
+      WORDPRESS_DB_NAME: wp
+      WORDPRESS_DEBUG: "1"
+      WORDPRESS_CONFIG_EXTRA: |
+        define( 'WP_ENVIRONMENT_TYPE', 'local' );
+    volumes:
+      - ../../..:/srv/php-toolkit:ro
+      - wp:/var/www/html
+
+  init:
+    image: wordpress:cli-php8.2
+    depends_on:
+      wp:
+        condition: service_started
+      db:
+        condition: service_healthy
+    user: "33:33"
+    environment:
+      WORDPRESS_DB_HOST: db:3306
+      WORDPRESS_DB_USER: root
+      WORDPRESS_DB_PASSWORD: root
+      WORDPRESS_DB_NAME: wp
+      WP_ORIGIN_DEMO_HOST: ${WP_ORIGIN_DEMO_HOST:-localhost:8090}
+    volumes:
+      - wp:/var/www/html
+      - ../../..:/srv/php-toolkit:ro
+      - ./init.sh:/init.sh:ro
+    entrypoint: ["bash", "/init.sh"]
+    restart: "no"
+
+volumes:
+  wp:
