@@ -99,15 +99,7 @@ class WpdbFilesystem implements Filesystem {
 			)
 		);
 		if ( ! $root_exists ) {
-			$this->wpdb->insert(
-				$this->files_table,
-				array(
-					'path'     => '/',
-					'type'     => 'dir',
-					'contents' => null,
-				),
-				array( '%s', '%s', '%s' )
-			);
+			$this->replace_file_record( '/', 'dir', null );
 		}
 	}
 
@@ -252,22 +244,17 @@ class WpdbFilesystem implements Filesystem {
 				function () use ( $path ) {
 					$parent = wp_unix_dirname( $path );
 
-					$this->wpdb->insert(
-						$this->files_table,
-						array(
-							'path'     => $path,
-							'type'     => 'dir',
-							'contents' => null,
+					$this->replace_file_record( $path, 'dir', null );
+					$this->assert_db_result(
+						$this->wpdb->insert(
+							$this->entries_table,
+							array(
+								'parent_path' => $parent,
+								'name'        => basename( $path ),
+							),
+							array( '%s', '%s' )
 						),
-						array( '%s', '%s', '%s' )
-					);
-					$this->wpdb->insert(
-						$this->entries_table,
-						array(
-							'parent_path' => $parent,
-							'name'        => basename( $path ),
-						),
-						array( '%s', '%s' )
+						'Failed to create directory entry: ' . $path
 					);
 				}
 			);
@@ -380,22 +367,17 @@ class WpdbFilesystem implements Filesystem {
 				function () use ( $path, $data ) {
 					$parent = wp_unix_dirname( $path );
 
-					$this->wpdb->replace(
-						$this->files_table,
-						array(
-							'path'     => $path,
-							'type'     => 'file',
-							'contents' => $data,
+					$this->replace_file_record( $path, 'file', $data );
+					$this->assert_db_result(
+						$this->wpdb->replace(
+							$this->entries_table,
+							array(
+								'parent_path' => $parent,
+								'name'        => basename( $path ),
+							),
+							array( '%s', '%s' )
 						),
-						array( '%s', '%s', '%s' )
-					);
-					$this->wpdb->replace(
-						$this->entries_table,
-						array(
-							'parent_path' => $parent,
-							'name'        => basename( $path ),
-						),
-						array( '%s', '%s' )
+						'Failed to write directory entry: ' . $path
 					);
 				}
 			);
@@ -408,6 +390,34 @@ class WpdbFilesystem implements Filesystem {
 				$e
 			);
 		}
+	}
+
+	private function replace_file_record( $path, $type, $contents ) {
+		$contents_sql = null === $contents ? 'NULL' : "X'" . bin2hex( $contents ) . "'";
+		$result       = $this->wpdb->query(
+			$this->wpdb->prepare(
+				"REPLACE INTO {$this->files_table} (path, type, contents) VALUES (%s, %s, {$contents_sql})",
+				$path,
+				$type
+			)
+		);
+
+		$this->assert_db_result(
+			$result,
+			'Failed to write file record: ' . $path
+		);
+	}
+
+	private function assert_db_result( $result, $message ) {
+		if ( false !== $result ) {
+			return;
+		}
+
+		if ( isset( $this->wpdb->last_error ) && '' !== $this->wpdb->last_error ) {
+			$message .= ': ' . $this->wpdb->last_error;
+		}
+
+		throw new FilesystemException( $message );
 	}
 
 	private function in_transaction( $callback ) {
