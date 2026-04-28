@@ -47,6 +47,33 @@ class WP_Origin_End_To_End_Test extends TestCase {
 		}
 	}
 
+	public function testSeedStatusReportsDone() {
+		$body  = $this->curl_get( $this->base_url . '/wp-json/wp-origin/v1/seed-status' );
+		$state = json_decode( $body, true );
+		$this->assertIsArray( $state, "Unexpected seed-status response: $body" );
+		$this->assertSame( 'done', $state['state'], "Seeder is not done: $body" );
+		$this->assertSame( 100, $state['percent'], "Seeder percent is not 100: $body" );
+		$this->assertGreaterThan( 0, $state['total'], "Seeder reports zero total posts: $body" );
+	}
+
+	public function testInitialCommitIsParentless() {
+		$clone_dir = $this->clone_repo( 'initial-commit' );
+		$result    = $this->run_cmd(
+			array( 'git', '-C', $clone_dir, 'log', '--all', '--format=%H %s', '--reverse' )
+		);
+		$lines = array_values( array_filter( explode( "\n", trim( $result['output'] ) ) ) );
+		$this->assertNotEmpty( $lines );
+
+		// First commit must be the squashed parent-less initial import.
+		list( $first_oid, $first_subject ) = explode( ' ', $lines[0], 2 );
+		$this->assertSame( 'Initial import from WordPress', $first_subject );
+		$parents = $this->run_cmd( array( 'git', '-C', $clone_dir, 'rev-list', '--parents', '-n', '1', $first_oid ) );
+		$this->assertSame( $first_oid, trim( $parents['output'] ), 'Initial commit must have no parents.' );
+
+		// And no "Seed batch" commits should have leaked into trunk.
+		$this->assertStringNotContainsString( 'Seed batch', $result['output'] );
+	}
+
 	public function testFullRoundTrip() {
 		$clone_dir = $this->clone_repo( 'clone' );
 

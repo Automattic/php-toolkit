@@ -35,13 +35,20 @@ class WP_Origin_Plugin {
 	const EPOCH_TIMESTAMP = 946684800;
 	const TABLE_PREFIX    = 'wp_origin_';
 
-	private static $supported_post_types    = array( 'post', 'page' );
-	private static $supported_post_statuses = array( 'publish', 'draft', 'pending', 'private', 'future' );
+	public static $supported_post_types    = array( 'post', 'page' );
+	public static $supported_post_statuses = array( 'publish', 'draft', 'pending', 'private', 'future' );
 
 	public static function bootstrap() {
 		add_action( 'rest_api_init', array( __CLASS__, 'register_routes' ) );
 		add_filter( 'rest_post_dispatch', array( __CLASS__, 'add_authentication_challenge' ), 10, 3 );
 		add_filter( 'rest_pre_serve_request', array( __CLASS__, 'serve_git_response' ), 10, 4 );
+
+		WP_Origin_Seeder::bootstrap();
+		WP_Origin_Admin::bootstrap();
+	}
+
+	public static function on_activation() {
+		WP_Origin_Seeder::on_activation();
 	}
 
 	public static function register_routes() {
@@ -81,6 +88,17 @@ class WP_Origin_Plugin {
 		$previous_error_handler = set_error_handler( array( __CLASS__, 'throw_on_php_warning' ) ); // phpcs:ignore
 
 		try {
+			if ( ! WP_Origin_Seeder::is_ready() ) {
+				$response = new WP_Origin_Buffering_Response();
+				$response->send_http_code( 503 );
+				$response->send_header( 'Content-Type', 'text/plain; charset=utf-8' );
+				$response->send_header( 'Cache-Control', 'no-cache' );
+				$response->send_header( 'Retry-After', '15' );
+				$response->append_bytes( WP_Origin_Seeder::not_ready_message() . "\n" );
+
+				return $response->to_rest_response();
+			}
+
 			$repository = self::open_repository();
 			self::sync_repository_from_wordpress( $repository );
 
@@ -216,7 +234,7 @@ class WP_Origin_Plugin {
 		return '/git-receive-pack' === $git_path;
 	}
 
-	private static function open_repository() {
+	public static function open_repository() {
 		global $wpdb;
 
 		$repository = new GitRepository(
@@ -309,26 +327,11 @@ class WP_Origin_Plugin {
 				continue;
 			}
 
-			$metadata = array(
-				'title'  => array( $post->post_title ),
-				'date'   => array( self::format_post_date_for_frontmatter( $post ) ),
-				'status' => array( self::frontmatter_status_from_post_status( $post->post_status ) ),
-			);
-			if ( '' !== trim( $post->post_excerpt ) ) {
-				$metadata['description'] = array( $post->post_excerpt );
-			}
-
-			$producer = new MarkdownProducer(
-				new BlocksWithMetadata(
-					$post->post_content,
-					$metadata
-				)
-			);
-			$path     = self::build_markdown_path( $post->post_type, $post->post_name );
+			$path = self::build_markdown_path( $post->post_type, $post->post_name );
 
 			$files[ $path ] = array(
 				'post'     => $post,
-				'markdown' => $producer->produce(),
+				'markdown' => self::export_post_to_markdown( $post ),
 			);
 		}
 
@@ -337,8 +340,37 @@ class WP_Origin_Plugin {
 		return $files;
 	}
 
-	private static function build_markdown_path( $post_type, $slug ) {
+	public static function build_markdown_path( $post_type, $slug ) {
 		return ltrim( $post_type . '/' . $slug . '.md', '/' );
+	}
+
+	/**
+	 * Convert a single WP_Post to its Markdown representation, the same
+	 * way `export_wordpress_content()` does in bulk. Public so the
+	 * seeder can reuse the conversion without duplicating logic.
+	 */
+	public static function export_post_to_markdown( WP_Post $post ) {
+		$metadata = array(
+			'title'  => array( $post->post_title ),
+			'date'   => array( self::format_post_date_for_frontmatter( $post ) ),
+			'status' => array( self::frontmatter_status_from_post_status( $post->post_status ) ),
+		);
+		if ( '' !== trim( $post->post_excerpt ) ) {
+			$metadata['description'] = array( $post->post_excerpt );
+		}
+
+		$producer = new MarkdownProducer(
+			new BlocksWithMetadata(
+				$post->post_content,
+				$metadata
+			)
+		);
+
+		return $producer->produce();
+	}
+
+	public static function repository_identity( GitRepository $repository ) {
+		return self::get_repository_identity( $repository );
 	}
 
 	private static function apply_repository_changes_to_wordpress( GitRepository $repository, $old_commit, $new_commit ) {

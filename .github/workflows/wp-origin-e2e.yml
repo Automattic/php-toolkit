@@ -87,14 +87,6 @@ jobs:
           wp --path="$WP_DIR" option update permalink_structure '/%postname%/'
           wp --path="$WP_DIR" rewrite flush --hard
 
-      - name: Mount toolkit components and activate plugin
-        run: |
-          rm -rf "$WP_DIR/wp-content/plugins/wp-origin"
-          ln -s "$GITHUB_WORKSPACE/plugins/wp-origin" "$WP_DIR/wp-content/plugins/wp-origin"
-          ln -s "$GITHUB_WORKSPACE/components" "$WP_DIR/wp-content/components"
-          ln -s "$GITHUB_WORKSPACE/vendor" "$WP_DIR/wp-content/vendor"
-          wp --path="$WP_DIR" plugin activate wp-origin
-
       - name: Seed Hello World post and Sample Page
         run: |
           wp --path="$WP_DIR" post update 1 \
@@ -105,6 +97,31 @@ jobs:
             --post_title='Sample Page' \
             --post_content='<!-- wp:paragraph --><p>Page from WordPress</p><!-- /wp:paragraph -->' \
             --post_status=publish
+
+      - name: Mount toolkit components and activate plugin
+        run: |
+          rm -rf "$WP_DIR/wp-content/plugins/wp-origin"
+          ln -s "$GITHUB_WORKSPACE/plugins/wp-origin" "$WP_DIR/wp-content/plugins/wp-origin"
+          ln -s "$GITHUB_WORKSPACE/components" "$WP_DIR/wp-content/components"
+          ln -s "$GITHUB_WORKSPACE/vendor" "$WP_DIR/wp-content/vendor"
+          wp --path="$WP_DIR" plugin activate wp-origin
+
+      - name: Drive seeder cron until done
+        run: |
+          for i in $(seq 1 30); do
+            wp --path="$WP_DIR" cron event run --due-now > /dev/null 2>&1 || true
+            STATE=$(wp --path="$WP_DIR" option get wp_origin_seed_state 2>/dev/null || echo "pending")
+            echo "tick $i: state=$STATE"
+            if [ "$STATE" = "done" ]; then exit 0; fi
+            if [ "$STATE" = "failed" ]; then
+              wp --path="$WP_DIR" option get wp_origin_seed_progress
+              exit 1
+            fi
+            sleep 1
+          done
+          echo "Seeder never reached 'done' state." >&2
+          wp --path="$WP_DIR" option get wp_origin_seed_progress
+          exit 1
 
       - name: Create Application Password
         id: app_password
