@@ -31,6 +31,20 @@ class WpdbFilesystemTest extends FilesystemTestCase {
 		$this->assertSame( $binary, $this->fs->get_contents( '/blob.bin' ) );
 	}
 
+	public function testOpenWriteStreamRoundTripsBinaryContents() {
+		$binary = '';
+		for ( $i = 0; $i < 256; $i++ ) {
+			$binary .= chr( $i );
+		}
+
+		$writer = $this->fs->open_write_stream( '/streamed.bin' );
+		$writer->append_bytes( substr( $binary, 0, 128 ) );
+		$writer->append_bytes( substr( $binary, 128 ) );
+		$writer->close_writing();
+
+		$this->assertSame( $binary, $this->fs->get_contents( '/streamed.bin' ) );
+	}
+
 	public function testReplacingFileContentsOverwritesBytes() {
 		$this->fs->put_contents( '/object', 'first' );
 		$this->fs->put_contents( '/object', 'second' );
