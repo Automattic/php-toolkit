@@ -57,6 +57,11 @@ class WP_Origin_End_To_End_Test extends TestCase {
 			file_get_contents( $clone_dir . '/post/hello-world.md' )
 		);
 
+		// Capture the page ID up front: WordPress mangles the slug to
+		// `sample-page__trashed` once we trash the page in step 3, so a
+		// later slug lookup would not find it.
+		$sample_page_id = $this->fetch_id_by_slug( 'sample-page', 'pages' );
+
 		$this->configure_git( $clone_dir );
 
 		// 1) Update an existing post via Git push.
@@ -92,8 +97,7 @@ class WP_Origin_End_To_End_Test extends TestCase {
 			'Created from Git',
 			$this->fetch_content( $created_id, 'posts' )
 		);
-		$page_id = $this->fetch_id_by_slug( 'sample-page', 'pages', array( 'publish', 'trash' ) );
-		$this->assertSame( 'trash', $this->fetch_status( $page_id, 'pages' ) );
+		$this->assertSame( 'trash', $this->fetch_status( $sample_page_id, 'pages' ) );
 
 		// 4) Stale push: an out-of-date local commit must be rejected.
 		$this->run_cmd( array( 'git', '-C', $clone_dir, 'pull', '--rebase', 'origin', 'trunk' ) );
@@ -168,10 +172,9 @@ class WP_Origin_End_To_End_Test extends TestCase {
 		$this->run_cmd( array( 'git', '-C', $dir, 'push', 'origin', 'trunk' ) );
 	}
 
-	private function fetch_id_by_slug( $slug, $endpoint, $statuses = array( 'publish' ) ) {
-		$url   = $this->base_url . '/wp-json/wp/v2/' . $endpoint
-			. '?slug=' . rawurlencode( $slug )
-			. '&context=edit&status=' . rawurlencode( implode( ',', $statuses ) );
+	private function fetch_id_by_slug( $slug, $endpoint ) {
+		$url = $this->base_url . '/wp-json/wp/v2/' . $endpoint
+			. '?slug=' . rawurlencode( $slug ) . '&context=edit';
 		$body  = $this->curl_get( $url );
 		$items = json_decode( $body, true );
 		$this->assertIsArray( $items, "Unexpected REST response for $endpoint?slug=$slug: $body" );
