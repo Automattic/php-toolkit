@@ -84,6 +84,13 @@ class WP_Origin_Seeder {
 			return;
 		}
 
+		// Wipe any leftover repository tables from a previous failed
+		// activation so the new seeder starts on a clean object store.
+		// Without this, re-activating after a partial seed hits PK
+		// collisions on /objects/ paths the moment Git tries to write
+		// a blob it had already started writing last time.
+		WP_Origin_Plugin::drop_repository_tables();
+
 		update_option( self::STATE_OPTION, self::STATE_PENDING, false );
 		update_option(
 			self::PROGRESS_OPTION,
@@ -108,6 +115,7 @@ class WP_Origin_Seeder {
 		delete_option( self::PROGRESS_OPTION );
 		delete_transient( self::LOCK_TRANSIENT );
 		wp_clear_scheduled_hook( self::CRON_HOOK );
+		WP_Origin_Plugin::drop_repository_tables();
 	}
 
 	public static function get_state() {
@@ -133,7 +141,66 @@ class WP_Origin_Seeder {
 			'last_id'     => isset( $progress['last_id'] ) ? intval( $progress['last_id'] ) : 0,
 			'started_at'  => isset( $progress['started_at'] ) ? intval( $progress['started_at'] ) : 0,
 			'finished_at' => isset( $progress['finished_at'] ) ? intval( $progress['finished_at'] ) : 0,
+			'commits'     => self::get_commit_log( 25 ),
 		);
+	}
+
+	/**
+	 * Walk back from the seed branch (during import) or trunk (after
+	 * finalization) and return the latest commit subjects for the
+	 * admin UI. Returns an empty array if the repository is not yet
+	 * initialised.
+	 */
+	public static function get_commit_log( $limit = 25 ) {
+		try {
+			global $wpdb;
+			$table = $wpdb->prefix . WP_Origin_Plugin::TABLE_PREFIX . 'files';
+			if ( ! $wpdb->get_var( "SHOW TABLES LIKE '" . esc_sql( $table ) . "'" ) ) {
+				return array();
+			}
+			$repository = WP_Origin_Plugin::open_repository();
+		} catch ( Throwable $exception ) {
+			return array();
+		}
+
+		$tip = null;
+		foreach ( array( 'refs/heads/trunk', self::SEED_BRANCH ) as $ref ) {
+			try {
+				if ( ! $repository->branch_exists( $ref ) ) {
+					continue;
+				}
+				$candidate = $repository->get_branch_tip( $ref );
+			} catch ( Throwable $exception ) {
+				continue;
+			}
+			if ( is_string( $candidate ) && '' !== $candidate && ! Commit::is_null_hash( $candidate ) ) {
+				$tip = $candidate;
+				break;
+			}
+		}
+
+		if ( null === $tip ) {
+			return array();
+		}
+
+		$commits = array();
+		$current = $tip;
+		while ( $current && ! Commit::is_null_hash( $current ) && count( $commits ) < $limit ) {
+			try {
+				$commit = $repository->read_object( $current )->as_commit();
+			} catch ( Throwable $exception ) {
+				break;
+			}
+			$lines     = preg_split( "/\r\n|\n|\r/", (string) $commit->message );
+			$subject   = is_array( $lines ) && isset( $lines[0] ) ? trim( $lines[0] ) : '';
+			$commits[] = array(
+				'oid'     => substr( $current, 0, 7 ),
+				'subject' => '' !== $subject ? $subject : '(no message)',
+			);
+			$current = empty( $commit->parents ) ? null : $commit->parents[0];
+		}
+
+		return $commits;
 	}
 
 	public static function is_ready() {

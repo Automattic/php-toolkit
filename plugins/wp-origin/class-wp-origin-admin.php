@@ -54,16 +54,29 @@ class WP_Origin_Admin {
 	}
 
 	public static function rest_status() {
-		// Each poll from the admin page also drives the seeder forward
-		// by one tick. WP-Cron only fires when something hits the site,
-		// so on a brand-new install — where no visitor has shown up yet
-		// — the cron event would otherwise sit idle. The transient lock
-		// inside tick() makes this safe to call on every poll.
-		if ( ! WP_Origin_Seeder::is_ready() ) {
-			WP_Origin_Seeder::tick();
-		}
+		// Each poll drives the seeder for up to ~1.5 seconds before
+		// returning. With the demo's 0-second batch budget that's many
+		// batches per poll, so the progress bar always reflects fresh
+		// work — instead of stalling for one tick per 2-second JS
+		// interval. The transient lock inside tick() makes repeated
+		// calls safe.
+		self::drive_seeder( 1.5 );
 
 		return rest_ensure_response( WP_Origin_Seeder::get_progress() );
+	}
+
+	private static function drive_seeder( $seconds ) {
+		$deadline = microtime( true ) + $seconds;
+		while ( ! WP_Origin_Seeder::is_ready() && microtime( true ) < $deadline ) {
+			$state_before = WP_Origin_Seeder::get_state();
+			WP_Origin_Seeder::tick();
+			if ( WP_Origin_Seeder::get_state() === $state_before
+				&& 'in_progress' !== $state_before
+				&& 'pending' !== $state_before
+			) {
+				break;
+			}
+		}
 	}
 
 	public static function rest_retry() {
@@ -78,12 +91,11 @@ class WP_Origin_Admin {
 		if ( ! current_user_can( 'manage_options' ) ) {
 			return;
 		}
-		// Drive the seeder forward before painting the page so the user
-		// never lands on "Queued. Waiting for the first cron tick." —
-		// by the time they see the progress bar it's already moving.
-		if ( ! WP_Origin_Seeder::is_ready() ) {
-			WP_Origin_Seeder::tick();
-		}
+		// Drive the seeder forward for ~1.5s before painting the page,
+		// so the user never lands on "Queued. Waiting for the first
+		// cron tick." — by the time they see the progress bar it's
+		// already moving and several commits exist.
+		self::drive_seeder( 1.5 );
 		$progress   = WP_Origin_Seeder::get_progress();
 		$nonce      = wp_create_nonce( 'wp_rest' );
 		$status_url = esc_url_raw( rest_url( self::REST_NAMESPACE . self::STATUS_ROUTE ) );
@@ -110,6 +122,26 @@ class WP_Origin_Admin {
 				</tbody>
 			</table>
 
+			<h2 style="margin-top: 1.5em;">Commit log</h2>
+			<p class="description">Most recent commits on the staging branch (or trunk after finalization). Newest first.</p>
+			<table class="widefat striped" style="max-width: 720px;">
+				<thead>
+					<tr><th style="width: 8em;">Hash</th><th>Subject</th></tr>
+				</thead>
+				<tbody id="wp-origin-commits">
+				<?php if ( empty( $progress['commits'] ) ) : ?>
+					<tr><td colspan="2"><em>No commits yet.</em></td></tr>
+				<?php else : ?>
+					<?php foreach ( $progress['commits'] as $commit ) : ?>
+					<tr>
+						<td><code><?php echo esc_html( $commit['oid'] ); ?></code></td>
+						<td><?php echo esc_html( $commit['subject'] ); ?></td>
+					</tr>
+					<?php endforeach; ?>
+				<?php endif; ?>
+				</tbody>
+			</table>
+
 			<p>
 				<button type="button" class="button" id="wp-origin-retry">Retry import</button>
 			</p>
@@ -125,6 +157,7 @@ class WP_Origin_Admin {
 			var percentEl = document.getElementById('wp-origin-percent');
 			var countsEl = document.getElementById('wp-origin-counts');
 			var messageEl = document.getElementById('wp-origin-message');
+			var commitsEl = document.getElementById('wp-origin-commits');
 
 			function render(data) {
 				stateEl.textContent = data.state;
@@ -132,6 +165,20 @@ class WP_Origin_Admin {
 				percentEl.textContent = data.percent;
 				countsEl.textContent = data.processed + ' / ' + data.total;
 				messageEl.textContent = data.message;
+
+				if (Array.isArray(data.commits) && data.commits.length > 0) {
+					var rows = '';
+					data.commits.forEach(function (c) {
+						var oid = document.createElement('code');
+						oid.textContent = c.oid;
+						var subject = document.createElement('span');
+						subject.textContent = c.subject;
+						rows += '<tr><td>' + oid.outerHTML + '</td><td>' + subject.outerHTML + '</td></tr>';
+					});
+					commitsEl.innerHTML = rows;
+				} else {
+					commitsEl.innerHTML = '<tr><td colspan="2"><em>No commits yet.</em></td></tr>';
+				}
 			}
 
 			function poll() {

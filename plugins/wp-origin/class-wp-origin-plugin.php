@@ -234,6 +234,11 @@ class WP_Origin_Plugin {
 		return '/git-receive-pack' === $git_path;
 	}
 
+	public static function drop_repository_tables() {
+		global $wpdb;
+		WpdbFilesystem::drop_tables( $wpdb, $wpdb->prefix . self::TABLE_PREFIX );
+	}
+
 	public static function open_repository() {
 		global $wpdb;
 
