@@ -327,9 +327,12 @@ class WP_Origin_Seeder {
 		}
 
 		$repository->set_branch_tip( 'refs/heads/trunk', $initial_oid );
-		// Drop the staging branch — the seed commits are unreachable
-		// from any ref, so Git will treat their objects as garbage.
-		$repository->set_branch_tip( self::SEED_BRANCH, Commit::NULL_HASH );
+		// Drop the staging branch entirely. Leaving a NULL_HASH file on
+		// disk would cause `info/refs` to advertise a ref with an
+		// invalid OID and break clones.
+		if ( $repository->branch_exists( self::SEED_BRANCH ) ) {
+			$repository->delete_branch( self::SEED_BRANCH );
+		}
 
 		$progress['finished_at'] = time();
 		$progress['percent']     = 100;
