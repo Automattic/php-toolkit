@@ -78,6 +78,12 @@ class WP_Origin_Admin {
 		if ( ! current_user_can( 'manage_options' ) ) {
 			return;
 		}
+		// Drive the seeder forward before painting the page so the user
+		// never lands on "Queued. Waiting for the first cron tick." —
+		// by the time they see the progress bar it's already moving.
+		if ( ! WP_Origin_Seeder::is_ready() ) {
+			WP_Origin_Seeder::tick();
+		}
 		$progress   = WP_Origin_Seeder::get_progress();
 		$nonce      = wp_create_nonce( 'wp_rest' );
 		$status_url = esc_url_raw( rest_url( self::REST_NAMESPACE . self::STATUS_ROUTE ) );
