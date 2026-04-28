@@ -58,6 +58,26 @@ class WP_Origin_Seeder {
 		add_action( self::CRON_HOOK, array( __CLASS__, 'tick' ) );
 	}
 
+	/**
+	 * Resolve budget knobs through filters. The defaults are the
+	 * production values; tests and unusual hosts can shrink them via
+	 * `wp_origin_seed_batch_size`,
+	 * `wp_origin_seed_time_budget_seconds`, and
+	 * `wp_origin_seed_tick_reschedule_seconds` to force the seeder to
+	 * span multiple cron ticks.
+	 */
+	private static function batch_size() {
+		return (int) apply_filters( 'wp_origin_seed_batch_size', self::BATCH_SIZE );
+	}
+
+	private static function time_budget_seconds() {
+		return (float) apply_filters( 'wp_origin_seed_time_budget_seconds', self::TIME_BUDGET_SECONDS );
+	}
+
+	private static function tick_reschedule_seconds() {
+		return (int) apply_filters( 'wp_origin_seed_tick_reschedule_seconds', self::TICK_RESCHEDULE_SECONDS );
+	}
+
 	public static function on_activation() {
 		$state = get_option( self::STATE_OPTION );
 		if ( self::STATE_DONE === $state ) {
@@ -103,18 +123,16 @@ class WP_Origin_Seeder {
 		$done     = isset( $progress['processed'] ) ? intval( $progress['processed'] ) : 0;
 		$percent  = self::STATE_DONE === $state ? 100 : ( $total > 0 ? min( 99, intval( floor( $done * 100 / $total ) ) ) : 0 );
 
-		return array_merge(
-			array(
-				'state'      => $state,
-				'percent'    => $percent,
-				'processed'  => $done,
-				'total'      => $total,
-				'message'    => isset( $progress['message'] ) ? $progress['message'] : '',
-				'last_id'    => isset( $progress['last_id'] ) ? intval( $progress['last_id'] ) : 0,
-				'started_at' => isset( $progress['started_at'] ) ? intval( $progress['started_at'] ) : 0,
-				'finished_at' => isset( $progress['finished_at'] ) ? intval( $progress['finished_at'] ) : 0,
-			),
-			array()
+		return array(
+			'state'       => $state,
+			'percent'     => $percent,
+			'processed'   => $done,
+			'total'       => $total,
+			'tick_count'  => isset( $progress['tick_count'] ) ? intval( $progress['tick_count'] ) : 0,
+			'message'     => isset( $progress['message'] ) ? $progress['message'] : '',
+			'last_id'     => isset( $progress['last_id'] ) ? intval( $progress['last_id'] ) : 0,
+			'started_at'  => isset( $progress['started_at'] ) ? intval( $progress['started_at'] ) : 0,
+			'finished_at' => isset( $progress['finished_at'] ) ? intval( $progress['finished_at'] ) : 0,
 		);
 	}
 
@@ -148,6 +166,11 @@ class WP_Origin_Seeder {
 				return;
 			}
 
+			$progress                 = self::get_progress_storage();
+			$progress['tick_count']   = isset( $progress['tick_count'] ) ? intval( $progress['tick_count'] ) + 1 : 1;
+			$progress['last_tick_at'] = time();
+			update_option( self::PROGRESS_OPTION, $progress, false );
+
 			if ( self::STATE_PENDING === $state ) {
 				self::initialize();
 				$state = self::get_state();
@@ -179,12 +202,15 @@ class WP_Origin_Seeder {
 		);
 		// phpcs:enable
 
+		$existing   = self::get_progress_storage();
+		$tick_count = isset( $existing['tick_count'] ) ? intval( $existing['tick_count'] ) : 0;
 		update_option(
 			self::PROGRESS_OPTION,
 			array(
 				'processed'    => 0,
 				'total'        => $total,
 				'last_id'      => 0,
+				'tick_count'   => $tick_count,
 				'started_at'   => time(),
 				'last_tick_at' => time(),
 				'message'      => sprintf( 'Found %d posts and pages to import.', $total ),
@@ -269,7 +295,7 @@ class WP_Origin_Seeder {
 			wp_cache_flush_runtime();
 
 			if ( self::budget_exhausted( $started_at ) ) {
-				wp_schedule_single_event( time() + self::TICK_RESCHEDULE_SECONDS, self::CRON_HOOK );
+				wp_schedule_single_event( time() + self::tick_reschedule_seconds(), self::CRON_HOOK );
 				break;
 			}
 		}
@@ -355,7 +381,7 @@ class WP_Origin_Seeder {
 				ORDER BY ID ASC
 				LIMIT %d",
 				intval( $after_id ),
-				self::BATCH_SIZE
+				self::batch_size()
 			)
 		);
 		// phpcs:enable
@@ -386,7 +412,7 @@ class WP_Origin_Seeder {
 	}
 
 	private static function budget_exhausted( $started_at ) {
-		if ( microtime( true ) - $started_at > self::TIME_BUDGET_SECONDS ) {
+		if ( microtime( true ) - $started_at > self::time_budget_seconds() ) {
 			return true;
 		}
 

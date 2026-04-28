@@ -56,6 +56,20 @@ class WP_Origin_End_To_End_Test extends TestCase {
 		$this->assertGreaterThan( 0, $state['total'], "Seeder reports zero total posts: $body" );
 	}
 
+	public function testSeedingSpansMultipleCronTicks() {
+		// The CI workflow seeds 30 posts and drops a mu-plugin that
+		// shrinks the batch size to 5 and the time budget to 0
+		// seconds. That guarantees the seeder reschedules itself after
+		// every batch, so finishing requires several cron ticks. If
+		// any of that machinery breaks we'd silently lose resumability
+		// — assert directly that the import didn't fit in one tick.
+		$body  = $this->curl_get( $this->base_url . '/wp-json/wp-origin/v1/seed-status' );
+		$state = json_decode( $body, true );
+		$this->assertIsArray( $state, "Unexpected seed-status response: $body" );
+		$this->assertGreaterThanOrEqual( 30, $state['total'], "Expected the bulk seed to leave >=30 posts to import: $body" );
+		$this->assertGreaterThan( 1, $state['tick_count'], "Seeder finished in a single tick — resumability untested: $body" );
+	}
+
 	public function testInitialCommitIsParentless() {
 		$clone_dir = $this->clone_repo( 'initial-commit' );
 		$result    = $this->run_cmd(

@@ -98,6 +98,25 @@ jobs:
             --post_content='<!-- wp:paragraph --><p>Page from WordPress</p><!-- /wp:paragraph -->' \
             --post_status=publish
 
+      - name: Generate bulk posts to force multi-tick seeding
+        run: |
+          # 28 generated posts + the 2 seeded ones = 30 total. Combined
+          # with the CI test helper's batch_size=5 / time_budget=0
+          # filters this forces the seeder to reschedule itself across
+          # at least 6 cron ticks before reaching `done`.
+          wp --path="$WP_DIR" post generate \
+            --count=28 \
+            --post_type=post \
+            --post_status=publish \
+            --post_title='CI bulk post' \
+            --post_content='<!-- wp:paragraph --><p>Bulk post for the multi-tick seeder e2e test.</p><!-- /wp:paragraph -->'
+
+      - name: Install CI seeder helper as a mu-plugin
+        run: |
+          mkdir -p "$WP_DIR/wp-content/mu-plugins"
+          cp "$GITHUB_WORKSPACE/plugins/wp-origin/Tests/ci-mu-test-helper.php" \
+            "$WP_DIR/wp-content/mu-plugins/wp-origin-ci-test-helper.php"
+
       - name: Mount toolkit components and activate plugin
         run: |
           rm -rf "$WP_DIR/wp-content/plugins/wp-origin"
