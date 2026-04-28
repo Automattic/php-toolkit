@@ -112,11 +112,12 @@ class WP_Origin_Plugin {
 
 			if ( self::is_push_request( $git_path ) ) {
 				try {
-					self::apply_repository_changes_to_wordpress(
+					$push_summary = self::apply_repository_changes_to_wordpress(
 						$repository,
 						$push_header['old_oid'],
 						$push_header['new_oid']
 					);
+					$response->append_progress_messages( self::format_push_summary_messages( $push_summary ) );
 				} catch ( Throwable $exception ) {
 					return self::build_protocol_error_response(
 						'git-receive-pack',
@@ -343,6 +344,7 @@ class WP_Origin_Plugin {
 
 	private static function apply_repository_changes_to_wordpress( GitRepository $repository, $old_commit, $new_commit ) {
 		$commit_hashes = self::get_push_commit_hashes( $repository, $old_commit, $new_commit );
+		$push_summary  = array();
 
 		foreach ( $commit_hashes as $index => $commit_hash ) {
 			// Conflict checks against WordPress's current modified_gmt only
@@ -350,8 +352,13 @@ class WP_Origin_Plugin {
 			// subsequent commit is being applied on top of the WP state we
 			// just produced, so per-file modified_gmt comparisons would
 			// spuriously fail.
-			self::apply_single_commit_to_wordpress( $repository, $commit_hash, 0 !== $index );
+			$push_summary = array_merge(
+				$push_summary,
+				self::apply_single_commit_to_wordpress( $repository, $commit_hash, 0 !== $index )
+			);
 		}
+
+		return $push_summary;
 	}
 
 	private static function apply_single_commit_to_wordpress( GitRepository $repository, $commit_hash, $skip_modified_checks ) {
@@ -365,19 +372,22 @@ class WP_Origin_Plugin {
 		$new_files   = self::read_markdown_files_from_commit( $repository, $commit_hash );
 
 		$updated_post_ids = array();
+		$changes          = array();
 
 		foreach ( $new_files as $path => $contents ) {
 			if ( isset( $old_files[ $path ] ) && $old_files[ $path ] === $contents ) {
 				continue;
 			}
 
-			$post_id = self::upsert_post_from_markdown(
+			$applied = self::upsert_post_from_markdown(
 				$path,
 				$contents,
 				array( 'skip_modified_check' => $skip_modified_checks )
 			);
+			$post_id = $applied['post_id'];
 			if ( $post_id ) {
 				$updated_post_ids[ $post_id ] = true;
+				$changes[]                    = $applied['change'];
 			}
 		}
 
@@ -404,10 +414,15 @@ class WP_Origin_Plugin {
 			}
 			self::assert_can_edit_post( $post_id );
 
+			$post      = get_post( $post_id );
+			$changes[] = self::build_push_summary_item( 'trashed', $post, $path );
+
 			if ( false === wp_trash_post( $post_id ) ) {
 				throw new Exception( 'Push rejected because WordPress could not trash the deleted content.' );
 			}
 		}
+
+		return $changes;
 	}
 
 	private static function get_push_commit_hashes( GitRepository $repository, $old_commit, $new_commit ) {
@@ -517,7 +532,58 @@ class WP_Origin_Plugin {
 			throw new Exception( $post_id->get_error_message() );
 		}
 
-		return $post_id;
+		$post = get_post( $post_id );
+
+		return array(
+			'post_id' => $post_id,
+			'change'  => self::build_push_summary_item(
+				$existing_post ? 'updated' : 'created',
+				$post,
+				$path
+			),
+		);
+	}
+
+	private static function build_push_summary_item( $action, $post, $path ) {
+		$post_id = $post ? $post->ID : 0;
+
+		return array(
+			'action'    => $action,
+			'post_id'   => $post_id,
+			'post_type' => $post ? $post->post_type : self::path_to_post_type( $path ),
+			'status'    => $post ? $post->post_status : '',
+			'title'     => $post ? get_the_title( $post ) : '',
+			'url'       => $post_id ? get_permalink( $post_id ) : '',
+			'path'      => $path,
+		);
+	}
+
+	private static function format_push_summary_messages( $push_summary ) {
+		if ( empty( $push_summary ) ) {
+			return array();
+		}
+
+		$messages   = array();
+		$messages[] = sprintf(
+			'WP Origin applied %d content %s:',
+			count( $push_summary ),
+			1 === count( $push_summary ) ? 'change' : 'changes'
+		);
+
+		foreach ( $push_summary as $change ) {
+			$messages[] = sprintf(
+				'- %s %s: %s',
+				ucfirst( $change['action'] ),
+				$change['post_type'],
+				self::sanitize_push_summary_text( $change['url'] ? $change['url'] : $change['path'] )
+			);
+		}
+
+		return $messages;
+	}
+
+	private static function sanitize_push_summary_text( $text ) {
+		return str_replace( array( "\r", "\n" ), ' ', (string) $text );
 	}
 
 	private static function get_repository_identity( GitRepository $repository ) {

@@ -21,6 +21,27 @@ class WP_Origin_Buffering_Response implements ResponseWriteStream {
 		$this->body .= $body;
 	}
 
+	public function append_progress_messages( $messages ) {
+		if ( empty( $messages ) ) {
+			return;
+		}
+
+		$progress = '';
+		foreach ( $messages as $message ) {
+			$progress .= WordPress\Git\Protocol\GitProtocolEncoderPipe::encode_packet_line(
+				rtrim( $message ) . "\n",
+				"\x02"
+			);
+		}
+
+		if ( '0000' === substr( $this->body, -4 ) ) {
+			$this->body = substr( $this->body, 0, -4 ) . $progress . '0000';
+			return;
+		}
+
+		$this->body .= $progress;
+	}
+
 	public function close_writing(): void {
 	}
 
