@@ -80,6 +80,16 @@ BASE_URL="http://127.0.0.1:$PORT"
 REMOTE_AUTH_URL="http://$USERNAME:$PASSWORD@127.0.0.1:$PORT/wp-json/git/v1/md.git"
 CLONE_DIR="$WORK_DIR/clone"
 
+assert_push_summary_contains() {
+	OUTPUT="$1"
+	NEEDLE="$2"
+	if ! printf '%s' "$OUTPUT" | grep -Fq "$NEEDLE"; then
+		printf '%s\n' "$OUTPUT"
+		echo "Expected push output to contain: $NEEDLE" >&2
+		exit 1
+	fi
+}
+
 git -c protocol.version=2 clone "$REMOTE_AUTH_URL" "$CLONE_DIR"
 
 test -f "$CLONE_DIR/post/hello-world.md"
@@ -112,7 +122,9 @@ file_put_contents($path, $contents);
 
 git add post/hello-world.md
 git commit -m "Update hello world from Git"
-git push origin trunk
+PUSH_OUTPUT="$(git push origin trunk 2>&1)"
+assert_push_summary_contains "$PUSH_OUTPUT" 'WP Origin applied 1 content change:'
+assert_push_summary_contains "$PUSH_OUTPUT" '/hello-world/'
 
 UPDATED_CONTENT="$(curl -sS -f -H "Authorization: Basic $AUTH_HEADER" "$BASE_URL/wp-json/wp/v2/posts/$POST_ID?context=edit" | php -r '
 $post = json_decode(stream_get_contents(STDIN), true);
@@ -137,7 +149,9 @@ file_put_contents($path, $contents);
 EXACT_COMMIT_MESSAGE='Preserve C:\\Temp\\wp-origin in commit metadata'
 git add post/hello-world.md
 git commit -m "$EXACT_COMMIT_MESSAGE"
-git push origin trunk
+PUSH_OUTPUT="$(git push origin trunk 2>&1)"
+assert_push_summary_contains "$PUSH_OUTPUT" 'WP Origin applied 1 content change:'
+assert_push_summary_contains "$PUSH_OUTPUT" '/hello-world/'
 
 EXACT_CLONE_DIR="$WORK_DIR/exact-clone"
 git -c protocol.version=2 clone "$REMOTE_AUTH_URL" "$EXACT_CLONE_DIR"
@@ -176,7 +190,11 @@ file_put_contents($path, $markdown);
 rm "$CLONE_DIR/page/sample-page.md"
 git add post/created-from-git.md page/page-from-git.md page/sample-page.md
 git commit -m "Create and delete content from Git"
-git push origin trunk
+PUSH_OUTPUT="$(git push origin trunk 2>&1)"
+assert_push_summary_contains "$PUSH_OUTPUT" 'WP Origin applied 3 content changes:'
+assert_push_summary_contains "$PUSH_OUTPUT" '/created-from-git/'
+assert_push_summary_contains "$PUSH_OUTPUT" '/page-from-git/'
+assert_push_summary_contains "$PUSH_OUTPUT" '/sample-page/'
 
 CREATED_POST_CONTENT="$(curl -sS -f -H "Authorization: Basic $AUTH_HEADER" "$BASE_URL/wp-json/wp/v2/posts?slug=created-from-git&context=edit" | php -r '
 $posts = json_decode(stream_get_contents(STDIN), true);
