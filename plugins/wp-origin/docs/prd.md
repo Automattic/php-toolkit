@@ -69,7 +69,7 @@ The guiding rule is that users must not lose data. If a conversion cannot preser
 - **Content export to Markdown** (Priority: High)
   - Export posts and pages as Markdown files.
   - Store files in predictable paths that mirror WordPress post type names, such as `post/{slug}.md` and `page/{slug}.md`.
-  - Include front matter for stable WordPress metadata such as ID, type, slug, status, title, date, and modified time.
+  - Include lean, established front matter such as title, date, status, and an explicit excerpt description.
   - Preserve unsupported block markup as fenced `gutenberg` code blocks, or inline HTML when Markdown cannot represent it safely.
   - Keep Markdown human-editable and compatible with common editors such as Obsidian wherever that does not weaken round-trip fidelity.
 
@@ -284,13 +284,17 @@ The guiding rule is that users must not lose data. If a conversion cannot preser
   - `post/{slug}.md`
   - `page/{slug}.md`
 - Add front matter with the smallest useful metadata:
-  - `id`
-  - `type`
-  - `slug`
-  - `status`
   - `title`
-  - `date_gmt`
-  - `modified_gmt`
+  - `date`
+  - `status`
+  - `description` when an explicit excerpt exists
+- Export human-facing status values while accepting both human-facing and WordPress-native values on push:
+  - `published` or `publish`
+  - `scheduled` or `future`
+  - `draft`
+  - `pending`
+  - `private`
+- Keep machine identity and conflict metadata out of Markdown front matter.
 - Use existing php-toolkit Markdown/Data Liberation conversion code where possible.
 - Use the Git component to serve a generated repository snapshot.
 - Verify with `git clone` and `git pull` against a local WordPress site.
@@ -299,7 +303,7 @@ The guiding rule is that users must not lose data. If a conversion cannot preser
 
 - Accept `git receive-pack` requests from a local clone.
 - Read the pushed tree and map changed files back to WordPress entities.
-- Match existing content by front matter ID first, then by content type and slug/path.
+- Match existing content by path and slug, while preserving backward compatibility with older front matter IDs when present.
 - Update existing posts with `wp_update_post()`.
 - Create new posts with `wp_insert_post()`.
 - Move deleted files to trash with `wp_trash_post()` instead of permanent deletion.
@@ -308,8 +312,8 @@ The guiding rule is that users must not lose data. If a conversion cannot preser
 
 ### 10.7 Add data-loss protections
 
-- Track the WordPress `modified_gmt` value exported into each Markdown file.
-- Reject pushes where the live post has changed since the exported value.
+- Track identity and freshness in WP Origin's stored commit manifest instead of noisy Markdown front matter.
+- Reject pushes where the remote changed and the local clone needs to pull first.
 - Preserve unsupported blocks as fenced `gutenberg` payloads or inline HTML.
 - Reject files that would drop required metadata for an existing post.
 - Reject path traversal, unsupported directories, binary files, and unexpected extensions.
@@ -381,7 +385,7 @@ The guiding rule is that users must not lose data. If a conversion cannot preser
 - **Description**: As a user, I want to edit a Markdown file and push it so that the matching WordPress post is updated.
 - **Acceptance criteria**:
   - The pushed file maps to the correct existing post.
-  - The post title, slug, status, and content update according to supported metadata.
+  - The post title, status, date, description, and content update according to supported metadata.
   - A WordPress revision is created.
   - The push does not modify unrelated content.
 
