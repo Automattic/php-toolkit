@@ -54,12 +54,22 @@ class WP_Origin_Admin {
 	}
 
 	public static function rest_status() {
+		// Each poll from the admin page also drives the seeder forward
+		// by one tick. WP-Cron only fires when something hits the site,
+		// so on a brand-new install — where no visitor has shown up yet
+		// — the cron event would otherwise sit idle. The transient lock
+		// inside tick() makes this safe to call on every poll.
+		if ( ! WP_Origin_Seeder::is_ready() ) {
+			WP_Origin_Seeder::tick();
+		}
+
 		return rest_ensure_response( WP_Origin_Seeder::get_progress() );
 	}
 
 	public static function rest_retry() {
 		WP_Origin_Seeder::reset();
 		WP_Origin_Seeder::on_activation();
+		WP_Origin_Seeder::tick();
 
 		return rest_ensure_response( WP_Origin_Seeder::get_progress() );
 	}
