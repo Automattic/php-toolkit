@@ -9,7 +9,7 @@
 
 ### 1.2 Product summary
 
-WP Origin makes WordPress content available as a Git remote where posts and pages are represented as Markdown files. A user or coding agent can run normal Git commands such as `clone`, `pull`, and `push`; WordPress remains the source of truth, and pushed Markdown updates WordPress content directly.
+WP Origin makes WordPress content available as a Git remote where posts and pages are represented as Markdown files, and structural block entities can be represented as raw Gutenberg HTML files. A user or coding agent can run normal Git commands such as `clone`, `pull`, and `push`; WordPress remains the source of truth, and pushed files update WordPress content directly.
 
 The MVP is a standalone WordPress plugin. It focuses on a happy path that proves the workflow works for posts and pages, while keeping the design open for media, block theme entities, custom post types, templates, navigation, and WordPress.com integration later.
 
@@ -101,9 +101,13 @@ The guiding rule is that users must not lose data. If a conversion cannot preser
   - Keep large media transfers streaming-first and reject pushes that exceed safe runtime limits.
 
 - **Block theme entities** (Priority: Medium)
-  - Explore `wp_template`, `wp_template_part`, and `wp_navigation` after posts/pages round-trip safely.
+  - Support `wp_template`, `wp_template_part`, and `wp_navigation` once posts/pages round-trip safely.
   - Represent these as explicit directories rather than mixing them into generic custom post type output.
-  - Apply the same non-lossy `gutenberg` fence strategy because these entities are block markup-heavy.
+  - Export them as `.html` files containing raw Gutenberg block markup, not Markdown.
+  - Do not include front matter in these `.html` files.
+  - Use the directory and path as identity: `wp_template/single.html` maps to post type `wp_template` and slug `single`.
+  - Allow pushed create and update operations for these files.
+  - Reject pushed deletes and renames for these files because the path is the identity and deletion can break site rendering.
 
 - **Conflict and safety checks** (Priority: High)
   - Reject pushes that would overwrite newer WordPress edits unless the client has pulled the latest content.
@@ -122,13 +126,13 @@ The guiding rule is that users must not lose data. If a conversion cannot preser
 
 ## 5. Core experience
 
-1. An administrator activates WP Origin and enables Git access for Markdown content.
+1. An administrator activates WP Origin and enables Git access for content.
 2. A user authenticates with Git over HTTP Basic Auth using a WordPress application password.
 3. The user runs `git clone https://example.com/wp-json/git/v1/md.git` or adds the site as a remote with `git remote add wp https://example.com/wp-json/git/v1/md.git`.
-4. The cloned repository contains Markdown files for posts and pages, plus enough metadata to map files back to WordPress content.
-5. The user or agent edits Markdown locally and commits normally.
+4. The cloned repository contains Markdown files for posts and pages, plus `.html` files for supported structural block entities when present.
+5. The user or agent edits files locally and commits normally.
 6. The user runs `git push wp trunk` or the equivalent command for the remote name they chose.
-7. WP Origin validates permissions, detects stale content, converts Markdown back to WordPress content, and updates or creates posts.
+7. WP Origin validates permissions, detects stale content, imports changed files back to WordPress content, and updates or creates posts.
 8. If a push cannot be applied safely, WP Origin rejects it with a clear error and leaves existing WordPress content unchanged.
 
 ## 6. Technical considerations
@@ -144,13 +148,16 @@ The guiding rule is that users must not lose data. If a conversion cannot preser
 
 ### 6.2 Content format
 
-- Markdown body with YAML-style front matter.
-- File paths grouped by WordPress post type name, starting with `post/` and `page/`, with media under `attachment/` once media support lands.
-- Front matter should be stable enough for round-trips but small enough for agents to understand.
+- Editorial posts and pages use Markdown bodies with YAML-style front matter.
+- Structural block entities use raw Gutenberg HTML with no front matter.
+- File paths are grouped by WordPress post type name, starting with `post/` and `page/`, with media under `attachment/` once media support lands.
+- Template-like structural paths use `.html`, for example `wp_template/single.html`, `wp_template_part/header.html`, and `wp_navigation/main.html`.
+- Front matter should be stable enough for post/page round-trips but small enough for agents to understand.
 - Unknown or lossy blocks should round-trip using fenced `gutenberg` code blocks where possible, with raw HTML as a fallback.
 - The importer should also accept the existing `block` fence language as a compatibility alias.
 - Markdown should remain useful in Obsidian: front matter is allowed, links and images should prefer normal Markdown syntax, media references should prefer relative paths, and hidden metadata should be kept minimal.
 - If an Obsidian-friendly representation conflicts with binary-safe round-tripping, round-trip safety wins.
+- For structural `.html` files, WordPress keeps title, status, date, author, IDs, and other administrative metadata. WP Origin resolves IDs dynamically from path-derived post type and slug.
 
 ### 6.3 Data storage and privacy
 
@@ -238,7 +245,9 @@ The guiding rule is that users must not lose data. If a conversion cannot preser
 - **Milestone 7: Media and block-theme exploration**
   - Export referenced media into relative Markdown paths.
   - Import safe new/changed media as attachments.
-  - Prototype read-only export of `wp_template`, `wp_template_part`, and `wp_navigation`.
+  - Export `wp_template`, `wp_template_part`, and `wp_navigation` as raw `.html` Gutenberg block files.
+  - Allow create/update pushes for those `.html` files.
+  - Reject delete/rename pushes for those `.html` files.
 
 - **Milestone 8: MVP hardening**
   - Document setup and supported workflows.
@@ -337,11 +346,16 @@ The guiding rule is that users must not lose data. If a conversion cannot preser
 - Hash binary files to detect unchanged media and avoid reuploads.
 - Add binary-safe tests that compare exported and imported media hashes.
 
-### 10.9 Explore block theme entities
+### 10.9 Add block theme entities
 
-- Add read-only fixtures for `wp_template`, `wp_template_part`, and `wp_navigation`.
+- Add fixtures for `wp_template`, `wp_template_part`, and `wp_navigation`.
 - Keep them in explicit directories that mirror post type names: `wp_template/`, `wp_template_part/`, and `wp_navigation/`.
-- Preserve block markup exactly until there is a safe higher-level Markdown representation.
+- Store each entity as a `.html` file containing only `post_content` block markup.
+- Do not write front matter into structural `.html` files.
+- Resolve identity from path: directory is post type, the path below it without `.html` is slug, and database ID is looked up at import time.
+- Preserve block markup exactly; do not convert these files to Markdown.
+- Allow pushed creates and updates.
+- Reject pushed deletes and renames.
 - Decide later whether block theme entities belong in the same `md.git` remote or a separate remote/branch.
 
 ### 10.10 Keep TDD useful for independent agents
@@ -475,14 +489,18 @@ The guiding rule is that users must not lose data. If a conversion cannot preser
   - Pushed new or changed media can become WordPress attachments when safe.
   - Binary file hashes match after round-trip.
 
-### 11.12 Explore block theme content
+### 11.12 Work with block theme content
 
 - **ID**: US-012
-- **Description**: As a site builder, I want block theme entities to become Git-addressable once content round-tripping is stable.
+- **Description**: As a site builder, I want block theme entities to be Git-addressable once content round-tripping is stable.
 - **Acceptance criteria**:
   - `wp_template`, `wp_template_part`, and `wp_navigation` are documented as follow-up post-type targets.
-  - Early support starts read-only.
-  - Block markup is preserved exactly unless a tested Markdown representation exists.
+  - Files export under explicit post-type directories with `.html` extensions.
+  - Files contain raw Gutenberg block markup with no front matter.
+  - The path determines post type and slug.
+  - Pushed creates and updates are allowed.
+  - Pushed deletes and renames are rejected.
+  - Block markup is preserved exactly unless a tested representation change is explicitly accepted.
 
 ## 12. Later-phase idea: Git hashes and WordPress revisions
 

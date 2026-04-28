@@ -110,12 +110,14 @@ git -c protocol.version=2 clone "$REMOTE_AUTH_URL" "$CLONE_DIR"
 
 test -f "$CLONE_DIR/post/hello-world.md"
 test -f "$CLONE_DIR/page/sample-page.md"
+test -f "$CLONE_DIR/wp_template/blog-home.html"
 test -f "$CLONE_DIR/wp_guideline/skills/wp-origin/SKILL.md"
 test -L "$CLONE_DIR/.agents/skills"
 test -L "$CLONE_DIR/.claude/skills"
 test -L "$CLONE_DIR/AGENTS.md"
 test -L "$CLONE_DIR/CLAUDE.md"
 grep -q 'Hello from WordPress' "$CLONE_DIR/post/hello-world.md"
+grep -q 'Template from WordPress' "$CLONE_DIR/wp_template/blog-home.html"
 grep -Fq 'title: "Hello World"' "$CLONE_DIR/post/hello-world.md"
 grep -Fq 'status: "published"' "$CLONE_DIR/post/hello-world.md"
 grep -Fq 'description: "Hand-authored summary."' "$CLONE_DIR/post/hello-world.md"
@@ -177,6 +179,39 @@ echo count($revisions);
 ')"
 [ "$REVISION_COUNT_AFTER_UPDATE" -gt "$REVISION_COUNT_BEFORE" ]
 git pull --rebase origin trunk
+
+php -r '
+$path = $argv[1];
+$contents = file_get_contents($path);
+$contents = str_replace("Template from WordPress", "Template updated from Git", $contents);
+file_put_contents($path, $contents);
+' "$CLONE_DIR/wp_template/blog-home.html"
+
+printf '%s' '<!-- wp:paragraph --><p>Created template from Git.</p><!-- /wp:paragraph -->' > "$CLONE_DIR/wp_template/custom-blog-card.html"
+git add wp_template/blog-home.html wp_template/custom-blog-card.html
+git commit -m "Update template HTML from Git"
+PUSH_OUTPUT="$(git push origin trunk 2>&1)"
+assert_push_summary_contains "$PUSH_OUTPUT" 'WP Origin applied 2 content changes:'
+assert_push_summary_contains "$PUSH_OUTPUT" 'wp_template'
+
+rm "$CLONE_DIR/wp_template/custom-blog-card.html"
+git add -A
+git commit -m "Delete template HTML from Git"
+if PUSH_OUTPUT="$(git push origin trunk 2>&1)"; then
+	echo "Expected template deletion push to fail." >&2
+	exit 1
+fi
+assert_push_summary_contains "$PUSH_OUTPUT" 'Push rejected because template HTML files cannot be deleted or renamed.'
+git reset --hard HEAD~1 >/dev/null
+
+git mv wp_template/custom-blog-card.html wp_template/renamed-blog-card.html
+git commit -m "Rename template HTML from Git"
+if PUSH_OUTPUT="$(git push origin trunk 2>&1)"; then
+	echo "Expected template rename push to fail." >&2
+	exit 1
+fi
+assert_push_summary_contains "$PUSH_OUTPUT" 'Push rejected because template HTML files cannot be deleted or renamed.'
+git reset --hard HEAD~1 >/dev/null
 
 php -r '
 $path = $argv[1];

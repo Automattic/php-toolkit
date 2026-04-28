@@ -41,6 +41,8 @@ class WP_Origin_Plugin {
 	public static $supported_post_types    = array( 'post', 'page' );
 	public static $supported_post_statuses = array( 'publish', 'draft', 'pending', 'private', 'future' );
 
+	private static $raw_block_post_types = array( 'wp_template', 'wp_template_part', 'wp_navigation' );
+
 	private static $guideline_type_directories = array(
 		'artifact'    => 'artifacts',
 		'content'     => 'content',
@@ -82,7 +84,10 @@ class WP_Origin_Plugin {
 	}
 
 	public static function get_supported_post_types() {
-		$post_types = self::$supported_post_types;
+		$post_types = array_merge(
+			self::$supported_post_types,
+			self::get_existing_raw_block_post_types()
+		);
 		if ( self::guidelines_available() ) {
 			$post_types[] = 'wp_guideline';
 		}
@@ -106,6 +111,7 @@ This repository is a Git checkout of a WordPress site exposed by WP Origin. Word
 
 - `post/{slug}.md` contains WordPress posts.
 - `page/{slug}.md` contains WordPress pages.
+- `wp_template/{slug}.html`, `wp_template_part/{slug}.html`, and `wp_navigation/{slug}.html` contain raw Gutenberg block markup for structural site entities.
 - `wp_guideline/skills/{slug}/SKILL.md` contains coding-agent skills stored as Gutenberg Guidelines.
 - `.agents/skills` and `.claude/skills` point to `wp_guideline/skills` for agent discovery.
 - `AGENTS.md` and `CLAUDE.md` point to this guide.
@@ -122,6 +128,8 @@ This repository is a Git checkout of a WordPress site exposed by WP Origin. Word
 
 - Preserve post and page front matter unless you are intentionally changing that WordPress metadata.
 - Guideline skill front matter is generated from WordPress fields. Keep the body focused on the guideline content.
+- Template HTML files must stay raw Gutenberg block markup without front matter.
+- Template HTML files may be created or updated, but deletes and renames are rejected because their paths are their WordPress identity.
 - Preserve unsupported block markup, fenced `gutenberg` blocks, custom blocks, and raw HTML unless the user asks for a conversion.
 - Use forward slashes in paths.
 - Keep changes scoped to site content. This checkout does not represent plugin code, themes, uploads, or the full database.
@@ -218,6 +226,8 @@ SKILL;
 					);
 					$response->append_progress_messages( self::format_push_summary_messages( $push_summary ) );
 				} catch ( Throwable $exception ) {
+					self::rollback_rejected_push_ref( $repository, $push_header );
+
 					return self::build_protocol_error_response(
 						'git-receive-pack',
 						self::get_throwable_message( $exception )
@@ -472,16 +482,42 @@ SKILL;
 		return self::get_supported_post_types();
 	}
 
+	private static function get_existing_raw_block_post_types() {
+		$post_types = array();
+		foreach ( self::$raw_block_post_types as $post_type ) {
+			if ( post_type_exists( $post_type ) ) {
+				$post_types[] = $post_type;
+			}
+		}
+
+		return $post_types;
+	}
+
+	private static function is_raw_block_post_type( $post_type ) {
+		return in_array( $post_type, self::$raw_block_post_types, true );
+	}
+
 	public static function build_markdown_path( $post_or_type, $slug = null ) {
 		if ( $post_or_type instanceof WP_Post ) {
 			if ( 'wp_guideline' === $post_or_type->post_type ) {
 				return self::build_guideline_markdown_path( $post_or_type );
 			}
+			if ( self::is_raw_block_post_type( $post_or_type->post_type ) ) {
+				return self::build_raw_block_path( $post_or_type->post_type, $post_or_type->post_name );
+			}
 
 			return ltrim( $post_or_type->post_type . '/' . $post_or_type->post_name . '.md', '/' );
 		}
 
+		if ( self::is_raw_block_post_type( $post_or_type ) ) {
+			return self::build_raw_block_path( $post_or_type, $slug );
+		}
+
 		return ltrim( $post_or_type . '/' . $slug . '.md', '/' );
+	}
+
+	private static function build_raw_block_path( $post_type, $slug ) {
+		return ltrim( $post_type . '/' . str_replace( '//', '/', $slug ) . '.html', '/' );
 	}
 
 	/**
@@ -495,6 +531,9 @@ SKILL;
 				return self::export_guideline_skill_to_markdown( $post );
 			}
 
+			return $post->post_content;
+		}
+		if ( self::is_raw_block_post_type( $post->post_type ) ) {
 			return $post->post_content;
 		}
 
@@ -610,6 +649,10 @@ SKILL;
 		$commit_hashes = self::get_push_commit_hashes( $repository, $old_commit, $new_commit );
 		$push_summary  = array();
 
+		foreach ( $commit_hashes as $commit_hash ) {
+			self::validate_single_commit_content_changes( $repository, $commit_hash );
+		}
+
 		foreach ( $commit_hashes as $index => $commit_hash ) {
 			// Conflict checks against WordPress's current modified_gmt only
 			// make sense for the first commit in the push range — every
@@ -625,6 +668,43 @@ SKILL;
 		return $push_summary;
 	}
 
+	private static function rollback_rejected_push_ref( GitRepository $repository, $push_header ) {
+		$branch_name = 'refs/heads/' . self::DEFAULT_BRANCH;
+
+		try {
+			if ( $push_header['new_oid'] === $repository->get_branch_tip( $branch_name ) ) {
+				$repository->set_branch_tip( $branch_name, $push_header['old_oid'] );
+			}
+		} catch ( Throwable $exception ) {
+			// Preserve the original rejection reason for the Git client.
+		}
+	}
+
+	private static function validate_single_commit_content_changes( GitRepository $repository, $commit_hash ) {
+		$commit = $repository->read_object( $commit_hash )->as_commit();
+		self::validate_push_commit( $repository, $commit );
+
+		$parent_hash = empty( $commit->parents ) ? Commit::NULL_HASH : $commit->get_first_parent_hash();
+		$old_files   = Commit::is_null_hash( $parent_hash )
+			? array()
+			: self::read_repository_entries_from_commit( $repository, $parent_hash );
+		$new_files   = self::read_repository_entries_from_commit( $repository, $commit_hash );
+
+		self::reject_deleted_raw_block_files( $old_files, $new_files );
+
+		foreach ( $new_files as $path => $entry ) {
+			if ( isset( $old_files[ $path ] ) && self::repository_entries_match( $old_files[ $path ], $entry ) ) {
+				continue;
+			}
+			if ( TreeEntry::FILE_MODE_SYMBOLIC_LINK === $entry['mode'] ) {
+				continue;
+			}
+			if ( self::is_raw_block_path( $path ) ) {
+				self::assert_raw_block_html_has_no_front_matter( $entry['content'] );
+			}
+		}
+	}
+
 	private static function apply_single_commit_to_wordpress( GitRepository $repository, $commit_hash, $skip_modified_checks ) {
 		$commit = $repository->read_object( $commit_hash )->as_commit();
 		self::validate_push_commit( $repository, $commit );
@@ -637,6 +717,7 @@ SKILL;
 
 		$updated_post_ids = array();
 		$changes          = array();
+		self::reject_deleted_raw_block_files( $old_files, $new_files );
 
 		foreach ( $new_files as $path => $entry ) {
 			if ( isset( $old_files[ $path ] ) && self::repository_entries_match( $old_files[ $path ], $entry ) ) {
@@ -738,11 +819,28 @@ SKILL;
 		}
 	}
 
+	private static function reject_deleted_raw_block_files( $old_files, $new_files ) {
+		foreach ( $old_files as $path => $entry ) {
+			if ( isset( $new_files[ $path ] ) ) {
+				continue;
+			}
+			if ( TreeEntry::FILE_MODE_SYMBOLIC_LINK === $entry['mode'] ) {
+				continue;
+			}
+			if ( self::is_raw_block_path( $path ) ) {
+				throw new Exception( 'Push rejected because template HTML files cannot be deleted or renamed. Update them in place or create a new .html file.' );
+			}
+		}
+	}
+
 	private static function upsert_post_from_markdown( $path, $markdown, $options = array() ) {
 		$post_type = self::path_to_post_type( $path );
 		$slug      = self::path_to_slug( $path );
 		if ( 'wp_guideline' === $post_type ) {
 			return self::upsert_guideline_from_markdown( $path, $markdown, $options );
+		}
+		if ( self::is_raw_block_post_type( $post_type ) ) {
+			return self::upsert_raw_block_post_from_html( $path, $markdown );
 		}
 
 		$consumer = new MarkdownConsumer( $markdown );
@@ -823,6 +921,55 @@ SKILL;
 				$path
 			),
 		);
+	}
+
+	private static function upsert_raw_block_post_from_html( $path, $html ) {
+		self::assert_raw_block_html_has_no_front_matter( $html );
+
+		$post_type     = self::path_to_post_type( $path );
+		$slug          = self::path_to_slug( $path );
+		$post_id       = self::find_post_id_by_path_metadata( $path, array(), false );
+		$existing_post = $post_id ? get_post( $post_id ) : null;
+
+		if ( $existing_post ) {
+			self::assert_can_edit_post( $existing_post->ID );
+			$postarr = array(
+				'ID'           => $existing_post->ID,
+				'post_content' => $html,
+			);
+			$post_id = wp_update_post( wp_slash( $postarr ), true );
+		} else {
+			self::assert_can_create_post_type( $post_type );
+			$postarr = array(
+				'post_type'    => $post_type,
+				'post_name'    => $slug,
+				'post_title'   => ucwords( str_replace( '-', ' ', $slug ) ),
+				'post_status'  => 'publish',
+				'post_content' => $html,
+			);
+			$post_id = wp_insert_post( wp_slash( $postarr ), true );
+		}
+
+		if ( is_wp_error( $post_id ) ) {
+			throw new Exception( $post_id->get_error_message() );
+		}
+
+		$post = get_post( $post_id );
+
+		return array(
+			'post_id' => $post_id,
+			'change'  => self::build_push_summary_item(
+				$existing_post ? 'updated' : 'created',
+				$post,
+				$path
+			),
+		);
+	}
+
+	private static function assert_raw_block_html_has_no_front_matter( $html ) {
+		if ( preg_match( '/\A---\r?\n/', $html ) ) {
+			throw new Exception( 'Push rejected because template HTML files must contain raw Gutenberg block markup without front matter.' );
+		}
 	}
 
 	private static function upsert_guideline_from_markdown( $path, $markdown, $options = array() ) {
@@ -1040,14 +1187,17 @@ SKILL;
 		return isset( $statuses[ $key ] ) ? $statuses[ $key ] : $post_status;
 	}
 
-	private static function find_post_id_by_path_metadata( $path, $metadata ) {
+	private static function find_post_id_by_path_metadata( $path, $metadata, $include_trash = true ) {
 		$post_type = self::path_to_post_type( $path );
 		$slug      = isset( $metadata['slug'] ) ? $metadata['slug'] : self::path_to_slug( $path );
+		$statuses  = $include_trash
+			? array_merge( self::$supported_post_statuses, array( 'trash' ) )
+			: self::$supported_post_statuses;
 		$posts     = get_posts(
 			array(
 				'post_type'      => $post_type,
 				'name'           => $slug,
-				'post_status'    => array_merge( self::$supported_post_statuses, array( 'trash' ) ),
+				'post_status'    => $statuses,
 				'posts_per_page' => 1,
 				'fields'         => 'ids',
 			)
@@ -1080,6 +1230,16 @@ SKILL;
 			$segments = explode( '/', ltrim( $path, '/' ) );
 			return $segments[2];
 		}
+		if ( self::is_raw_block_path( $path ) ) {
+			$basename = basename( $path );
+			if ( 'html' !== strtolower( pathinfo( $basename, PATHINFO_EXTENSION ) ) ) {
+				throw new Exception( 'Push rejected because template files must use the .html extension.' );
+			}
+			$relative_path = substr( ltrim( $path, '/' ), strlen( self::path_to_post_type( $path ) ) + 1 );
+			$slug_path     = substr( $relative_path, 0, - strlen( '.html' ) );
+
+			return str_replace( '/', '//', $slug_path );
+		}
 
 		$basename = basename( $path );
 		if ( 'md' !== pathinfo( $basename, PATHINFO_EXTENSION ) ) {
@@ -1087,6 +1247,12 @@ SKILL;
 		}
 
 		return pathinfo( $basename, PATHINFO_FILENAME );
+	}
+
+	private static function is_raw_block_path( $path ) {
+		$segments = explode( '/', ltrim( $path, '/' ) );
+
+		return ! empty( $segments[0] ) && self::is_raw_block_post_type( $segments[0] );
 	}
 
 	private static function path_to_guideline_type_slug( $path ) {

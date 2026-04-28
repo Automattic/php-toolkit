@@ -93,13 +93,18 @@ class WP_Origin_End_To_End_Test extends TestCase {
 
 		$this->assertFileExists( $clone_dir . '/post/hello-world.md' );
 		$this->assertFileExists( $clone_dir . '/page/sample-page.md' );
+		$this->assertFileExists( $clone_dir . '/wp_template/blog-home.html' );
 		$this->assertStringContainsString(
 			'Hello from WordPress',
 			file_get_contents( $clone_dir . '/post/hello-world.md' )
 		);
+		$this->assertStringContainsString(
+			'Template from WordPress',
+			file_get_contents( $clone_dir . '/wp_template/blog-home.html' )
+		);
 
 		// Capture the page ID up front: WordPress mangles the slug to
-		// `sample-page__trashed` once we trash the page in step 3, so a
+		// `sample-page__trashed` once we trash the page in step 6, so a
 		// later slug lookup would not find it.
 		$sample_page_id = $this->fetch_id_by_slug( 'sample-page', 'pages' );
 
@@ -123,7 +128,44 @@ class WP_Origin_End_To_End_Test extends TestCase {
 		// server before the next push.
 		$this->run_cmd( array( 'git', '-C', $clone_dir, 'pull', '--rebase', 'origin', 'trunk' ) );
 
-		// 3) Create a new post and delete an existing page in one push.
+		// 3) Update and create template HTML files without front matter.
+		$this->edit_file(
+			$clone_dir . '/wp_template/blog-home.html',
+			'Template from WordPress',
+			'Template updated from Git'
+		);
+		file_put_contents(
+			$clone_dir . '/wp_template/custom-blog-card.html',
+			'<!-- wp:paragraph --><p>Created template from Git.</p><!-- /wp:paragraph -->'
+		);
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'add', 'wp_template/blog-home.html', 'wp_template/custom-blog-card.html' ) );
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'commit', '-m', 'Update template HTML from Git' ) );
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'push', 'origin', 'trunk' ) );
+
+		// 4) Template HTML files may be updated or created, but not deleted.
+		unlink( $clone_dir . '/wp_template/custom-blog-card.html' );
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'add', '-A' ) );
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'commit', '-m', 'Delete template HTML from Git' ) );
+		$push_result = $this->run_cmd(
+			array( 'git', '-C', $clone_dir, 'push', 'origin', 'trunk' ),
+			true
+		);
+		$this->assertNotSame( 0, $push_result['code'], 'Template deletion should have been rejected.' );
+		$this->assertStringContainsString( 'Push rejected because template HTML files cannot be deleted or renamed.', $push_result['output'] );
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'reset', '--hard', 'HEAD~1' ) );
+
+		// 5) Renames are also rejected because the path is the identity.
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'mv', 'wp_template/custom-blog-card.html', 'wp_template/renamed-blog-card.html' ) );
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'commit', '-m', 'Rename template HTML from Git' ) );
+		$push_result = $this->run_cmd(
+			array( 'git', '-C', $clone_dir, 'push', 'origin', 'trunk' ),
+			true
+		);
+		$this->assertNotSame( 0, $push_result['code'], 'Template rename should have been rejected.' );
+		$this->assertStringContainsString( 'Push rejected because template HTML files cannot be deleted or renamed.', $push_result['output'] );
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'reset', '--hard', 'HEAD~1' ) );
+
+		// 6) Create a new post and delete an existing page in one push.
 		file_put_contents(
 			$clone_dir . '/post/created-from-git.md',
 			"---\ntype: \"post\"\nslug: \"created-from-git\"\nstatus: \"publish\"\ntitle: \"Created From Git\"\n---\n\nCreated from Git.\n"
@@ -140,7 +182,7 @@ class WP_Origin_End_To_End_Test extends TestCase {
 		);
 		$this->assertSame( 'trash', $this->fetch_status( $sample_page_id, 'pages' ) );
 
-		// 4) Stale push: an out-of-date local commit must be rejected.
+		// 7) Stale push: an out-of-date local commit must be rejected.
 		$this->run_cmd( array( 'git', '-C', $clone_dir, 'pull', '--rebase', 'origin', 'trunk' ) );
 		$this->edit_file(
 			$clone_dir . '/post/hello-world.md',
@@ -163,17 +205,29 @@ class WP_Origin_End_To_End_Test extends TestCase {
 		);
 		$this->assertNotSame( 0, $push_result['code'], 'Stale push should have been rejected.' );
 
-		// 5) Persistence proof: a brand-new clone (no shared state with
+		// 8) Persistence proof: a brand-new clone (no shared state with
 		// $clone_dir) must see every commit and file from above.
 		$fresh = $this->clone_repo( 'fresh' );
 		$this->assertFileExists( $fresh . '/post/hello-world.md' );
 		$this->assertFileExists( $fresh . '/post/created-from-git.md' );
+		$this->assertFileExists( $fresh . '/wp_template/blog-home.html' );
+		$this->assertFileExists( $fresh . '/wp_template/custom-blog-card.html' );
 		$this->assertFileDoesNotExist( $fresh . '/page/sample-page.md' );
+		$this->assertFileDoesNotExist( $fresh . '/wp_template/renamed-blog-card.html' );
+		$this->assertStringContainsString(
+			'Template updated from Git',
+			file_get_contents( $fresh . '/wp_template/blog-home.html' )
+		);
+		$this->assertStringContainsString(
+			'Created template from Git',
+			file_get_contents( $fresh . '/wp_template/custom-blog-card.html' )
+		);
 		$log = $this->run_cmd( array( 'git', '-C', $fresh, 'log', '--format=%s' ) );
 		$this->assertStringContainsString( 'Update hello world from Git', $log['output'] );
+		$this->assertStringContainsString( 'Update template HTML from Git', $log['output'] );
 		$this->assertStringContainsString( 'Create and delete content from Git', $log['output'] );
 
-		// 6) The CPT-based persistence model is gone.
+		// 9) The CPT-based persistence model is gone.
 		$this->assertNotSame(
 			200,
 			$this->http_status( $this->base_url . '/wp-json/wp/v2/types/wp_origin_commit' )
