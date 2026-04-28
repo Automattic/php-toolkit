@@ -310,14 +310,13 @@ class WP_Origin_Plugin {
 			}
 
 			$metadata = array(
-				'id'           => array( (string) $post->ID ),
-				'type'         => array( $post->post_type ),
-				'slug'         => array( $post->post_name ),
-				'status'       => array( $post->post_status ),
-				'title'        => array( $post->post_title ),
-				'date_gmt'     => array( $post->post_date_gmt ),
-				'modified_gmt' => array( $post->post_modified_gmt ),
+				'title'  => array( $post->post_title ),
+				'date'   => array( self::format_post_date_for_frontmatter( $post ) ),
+				'status' => array( self::frontmatter_status_from_post_status( $post->post_status ) ),
 			);
+			if ( '' !== trim( $post->post_excerpt ) ) {
+				$metadata['description'] = array( $post->post_excerpt );
+			}
 
 			$producer = new MarkdownProducer(
 				new BlocksWithMetadata(
@@ -484,8 +483,6 @@ class WP_Origin_Plugin {
 		if ( isset( $metadata['slug'] ) && $metadata['slug'] !== $slug ) {
 			throw new Exception( 'Push rejected because the file slug does not match its filename.' );
 		}
-		self::validate_post_status( isset( $metadata['status'] ) ? $metadata['status'] : 'draft', $post_type );
-
 		$post_id = isset( $metadata['id'] ) ? intval( $metadata['id'] ) : 0;
 		if ( $post_id && get_post( $post_id ) ) {
 			$existing_post = get_post( $post_id );
@@ -493,6 +490,10 @@ class WP_Origin_Plugin {
 			$post_id       = self::find_post_id_by_path_metadata( $path, $metadata );
 			$existing_post = $post_id ? get_post( $post_id ) : null;
 		}
+		$post_status = self::normalize_frontmatter_status(
+			isset( $metadata['status'] ) ? $metadata['status'] : ( $existing_post ? $existing_post->post_status : 'draft' )
+		);
+		self::validate_post_status( $post_status, $post_type );
 
 		if (
 			$existing_post &&
@@ -513,12 +514,17 @@ class WP_Origin_Plugin {
 			'post_type'    => $post_type,
 			'post_name'    => isset( $metadata['slug'] ) ? $metadata['slug'] : $slug,
 			'post_title'   => isset( $metadata['title'] ) ? $metadata['title'] : ucwords( str_replace( '-', ' ', $slug ) ),
-			'post_status'  => isset( $metadata['status'] ) ? $metadata['status'] : 'draft',
+			'post_status'  => $post_status,
 			'post_content' => $result->get_block_markup(),
 		);
 
-		if ( isset( $metadata['date_gmt'] ) && '' !== $metadata['date_gmt'] ) {
-			$postarr['post_date_gmt'] = $metadata['date_gmt'];
+		$post_date_gmt = self::frontmatter_date_to_mysql_gmt( $metadata );
+		if ( '' !== $post_date_gmt ) {
+			$postarr['post_date_gmt'] = $post_date_gmt;
+			$postarr['post_date']     = get_date_from_gmt( $post_date_gmt );
+		}
+		if ( array_key_exists( 'description', $metadata ) ) {
+			$postarr['post_excerpt'] = $metadata['description'];
 		}
 
 		if ( $existing_post ) {
@@ -596,6 +602,81 @@ class WP_Origin_Plugin {
 		}
 
 		return strtotime( $gmt_string . ' UTC' );
+	}
+
+	private static function format_post_date_for_frontmatter( WP_Post $post ) {
+		$timestamp = self::timestamp_from_gmt_string( $post->post_date_gmt );
+		if (
+			false === $timestamp &&
+			is_string( $post->post_date ) &&
+			'' !== $post->post_date &&
+			'0000-00-00 00:00:00' !== $post->post_date
+		) {
+			$timestamp = self::timestamp_from_gmt_string( get_gmt_from_date( $post->post_date ) );
+		}
+		if ( false === $timestamp ) {
+			$timestamp = self::EPOCH_TIMESTAMP;
+		}
+
+		return gmdate( 'Y-m-d\TH:i:s\Z', $timestamp );
+	}
+
+	private static function frontmatter_date_to_mysql_gmt( $metadata ) {
+		if ( isset( $metadata['date'] ) && '' !== trim( (string) $metadata['date'] ) ) {
+			return self::parse_frontmatter_date( $metadata['date'] );
+		}
+		if ( isset( $metadata['date_gmt'] ) && '' !== trim( (string) $metadata['date_gmt'] ) ) {
+			$timestamp = self::timestamp_from_gmt_string( $metadata['date_gmt'] );
+
+			return false === $timestamp ? '' : gmdate( 'Y-m-d H:i:s', $timestamp );
+		}
+
+		return '';
+	}
+
+	private static function parse_frontmatter_date( $date ) {
+		$date = trim( (string) $date );
+		if ( '' === $date ) {
+			return '';
+		}
+
+		if ( preg_match( '/^\d{4}-\d{2}-\d{2}$/', $date ) ) {
+			$timestamp = strtotime( $date . ' 00:00:00 UTC' );
+		} elseif ( preg_match( '/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}$/', $date ) ) {
+			$timestamp = strtotime( $date . ' UTC' );
+		} else {
+			$timestamp = strtotime( $date );
+		}
+
+		return false === $timestamp ? '' : gmdate( 'Y-m-d H:i:s', $timestamp );
+	}
+
+	private static function frontmatter_status_from_post_status( $post_status ) {
+		$statuses = array(
+			'publish' => 'published',
+			'future'  => 'scheduled',
+		);
+
+		return isset( $statuses[ $post_status ] ) ? $statuses[ $post_status ] : $post_status;
+	}
+
+	private static function normalize_frontmatter_status( $post_status ) {
+		if ( ! is_string( $post_status ) ) {
+			return $post_status;
+		}
+
+		$statuses = array(
+			'published' => 'publish',
+			'publish'   => 'publish',
+			'scheduled' => 'future',
+			'future'    => 'future',
+			'draft'     => 'draft',
+			'pending'   => 'pending',
+			'private'   => 'private',
+		);
+		$key      = strtolower( trim( $post_status ) );
+
+		return isset( $statuses[ $key ] ) ? $statuses[ $key ] : $post_status;
 	}
 
 	private static function find_post_id_by_path_metadata( $path, $metadata ) {

@@ -95,6 +95,11 @@ git -c protocol.version=2 clone "$REMOTE_AUTH_URL" "$CLONE_DIR"
 test -f "$CLONE_DIR/post/hello-world.md"
 test -f "$CLONE_DIR/page/sample-page.md"
 grep -q 'Hello from WordPress' "$CLONE_DIR/post/hello-world.md"
+grep -Fq 'title: "Hello World"' "$CLONE_DIR/post/hello-world.md"
+grep -Fq 'status: "published"' "$CLONE_DIR/post/hello-world.md"
+grep -Fq 'description: "Hand-authored summary."' "$CLONE_DIR/post/hello-world.md"
+grep -Eq '^date: "[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z"$' "$CLONE_DIR/post/hello-world.md"
+! grep -Eq '^(id|type|slug|date_gmt|modified_gmt):' "$CLONE_DIR/post/hello-world.md"
 
 POST_ID="$(curl -sS -f -H "Authorization: Basic $AUTH_HEADER" "$BASE_URL/wp-json/wp/v2/posts?slug=hello-world&context=edit" | php -r '
 $posts = json_decode(stream_get_contents(STDIN), true);
@@ -162,14 +167,15 @@ grep -Fq 'Escaped path literal: C:\\Temp\\wp-origin' "$WORK_DIR/exact-blob.md"
 grep -Fq 'Quoted JSON literal: {"windows":"C:\\\\Temp\\\\wp-origin"}' "$WORK_DIR/exact-blob.md"
 ACTUAL_COMMIT_MESSAGE="$(git -C "$EXACT_CLONE_DIR" show -s --format=%B "$EXACT_COMMIT_HASH" | php -r 'echo rtrim(stream_get_contents(STDIN), "\r\n");')"
 [ "$ACTUAL_COMMIT_MESSAGE" = "$EXACT_COMMIT_MESSAGE" ]
+git pull --rebase origin trunk
 
 php -r '
 $path = $argv[1];
 $markdown = "---\n"
-	. "type: \"post\"\n"
-	. "slug: \"created-from-git\"\n"
-	. "status: \"publish\"\n"
 	. "title: \"Created From Git\"\n"
+	. "date: \"2024-01-15T10:00:00Z\"\n"
+	. "status: \"published\"\n"
+	. "description: \"Created from Git summary.\"\n"
 	. "---\n\n"
 	. "Created from Git.\n";
 file_put_contents($path, $markdown);
@@ -201,12 +207,30 @@ $posts = json_decode(stream_get_contents(STDIN), true);
 echo $posts[0]["content"]["raw"];
 ')"
 printf '%s' "$CREATED_POST_CONTENT" | grep -q 'Created from Git'
+CREATED_POST="$(curl -sS -f -H "Authorization: Basic $AUTH_HEADER" "$BASE_URL/wp-json/wp/v2/posts?slug=created-from-git&context=edit")"
+printf '%s' "$CREATED_POST" | php -r '
+$posts = json_decode(stream_get_contents(STDIN), true);
+if ("publish" !== $posts[0]["status"]) {
+	exit(1);
+}
+if ("Created from Git summary." !== $posts[0]["excerpt"]["raw"]) {
+	exit(1);
+}
+if ("2024-01-15T10:00:00" !== $posts[0]["date_gmt"]) {
+	exit(1);
+}
+'
 
 CREATED_PAGE_CONTENT="$(curl -sS -f -H "Authorization: Basic $AUTH_HEADER" "$BASE_URL/wp-json/wp/v2/pages?slug=page-from-git&context=edit" | php -r '
 $pages = json_decode(stream_get_contents(STDIN), true);
 echo $pages[0]["content"]["raw"];
 ')"
 printf '%s' "$CREATED_PAGE_CONTENT" | grep -q 'Page created from Git'
+CREATED_PAGE_STATUS="$(curl -sS -f -H "Authorization: Basic $AUTH_HEADER" "$BASE_URL/wp-json/wp/v2/pages?slug=page-from-git&context=edit" | php -r '
+$pages = json_decode(stream_get_contents(STDIN), true);
+echo $pages[0]["status"];
+')"
+[ "$CREATED_PAGE_STATUS" = "publish" ]
 
 TRASHED_PAGE_STATUS="$(curl -sS -f -H "Authorization: Basic $AUTH_HEADER" "$BASE_URL/wp-json/wp/v2/pages/$PAGE_ID?context=edit" | php -r '
 $page = json_decode(stream_get_contents(STDIN), true);
