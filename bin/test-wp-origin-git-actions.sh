@@ -224,3 +224,23 @@ fi
 git fetch origin trunk
 git reset --hard FETCH_HEAD >/dev/null
 grep -q 'Updated in WordPress' "$CLONE_DIR/post/hello-world.md"
+
+# The CPT-based persistence model is gone. The wp_origin_commit post type
+# must not be registered, and a public types listing must not advertise it.
+CPT_LOOKUP_STATUS="$(curl -sS -o /dev/null -w '%{http_code}' -H "Authorization: Basic $AUTH_HEADER" "$BASE_URL/wp-json/wp/v2/types/wp_origin_commit")"
+if [ "$CPT_LOOKUP_STATUS" = "200" ]; then
+	echo "Expected wp_origin_commit post type to be absent, got HTTP $CPT_LOOKUP_STATUS." >&2
+	exit 1
+fi
+
+# Independently verify the wpdb-backed Git filesystem actually persisted
+# the history a client just produced: a brand-new clone (no shared state
+# with $CLONE_DIR) must still see every commit we pushed in this run.
+FRESH_CLONE_DIR="$WORK_DIR/fresh-clone"
+git -c protocol.version=2 clone "$REMOTE_AUTH_URL" "$FRESH_CLONE_DIR"
+test -f "$FRESH_CLONE_DIR/post/hello-world.md"
+test -f "$FRESH_CLONE_DIR/post/created-from-git.md"
+test -f "$FRESH_CLONE_DIR/page/page-from-git.md"
+test ! -f "$FRESH_CLONE_DIR/page/sample-page.md"
+git -C "$FRESH_CLONE_DIR" log --grep='Preserve' --format=%H -n 1 | grep -q '^[0-9a-f]\{40\}$'
+git -C "$FRESH_CLONE_DIR" log --grep='Create and delete content from Git' --format=%H -n 1 | grep -q '^[0-9a-f]\{40\}$'
