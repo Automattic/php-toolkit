@@ -58,6 +58,14 @@ class GitObjectEncoder implements ByteWriteStream {
 		if ( ! $fs->is_dir( $target_dir ) ) {
 			$fs->mkdir( $target_dir, array( 'recursive' => true ) );
 		}
+		if ( $fs->is_file( $target_path ) ) {
+			// Git objects are content-addressed. If this path already
+			// exists, the temporary object has identical contents and can
+			// be discarded instead of replacing the canonical object file.
+			$fs->rm( 'objects/.tmp' );
+
+			return;
+		}
 		$fs->rename( 'objects/.tmp', $target_path );
 	}
 }

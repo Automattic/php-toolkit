@@ -60,23 +60,9 @@ class WP_Origin_Admin {
 		// work — instead of stalling for one tick per 2-second JS
 		// interval. The transient lock inside tick() makes repeated
 		// calls safe.
-		self::drive_seeder( 1.5 );
+		WP_Origin_Seeder::drive( 1.5 );
 
 		return rest_ensure_response( WP_Origin_Seeder::get_progress() );
-	}
-
-	private static function drive_seeder( $seconds ) {
-		$deadline = microtime( true ) + $seconds;
-		while ( ! WP_Origin_Seeder::is_ready() && microtime( true ) < $deadline ) {
-			$state_before = WP_Origin_Seeder::get_state();
-			WP_Origin_Seeder::tick();
-			if ( WP_Origin_Seeder::get_state() === $state_before
-				&& 'in_progress' !== $state_before
-				&& 'pending' !== $state_before
-			) {
-				break;
-			}
-		}
 	}
 
 	public static function rest_retry() {

@@ -3,6 +3,7 @@ vendor/
 opfs/
 node_modules
 .cursor
+.context/
 rest/
 dist/
 outdir/

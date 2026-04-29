@@ -639,9 +639,10 @@ class GitRepository {
 	 */
 	public function commit( $options = array() ) {
 		// First process all blob updates.
-		$updates    = $options['updates'] ?? array();
-		$deletes    = $options['deletes'] ?? array();
-		$move_trees = $options['move_trees'] ?? array();
+		$updates         = $options['updates'] ?? array();
+		$create_symlinks = $options['create_symlinks'] ?? array();
+		$deletes         = $options['deletes'] ?? array();
+		$move_trees      = $options['move_trees'] ?? array();
 
 		// Track which trees need updating.
 		$changed_trees = array(
@@ -661,6 +662,24 @@ class GitRepository {
 				array(
 					'name' => $basename,
 					'mode' => TreeEntry::FILE_MODE_REGULAR_NON_EXECUTABLE,
+					'hash' => $blob_oid,
+				)
+			);
+		}
+
+		// Process symbolic link updates.
+		foreach ( $create_symlinks as $path => $target ) {
+			$path     = '/' . ltrim( $path, '/' );
+			$blob_oid = $this->add_object( 'blob', $target );
+			$this->mark_tree_path_changed( $changed_trees, wp_unix_dirname( $path ) );
+			$basename = basename( $path );
+			if ( '' === $basename ) {
+				throw new GitException( 'Cannot commit a symlink with an empty filename' );
+			}
+			$changed_trees[ wp_unix_dirname( $path ) ]->entries[ basename( $path ) ] = new TreeEntry(
+				array(
+					'name' => $basename,
+					'mode' => TreeEntry::FILE_MODE_SYMBOLIC_LINK,
 					'hash' => $blob_oid,
 				)
 			);
@@ -1024,10 +1043,25 @@ class GitRepository {
 		// Recursively process child trees.
 		foreach ( $changed_trees as $child_path => $child_tree ) {
 			if ( wp_unix_dirname( $child_path ) === $path && '/' !== $child_path ) {
-				$child_oid                               = $this->commit_tree( $child_path, $changed_trees );
-				$tree_objects[ basename( $child_path ) ] = new TreeEntry(
+				$child_name = basename( $child_path );
+				if (
+					isset( $tree_objects[ $child_name ] ) &&
+					TreeEntry::FILE_MODE_SYMBOLIC_LINK === $tree_objects[ $child_name ]->get_mode_bucket()
+				) {
+					// The parent path became a symlink, so the old
+					// directory descendants are intentionally ignored.
+					continue;
+				}
+				if (
+					isset( $tree_objects[ $child_name ] ) &&
+					TreeEntry::FILE_MODE_DIRECTORY !== $tree_objects[ $child_name ]->get_mode_bucket()
+				) {
+					throw new GitException( 'Cannot update child entries under a non-directory path' );
+				}
+				$child_oid                   = $this->commit_tree( $child_path, $changed_trees );
+				$tree_objects[ $child_name ] = new TreeEntry(
 					array(
-						'name' => basename( $child_path ),
+						'name' => $child_name,
 						'mode' => TreeEntry::FILE_MODE_DIRECTORY,
 						'hash' => $child_oid,
 					)

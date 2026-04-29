@@ -29,16 +29,29 @@ use WordPress\Markdown\MarkdownProducer;
  *      changes back to WordPress.
  */
 class WP_Origin_Plugin {
-	const DEFAULT_BRANCH  = 'trunk';
-	const ROUTE_NAMESPACE = 'git/v1';
-	const ROUTE_PATTERN   = '/md\.git(?P<path>/.*)?';
-	const EPOCH_TIMESTAMP = 946684800;
-	const TABLE_PREFIX    = 'wp_origin_';
+	const DEFAULT_BRANCH     = 'trunk';
+	const ROUTE_NAMESPACE    = 'git/v1';
+	const ROUTE_PATTERN      = '/md\.git(?P<path>/.*)?';
+	const EPOCH_TIMESTAMP    = 946684800;
+	const TABLE_PREFIX       = 'wp_origin_';
+	const AGENT_SKILL_SOURCE = 'wp-origin';
+	const AGENT_SKILL_SLUG   = 'wp-origin';
+	const AGENT_SKILL_TITLE  = 'WP Origin AGENTS.md';
 
 	public static $supported_post_types    = array( 'post', 'page' );
 	public static $supported_post_statuses = array( 'publish', 'draft', 'pending', 'private', 'future' );
 
+	private static $guideline_type_directories = array(
+		'artifact'    => 'artifacts',
+		'content'     => 'content',
+		'instruction' => 'instructions',
+		'memory'      => 'memories',
+		'plan'        => 'plans',
+		'skill'       => 'skills',
+	);
+
 	public static function bootstrap() {
+		add_action( 'init', array( __CLASS__, 'install_default_agent_skill' ), 20 );
 		add_action( 'rest_api_init', array( __CLASS__, 'register_routes' ) );
 		add_filter( 'rest_post_dispatch', array( __CLASS__, 'add_authentication_challenge' ), 10, 3 );
 		add_filter( 'rest_pre_serve_request', array( __CLASS__, 'serve_git_response' ), 10, 4 );
@@ -48,7 +61,71 @@ class WP_Origin_Plugin {
 	}
 
 	public static function on_activation() {
+		self::install_default_agent_skill();
 		WP_Origin_Seeder::on_activation();
+	}
+
+	public static function install_default_agent_skill() {
+		if ( ! self::guidelines_available() || ! function_exists( 'wp_install_skill' ) ) {
+			return;
+		}
+
+		wp_install_skill(
+			self::AGENT_SKILL_SOURCE,
+			self::AGENT_SKILL_TITLE,
+			'Guide for coding agents working in a WP Origin checkout of a WordPress site.',
+			self::get_default_agent_skill_content(),
+			array(
+				'post_name' => self::AGENT_SKILL_SLUG,
+			)
+		);
+	}
+
+	public static function get_supported_post_types() {
+		$post_types = self::$supported_post_types;
+		if ( self::guidelines_available() ) {
+			$post_types[] = 'wp_guideline';
+		}
+
+		return $post_types;
+	}
+
+	private static function guidelines_available() {
+		return post_type_exists( 'wp_guideline' ) && taxonomy_exists( 'wp_guideline_type' );
+	}
+
+	private static function get_default_agent_skill_content() {
+		return <<<'SKILL'
+# WP Origin AGENTS.md
+
+## What This Repository Is
+
+This repository is a Git checkout of a WordPress site exposed by WP Origin. WordPress remains the source of truth. The Git history in this clone is a working view for review, editing, and agent workflows.
+
+## Repository Layout
+
+- `post/{slug}.md` contains WordPress posts.
+- `page/{slug}.md` contains WordPress pages.
+- `wp_guideline/skills/{slug}/SKILL.md` contains coding-agent skills stored as Gutenberg Guidelines.
+- `.agents/skills` and `.claude/skills` point to `wp_guideline/skills` for agent discovery.
+- `AGENTS.md` and `CLAUDE.md` point to this guide.
+
+## Pulling And Pushing
+
+- `git pull` refreshes the checkout from the current WordPress site.
+- `git push` applies supported Markdown changes back to WordPress.
+- Pushed post and page changes create WordPress revisions.
+- Deleted post or page files are trashed in WordPress rather than permanently deleted.
+- If WordPress changed after your last pull, the push is rejected. Pull, review the diff, and then push again.
+
+## Editing Rules
+
+- Preserve post and page front matter unless you are intentionally changing that WordPress metadata.
+- Guideline skill front matter is generated from WordPress fields. Keep the body focused on the guideline content.
+- Preserve unsupported block markup, fenced `gutenberg` blocks, custom blocks, and raw HTML unless the user asks for a conversion.
+- Use forward slashes in paths.
+- Keep changes scoped to site content. This checkout does not represent plugin code, themes, uploads, or the full database.
+SKILL;
 	}
 
 	public static function register_routes() {
@@ -88,6 +165,10 @@ class WP_Origin_Plugin {
 		$previous_error_handler = set_error_handler( array( __CLASS__, 'throw_on_php_warning' ) ); // phpcs:ignore
 
 		try {
+			if ( ! WP_Origin_Seeder::is_ready() ) {
+				WP_Origin_Seeder::drive( 5 );
+			}
+
 			if ( ! WP_Origin_Seeder::is_ready() ) {
 				$response = new WP_Origin_Buffering_Response();
 				$response->send_http_code( 503 );
@@ -263,19 +344,29 @@ class WP_Origin_Plugin {
 		$exported_files = self::export_wordpress_content();
 		$head_oid       = $repository->get_branch_tip( 'refs/heads/' . self::DEFAULT_BRANCH );
 		$existing_files = ( is_string( $head_oid ) && '' !== $head_oid && ! Commit::is_null_hash( $head_oid ) )
-			? self::read_markdown_files_from_commit( $repository, $head_oid )
+			? self::read_repository_entries_from_commit( $repository, $head_oid )
 			: array();
 
 		$updates          = array();
+		$symlinks         = array();
 		$deletes          = array();
 		$commit_timestamp = self::EPOCH_TIMESTAMP;
 
 		foreach ( $exported_files as $path => $entry ) {
-			$markdown = $entry['markdown'];
-			$post     = $entry['post'];
+			$content = $entry['content'];
+			$mode    = $entry['mode'];
+			$post    = $entry['post'];
 
-			if ( ! isset( $existing_files[ $path ] ) || $existing_files[ $path ] !== $markdown ) {
-				$updates[ $path ] = $markdown;
+			if ( ! isset( $existing_files[ $path ] ) || ! self::repository_entries_match( $existing_files[ $path ], $entry ) ) {
+				if ( TreeEntry::FILE_MODE_SYMBOLIC_LINK === $mode ) {
+					$symlinks[ $path ] = $content;
+				} else {
+					$updates[ $path ] = $content;
+				}
+			}
+
+			if ( ! $post ) {
+				continue;
 			}
 
 			$maybe_timestamp = self::timestamp_from_gmt_string( $post->post_modified_gmt );
@@ -294,7 +385,7 @@ class WP_Origin_Plugin {
 			}
 		}
 
-		if ( empty( $updates ) && empty( $deletes ) ) {
+		if ( empty( $updates ) && empty( $symlinks ) && empty( $deletes ) ) {
 			return;
 		}
 
@@ -302,9 +393,10 @@ class WP_Origin_Plugin {
 		$date     = gmdate( Commit::DATE_FORMAT, $commit_timestamp );
 		$repository->commit(
 			array(
-				'updates' => $updates,
-				'deletes' => $deletes,
-				'commit'  => array(
+				'updates'         => $updates,
+				'create_symlinks' => $symlinks,
+				'deletes'         => $deletes,
+				'commit'          => array(
 					'message'        => 'Sync from WordPress',
 					'author'         => $identity,
 					'author_date'    => $date,
@@ -318,7 +410,7 @@ class WP_Origin_Plugin {
 	private static function export_wordpress_content() {
 		$posts = get_posts(
 			array(
-				'post_type'      => self::$supported_post_types,
+				'post_type'      => self::get_export_post_types(),
 				'post_status'    => self::$supported_post_statuses,
 				'posts_per_page' => -1,
 				'orderby'        => 'ID',
@@ -326,18 +418,49 @@ class WP_Origin_Plugin {
 			)
 		);
 
-		$files = array();
+		$files                  = array();
+		$has_guideline_skills   = false;
+		$agent_guide_skill_path = null;
 		foreach ( $posts as $post ) {
 			if ( ! current_user_can( 'read_post', $post->ID ) ) {
 				continue;
 			}
 
-			$path = self::build_markdown_path( $post->post_type, $post->post_name );
+			$path    = self::build_markdown_path( $post );
+			$content = self::export_post_to_markdown( $post );
 
 			$files[ $path ] = array(
-				'post'     => $post,
-				'markdown' => self::export_post_to_markdown( $post ),
+				'post'    => $post,
+				'mode'    => TreeEntry::FILE_MODE_REGULAR_NON_EXECUTABLE,
+				'content' => $content,
 			);
+
+			if ( 'wp_guideline' === $post->post_type && self::is_guideline_skill_path( $path ) ) {
+				$has_guideline_skills = true;
+				if ( self::AGENT_SKILL_SOURCE === get_post_meta( $post->ID, 'guideline_source', true ) ) {
+					$agent_guide_skill_path = $path;
+				}
+			}
+		}
+
+		if ( $has_guideline_skills ) {
+			foreach ( self::get_agent_skills_directory_symlink_paths() as $symlink_path => $target ) {
+				$files[ $symlink_path ] = array(
+					'post'    => null,
+					'mode'    => TreeEntry::FILE_MODE_SYMBOLIC_LINK,
+					'content' => $target,
+				);
+			}
+		}
+
+		if ( $agent_guide_skill_path ) {
+			foreach ( self::get_agent_entrypoint_symlink_paths( $agent_guide_skill_path ) as $symlink_path => $target ) {
+				$files[ $symlink_path ] = array(
+					'post'    => null,
+					'mode'    => TreeEntry::FILE_MODE_SYMBOLIC_LINK,
+					'content' => $target,
+				);
+			}
 		}
 
 		ksort( $files );
@@ -345,8 +468,20 @@ class WP_Origin_Plugin {
 		return $files;
 	}
 
-	public static function build_markdown_path( $post_type, $slug ) {
-		return ltrim( $post_type . '/' . $slug . '.md', '/' );
+	private static function get_export_post_types() {
+		return self::get_supported_post_types();
+	}
+
+	public static function build_markdown_path( $post_or_type, $slug = null ) {
+		if ( $post_or_type instanceof WP_Post ) {
+			if ( 'wp_guideline' === $post_or_type->post_type ) {
+				return self::build_guideline_markdown_path( $post_or_type );
+			}
+
+			return ltrim( $post_or_type->post_type . '/' . $post_or_type->post_name . '.md', '/' );
+		}
+
+		return ltrim( $post_or_type . '/' . $slug . '.md', '/' );
 	}
 
 	/**
@@ -355,6 +490,14 @@ class WP_Origin_Plugin {
 	 * seeder can reuse the conversion without duplicating logic.
 	 */
 	public static function export_post_to_markdown( WP_Post $post ) {
+		if ( 'wp_guideline' === $post->post_type ) {
+			if ( 'skill' === self::get_guideline_type_slug( $post->ID ) ) {
+				return self::export_guideline_skill_to_markdown( $post );
+			}
+
+			return $post->post_content;
+		}
+
 		$metadata = array(
 			'title'  => array( $post->post_title ),
 			'date'   => array( self::format_post_date_for_frontmatter( $post ) ),
@@ -372,6 +515,91 @@ class WP_Origin_Plugin {
 		);
 
 		return $producer->produce();
+	}
+
+	private static function export_guideline_skill_to_markdown( WP_Post $post ) {
+		$frontmatter = array(
+			'---',
+			'name: ' . self::quote_yaml_scalar( $post->post_name ),
+			'description: ' . self::quote_yaml_scalar( trim( $post->post_excerpt ) ),
+			'---',
+			'',
+		);
+
+		return implode( "\n", $frontmatter ) . ltrim( $post->post_content, "\r\n" );
+	}
+
+	private static function quote_yaml_scalar( $value ) {
+		$encoded = wp_json_encode( (string) $value );
+		if ( false === $encoded ) {
+			return '""';
+		}
+
+		return $encoded;
+	}
+
+	private static function build_guideline_markdown_path( WP_Post $post ) {
+		$type_slug = self::get_guideline_type_slug( $post->ID );
+		$directory = self::guideline_type_to_directory( $type_slug );
+
+		if ( 'skill' === $type_slug ) {
+			return 'wp_guideline/' . $directory . '/' . $post->post_name . '/SKILL.md';
+		}
+
+		return 'wp_guideline/' . $directory . '/' . $post->post_name . '.md';
+	}
+
+	private static function get_guideline_type_slug( $post_id ) {
+		if ( ! taxonomy_exists( 'wp_guideline_type' ) ) {
+			return 'artifact';
+		}
+
+		$terms = get_the_terms( $post_id, 'wp_guideline_type' );
+		if ( is_wp_error( $terms ) || empty( $terms ) ) {
+			return 'artifact';
+		}
+
+		$known_types = array_keys( self::$guideline_type_directories );
+		foreach ( $known_types as $known_type ) {
+			foreach ( $terms as $term ) {
+				if ( $known_type === $term->slug ) {
+					return $term->slug;
+				}
+			}
+		}
+
+		return $terms[0]->slug;
+	}
+
+	private static function guideline_type_to_directory( $type_slug ) {
+		if ( isset( self::$guideline_type_directories[ $type_slug ] ) ) {
+			return self::$guideline_type_directories[ $type_slug ];
+		}
+
+		return sanitize_title( $type_slug ) . 's';
+	}
+
+	private static function guideline_directory_to_type( $directory ) {
+		$type_slug = array_search( $directory, self::$guideline_type_directories, true );
+		if ( false !== $type_slug ) {
+			return $type_slug;
+		}
+
+		throw new Exception( 'Push rejected because the guideline type directory is not supported yet.' );
+	}
+
+	private static function get_agent_skills_directory_symlink_paths() {
+		return array(
+			'.agents/skills' => '../wp_guideline/skills',
+			'.claude/skills' => '../wp_guideline/skills',
+		);
+	}
+
+	private static function get_agent_entrypoint_symlink_paths( $skill_path ) {
+		return array(
+			'AGENTS.md' => $skill_path,
+			'CLAUDE.md' => $skill_path,
+		);
 	}
 
 	public static function repository_identity( GitRepository $repository ) {
@@ -404,20 +632,23 @@ class WP_Origin_Plugin {
 		$parent_hash = empty( $commit->parents ) ? Commit::NULL_HASH : $commit->get_first_parent_hash();
 		$old_files   = Commit::is_null_hash( $parent_hash )
 			? array()
-			: self::read_markdown_files_from_commit( $repository, $parent_hash );
-		$new_files   = self::read_markdown_files_from_commit( $repository, $commit_hash );
+			: self::read_repository_entries_from_commit( $repository, $parent_hash );
+		$new_files   = self::read_repository_entries_from_commit( $repository, $commit_hash );
 
 		$updated_post_ids = array();
 		$changes          = array();
 
-		foreach ( $new_files as $path => $contents ) {
-			if ( isset( $old_files[ $path ] ) && $old_files[ $path ] === $contents ) {
+		foreach ( $new_files as $path => $entry ) {
+			if ( isset( $old_files[ $path ] ) && self::repository_entries_match( $old_files[ $path ], $entry ) ) {
+				continue;
+			}
+			if ( TreeEntry::FILE_MODE_SYMBOLIC_LINK === $entry['mode'] ) {
 				continue;
 			}
 
 			$applied = self::upsert_post_from_markdown(
 				$path,
-				$contents,
+				$entry['content'],
 				array( 'skip_modified_check' => $skip_modified_checks )
 			);
 			$post_id = $applied['post_id'];
@@ -427,12 +658,15 @@ class WP_Origin_Plugin {
 			}
 		}
 
-		foreach ( $old_files as $path => $contents ) {
+		foreach ( $old_files as $path => $entry ) {
 			if ( isset( $new_files[ $path ] ) ) {
 				continue;
 			}
+			if ( TreeEntry::FILE_MODE_SYMBOLIC_LINK === $entry['mode'] ) {
+				continue;
+			}
 
-			$metadata = self::parse_markdown_metadata( $contents );
+			$metadata = self::parse_markdown_metadata( $entry['content'] );
 			$post_id  = isset( $metadata['id'] ) ? intval( $metadata['id'] ) : 0;
 			if ( ! $post_id ) {
 				$post_id = self::find_post_id_by_path_metadata( $path, $metadata );
@@ -507,9 +741,13 @@ class WP_Origin_Plugin {
 	private static function upsert_post_from_markdown( $path, $markdown, $options = array() ) {
 		$post_type = self::path_to_post_type( $path );
 		$slug      = self::path_to_slug( $path );
-		$consumer  = new MarkdownConsumer( $markdown );
-		$result    = $consumer->consume();
-		$metadata  = array();
+		if ( 'wp_guideline' === $post_type ) {
+			return self::upsert_guideline_from_markdown( $path, $markdown, $options );
+		}
+
+		$consumer = new MarkdownConsumer( $markdown );
+		$result   = $consumer->consume();
+		$metadata = array();
 		foreach ( $result->get_all_metadata() as $key => $value ) {
 			$metadata[ $key ] = is_array( $value ) ? reset( $value ) : $value;
 		}
@@ -573,6 +811,92 @@ class WP_Origin_Plugin {
 
 		if ( is_wp_error( $post_id ) ) {
 			throw new Exception( $post_id->get_error_message() );
+		}
+
+		$post = get_post( $post_id );
+
+		return array(
+			'post_id' => $post_id,
+			'change'  => self::build_push_summary_item(
+				$existing_post ? 'updated' : 'created',
+				$post,
+				$path
+			),
+		);
+	}
+
+	private static function upsert_guideline_from_markdown( $path, $markdown, $options = array() ) {
+		if ( ! self::guidelines_available() ) {
+			throw new Exception( 'Push rejected because Gutenberg Guidelines are not available on this site.' );
+		}
+
+		$slug                = self::path_to_slug( $path );
+		$guideline_type_slug = self::path_to_guideline_type_slug( $path );
+		$metadata            = array();
+		if ( 'skill' === $guideline_type_slug ) {
+			$skill_document = self::split_guideline_skill_markdown( $markdown );
+			$metadata       = $skill_document['metadata'];
+			$markdown       = $skill_document['content'];
+			if ( isset( $metadata['name'] ) && $metadata['name'] !== $slug ) {
+				throw new Exception( 'Push rejected because the skill name front matter does not match its directory.' );
+			}
+		}
+
+		$post_id = isset( $metadata['id'] ) ? intval( $metadata['id'] ) : 0;
+		if ( $post_id && get_post( $post_id ) ) {
+			$existing_post = get_post( $post_id );
+		} else {
+			$post_id       = self::find_post_id_by_path_metadata( $path, $metadata );
+			$existing_post = $post_id ? get_post( $post_id ) : null;
+		}
+
+		$post_status = self::normalize_frontmatter_status(
+			isset( $metadata['status'] ) ? $metadata['status'] : ( $existing_post ? $existing_post->post_status : 'draft' )
+		);
+		self::validate_post_status( $post_status, 'wp_guideline' );
+
+		if (
+			$existing_post &&
+			empty( $options['skip_modified_check'] ) &&
+			isset( $metadata['modified_gmt'] ) &&
+			$existing_post->post_modified_gmt !== $metadata['modified_gmt']
+		) {
+			throw new Exception( 'Push rejected because WordPress content changed since the last pull.' );
+		}
+
+		if ( $existing_post ) {
+			self::assert_can_edit_post( $existing_post->ID );
+		} else {
+			self::assert_can_create_post_type( 'wp_guideline' );
+		}
+
+		$postarr = array(
+			'post_type'    => 'wp_guideline',
+			'post_name'    => $slug,
+			'post_title'   => self::guideline_title_from_metadata( $metadata, $slug, $existing_post ),
+			'post_status'  => $post_status,
+			'post_content' => $markdown,
+		);
+
+		if ( array_key_exists( 'description', $metadata ) ) {
+			$postarr['post_excerpt'] = $metadata['description'];
+		}
+
+		if ( $existing_post ) {
+			$postarr['ID'] = $existing_post->ID;
+			$post_id       = wp_update_post( wp_slash( $postarr ), true );
+		} else {
+			$post_id = wp_insert_post( wp_slash( $postarr ), true );
+		}
+
+		if ( is_wp_error( $post_id ) ) {
+			throw new Exception( $post_id->get_error_message() );
+		}
+
+		$term_id   = self::get_or_create_guideline_type_term_id( $guideline_type_slug );
+		$set_terms = wp_set_object_terms( $post_id, array( $term_id ), 'wp_guideline_type' );
+		if ( is_wp_error( $set_terms ) ) {
+			throw new Exception( $set_terms->get_error_message() );
 		}
 
 		$post = get_post( $post_id );
@@ -738,20 +1062,66 @@ class WP_Origin_Plugin {
 
 	private static function path_to_post_type( $path ) {
 		$segments = explode( '/', ltrim( $path, '/' ) );
-		if ( empty( $segments[0] ) || ! in_array( $segments[0], self::$supported_post_types, true ) ) {
+		if ( ! empty( $segments[0] ) && 'wp_guideline' === $segments[0] && ! self::guidelines_available() ) {
+			throw new Exception( 'Push rejected because Gutenberg Guidelines are not available on this site.' );
+		}
+		if ( empty( $segments[0] ) || ! in_array( $segments[0], self::get_supported_post_types(), true ) ) {
 			throw new Exception( 'Push rejected because the file path is outside the supported post type directories.' );
+		}
+		if ( 'wp_guideline' === $segments[0] ) {
+			self::path_to_guideline_type_slug( $path );
 		}
 
 		return $segments[0];
 	}
 
 	private static function path_to_slug( $path ) {
+		if ( self::is_guideline_skill_path( $path ) ) {
+			$segments = explode( '/', ltrim( $path, '/' ) );
+			return $segments[2];
+		}
+
 		$basename = basename( $path );
 		if ( 'md' !== pathinfo( $basename, PATHINFO_EXTENSION ) ) {
 			throw new Exception( 'Push rejected because only Markdown files are supported.' );
 		}
 
 		return pathinfo( $basename, PATHINFO_FILENAME );
+	}
+
+	private static function path_to_guideline_type_slug( $path ) {
+		$segments = explode( '/', ltrim( $path, '/' ) );
+		if (
+			count( $segments ) < 3 ||
+			'wp_guideline' !== $segments[0] ||
+			! in_array( $segments[1], self::$guideline_type_directories, true )
+		) {
+			throw new Exception( 'Push rejected because guideline files must live under wp_guideline/<type> directories.' );
+		}
+
+		$type_slug = self::guideline_directory_to_type( $segments[1] );
+		if ( 'skill' === $type_slug ) {
+			if ( 4 !== count( $segments ) || 'SKILL.md' !== $segments[3] ) {
+				throw new Exception( 'Push rejected because guideline skills must use wp_guideline/skills/<name>/SKILL.md.' );
+			}
+			return $type_slug;
+		}
+
+		if ( 3 !== count( $segments ) || 'md' !== pathinfo( $segments[2], PATHINFO_EXTENSION ) ) {
+			throw new Exception( 'Push rejected because guideline files must be Markdown files.' );
+		}
+
+		return $type_slug;
+	}
+
+	private static function is_guideline_skill_path( $path ) {
+		$segments = explode( '/', ltrim( $path, '/' ) );
+
+		return 4 === count( $segments )
+			&& 'wp_guideline' === $segments[0]
+			&& 'skills' === $segments[1]
+			&& '' !== $segments[2]
+			&& 'SKILL.md' === $segments[3];
 	}
 
 	private static function parse_markdown_metadata( $markdown ) {
@@ -763,6 +1133,54 @@ class WP_Origin_Plugin {
 		}
 
 		return $metadata;
+	}
+
+	private static function split_guideline_skill_markdown( $markdown ) {
+		$metadata = array();
+		$content  = $markdown;
+
+		if ( preg_match( '/\A---\r?\n.*?\r?\n---(?:\r?\n|\z)/s', $markdown, $matches ) ) {
+			$metadata = self::parse_markdown_metadata( $markdown );
+			$content  = substr( $markdown, strlen( $matches[0] ) );
+		}
+
+		return array(
+			'metadata' => $metadata,
+			'content'  => $content,
+		);
+	}
+
+	private static function guideline_title_from_metadata( $metadata, $slug, $existing_post = null ) {
+		if ( isset( $metadata['title'] ) && '' !== trim( (string) $metadata['title'] ) ) {
+			return $metadata['title'];
+		}
+		if ( $existing_post ) {
+			return $existing_post->post_title;
+		}
+		if ( isset( $metadata['name'] ) && '' !== trim( (string) $metadata['name'] ) ) {
+			return ucwords( str_replace( '-', ' ', $metadata['name'] ) );
+		}
+
+		return ucwords( str_replace( '-', ' ', $slug ) );
+	}
+
+	private static function get_or_create_guideline_type_term_id( $slug ) {
+		$term = get_term_by( 'slug', $slug, 'wp_guideline_type' );
+		if ( $term ) {
+			return (int) $term->term_id;
+		}
+
+		$inserted = wp_insert_term(
+			ucwords( str_replace( '-', ' ', $slug ) ),
+			'wp_guideline_type',
+			array( 'slug' => $slug )
+		);
+
+		if ( is_wp_error( $inserted ) ) {
+			throw new Exception( $inserted->get_error_message() );
+		}
+
+		return (int) $inserted['term_id'];
 	}
 
 	private static function validate_post_status( $post_status, $post_type ) {
@@ -779,7 +1197,7 @@ class WP_Origin_Plugin {
 		);
 	}
 
-	private static function read_markdown_files_from_commit( GitRepository $repository, $commit_hash ) {
+	private static function read_repository_entries_from_commit( GitRepository $repository, $commit_hash ) {
 		$commit = $repository->read_object( $commit_hash )->as_commit();
 		$files  = array();
 
@@ -787,24 +1205,37 @@ class WP_Origin_Plugin {
 			return $files;
 		}
 
-		self::collect_tree_files( $repository, $commit->tree, '', $files );
+		self::collect_tree_entries( $repository, $commit->tree, '', $files );
 		ksort( $files );
 
 		return $files;
 	}
 
-	private static function collect_tree_files( GitRepository $repository, $tree_hash, $prefix, &$files ) {
+	private static function repository_entries_match( $a, $b ) {
+		return isset( $a['mode'], $a['content'], $b['mode'], $b['content'] )
+			&& $a['mode'] === $b['mode']
+			&& $a['content'] === $b['content'];
+	}
+
+	private static function collect_tree_entries( GitRepository $repository, $tree_hash, $prefix, &$files ) {
 		$tree = $repository->read_object( $tree_hash )->as_tree();
 		foreach ( $tree->entries as $entry ) {
 			$path = ltrim( $prefix . '/' . $entry->name, '/' );
 			if ( TreeEntry::FILE_MODE_DIRECTORY === $entry->get_mode_bucket() ) {
-				self::collect_tree_files( $repository, $entry->hash, $path, $files );
+				self::collect_tree_entries( $repository, $entry->hash, $path, $files );
 				continue;
 			}
-			if ( 'md' !== pathinfo( $path, PATHINFO_EXTENSION ) ) {
-				throw new Exception( 'Push rejected because only Markdown files are supported.' );
+			if (
+				TreeEntry::FILE_MODE_REGULAR_NON_EXECUTABLE !== $entry->get_mode_bucket() &&
+				TreeEntry::FILE_MODE_REGULAR_EXECUTABLE !== $entry->get_mode_bucket() &&
+				TreeEntry::FILE_MODE_SYMBOLIC_LINK !== $entry->get_mode_bucket()
+			) {
+				throw new Exception( 'Push rejected because one or more repository entries use an unsupported Git file mode.' );
 			}
-			$files[ $path ] = $repository->read_object( $entry->hash )->consume_all();
+			$files[ $path ] = array(
+				'mode'    => $entry->get_mode_bucket(),
+				'content' => $repository->read_object( $entry->hash )->consume_all(),
+			);
 		}
 	}
 
