@@ -4,6 +4,7 @@ namespace WordPress\Git\Protocol;
 
 use WordPress\ByteStream\ReadStream\BaseByteReadStream;
 use WordPress\Git\Model\Tree;
+use WordPress\Git\Model\TreeEntry;
 
 class GitProtocolEncoderPipe extends BaseByteReadStream {
 
@@ -51,11 +52,29 @@ class GitProtocolEncoderPipe extends BaseByteReadStream {
 
 	public static function encode_tree_bytes( Tree $tree ) {
 		$tree_bytes = '';
-		foreach ( $tree->entries as $entry ) {
+		foreach ( self::sort_tree_entries( $tree->entries ) as $entry ) {
 			$tree_bytes .= $entry->mode . ' ' . $entry->name . "\0" . hex2bin( $entry->hash );
 		}
 
 		return $tree_bytes;
+	}
+
+	public static function sort_tree_entries( $entries ) {
+		uasort( $entries, array( __CLASS__, 'compare_tree_entries' ) );
+
+		return $entries;
+	}
+
+	private static function compare_tree_entries( TreeEntry $a, TreeEntry $b ) {
+		return strcmp( self::get_tree_sort_name( $a ), self::get_tree_sort_name( $b ) );
+	}
+
+	private static function get_tree_sort_name( TreeEntry $entry ) {
+		if ( TreeEntry::FILE_MODE_DIRECTORY === $entry->get_mode_bucket() ) {
+			return $entry->name . '/';
+		}
+
+		return $entry->name;
 	}
 
 	protected function internal_pull( $n ): string {

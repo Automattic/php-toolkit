@@ -1069,9 +1069,7 @@ class GitRepository {
 			}
 		}
 
-		// Git seems to require alphabetical order for the tree objects.
-		// Or at least GitHub rejects the push if the tree objects are not sorted.
-		ksort( $tree_objects );
+		$tree_objects = GitProtocolEncoderPipe::sort_tree_entries( $tree_objects );
 
 		// Create new tree object.
 		return $this->add_object(

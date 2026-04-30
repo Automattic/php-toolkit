@@ -77,7 +77,8 @@ The guiding rule is that users must not lose data. If a conversion cannot preser
   - When Gutenberg's Guidelines experiment is available, export `wp_guideline` posts under `wp_guideline/{type}/`.
   - Store guideline skills as agent-portable skill directories, such as `wp_guideline/skills/{slug}/SKILL.md`.
   - Expose guideline skills through `.agents/skills` and `.claude/skills` directory symlinks so agents can discover the same canonical skill content.
-  - Install a default WP Origin coding-agent skill when Guidelines is available and expose `AGENTS.md` and `CLAUDE.md` as symlinks to it.
+  - Install default WP Origin coding-agent skills when Guidelines is available, including a general checkout guide and a focused block theme template-editing skill.
+  - Expose `AGENTS.md` and `CLAUDE.md` as symlinks to the general WP Origin checkout guide.
   - Store guideline skill bodies as content only in WordPress, and generate agent-required YAML front matter from WordPress title, slug, and excerpt on export.
   - Keep the canonical `wp_guideline/` tree aligned with `wp_guideline_type` taxonomy terms, including `artifact`, `skill`, `plan`, and future instruction-like types.
 
@@ -103,11 +104,19 @@ The guiding rule is that users must not lose data. If a conversion cannot preser
 - **Block theme entities** (Priority: Medium)
   - Support `wp_template`, `wp_template_part`, and `wp_navigation` once posts/pages round-trip safely.
   - Represent these as explicit directories rather than mixing them into generic custom post type output.
-  - Export them as `.html` files containing raw Gutenberg block markup, not Markdown.
+  - Export theme-provided base templates and template parts as `.html` files containing raw Gutenberg block markup, not Markdown, even before they have database customizations.
+  - Layer database customizations for `wp_template`, `wp_template_part`, and `wp_navigation` on top of the theme-provided base files at the same logical paths.
+  - Create a distinct theme-base commit before the WordPress customization/content commit so agents can distinguish hardcoded theme defaults from site-specific changes.
+  - Export theme-provided `theme.json` files under `wp_theme/{theme}/theme.json` for agent context.
   - Do not include front matter in these `.html` files.
   - Use the directory and path as identity: `wp_template/single.html` maps to post type `wp_template` and slug `single`.
-  - Allow pushed create and update operations for these files.
+  - For theme-scoped templates and template parts, map `wp_template/{theme}/index.html` and `wp_template_part/{theme}/footer.html` to WordPress template IDs such as `{theme}//index` and `{theme}//footer`.
+  - Store pushed theme-scoped customizations using the WordPress identity model: the post slug remains the template slug, such as `footer`, while the `wp_theme` taxonomy term stores the theme, such as `twentytwentyfive`. Do not flatten these into slugs such as `twentytwentyfive-footer`.
+  - Allow pushed create and update operations for template HTML files; editing a theme-provided template creates a WordPress customization.
   - Reject pushed deletes and renames for these files because the path is the identity and deletion can break site rendering.
+  - Reject pushed edits to `wp_theme/{theme}/theme.json` because WP Origin does not mutate theme source files.
+  - Provide agent guidance for template edits that prefers editable core block markup, preserves custom blocks, avoids new `core/html` blocks for normal layout, and uses WordPress-native full-width alignment patterns.
+  - Export model-facing guidance through `AGENTS.md`, `CLAUDE.md`, and a `wp-origin-template-editor` skill so agents understand that theme base files are context, `wp_theme` files are read-only, and nested theme paths such as `wp_template_part/twentytwentyfive/footer.html` must not be flattened.
 
 - **Conflict and safety checks** (Priority: High)
   - Reject pushes that would overwrite newer WordPress edits unless the client has pulled the latest content.
@@ -152,6 +161,10 @@ The guiding rule is that users must not lose data. If a conversion cannot preser
 - Structural block entities use raw Gutenberg HTML with no front matter.
 - File paths are grouped by WordPress post type name, starting with `post/` and `page/`, with media under `attachment/` once media support lands.
 - Template-like structural paths use `.html`, for example `wp_template/single.html`, `wp_template_part/header.html`, and `wp_navigation/main.html`.
+- Theme-provided templates use theme-qualified nested paths such as `wp_template/{theme}/index.html` and `wp_template_part/{theme}/header.html`; pushed edits to those files create or update the matching WordPress customization.
+- Theme-qualified template paths are a file-system view of WordPress template IDs. For example, `wp_template_part/twentytwentyfive/footer.html` maps to `twentytwentyfive//footer` in the template-part REST API, backed by a `wp_template_part` post with `post_name=footer` and a `wp_theme=twentytwentyfive` term when customized.
+- Theme-provided JSON is exported as read-only context under `wp_theme/{theme}/theme.json`.
+- The checkout includes agent-readable guidance: root `AGENTS.md` and `CLAUDE.md` point to the WP Origin guide, `.agents/skills` and `.claude/skills` expose the exported skills, and the template editor skill documents the theme-base overlay model and path identity rules.
 - Front matter should be stable enough for post/page round-trips but small enough for agents to understand.
 - Unknown or lossy blocks should round-trip using fenced `gutenberg` code blocks where possible, with raw HTML as a fallback.
 - The importer should also accept the existing `block` fence language as a compatibility alias.
@@ -245,8 +258,10 @@ The guiding rule is that users must not lose data. If a conversion cannot preser
 - **Milestone 7: Media and block-theme exploration**
   - Export referenced media into relative Markdown paths.
   - Import safe new/changed media as attachments.
-  - Export `wp_template`, `wp_template_part`, and `wp_navigation` as raw `.html` Gutenberg block files.
-  - Allow create/update pushes for those `.html` files.
+  - Export theme-provided `wp_template` and `wp_template_part` files as raw `.html` Gutenberg block files before database customizations exist.
+  - Export `wp_navigation` and database customizations for `wp_template` and `wp_template_part` as raw `.html` Gutenberg block files.
+  - Export active theme `theme.json` as read-only agent context.
+  - Allow create/update pushes for template `.html` files, including pushes that convert a theme-provided file into a WordPress customization using the correct `{theme}//{slug}` identity.
   - Reject delete/rename pushes for those `.html` files.
 
 - **Milestone 8: MVP hardening**

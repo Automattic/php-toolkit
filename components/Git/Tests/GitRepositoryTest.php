@@ -201,6 +201,31 @@ COMMIT
 		$this->assertSame( '../target/file.txt', $repo->read_object( $second_link_entry->hash )->consume_all() );
 	}
 
+	public function test_commit_writes_git_sorted_directory_entries() {
+		$repo = new GitRepository( InMemoryFilesystem::create() );
+		$repo->set_branch_tip( 'refs/heads/trunk', Commit::NULL_HASH );
+		$repo->set_branch_tip( 'HEAD', 'ref: refs/heads/trunk' );
+
+		$repo->commit(
+			array(
+				'updates' => array(
+					'wp_guideline/skills/wp-origin/SKILL.md'                 => 'WP Origin guide',
+					'wp_guideline/skills/wp-origin-template-editor/SKILL.md' => 'Template editor guide',
+				),
+			)
+		);
+
+		$tree = $repo->read_object_by_path( '/wp_guideline/skills' )->as_tree();
+
+		$this->assertSame(
+			array(
+				'wp-origin-template-editor',
+				'wp-origin',
+			),
+			array_keys( $tree->entries )
+		);
+	}
+
 	public function test_commit_can_replace_directory_with_symbolic_link() {
 		$repo = new GitRepository( InMemoryFilesystem::create() );
 		$repo->set_branch_tip( 'refs/heads/trunk', Commit::NULL_HASH );

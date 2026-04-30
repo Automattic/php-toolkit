@@ -78,11 +78,18 @@ class WP_Origin_End_To_End_Test extends TestCase {
 		$lines = array_values( array_filter( explode( "\n", trim( $result['output'] ) ) ) );
 		$this->assertNotEmpty( $lines );
 
-		// First commit must be the squashed parent-less initial import.
+		// First commit must be parent-less. Block themes also get a
+		// theme-base commit before the squashed WordPress overlay.
 		list( $first_oid, $first_subject ) = explode( ' ', $lines[0], 2 );
-		$this->assertSame( 'Initial import from WordPress', $first_subject );
 		$parents = $this->run_cmd( array( 'git', '-C', $clone_dir, 'rev-list', '--parents', '-n', '1', $first_oid ) );
 		$this->assertSame( $first_oid, trim( $parents['output'] ), 'Initial commit must have no parents.' );
+		if ( 'Initial theme base from WordPress' === $first_subject ) {
+			$this->assertGreaterThanOrEqual( 2, count( $lines ) );
+			list( , $second_subject ) = explode( ' ', $lines[1], 2 );
+			$this->assertSame( 'Initial import from WordPress', $second_subject );
+		} else {
+			$this->assertSame( 'Initial import from WordPress', $first_subject );
+		}
 
 		// And no "Seed batch" commits should have leaked into trunk.
 		$this->assertStringNotContainsString( 'Seed batch', $result['output'] );
@@ -94,6 +101,11 @@ class WP_Origin_End_To_End_Test extends TestCase {
 		$this->assertFileExists( $clone_dir . '/post/hello-world.md' );
 		$this->assertFileExists( $clone_dir . '/page/sample-page.md' );
 		$this->assertFileExists( $clone_dir . '/wp_template/blog-home.html' );
+		$this->assertNotEmpty( glob( $clone_dir . '/wp_template/*/*.html' ), 'Expected active theme base templates to be exported.' );
+		$this->assertNotEmpty( glob( $clone_dir . '/wp_template_part/*/*.html' ), 'Expected active theme base template parts to be exported.' );
+		$this->assertNotEmpty( glob( $clone_dir . '/wp_theme/*/theme.json' ), 'Expected active theme theme.json to be exported.' );
+		$this->assertFileExists( $clone_dir . '/wp_guideline/skills/wp-origin/SKILL.md' );
+		$this->assertFileExists( $clone_dir . '/wp_guideline/skills/wp-origin-template-editor/SKILL.md' );
 		$this->assertStringContainsString(
 			'Hello from WordPress',
 			file_get_contents( $clone_dir . '/post/hello-world.md' )
@@ -102,6 +114,36 @@ class WP_Origin_End_To_End_Test extends TestCase {
 			'Template from WordPress',
 			file_get_contents( $clone_dir . '/wp_template/blog-home.html' )
 		);
+		$wp_origin_skill          = file_get_contents( $clone_dir . '/wp_guideline/skills/wp-origin/SKILL.md' );
+		$template_editor_skill    = file_get_contents( $clone_dir . '/wp_guideline/skills/wp-origin-template-editor/SKILL.md' );
+		$this->assertStringContainsString(
+			'Use the `wp-origin-template-editor` skill before editing',
+			$wp_origin_skill
+		);
+		$this->assertStringContainsString(
+			'do not create flattened files such as `wp_template_part/twentytwentyfive-footer.html`',
+			$wp_origin_skill
+		);
+		$this->assertStringContainsString(
+			'The customized database post keeps the slug `footer` and stores `twentytwentyfive` in the `wp_theme` taxonomy.',
+			$wp_origin_skill
+		);
+		$this->assertStringContainsString(
+			'maps to the template-part ID `twentytwentyfive//footer`',
+			$template_editor_skill
+		);
+		$this->assertStringContainsString(
+			'Do not flatten theme-scoped paths into files such as `wp_template_part/twentytwentyfive-footer.html`',
+			$template_editor_skill
+		);
+		$this->assertStringContainsString(
+			'Prefer editable core blocks',
+			$template_editor_skill
+		);
+		$this->assertStringContainsString(
+			'Run `git status --short` before committing or pushing',
+			$template_editor_skill
+		);
 
 		// Capture the page ID up front: WordPress mangles the slug to
 		// `sample-page__trashed` once we trash the page in step 6, so a
@@ -109,6 +151,50 @@ class WP_Origin_End_To_End_Test extends TestCase {
 		$sample_page_id = $this->fetch_id_by_slug( 'sample-page', 'pages' );
 
 		$this->configure_git( $clone_dir );
+
+		// Theme source JSON is exported for context, not edited through
+		// WP Origin.
+		$theme_json_files = glob( $clone_dir . '/wp_theme/*/theme.json' );
+		file_put_contents( $theme_json_files[0], "\n", FILE_APPEND );
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'add', $theme_json_files[0] ) );
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'commit', '-m', 'Edit theme base JSON from Git' ) );
+		$push_result = $this->run_cmd(
+			array( 'git', '-C', $clone_dir, 'push', 'origin', 'trunk' ),
+			true
+		);
+		$this->assertNotSame( 0, $push_result['code'], 'Theme base JSON edits should have been rejected.' );
+		$this->assertStringContainsString( 'Push rejected because theme base files are read-only in WP Origin.', $push_result['output'] );
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'reset', '--hard', 'HEAD~1' ) );
+
+		$footer_files = glob( $clone_dir . '/wp_template_part/*/footer.html' );
+		$this->assertNotEmpty( $footer_files, 'Expected an active theme footer template part.' );
+		$footer_path  = $footer_files[0];
+		$footer_theme = basename( dirname( $footer_path ) );
+		file_put_contents(
+			$footer_path,
+			'<!-- wp:group {"align":"full","style":{"color":{"background":"#ff0000"}},"layout":{"type":"constrained"}} -->' . "\n"
+			. '<div class="wp-block-group alignfull" style="background-color:#ff0000">' . "\n"
+			. "\t" . '<!-- wp:paragraph {"style":{"color":{"text":"#ffffff"}}} -->' . "\n"
+			. "\t" . '<p style="color:#ffffff">Theme footer customized from Git</p>' . "\n"
+			. "\t" . '<!-- /wp:paragraph -->' . "\n"
+			. '</div>' . "\n"
+			. '<!-- /wp:group -->'
+		);
+		$this->commit_and_push(
+			$clone_dir,
+			substr( $footer_path, strlen( $clone_dir ) + 1 ),
+			'Customize theme footer from Git'
+		);
+		$footer = json_decode(
+			$this->curl_get( $this->base_url . '/wp-json/wp/v2/template-parts/' . rawurlencode( $footer_theme ) . '//footer?context=edit' ),
+			true
+		);
+		$this->assertSame( 'custom', $footer['source'] );
+		$this->assertGreaterThan( 0, intval( $footer['wp_id'] ) );
+		$this->assertStringContainsString( 'Theme footer customized from Git', $footer['content']['raw'] );
+		$this->assertStringContainsString( 'Theme footer customized from Git', $this->curl_get( $this->base_url . '/' ) );
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'pull', '--rebase', 'origin', 'trunk' ) );
+		$this->assertFileDoesNotExist( $clone_dir . '/wp_template_part/' . $footer_theme . '-footer.html' );
 
 		// 1) Update an existing post via Git push.
 		$this->edit_file(
@@ -247,6 +333,8 @@ class WP_Origin_End_To_End_Test extends TestCase {
 		$this->run_cmd(
 			array( 'git', '-c', 'protocol.version=2', 'clone', $this->remote_url(), $dir )
 		);
+		$status = $this->run_cmd( array( 'git', '-C', $dir, 'status', '--porcelain' ) );
+		$this->assertSame( '', trim( $status['output'] ), 'Fresh clones should not have staged or unstaged changes.' );
 
 		return $dir;
 	}

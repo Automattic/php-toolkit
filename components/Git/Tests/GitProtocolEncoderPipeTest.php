@@ -6,6 +6,8 @@ use PHPUnit\Framework\TestCase;
 use WordPress\ByteStream\MemoryPipe;
 use WordPress\Filesystem\InMemoryFilesystem;
 use WordPress\Git\GitRepository;
+use WordPress\Git\Model\Tree;
+use WordPress\Git\Model\TreeEntry;
 use WordPress\Git\Protocol\GitProtocolEncoderPipe;
 use WordPress\Git\Protocol\Parser\GitProtocolDecoder;
 
@@ -50,5 +52,33 @@ class GitProtocolEncoderPipeTest extends TestCase {
 
 		// We just want to see there are no exceptions thrown
 		$this->assertTrue( true );
+	}
+
+	public function test_encode_tree_uses_git_directory_sort_order() {
+		$encoded = GitProtocolEncoderPipe::encode_tree_bytes(
+			new Tree(
+				array(
+					'wp-origin'                 => new TreeEntry(
+						array(
+							'mode' => TreeEntry::FILE_MODE_DIRECTORY,
+							'name' => 'wp-origin',
+							'hash' => str_repeat( '0', 40 ),
+						)
+					),
+					'wp-origin-template-editor' => new TreeEntry(
+						array(
+							'mode' => TreeEntry::FILE_MODE_DIRECTORY,
+							'name' => 'wp-origin-template-editor',
+							'hash' => str_repeat( '1', 40 ),
+						)
+					),
+				)
+			)
+		);
+
+		$this->assertLessThan(
+			strpos( $encoded, "40000 wp-origin\0" ),
+			strpos( $encoded, "40000 wp-origin-template-editor\0" )
+		);
 	}
 }

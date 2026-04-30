@@ -29,19 +29,28 @@ use WordPress\Markdown\MarkdownProducer;
  *      changes back to WordPress.
  */
 class WP_Origin_Plugin {
-	const DEFAULT_BRANCH     = 'trunk';
-	const ROUTE_NAMESPACE    = 'git/v1';
-	const ROUTE_PATTERN      = '/md\.git(?P<path>/.*)?';
-	const EPOCH_TIMESTAMP    = 946684800;
-	const TABLE_PREFIX       = 'wp_origin_';
-	const AGENT_SKILL_SOURCE = 'wp-origin';
-	const AGENT_SKILL_SLUG   = 'wp-origin';
-	const AGENT_SKILL_TITLE  = 'WP Origin AGENTS.md';
+	const DEFAULT_BRANCH               = 'trunk';
+	const ROUTE_NAMESPACE              = 'git/v1';
+	const ROUTE_PATTERN                = '/md\.git(?P<path>/.*)?';
+	const EPOCH_TIMESTAMP              = 946684800;
+	const TABLE_PREFIX                 = 'wp_origin_';
+	const AGENT_SKILL_SOURCE           = 'wp-origin';
+	const AGENT_SKILL_SLUG             = 'wp-origin';
+	const AGENT_SKILL_TITLE            = 'WP Origin AGENTS.md';
+	const TEMPLATE_EDITOR_SKILL_SOURCE = 'wp-origin-template-editor';
+	const TEMPLATE_EDITOR_SKILL_SLUG   = 'wp-origin-template-editor';
+	const TEMPLATE_EDITOR_SKILL_TITLE  = 'WP Origin Template Editor';
+	const THEME_BASE_REF               = 'refs/remotes/wp-origin/theme-base';
+	const THEME_BASE_COMMIT_MESSAGE    = 'Initial theme base from WordPress';
+	const THEME_BASE_SYNC_MESSAGE      = 'Sync theme base from WordPress';
+	const WORDPRESS_SYNC_MESSAGE       = 'Sync from WordPress';
 
 	public static $supported_post_types    = array( 'post', 'page' );
 	public static $supported_post_statuses = array( 'publish', 'draft', 'pending', 'private', 'future' );
 
 	private static $raw_block_post_types = array( 'wp_template', 'wp_template_part', 'wp_navigation' );
+
+	private static $theme_scoped_raw_block_post_types = array( 'wp_template', 'wp_template_part' );
 
 	private static $guideline_type_directories = array(
 		'artifact'    => 'artifacts',
@@ -81,6 +90,16 @@ class WP_Origin_Plugin {
 				'post_name' => self::AGENT_SKILL_SLUG,
 			)
 		);
+
+		wp_install_skill(
+			self::TEMPLATE_EDITOR_SKILL_SOURCE,
+			self::TEMPLATE_EDITOR_SKILL_TITLE,
+			'Edit WP Origin block theme templates and template parts as raw Gutenberg HTML while preserving Site Editor compatibility.',
+			self::get_default_template_editor_skill_content(),
+			array(
+				'post_name' => self::TEMPLATE_EDITOR_SKILL_SLUG,
+			)
+		);
 	}
 
 	public static function get_supported_post_types() {
@@ -111,7 +130,8 @@ This repository is a Git checkout of a WordPress site exposed by WP Origin. Word
 
 - `post/{slug}.md` contains WordPress posts.
 - `page/{slug}.md` contains WordPress pages.
-- `wp_template/{slug}.html`, `wp_template_part/{slug}.html`, and `wp_navigation/{slug}.html` contain raw Gutenberg block markup for structural site entities.
+- `wp_template/{slug}.html`, `wp_template_part/{slug}.html`, and `wp_navigation/{slug}.html` contain raw Gutenberg block markup for structural site entities. Theme-qualified WordPress slugs may appear as nested paths such as `wp_template_part/{theme}/header.html`.
+- `wp_theme/{theme}/theme.json` contains read-only theme-provided design settings for agent context.
 - `wp_guideline/skills/{slug}/SKILL.md` contains coding-agent skills stored as Gutenberg Guidelines.
 - `.agents/skills` and `.claude/skills` point to `wp_guideline/skills` for agent discovery.
 - `AGENTS.md` and `CLAUDE.md` point to this guide.
@@ -130,9 +150,80 @@ This repository is a Git checkout of a WordPress site exposed by WP Origin. Word
 - Guideline skill front matter is generated from WordPress fields. Keep the body focused on the guideline content.
 - Template HTML files must stay raw Gutenberg block markup without front matter.
 - Template HTML files may be created or updated, but deletes and renames are rejected because their paths are their WordPress identity.
+- Theme base files are checked out for context. Editing theme-provided templates creates WordPress customizations; `wp_theme/{theme}/theme.json` is read-only in this checkout.
+- Keep theme-scoped templates in their nested paths. For example, edit `wp_template_part/twentytwentyfive/footer.html`; do not create flattened files such as `wp_template_part/twentytwentyfive-footer.html`.
+- A path such as `wp_template_part/twentytwentyfive/footer.html` maps to the WordPress template-part ID `twentytwentyfive//footer`. The customized database post keeps the slug `footer` and stores `twentytwentyfive` in the `wp_theme` taxonomy.
+- Use the `wp-origin-template-editor` skill before editing `wp_template/*.html`, `wp_template_part/*.html`, or `wp_navigation/*.html`.
 - Preserve unsupported block markup, fenced `gutenberg` blocks, custom blocks, and raw HTML unless the user asks for a conversion.
+- After template edits, run `git status --short` and confirm there are no unintended deleted files, renamed files, `wp_theme` changes, or flattened theme paths.
 - Use forward slashes in paths.
 - Keep changes scoped to site content. This checkout does not represent plugin code, themes, uploads, or the full database.
+SKILL;
+	}
+
+	private static function get_default_template_editor_skill_content() {
+		return <<<'SKILL'
+# WP Origin Template Editor
+
+Use this skill when editing `wp_template/*.html`, `wp_template_part/*.html`, or `wp_navigation/*.html` in a WP Origin checkout.
+
+## What These Files Are
+
+Template HTML files are WordPress structural block entities exported as raw serialized Gutenberg block markup. WordPress remains the source of truth for IDs, titles, status, dates, theme ownership, and other administrative metadata. The file path is the working identity in Git.
+
+Theme-provided templates and template parts appear in this checkout even before they have been customized in WordPress. Editing and pushing one of those files creates or updates the WordPress customization for that path. Theme-provided `wp_theme/{theme}/theme.json` files are exported for context and are read-only.
+
+Theme-scoped paths are a filesystem view of WordPress template IDs. For example, `wp_template_part/twentytwentyfive/footer.html` maps to the template-part ID `twentytwentyfive//footer`. When customized, WordPress stores this as a `wp_template_part` post whose slug remains `footer` and whose `wp_theme` taxonomy term is `twentytwentyfive`.
+
+## Hard Rules
+
+- Keep files as raw Gutenberg block HTML. Do not add Markdown or YAML front matter.
+- Create and update template HTML files only. Do not delete or rename them.
+- Treat the path as identity. A nested path such as `wp_template_part/{theme}/header.html` maps back to a theme-qualified WordPress slug.
+- Keep the theme as a directory segment. Do not flatten theme-scoped paths into files such as `wp_template_part/twentytwentyfive-footer.html` or `wp_template/twentytwentyfive-index.html`.
+- Edit theme-provided templates in place. Do not copy them to top-level files unless the user explicitly wants a different non-theme-scoped entity.
+- Do not edit `wp_theme/{theme}/theme.json`; use it to understand theme colors, spacing, typography, and layout settings.
+- Preserve unknown blocks, custom blocks, and existing block attributes unless the user explicitly asks to change them.
+- Preserve Gutenberg block comments. They are the block schema, not decorative comments.
+- Do not create theme, plugin, upload, or database files. WP Origin exposes content entities only.
+- Use forward slashes in paths.
+
+## Block Theme Markup Rules
+
+- Prefer editable core blocks such as `core/group`, `core/columns`, `core/heading`, `core/paragraph`, `core/image`, `core/query`, `core/post-title`, `core/post-content`, `core/navigation`, and `core/template-part`.
+- Avoid adding `core/html` blocks for normal layout, text, or visual wrappers. Use `core/html` only when the user explicitly needs opaque custom HTML.
+- Reference reusable areas with `core/template-part` blocks instead of duplicating header, footer, or navigation markup across templates.
+- Keep template parts focused: headers in `wp_template_part/header.html` or `wp_template_part/{theme}/header.html`, footers in `wp_template_part/footer.html` or `wp_template_part/{theme}/footer.html`, and navigation in `wp_navigation/*.html` when navigation entities are available.
+- For full-width sections, use WordPress-native alignment attributes instead of CSS-only breakout tricks.
+
+## Full-Width Section Pattern
+
+Use an outer full-width group and an inner wide content shell:
+
+```html
+<!-- wp:group {"align":"full","layout":{"type":"default"}} -->
+<div class="wp-block-group alignfull">
+	<!-- wp:group {"align":"wide","layout":{"type":"constrained"}} -->
+	<div class="wp-block-group alignwide">
+		<!-- wp:heading -->
+		<h2 class="wp-block-heading">Section heading</h2>
+		<!-- /wp:heading -->
+	</div>
+	<!-- /wp:group -->
+</div>
+<!-- /wp:group -->
+```
+
+Use the site's existing markup style when it differs, but keep alignment in block attributes so the Site Editor and front end agree.
+
+## Editing Workflow
+
+- Pull before editing if the user has not already done so.
+- Make the smallest template change that satisfies the request.
+- Check nearby templates and parts before duplicating structure.
+- Run `git status --short` before committing or pushing, and verify template edits stayed on the intended `.html` path with no deletes, renames, flattened theme files, or `wp_theme` changes.
+- After a successful push, pull again if WordPress normalizes or rewrites the exported markup.
+- If a change would require theme files, plugin code, CSS assets, or database settings that are not represented in this checkout, tell the user instead of inventing files.
 SKILL;
 	}
 
@@ -351,63 +442,78 @@ SKILL;
 	}
 
 	private static function sync_repository_from_wordpress( GitRepository $repository ) {
-		$exported_files = self::export_wordpress_content();
-		$head_oid       = $repository->get_branch_tip( 'refs/heads/' . self::DEFAULT_BRANCH );
-		$existing_files = ( is_string( $head_oid ) && '' !== $head_oid && ! Commit::is_null_hash( $head_oid ) )
-			? self::read_repository_entries_from_commit( $repository, $head_oid )
-			: array();
+		$theme_base_files = self::export_theme_base_content();
+		self::sync_theme_base_from_wordpress( $repository, $theme_base_files );
 
-		$updates          = array();
-		$symlinks         = array();
-		$deletes          = array();
-		$commit_timestamp = self::EPOCH_TIMESTAMP;
+		$exported_files = array_merge( $theme_base_files, self::export_wordpress_content() );
+		ksort( $exported_files );
+		self::sync_files_to_repository( $repository, $exported_files, self::WORDPRESS_SYNC_MESSAGE );
+	}
 
-		foreach ( $exported_files as $path => $entry ) {
-			$content = $entry['content'];
-			$mode    = $entry['mode'];
-			$post    = $entry['post'];
-
-			if ( ! isset( $existing_files[ $path ] ) || ! self::repository_entries_match( $existing_files[ $path ], $entry ) ) {
-				if ( TreeEntry::FILE_MODE_SYMBOLIC_LINK === $mode ) {
-					$symlinks[ $path ] = $content;
-				} else {
-					$updates[ $path ] = $content;
-				}
-			}
-
-			if ( ! $post ) {
-				continue;
-			}
-
-			$maybe_timestamp = self::timestamp_from_gmt_string( $post->post_modified_gmt );
-			if ( false === $maybe_timestamp ) {
-				$maybe_timestamp = self::timestamp_from_gmt_string( $post->post_date_gmt );
-			}
-			if ( false !== $maybe_timestamp ) {
-				$commit_timestamp = max( $commit_timestamp, $maybe_timestamp );
+	private static function sync_theme_base_from_wordpress( GitRepository $repository, $theme_base_files ) {
+		$previous_base_files = array();
+		if ( $repository->branch_exists( self::THEME_BASE_REF ) ) {
+			$base_ref = $repository->get_branch_tip( self::THEME_BASE_REF );
+			if ( is_string( $base_ref ) && '' !== $base_ref && ! Commit::is_null_hash( $base_ref ) ) {
+				$previous_base_files = self::read_repository_entries_from_commit( $repository, $base_ref );
 			}
 		}
 
-		foreach ( $existing_files as $path => $contents ) {
-			unset( $contents );
-			if ( ! isset( $exported_files[ $path ] ) ) {
-				$deletes[] = $path;
-			}
-		}
-
-		if ( empty( $updates ) && empty( $symlinks ) && empty( $deletes ) ) {
+		$delta = self::calculate_file_delta( $previous_base_files, $theme_base_files );
+		if ( empty( $delta['updates'] ) && empty( $delta['symlinks'] ) && empty( $delta['deletes'] ) ) {
 			return;
 		}
 
+		$head_ref = $repository->get_branch_tip( 'HEAD', array( 'follow_symrefs' => false ) );
+		if ( ! $repository->branch_exists( self::THEME_BASE_REF ) ) {
+			$repository->set_branch_tip( self::THEME_BASE_REF, Commit::NULL_HASH );
+		}
+
 		$identity = self::get_repository_identity( $repository );
-		$date     = gmdate( Commit::DATE_FORMAT, $commit_timestamp );
+		$date     = gmdate( Commit::DATE_FORMAT, self::export_timestamp_from_entries( $theme_base_files ) );
+
+		try {
+			$repository->set_branch_tip( 'HEAD', 'ref: ' . self::THEME_BASE_REF . "\n" );
+			$repository->commit(
+				array(
+					'updates'         => $delta['updates'],
+					'create_symlinks' => $delta['symlinks'],
+					'deletes'         => $delta['deletes'],
+					'commit'          => array(
+						'message'        => self::THEME_BASE_SYNC_MESSAGE,
+						'author'         => $identity,
+						'author_date'    => $date,
+						'committer'      => $identity,
+						'committer_date' => $date,
+					),
+				)
+			);
+		} finally {
+			$repository->set_branch_tip( 'HEAD', $head_ref );
+		}
+
+		$head_oid        = $repository->get_branch_tip( 'refs/heads/' . self::DEFAULT_BRANCH );
+		$existing_files  = ( is_string( $head_oid ) && '' !== $head_oid && ! Commit::is_null_hash( $head_oid ) )
+			? self::read_repository_entries_from_commit( $repository, $head_oid )
+			: array();
+		$visible_deletes = array();
+		foreach ( $delta['deletes'] as $path ) {
+			if ( isset( $existing_files[ $path ] ) ) {
+				$visible_deletes[] = $path;
+			}
+		}
+
+		if ( empty( $delta['updates'] ) && empty( $delta['symlinks'] ) && empty( $visible_deletes ) ) {
+			return;
+		}
+
 		$repository->commit(
 			array(
-				'updates'         => $updates,
-				'create_symlinks' => $symlinks,
-				'deletes'         => $deletes,
+				'updates'         => $delta['updates'],
+				'create_symlinks' => $delta['symlinks'],
+				'deletes'         => $visible_deletes,
 				'commit'          => array(
-					'message'        => 'Sync from WordPress',
+					'message'        => self::THEME_BASE_SYNC_MESSAGE,
 					'author'         => $identity,
 					'author_date'    => $date,
 					'committer'      => $identity,
@@ -415,6 +521,88 @@ SKILL;
 				),
 			)
 		);
+	}
+
+	private static function sync_files_to_repository( GitRepository $repository, $exported_files, $message ) {
+		$head_oid       = $repository->get_branch_tip( 'refs/heads/' . self::DEFAULT_BRANCH );
+		$existing_files = ( is_string( $head_oid ) && '' !== $head_oid && ! Commit::is_null_hash( $head_oid ) )
+			? self::read_repository_entries_from_commit( $repository, $head_oid )
+			: array();
+
+		$delta = self::calculate_file_delta( $existing_files, $exported_files );
+
+		if ( empty( $delta['updates'] ) && empty( $delta['symlinks'] ) && empty( $delta['deletes'] ) ) {
+			return;
+		}
+
+		$identity = self::get_repository_identity( $repository );
+		$date     = gmdate( Commit::DATE_FORMAT, self::export_timestamp_from_entries( $exported_files ) );
+		$repository->commit(
+			array(
+				'updates'         => $delta['updates'],
+				'create_symlinks' => $delta['symlinks'],
+				'deletes'         => $delta['deletes'],
+				'commit'          => array(
+					'message'        => $message,
+					'author'         => $identity,
+					'author_date'    => $date,
+					'committer'      => $identity,
+					'committer_date' => $date,
+				),
+			)
+		);
+	}
+
+	private static function calculate_file_delta( $old_files, $new_files ) {
+		$updates  = array();
+		$symlinks = array();
+		$deletes  = array();
+
+		foreach ( $new_files as $path => $entry ) {
+			if ( isset( $old_files[ $path ] ) && self::repository_entries_match( $old_files[ $path ], $entry ) ) {
+				continue;
+			}
+
+			if ( TreeEntry::FILE_MODE_SYMBOLIC_LINK === $entry['mode'] ) {
+				$symlinks[ $path ] = $entry['content'];
+			} else {
+				$updates[ $path ] = $entry['content'];
+			}
+		}
+
+		foreach ( $old_files as $path => $entry ) {
+			unset( $entry );
+			if ( ! isset( $new_files[ $path ] ) ) {
+				$deletes[] = $path;
+			}
+		}
+
+		return array(
+			'updates'  => $updates,
+			'symlinks' => $symlinks,
+			'deletes'  => $deletes,
+		);
+	}
+
+	private static function export_timestamp_from_entries( $entries ) {
+		$commit_timestamp = self::EPOCH_TIMESTAMP;
+
+		foreach ( $entries as $entry ) {
+			if ( isset( $entry['post'] ) && $entry['post'] instanceof WP_Post ) {
+				$maybe_timestamp = self::timestamp_from_gmt_string( $entry['post']->post_modified_gmt );
+				if ( false === $maybe_timestamp ) {
+					$maybe_timestamp = self::timestamp_from_gmt_string( $entry['post']->post_date_gmt );
+				}
+				if ( false !== $maybe_timestamp ) {
+					$commit_timestamp = max( $commit_timestamp, $maybe_timestamp );
+				}
+			}
+			if ( isset( $entry['modified_timestamp'] ) ) {
+				$commit_timestamp = max( $commit_timestamp, intval( $entry['modified_timestamp'] ) );
+			}
+		}
+
+		return $commit_timestamp;
 	}
 
 	private static function export_wordpress_content() {
@@ -478,6 +666,149 @@ SKILL;
 		return $files;
 	}
 
+	public static function export_theme_base_content() {
+		$files = array();
+
+		if ( ! function_exists( 'get_stylesheet' ) || ! function_exists( 'get_stylesheet_directory' ) ) {
+			return $files;
+		}
+
+		$active_theme_slug = self::sanitize_repository_path_segment( get_stylesheet() );
+		if ( '' === $active_theme_slug ) {
+			return $files;
+		}
+
+		foreach ( self::get_theme_file_roots() as $root ) {
+			self::collect_theme_block_files(
+				$files,
+				$root['directory'] . '/templates',
+				'wp_template/' . $active_theme_slug
+			);
+			self::collect_theme_block_files(
+				$files,
+				$root['directory'] . '/parts',
+				'wp_template_part/' . $active_theme_slug
+			);
+			self::add_theme_json_base_file( $files, $root['slug'], $root['directory'] );
+		}
+
+		ksort( $files );
+
+		return $files;
+	}
+
+	private static function get_theme_file_roots() {
+		$roots = array();
+
+		if ( function_exists( 'get_template' ) && function_exists( 'get_template_directory' ) ) {
+			$roots[] = array(
+				'slug'      => self::sanitize_repository_path_segment( get_template() ),
+				'directory' => get_template_directory(),
+			);
+		}
+
+		$stylesheet_root = array(
+			'slug'      => self::sanitize_repository_path_segment( get_stylesheet() ),
+			'directory' => get_stylesheet_directory(),
+		);
+		$last_root       = end( $roots );
+		if (
+			empty( $roots ) ||
+			$last_root['slug'] !== $stylesheet_root['slug'] ||
+			wp_normalize_path( $last_root['directory'] ) !== wp_normalize_path( $stylesheet_root['directory'] )
+		) {
+			$roots[] = $stylesheet_root;
+		}
+
+		return $roots;
+	}
+
+	private static function collect_theme_block_files( &$files, $directory, $repository_directory ) {
+		if ( ! is_dir( $directory ) ) {
+			return;
+		}
+
+		$base_directory = trailingslashit( wp_normalize_path( $directory ) );
+		$iterator       = new RecursiveIteratorIterator(
+			new RecursiveDirectoryIterator( $directory, FilesystemIterator::SKIP_DOTS )
+		);
+
+		foreach ( $iterator as $file ) {
+			if ( ! $file->isFile() || 'html' !== strtolower( pathinfo( $file->getFilename(), PATHINFO_EXTENSION ) ) ) {
+				continue;
+			}
+
+			$full_path = wp_normalize_path( $file->getPathname() );
+			if ( 0 !== strpos( $full_path, $base_directory ) ) {
+				continue;
+			}
+
+			$relative_path = substr( $full_path, strlen( $base_directory ) );
+			$relative_path = self::sanitize_repository_relative_path( $relative_path );
+			if ( '' === $relative_path ) {
+				continue;
+			}
+
+			$content = file_get_contents( $full_path );
+			if ( false === $content ) {
+				continue;
+			}
+
+			$path           = $repository_directory . '/' . $relative_path;
+			$files[ $path ] = array(
+				'post'               => null,
+				'mode'               => TreeEntry::FILE_MODE_REGULAR_NON_EXECUTABLE,
+				'content'            => $content,
+				'modified_timestamp' => filemtime( $full_path ),
+			);
+		}
+	}
+
+	private static function add_theme_json_base_file( &$files, $theme_slug, $directory ) {
+		$theme_json_path = wp_normalize_path( $directory . '/theme.json' );
+		if ( '' === $theme_slug || ! is_file( $theme_json_path ) ) {
+			return;
+		}
+
+		$content = file_get_contents( $theme_json_path );
+		if ( false === $content ) {
+			return;
+		}
+
+		$files[ 'wp_theme/' . $theme_slug . '/theme.json' ] = array(
+			'post'               => null,
+			'mode'               => TreeEntry::FILE_MODE_REGULAR_NON_EXECUTABLE,
+			'content'            => $content,
+			'modified_timestamp' => filemtime( $theme_json_path ),
+		);
+	}
+
+	private static function sanitize_repository_relative_path( $path ) {
+		$segments = explode( '/', wp_normalize_path( $path ) );
+		$safe     = array();
+
+		foreach ( $segments as $segment ) {
+			if ( '' === $segment || '.' === $segment || '..' === $segment ) {
+				return '';
+			}
+			$safe_segment = self::sanitize_repository_path_segment( $segment );
+			if ( '' === $safe_segment ) {
+				return '';
+			}
+			$safe[] = $safe_segment;
+		}
+
+		return implode( '/', $safe );
+	}
+
+	private static function sanitize_repository_path_segment( $segment ) {
+		$segment = sanitize_file_name( (string) $segment );
+		$segment = str_replace( '\\', '', $segment );
+		$segment = str_replace( '/', '', $segment );
+
+		return $segment;
+	}
+
 	private static function get_export_post_types() {
 		return self::get_supported_post_types();
 	}
@@ -497,13 +828,21 @@ SKILL;
 		return in_array( $post_type, self::$raw_block_post_types, true );
 	}
 
+	private static function is_theme_scoped_raw_block_post_type( $post_type ) {
+		return in_array( $post_type, self::$theme_scoped_raw_block_post_types, true );
+	}
+
 	public static function build_markdown_path( $post_or_type, $slug = null ) {
 		if ( $post_or_type instanceof WP_Post ) {
 			if ( 'wp_guideline' === $post_or_type->post_type ) {
 				return self::build_guideline_markdown_path( $post_or_type );
 			}
 			if ( self::is_raw_block_post_type( $post_or_type->post_type ) ) {
-				return self::build_raw_block_path( $post_or_type->post_type, $post_or_type->post_name );
+				return self::build_raw_block_path(
+					$post_or_type->post_type,
+					$post_or_type->post_name,
+					self::get_raw_block_post_theme_slug( $post_or_type )
+				);
 			}
 
 			return ltrim( $post_or_type->post_type . '/' . $post_or_type->post_name . '.md', '/' );
@@ -516,8 +855,26 @@ SKILL;
 		return ltrim( $post_or_type . '/' . $slug . '.md', '/' );
 	}
 
-	private static function build_raw_block_path( $post_type, $slug ) {
-		return ltrim( $post_type . '/' . str_replace( '//', '/', $slug ) . '.html', '/' );
+	private static function build_raw_block_path( $post_type, $slug, $theme_slug = '' ) {
+		$slug_path = str_replace( '//', '/', $slug );
+		if ( '' !== $theme_slug && self::is_theme_scoped_raw_block_post_type( $post_type ) ) {
+			$slug_path = $theme_slug . '/' . $slug_path;
+		}
+
+		return ltrim( $post_type . '/' . $slug_path . '.html', '/' );
+	}
+
+	private static function get_raw_block_post_theme_slug( WP_Post $post ) {
+		if ( ! self::is_theme_scoped_raw_block_post_type( $post->post_type ) || ! taxonomy_exists( 'wp_theme' ) ) {
+			return '';
+		}
+
+		$terms = get_the_terms( $post->ID, 'wp_theme' );
+		if ( is_wp_error( $terms ) || empty( $terms ) ) {
+			return '';
+		}
+
+		return self::sanitize_repository_path_segment( $terms[0]->slug );
 	}
 
 	/**
@@ -691,6 +1048,7 @@ SKILL;
 		$new_files   = self::read_repository_entries_from_commit( $repository, $commit_hash );
 
 		self::reject_deleted_raw_block_files( $old_files, $new_files );
+		self::reject_deleted_theme_base_files( $old_files, $new_files );
 
 		foreach ( $new_files as $path => $entry ) {
 			if ( isset( $old_files[ $path ] ) && self::repository_entries_match( $old_files[ $path ], $entry ) ) {
@@ -698,6 +1056,9 @@ SKILL;
 			}
 			if ( TreeEntry::FILE_MODE_SYMBOLIC_LINK === $entry['mode'] ) {
 				continue;
+			}
+			if ( self::is_theme_base_path( $path ) ) {
+				throw new Exception( 'Push rejected because theme base files are read-only in WP Origin. Edit template HTML files to create WordPress customizations instead.' );
 			}
 			if ( self::is_raw_block_path( $path ) ) {
 				self::assert_raw_block_html_has_no_front_matter( $entry['content'] );
@@ -718,6 +1079,7 @@ SKILL;
 		$updated_post_ids = array();
 		$changes          = array();
 		self::reject_deleted_raw_block_files( $old_files, $new_files );
+		self::reject_deleted_theme_base_files( $old_files, $new_files );
 
 		foreach ( $new_files as $path => $entry ) {
 			if ( isset( $old_files[ $path ] ) && self::repository_entries_match( $old_files[ $path ], $entry ) ) {
@@ -833,6 +1195,20 @@ SKILL;
 		}
 	}
 
+	private static function reject_deleted_theme_base_files( $old_files, $new_files ) {
+		foreach ( $old_files as $path => $entry ) {
+			if ( isset( $new_files[ $path ] ) ) {
+				continue;
+			}
+			if ( TreeEntry::FILE_MODE_SYMBOLIC_LINK === $entry['mode'] ) {
+				continue;
+			}
+			if ( self::is_theme_base_path( $path ) ) {
+				throw new Exception( 'Push rejected because theme base files are read-only in WP Origin. Edit template HTML files to create WordPress customizations instead.' );
+			}
+		}
+	}
+
 	private static function upsert_post_from_markdown( $path, $markdown, $options = array() ) {
 		$post_type = self::path_to_post_type( $path );
 		$slug      = self::path_to_slug( $path );
@@ -926,9 +1302,10 @@ SKILL;
 	private static function upsert_raw_block_post_from_html( $path, $html ) {
 		self::assert_raw_block_html_has_no_front_matter( $html );
 
-		$post_type     = self::path_to_post_type( $path );
-		$slug          = self::path_to_slug( $path );
-		$post_id       = self::find_post_id_by_path_metadata( $path, array(), false );
+		$identity      = self::path_to_raw_block_identity( $path );
+		$post_type     = $identity['post_type'];
+		$slug          = $identity['slug'];
+		$post_id       = self::find_raw_block_post_id_by_path( $path, false );
 		$existing_post = $post_id ? get_post( $post_id ) : null;
 
 		if ( $existing_post ) {
@@ -953,6 +1330,8 @@ SKILL;
 		if ( is_wp_error( $post_id ) ) {
 			throw new Exception( $post_id->get_error_message() );
 		}
+
+		self::assign_raw_block_theme_slug( $post_id, $identity['theme'] );
 
 		$post = get_post( $post_id );
 
@@ -1189,11 +1568,15 @@ SKILL;
 
 	private static function find_post_id_by_path_metadata( $path, $metadata, $include_trash = true ) {
 		$post_type = self::path_to_post_type( $path );
-		$slug      = isset( $metadata['slug'] ) ? $metadata['slug'] : self::path_to_slug( $path );
-		$statuses  = $include_trash
+		if ( self::is_raw_block_post_type( $post_type ) ) {
+			return self::find_raw_block_post_id_by_path( $path, $include_trash );
+		}
+
+		$slug     = isset( $metadata['slug'] ) ? $metadata['slug'] : self::path_to_slug( $path );
+		$statuses = $include_trash
 			? array_merge( self::$supported_post_statuses, array( 'trash' ) )
 			: self::$supported_post_statuses;
-		$posts     = get_posts(
+		$posts    = get_posts(
 			array(
 				'post_type'      => $post_type,
 				'name'           => $slug,
@@ -1208,6 +1591,29 @@ SKILL;
 		}
 
 		return intval( $posts[0] );
+	}
+
+	private static function find_raw_block_post_id_by_path( $path, $include_trash = true ) {
+		$identity = self::path_to_raw_block_identity( $path );
+		$statuses = $include_trash
+			? array_merge( self::$supported_post_statuses, array( 'trash' ) )
+			: self::$supported_post_statuses;
+		$posts    = get_posts(
+			array(
+				'post_type'      => $identity['post_type'],
+				'name'           => $identity['slug'],
+				'post_status'    => $statuses,
+				'posts_per_page' => -1,
+			)
+		);
+
+		foreach ( $posts as $post ) {
+			if ( self::get_raw_block_post_theme_slug( $post ) === $identity['theme'] ) {
+				return intval( $post->ID );
+			}
+		}
+
+		return 0;
 	}
 
 	private static function path_to_post_type( $path ) {
@@ -1231,14 +1637,12 @@ SKILL;
 			return $segments[2];
 		}
 		if ( self::is_raw_block_path( $path ) ) {
-			$basename = basename( $path );
-			if ( 'html' !== strtolower( pathinfo( $basename, PATHINFO_EXTENSION ) ) ) {
-				throw new Exception( 'Push rejected because template files must use the .html extension.' );
+			$identity = self::path_to_raw_block_identity( $path );
+			if ( '' !== $identity['theme'] ) {
+				return $identity['theme'] . '//' . $identity['slug'];
 			}
-			$relative_path = substr( ltrim( $path, '/' ), strlen( self::path_to_post_type( $path ) ) + 1 );
-			$slug_path     = substr( $relative_path, 0, - strlen( '.html' ) );
 
-			return str_replace( '/', '//', $slug_path );
+			return $identity['slug'];
 		}
 
 		$basename = basename( $path );
@@ -1249,10 +1653,59 @@ SKILL;
 		return pathinfo( $basename, PATHINFO_FILENAME );
 	}
 
+	private static function path_to_raw_block_identity( $path ) {
+		$post_type = self::path_to_post_type( $path );
+		$basename  = basename( $path );
+		if ( 'html' !== strtolower( pathinfo( $basename, PATHINFO_EXTENSION ) ) ) {
+			throw new Exception( 'Push rejected because template files must use the .html extension.' );
+		}
+
+		$relative_path = substr( ltrim( $path, '/' ), strlen( $post_type ) + 1 );
+		$slug_path     = substr( $relative_path, 0, - strlen( '.html' ) );
+		$theme_slug    = '';
+
+		if ( self::is_theme_scoped_raw_block_post_type( $post_type ) ) {
+			$parts = explode( '/', $slug_path );
+			if ( count( $parts ) > 1 ) {
+				$theme_slug = array_shift( $parts );
+				$slug_path  = implode( '/', $parts );
+			}
+		}
+
+		return array(
+			'post_type' => $post_type,
+			'slug'      => str_replace( '/', '//', $slug_path ),
+			'theme'     => $theme_slug,
+		);
+	}
+
+	private static function assign_raw_block_theme_slug( $post_id, $theme_slug ) {
+		$post = get_post( $post_id );
+		if (
+			! $post ||
+			'' === $theme_slug ||
+			! self::is_theme_scoped_raw_block_post_type( $post->post_type ) ||
+			! taxonomy_exists( 'wp_theme' )
+		) {
+			return;
+		}
+
+		$terms = wp_set_object_terms( $post_id, array( $theme_slug ), 'wp_theme' );
+		if ( is_wp_error( $terms ) ) {
+			throw new Exception( $terms->get_error_message() );
+		}
+	}
+
 	private static function is_raw_block_path( $path ) {
 		$segments = explode( '/', ltrim( $path, '/' ) );
 
 		return ! empty( $segments[0] ) && self::is_raw_block_post_type( $segments[0] );
+	}
+
+	private static function is_theme_base_path( $path ) {
+		$segments = explode( '/', ltrim( $path, '/' ) );
+
+		return ! empty( $segments[0] ) && 'wp_theme' === $segments[0];
 	}
 
 	private static function path_to_guideline_type_slug( $path ) {
