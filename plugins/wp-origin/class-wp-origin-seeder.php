@@ -155,6 +155,7 @@ class WP_Origin_Seeder {
 		try {
 			global $wpdb;
 			$table = $wpdb->prefix . WP_Origin_Plugin::TABLE_PREFIX . 'files';
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 			if ( ! $wpdb->get_var( "SHOW TABLES LIKE '" . esc_sql( $table ) . "'" ) ) {
 				return array();
 			}
@@ -197,7 +198,7 @@ class WP_Origin_Seeder {
 				'oid'     => substr( $current, 0, 7 ),
 				'subject' => '' !== $subject ? $subject : '(no message)',
 			);
-			$current = empty( $commit->parents ) ? null : $commit->parents[0];
+			$current   = empty( $commit->parents ) ? null : $commit->parents[0];
 		}
 
 		return $commits;
@@ -219,6 +220,20 @@ class WP_Origin_Seeder {
 			$progress['processed'],
 			$progress['total']
 		);
+	}
+
+	public static function drive( $seconds ) {
+		$deadline = microtime( true ) + $seconds;
+		while ( ! self::is_ready() && microtime( true ) < $deadline ) {
+			$state_before = self::get_state();
+			self::tick();
+			if ( self::get_state() === $state_before
+				&& self::STATE_IN_PROGRESS !== $state_before
+				&& self::STATE_PENDING !== $state_before
+			) {
+				break;
+			}
+		}
 	}
 
 	public static function tick() {
@@ -261,7 +276,7 @@ class WP_Origin_Seeder {
 	private static function initialize() {
 		global $wpdb;
 
-		$types_in    = "'" . implode( "','", array_map( 'esc_sql', WP_Origin_Plugin::$supported_post_types ) ) . "'";
+		$types_in    = "'" . implode( "','", array_map( 'esc_sql', WP_Origin_Plugin::get_supported_post_types() ) ) . "'";
 		$statuses_in = "'" . implode( "','", array_map( 'esc_sql', WP_Origin_Plugin::$supported_post_statuses ) ) . "'";
 		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.DirectDatabaseQuery
 		$total = (int) $wpdb->get_var(
@@ -280,7 +295,7 @@ class WP_Origin_Seeder {
 				'tick_count'   => $tick_count,
 				'started_at'   => time(),
 				'last_tick_at' => time(),
-				'message'      => sprintf( 'Found %d posts and pages to import.', $total ),
+				'message'      => sprintf( 'Found %d content items to import.', $total ),
 			),
 			false
 		);
@@ -323,7 +338,7 @@ class WP_Origin_Seeder {
 			$last_id   = $progress['last_id'];
 			$processed = $progress['processed'];
 			foreach ( $batch as $post ) {
-				$path             = WP_Origin_Plugin::build_markdown_path( $post->post_type, $post->post_name );
+				$path             = WP_Origin_Plugin::build_markdown_path( $post );
 				$updates[ $path ] = WP_Origin_Plugin::export_post_to_markdown( $post );
 				$last_id          = $post->ID;
 				++$processed;
@@ -436,7 +451,7 @@ class WP_Origin_Seeder {
 	private static function next_batch( $after_id ) {
 		global $wpdb;
 
-		$types_in    = "'" . implode( "','", array_map( 'esc_sql', WP_Origin_Plugin::$supported_post_types ) ) . "'";
+		$types_in    = "'" . implode( "','", array_map( 'esc_sql', WP_Origin_Plugin::get_supported_post_types() ) ) . "'";
 		$statuses_in = "'" . implode( "','", array_map( 'esc_sql', WP_Origin_Plugin::$supported_post_statuses ) ) . "'";
 		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.DirectDatabaseQuery
 		$ids = $wpdb->get_col(

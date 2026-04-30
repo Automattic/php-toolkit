@@ -4,6 +4,7 @@ namespace WordPress\Git\Tests;
 
 use PHPUnit\Framework\TestCase;
 use WordPress\Filesystem\InMemoryFilesystem;
+use WordPress\Git\GitException;
 use WordPress\Git\GitRepository;
 use WordPress\Git\Model\Commit;
 use WordPress\Git\Model\Tree;
@@ -171,6 +172,88 @@ COMMIT
 			)
 		);
 		$this->assertEquals( $commit_oid, $repo->get_branch_tip() );
+	}
+
+	public function test_commit_symbolic_link() {
+		$repo = new GitRepository( InMemoryFilesystem::create() );
+		$repo->set_branch_tip( 'refs/heads/trunk', Commit::NULL_HASH );
+		$repo->set_branch_tip( 'HEAD', 'ref: refs/heads/trunk' );
+
+		$repo->commit(
+			array(
+				'updates'         => array(
+					'target/file.txt' => 'Hello, world!',
+				),
+				'create_symlinks' => array(
+					'alias/file-link'       => '../target/file.txt',
+					'alias/second-file-link' => '../target/file.txt',
+				),
+			)
+		);
+
+		$tree              = $repo->read_object_by_path( '/alias' )->as_tree();
+		$link_entry        = $tree->entries['file-link'];
+		$second_link_entry = $tree->entries['second-file-link'];
+
+		$this->assertSame( TreeEntry::FILE_MODE_SYMBOLIC_LINK, $link_entry->get_mode_bucket() );
+		$this->assertSame( TreeEntry::FILE_MODE_SYMBOLIC_LINK, $second_link_entry->get_mode_bucket() );
+		$this->assertSame( '../target/file.txt', $repo->read_object( $link_entry->hash )->consume_all() );
+		$this->assertSame( '../target/file.txt', $repo->read_object( $second_link_entry->hash )->consume_all() );
+	}
+
+	public function test_commit_can_replace_directory_with_symbolic_link() {
+		$repo = new GitRepository( InMemoryFilesystem::create() );
+		$repo->set_branch_tip( 'refs/heads/trunk', Commit::NULL_HASH );
+		$repo->set_branch_tip( 'HEAD', 'ref: refs/heads/trunk' );
+
+		$repo->commit(
+			array(
+				'updates' => array(
+					'.agents/skills/wordpress-content-review' => 'wp_guideline/skills/wordpress-content-review',
+				),
+			)
+		);
+		$repo->commit(
+			array(
+				'create_symlinks' => array(
+					'.agents/skills' => '../wp_guideline/skills',
+				),
+				'deletes'         => array(
+					'.agents/skills/wordpress-content-review',
+				),
+			)
+		);
+
+		$tree       = $repo->read_object_by_path( '/.agents' )->as_tree();
+		$link_entry = $tree->entries['skills'];
+
+		$this->assertSame( TreeEntry::FILE_MODE_SYMBOLIC_LINK, $link_entry->get_mode_bucket() );
+		$this->assertSame( '../wp_guideline/skills', $repo->read_object( $link_entry->hash )->consume_all() );
+	}
+
+	public function test_commit_rejects_child_update_under_regular_file() {
+		$repo = new GitRepository( InMemoryFilesystem::create() );
+		$repo->set_branch_tip( 'refs/heads/trunk', Commit::NULL_HASH );
+		$repo->set_branch_tip( 'HEAD', 'ref: refs/heads/trunk' );
+
+		$repo->commit(
+			array(
+				'updates' => array(
+					'agent' => 'regular file',
+				),
+			)
+		);
+
+		$this->expectException( GitException::class );
+		$this->expectExceptionMessage( 'Cannot update child entries under a non-directory path' );
+
+		$repo->commit(
+			array(
+				'updates' => array(
+					'agent/skill.md' => 'child',
+				),
+			)
+		);
 	}
 
 	public function test_initial_commit_has_no_null_parent() {

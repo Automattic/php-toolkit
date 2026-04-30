@@ -90,16 +90,50 @@ assert_push_summary_contains() {
 	fi
 }
 
+wait_for_seed_done() {
+	for _ in $(seq 1 120); do
+		STATUS_JSON="$(curl -sS -f -H "Authorization: Basic $AUTH_HEADER" "$BASE_URL/wp-json/wp-origin/v1/seed-status" || true)"
+		STATE="$(printf '%s' "$STATUS_JSON" | php -r '$state = json_decode(stream_get_contents(STDIN), true); echo is_array($state) && isset($state["state"]) ? $state["state"] : "";')"
+		if [ "$STATE" = "done" ]; then
+			return
+		fi
+		sleep 1
+	done
+
+	cat "$PLAYGROUND_LOG"
+	echo "WP Origin seeder did not finish." >&2
+	exit 1
+}
+
+wait_for_seed_done
 git -c protocol.version=2 clone "$REMOTE_AUTH_URL" "$CLONE_DIR"
 
 test -f "$CLONE_DIR/post/hello-world.md"
 test -f "$CLONE_DIR/page/sample-page.md"
+test -f "$CLONE_DIR/wp_guideline/skills/wp-origin/SKILL.md"
+test -L "$CLONE_DIR/.agents/skills"
+test -L "$CLONE_DIR/.claude/skills"
+test -L "$CLONE_DIR/AGENTS.md"
+test -L "$CLONE_DIR/CLAUDE.md"
 grep -q 'Hello from WordPress' "$CLONE_DIR/post/hello-world.md"
 grep -Fq 'title: "Hello World"' "$CLONE_DIR/post/hello-world.md"
 grep -Fq 'status: "published"' "$CLONE_DIR/post/hello-world.md"
 grep -Fq 'description: "Hand-authored summary."' "$CLONE_DIR/post/hello-world.md"
 grep -Eq '^date: "[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z"$' "$CLONE_DIR/post/hello-world.md"
 ! grep -Eq '^(id|type|slug|date_gmt|modified_gmt):' "$CLONE_DIR/post/hello-world.md"
+head -n 1 "$CLONE_DIR/wp_guideline/skills/wp-origin/SKILL.md" | grep -Fxq -- '---'
+grep -Fq 'name: "wp-origin"' "$CLONE_DIR/wp_guideline/skills/wp-origin/SKILL.md"
+grep -Fq 'description: "Guide for coding agents working in a WP Origin checkout of a WordPress site."' "$CLONE_DIR/wp_guideline/skills/wp-origin/SKILL.md"
+grep -Fq '# WP Origin AGENTS.md' "$CLONE_DIR/wp_guideline/skills/wp-origin/SKILL.md"
+grep -Fq 'This repository is a Git checkout of a WordPress site' "$CLONE_DIR/wp_guideline/skills/wp-origin/SKILL.md"
+grep -Fq 'This repository is a Git checkout of a WordPress site' "$CLONE_DIR/.agents/skills/wp-origin/SKILL.md"
+grep -Fq 'This repository is a Git checkout of a WordPress site' "$CLONE_DIR/.claude/skills/wp-origin/SKILL.md"
+grep -Fq 'This repository is a Git checkout of a WordPress site' "$CLONE_DIR/AGENTS.md"
+grep -Fq 'This repository is a Git checkout of a WordPress site' "$CLONE_DIR/CLAUDE.md"
+[ "$(readlink "$CLONE_DIR/.agents/skills")" = "../wp_guideline/skills" ]
+[ "$(readlink "$CLONE_DIR/.claude/skills")" = "../wp_guideline/skills" ]
+[ "$(readlink "$CLONE_DIR/AGENTS.md")" = "wp_guideline/skills/wp-origin/SKILL.md" ]
+[ "$(readlink "$CLONE_DIR/CLAUDE.md")" = "wp_guideline/skills/wp-origin/SKILL.md" ]
 
 POST_ID="$(curl -sS -f -H "Authorization: Basic $AUTH_HEADER" "$BASE_URL/wp-json/wp/v2/posts?slug=hello-world&context=edit" | php -r '
 $posts = json_decode(stream_get_contents(STDIN), true);

@@ -73,6 +73,14 @@ The guiding rule is that users must not lose data. If a conversion cannot preser
   - Preserve unsupported block markup as fenced `gutenberg` code blocks, or inline HTML when Markdown cannot represent it safely.
   - Keep Markdown human-editable and compatible with common editors such as Obsidian wherever that does not weaken round-trip fidelity.
 
+- **Guidelines and agent portability** (Priority: Medium)
+  - When Gutenberg's Guidelines experiment is available, export `wp_guideline` posts under `wp_guideline/{type}/`.
+  - Store guideline skills as agent-portable skill directories, such as `wp_guideline/skills/{slug}/SKILL.md`.
+  - Expose guideline skills through `.agents/skills` and `.claude/skills` directory symlinks so agents can discover the same canonical skill content.
+  - Install a default WP Origin coding-agent skill when Guidelines is available and expose `AGENTS.md` and `CLAUDE.md` as symlinks to it.
+  - Store guideline skill bodies as content only in WordPress, and generate agent-required YAML front matter from WordPress title, slug, and excerpt on export.
+  - Keep the canonical `wp_guideline/` tree aligned with `wp_guideline_type` taxonomy terms, including `artifact`, `skill`, `plan`, and future instruction-like types.
+
 - **Markdown import to WordPress** (Priority: High)
   - Convert pushed Markdown back into WordPress post content.
   - Update existing posts by stable metadata when possible, then by path or slug as a fallback.
