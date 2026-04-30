@@ -52,6 +52,8 @@ class WP_Origin_Plugin {
 
 	private static $theme_scoped_raw_block_post_types = array( 'wp_template', 'wp_template_part' );
 
+	private static $json_post_types = array( 'wp_global_styles' );
+
 	private static $guideline_type_directories = array(
 		'artifact'    => 'artifacts',
 		'content'     => 'content',
@@ -105,7 +107,8 @@ class WP_Origin_Plugin {
 	public static function get_supported_post_types() {
 		$post_types = array_merge(
 			self::$supported_post_types,
-			self::get_existing_raw_block_post_types()
+			self::get_existing_raw_block_post_types(),
+			self::get_existing_json_post_types()
 		);
 		if ( self::guidelines_available() ) {
 			$post_types[] = 'wp_guideline';
@@ -132,6 +135,7 @@ This repository is a Git checkout of a WordPress site exposed by WP Origin. Word
 - `page/{slug}.md` contains WordPress pages.
 - `wp_template/{slug}.html`, `wp_template_part/{slug}.html`, and `wp_navigation/{slug}.html` contain raw Gutenberg block markup for structural site entities. Theme-qualified WordPress slugs may appear as nested paths such as `wp_template_part/{theme}/header.html`.
 - `wp_theme/{theme}/theme.json` contains read-only theme-provided design settings for agent context.
+- `wp_global_styles/{theme}.json` contains the editable Global Styles overlay for the active theme. Edit this file for site-wide styles and settings instead of editing `wp_theme/{theme}/theme.json`.
 - `wp_guideline/skills/{slug}/SKILL.md` contains coding-agent skills stored as Gutenberg Guidelines.
 - `.agents/skills` and `.claude/skills` point to `wp_guideline/skills` for agent discovery.
 - `AGENTS.md` and `CLAUDE.md` point to this guide.
@@ -151,11 +155,12 @@ This repository is a Git checkout of a WordPress site exposed by WP Origin. Word
 - Template HTML files must stay raw Gutenberg block markup without front matter.
 - Template HTML files may be created or updated, but deletes and renames are rejected because their paths are their WordPress identity.
 - Theme base files are checked out for context. Editing theme-provided templates creates WordPress customizations; `wp_theme/{theme}/theme.json` is read-only in this checkout.
+- Global Styles JSON files may be created or updated, but deletes and renames are rejected. `wp_global_styles/{theme}.json` is the database overlay for `wp_theme/{theme}/theme.json`.
 - Keep theme-scoped templates in their nested paths. For example, edit `wp_template_part/twentytwentyfive/footer.html`; do not create flattened files such as `wp_template_part/twentytwentyfive-footer.html`.
 - A path such as `wp_template_part/twentytwentyfive/footer.html` maps to the WordPress template-part ID `twentytwentyfive//footer`. The customized database post keeps the slug `footer` and stores `twentytwentyfive` in the `wp_theme` taxonomy.
 - Use the `wp-origin-template-editor` skill before editing `wp_template/*.html`, `wp_template_part/*.html`, or `wp_navigation/*.html`.
 - Preserve unsupported block markup, fenced `gutenberg` blocks, custom blocks, and raw HTML unless the user asks for a conversion.
-- After template edits, run `git status --short` and confirm there are no unintended deleted files, renamed files, `wp_theme` changes, or flattened theme paths.
+- After template or Global Styles edits, run `git status --short` and confirm there are no unintended deleted files, renamed files, `wp_theme` changes, or flattened theme paths.
 - Use forward slashes in paths.
 - Keep changes scoped to site content. This checkout does not represent plugin code, themes, uploads, or the full database.
 SKILL;
@@ -171,7 +176,7 @@ Use this skill when editing `wp_template/*.html`, `wp_template_part/*.html`, or 
 
 Template HTML files are WordPress structural block entities exported as raw serialized Gutenberg block markup. WordPress remains the source of truth for IDs, titles, status, dates, theme ownership, and other administrative metadata. The file path is the working identity in Git.
 
-Theme-provided templates and template parts appear in this checkout even before they have been customized in WordPress. Editing and pushing one of those files creates or updates the WordPress customization for that path. Theme-provided `wp_theme/{theme}/theme.json` files are exported for context and are read-only.
+Theme-provided templates and template parts appear in this checkout even before they have been customized in WordPress. Editing and pushing one of those files creates or updates the WordPress customization for that path. Theme-provided `wp_theme/{theme}/theme.json` files are exported for context and are read-only. Use `wp_global_styles/{theme}.json` for editable site-wide style and settings changes.
 
 Theme-scoped paths are a filesystem view of WordPress template IDs. For example, `wp_template_part/twentytwentyfive/footer.html` maps to the template-part ID `twentytwentyfive//footer`. When customized, WordPress stores this as a `wp_template_part` post whose slug remains `footer` and whose `wp_theme` taxonomy term is `twentytwentyfive`.
 
@@ -182,7 +187,7 @@ Theme-scoped paths are a filesystem view of WordPress template IDs. For example,
 - Treat the path as identity. A nested path such as `wp_template_part/{theme}/header.html` maps back to a theme-qualified WordPress slug.
 - Keep the theme as a directory segment. Do not flatten theme-scoped paths into files such as `wp_template_part/twentytwentyfive-footer.html` or `wp_template/twentytwentyfive-index.html`.
 - Edit theme-provided templates in place. Do not copy them to top-level files unless the user explicitly wants a different non-theme-scoped entity.
-- Do not edit `wp_theme/{theme}/theme.json`; use it to understand theme colors, spacing, typography, and layout settings.
+- Do not edit `wp_theme/{theme}/theme.json`; use it to understand theme colors, spacing, typography, and layout settings. Edit `wp_global_styles/{theme}.json` when the user asks for site-wide theme.json-style changes.
 - Preserve unknown blocks, custom blocks, and existing block attributes unless the user explicitly asks to change them.
 - Preserve Gutenberg block comments. They are the block schema, not decorative comments.
 - Do not create theme, plugin, upload, or database files. WP Origin exposes content entities only.
@@ -641,6 +646,8 @@ SKILL;
 			}
 		}
 
+		self::add_global_styles_overlay_file( $files );
+
 		if ( $has_guideline_skills ) {
 			foreach ( self::get_agent_skills_directory_symlink_paths() as $symlink_path => $target ) {
 				$files[ $symlink_path ] = array(
@@ -824,6 +831,17 @@ SKILL;
 		return $post_types;
 	}
 
+	private static function get_existing_json_post_types() {
+		$post_types = array();
+		foreach ( self::$json_post_types as $post_type ) {
+			if ( post_type_exists( $post_type ) ) {
+				$post_types[] = $post_type;
+			}
+		}
+
+		return $post_types;
+	}
+
 	private static function is_raw_block_post_type( $post_type ) {
 		return in_array( $post_type, self::$raw_block_post_types, true );
 	}
@@ -844,12 +862,20 @@ SKILL;
 					self::get_raw_block_post_theme_slug( $post_or_type )
 				);
 			}
+			if ( 'wp_global_styles' === $post_or_type->post_type ) {
+				return self::build_global_styles_path(
+					self::get_post_theme_slug( $post_or_type )
+				);
+			}
 
 			return ltrim( $post_or_type->post_type . '/' . $post_or_type->post_name . '.md', '/' );
 		}
 
 		if ( self::is_raw_block_post_type( $post_or_type ) ) {
 			return self::build_raw_block_path( $post_or_type, $slug );
+		}
+		if ( 'wp_global_styles' === $post_or_type ) {
+			return self::build_global_styles_path( $slug );
 		}
 
 		return ltrim( $post_or_type . '/' . $slug . '.md', '/' );
@@ -865,16 +891,60 @@ SKILL;
 	}
 
 	private static function get_raw_block_post_theme_slug( WP_Post $post ) {
-		if ( ! self::is_theme_scoped_raw_block_post_type( $post->post_type ) || ! taxonomy_exists( 'wp_theme' ) ) {
+		if ( ! self::is_theme_scoped_raw_block_post_type( $post->post_type ) ) {
 			return '';
 		}
 
+		return self::get_post_theme_slug( $post );
+	}
+
+	private static function get_post_theme_slug( WP_Post $post ) {
+		if ( ! taxonomy_exists( 'wp_theme' ) ) {
+			return '';
+		}
 		$terms = get_the_terms( $post->ID, 'wp_theme' );
 		if ( is_wp_error( $terms ) || empty( $terms ) ) {
 			return '';
 		}
 
 		return self::sanitize_repository_path_segment( $terms[0]->slug );
+	}
+
+	private static function build_global_styles_path( $theme_slug ) {
+		$theme_slug = self::sanitize_repository_path_segment( $theme_slug );
+		if ( '' === $theme_slug && function_exists( 'get_stylesheet' ) ) {
+			$theme_slug = self::sanitize_repository_path_segment( get_stylesheet() );
+		}
+
+		return 'wp_global_styles/' . $theme_slug . '.json';
+	}
+
+	private static function add_global_styles_overlay_file( &$files ) {
+		if ( ! post_type_exists( 'wp_global_styles' ) || ! function_exists( 'get_stylesheet' ) ) {
+			return;
+		}
+
+		$theme_slug = self::sanitize_repository_path_segment( get_stylesheet() );
+		if ( '' === $theme_slug ) {
+			return;
+		}
+
+		$path = self::build_global_styles_path( $theme_slug );
+		if ( isset( $files[ $path ] ) ) {
+			return;
+		}
+
+		$files[ $path ] = array(
+			'post'    => null,
+			'mode'    => TreeEntry::FILE_MODE_REGULAR_NON_EXECUTABLE,
+			'content' => self::encode_global_styles_json(
+				array(
+					'version'  => self::latest_theme_json_schema_version(),
+					'settings' => new stdClass(),
+					'styles'   => new stdClass(),
+				)
+			),
+		);
 	}
 
 	/**
@@ -892,6 +962,9 @@ SKILL;
 		}
 		if ( self::is_raw_block_post_type( $post->post_type ) ) {
 			return $post->post_content;
+		}
+		if ( 'wp_global_styles' === $post->post_type ) {
+			return self::export_global_styles_to_json( $post );
 		}
 
 		$metadata = array(
@@ -911,6 +984,40 @@ SKILL;
 		);
 
 		return $producer->produce();
+	}
+
+	private static function export_global_styles_to_json( WP_Post $post ) {
+		$config = json_decode( $post->post_content, true );
+		if ( ! is_array( $config ) ) {
+			$config = array();
+		}
+
+		unset( $config['isGlobalStylesUserThemeJSON'] );
+		if ( ! isset( $config['version'] ) ) {
+			$config['version'] = self::latest_theme_json_schema_version();
+		}
+
+		return self::encode_global_styles_json( $config );
+	}
+
+	private static function encode_global_styles_json( $config ) {
+		$encoded = wp_json_encode(
+			$config,
+			JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE
+		);
+		if ( false === $encoded ) {
+			$encoded = '{}';
+		}
+
+		return $encoded . "\n";
+	}
+
+	private static function latest_theme_json_schema_version() {
+		if ( class_exists( 'WP_Theme_JSON' ) ) {
+			return WP_Theme_JSON::LATEST_SCHEMA;
+		}
+
+		return 3;
 	}
 
 	private static function export_guideline_skill_to_markdown( WP_Post $post ) {
@@ -1049,6 +1156,7 @@ SKILL;
 
 		self::reject_deleted_raw_block_files( $old_files, $new_files );
 		self::reject_deleted_theme_base_files( $old_files, $new_files );
+		self::reject_deleted_global_styles_files( $old_files, $new_files );
 
 		foreach ( $new_files as $path => $entry ) {
 			if ( isset( $old_files[ $path ] ) && self::repository_entries_match( $old_files[ $path ], $entry ) ) {
@@ -1062,6 +1170,9 @@ SKILL;
 			}
 			if ( self::is_raw_block_path( $path ) ) {
 				self::assert_raw_block_html_has_no_front_matter( $entry['content'] );
+			}
+			if ( self::is_global_styles_path( $path ) ) {
+				self::assert_global_styles_json_is_valid( $path, $entry['content'] );
 			}
 		}
 	}
@@ -1080,6 +1191,7 @@ SKILL;
 		$changes          = array();
 		self::reject_deleted_raw_block_files( $old_files, $new_files );
 		self::reject_deleted_theme_base_files( $old_files, $new_files );
+		self::reject_deleted_global_styles_files( $old_files, $new_files );
 
 		foreach ( $new_files as $path => $entry ) {
 			if ( isset( $old_files[ $path ] ) && self::repository_entries_match( $old_files[ $path ], $entry ) ) {
@@ -1209,6 +1321,20 @@ SKILL;
 		}
 	}
 
+	private static function reject_deleted_global_styles_files( $old_files, $new_files ) {
+		foreach ( $old_files as $path => $entry ) {
+			if ( isset( $new_files[ $path ] ) ) {
+				continue;
+			}
+			if ( TreeEntry::FILE_MODE_SYMBOLIC_LINK === $entry['mode'] ) {
+				continue;
+			}
+			if ( self::is_global_styles_path( $path ) ) {
+				throw new Exception( 'Push rejected because Global Styles JSON files cannot be deleted or renamed. Update them in place.' );
+			}
+		}
+	}
+
 	private static function upsert_post_from_markdown( $path, $markdown, $options = array() ) {
 		$post_type = self::path_to_post_type( $path );
 		$slug      = self::path_to_slug( $path );
@@ -1217,6 +1343,9 @@ SKILL;
 		}
 		if ( self::is_raw_block_post_type( $post_type ) ) {
 			return self::upsert_raw_block_post_from_html( $path, $markdown );
+		}
+		if ( 'wp_global_styles' === $post_type ) {
+			return self::upsert_global_styles_from_json( $path, $markdown );
 		}
 
 		$consumer = new MarkdownConsumer( $markdown );
@@ -1345,10 +1474,101 @@ SKILL;
 		);
 	}
 
+	private static function upsert_global_styles_from_json( $path, $json ) {
+		$config        = self::parse_global_styles_json( $path, $json );
+		$theme_slug    = self::path_to_global_styles_theme_slug( $path );
+		$post_id       = self::find_global_styles_post_id_by_theme_slug( $theme_slug, false );
+		$existing_post = $post_id ? get_post( $post_id ) : null;
+
+		$config['isGlobalStylesUserThemeJSON'] = true;
+		if ( ! isset( $config['version'] ) ) {
+			$config['version'] = self::latest_theme_json_schema_version();
+		}
+
+		$post_content = wp_json_encode( $config );
+		if ( false === $post_content ) {
+			throw new Exception( 'Push rejected because the Global Styles JSON could not be encoded.' );
+		}
+
+		if ( $existing_post ) {
+			self::assert_can_edit_post( $existing_post->ID );
+			$postarr = array(
+				'ID'           => $existing_post->ID,
+				'post_content' => $post_content,
+			);
+			$post_id = wp_update_post( wp_slash( $postarr ), true );
+		} else {
+			self::assert_can_create_post_type( 'wp_global_styles' );
+			$postarr = array(
+				'post_type'    => 'wp_global_styles',
+				'post_name'    => 'wp-global-styles-' . rawurlencode( $theme_slug ),
+				'post_title'   => 'Custom Styles',
+				'post_status'  => 'publish',
+				'post_content' => $post_content,
+			);
+			$post_id = wp_insert_post( wp_slash( $postarr ), true );
+		}
+
+		if ( is_wp_error( $post_id ) ) {
+			throw new Exception( $post_id->get_error_message() );
+		}
+
+		self::assign_post_theme_slug( $post_id, $theme_slug );
+		if ( function_exists( 'wp_clean_theme_json_cache' ) ) {
+			wp_clean_theme_json_cache();
+		}
+
+		$post = get_post( $post_id );
+
+		return array(
+			'post_id' => $post_id,
+			'change'  => self::build_push_summary_item(
+				$existing_post ? 'updated' : 'created',
+				$post,
+				$path
+			),
+		);
+	}
+
+	private static function assert_global_styles_json_is_valid( $path, $json ) {
+		self::parse_global_styles_json( $path, $json );
+	}
+
+	private static function parse_global_styles_json( $path, $json ) {
+		self::path_to_global_styles_theme_slug( $path );
+		$config = json_decode( $json, true );
+		if ( JSON_ERROR_NONE !== json_last_error() ) {
+			throw new Exception( 'Push rejected because Global Styles JSON is invalid: ' . json_last_error_msg() );
+		}
+		if ( ! is_array( $config ) ) {
+			throw new Exception( 'Push rejected because Global Styles files must contain a JSON object.' );
+		}
+		if ( ! empty( $config ) && self::is_array_list( $config ) ) {
+			throw new Exception( 'Push rejected because Global Styles files must contain a JSON object.' );
+		}
+
+		unset( $config['isGlobalStylesUserThemeJSON'] );
+
+		return $config;
+	}
+
 	private static function assert_raw_block_html_has_no_front_matter( $html ) {
 		if ( preg_match( '/\A---\r?\n/', $html ) ) {
 			throw new Exception( 'Push rejected because template HTML files must contain raw Gutenberg block markup without front matter.' );
 		}
+	}
+
+	private static function is_array_list( $items ) {
+		$index = 0;
+		foreach ( $items as $key => $value ) {
+			unset( $value );
+			if ( $key !== $index ) {
+				return false;
+			}
+			++$index;
+		}
+
+		return true;
 	}
 
 	private static function upsert_guideline_from_markdown( $path, $markdown, $options = array() ) {
@@ -1571,6 +1791,12 @@ SKILL;
 		if ( self::is_raw_block_post_type( $post_type ) ) {
 			return self::find_raw_block_post_id_by_path( $path, $include_trash );
 		}
+		if ( 'wp_global_styles' === $post_type ) {
+			return self::find_global_styles_post_id_by_theme_slug(
+				self::path_to_global_styles_theme_slug( $path ),
+				$include_trash
+			);
+		}
 
 		$slug     = isset( $metadata['slug'] ) ? $metadata['slug'] : self::path_to_slug( $path );
 		$statuses = $include_trash
@@ -1616,6 +1842,27 @@ SKILL;
 		return 0;
 	}
 
+	private static function find_global_styles_post_id_by_theme_slug( $theme_slug, $include_trash = true ) {
+		$statuses = $include_trash
+			? array_merge( self::$supported_post_statuses, array( 'trash' ) )
+			: self::$supported_post_statuses;
+		$posts    = get_posts(
+			array(
+				'post_type'      => 'wp_global_styles',
+				'post_status'    => $statuses,
+				'posts_per_page' => -1,
+			)
+		);
+
+		foreach ( $posts as $post ) {
+			if ( self::get_post_theme_slug( $post ) === $theme_slug ) {
+				return intval( $post->ID );
+			}
+		}
+
+		return 0;
+	}
+
 	private static function path_to_post_type( $path ) {
 		$segments = explode( '/', ltrim( $path, '/' ) );
 		if ( ! empty( $segments[0] ) && 'wp_guideline' === $segments[0] && ! self::guidelines_available() ) {
@@ -1643,6 +1890,9 @@ SKILL;
 			}
 
 			return $identity['slug'];
+		}
+		if ( self::is_global_styles_path( $path ) ) {
+			return self::path_to_global_styles_theme_slug( $path );
 		}
 
 		$basename = basename( $path );
@@ -1679,14 +1929,41 @@ SKILL;
 		);
 	}
 
+	private static function path_to_global_styles_theme_slug( $path ) {
+		$post_type = self::path_to_post_type( $path );
+		$segments  = explode( '/', ltrim( $path, '/' ) );
+		if ( 'wp_global_styles' !== $post_type || 2 !== count( $segments ) ) {
+			throw new Exception( 'Push rejected because Global Styles files must use wp_global_styles/<theme>.json paths.' );
+		}
+
+		$basename = basename( $path );
+		if ( 'json' !== strtolower( pathinfo( $basename, PATHINFO_EXTENSION ) ) ) {
+			throw new Exception( 'Push rejected because Global Styles files must use the .json extension.' );
+		}
+
+		$theme_slug = pathinfo( $basename, PATHINFO_FILENAME );
+		if ( '' === $theme_slug || self::sanitize_repository_path_segment( $theme_slug ) !== $theme_slug ) {
+			throw new Exception( 'Push rejected because the Global Styles theme filename is not supported.' );
+		}
+
+		return $theme_slug;
+	}
+
 	private static function assign_raw_block_theme_slug( $post_id, $theme_slug ) {
 		$post = get_post( $post_id );
 		if (
 			! $post ||
 			'' === $theme_slug ||
-			! self::is_theme_scoped_raw_block_post_type( $post->post_type ) ||
-			! taxonomy_exists( 'wp_theme' )
+			! self::is_theme_scoped_raw_block_post_type( $post->post_type )
 		) {
+			return;
+		}
+
+		self::assign_post_theme_slug( $post_id, $theme_slug );
+	}
+
+	private static function assign_post_theme_slug( $post_id, $theme_slug ) {
+		if ( '' === $theme_slug || ! taxonomy_exists( 'wp_theme' ) ) {
 			return;
 		}
 
@@ -1706,6 +1983,12 @@ SKILL;
 		$segments = explode( '/', ltrim( $path, '/' ) );
 
 		return ! empty( $segments[0] ) && 'wp_theme' === $segments[0];
+	}
+
+	private static function is_global_styles_path( $path ) {
+		$segments = explode( '/', ltrim( $path, '/' ) );
+
+		return ! empty( $segments[0] ) && 'wp_global_styles' === $segments[0];
 	}
 
 	private static function path_to_guideline_type_slug( $path ) {

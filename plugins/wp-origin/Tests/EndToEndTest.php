@@ -104,6 +104,7 @@ class WP_Origin_End_To_End_Test extends TestCase {
 		$this->assertNotEmpty( glob( $clone_dir . '/wp_template/*/*.html' ), 'Expected active theme base templates to be exported.' );
 		$this->assertNotEmpty( glob( $clone_dir . '/wp_template_part/*/*.html' ), 'Expected active theme base template parts to be exported.' );
 		$this->assertNotEmpty( glob( $clone_dir . '/wp_theme/*/theme.json' ), 'Expected active theme theme.json to be exported.' );
+		$this->assertNotEmpty( glob( $clone_dir . '/wp_global_styles/*.json' ), 'Expected active theme Global Styles overlay to be exported.' );
 		$this->assertFileExists( $clone_dir . '/wp_guideline/skills/wp-origin/SKILL.md' );
 		$this->assertFileExists( $clone_dir . '/wp_guideline/skills/wp-origin-template-editor/SKILL.md' );
 		$this->assertStringContainsString(
@@ -121,6 +122,10 @@ class WP_Origin_End_To_End_Test extends TestCase {
 			$wp_origin_skill
 		);
 		$this->assertStringContainsString(
+			'`wp_global_styles/{theme}.json` contains the editable Global Styles overlay',
+			$wp_origin_skill
+		);
+		$this->assertStringContainsString(
 			'do not create flattened files such as `wp_template_part/twentytwentyfive-footer.html`',
 			$wp_origin_skill
 		);
@@ -134,6 +139,10 @@ class WP_Origin_End_To_End_Test extends TestCase {
 		);
 		$this->assertStringContainsString(
 			'Do not flatten theme-scoped paths into files such as `wp_template_part/twentytwentyfive-footer.html`',
+			$template_editor_skill
+		);
+		$this->assertStringContainsString(
+			'Edit `wp_global_styles/{theme}.json` when the user asks for site-wide theme.json-style changes.',
 			$template_editor_skill
 		);
 		$this->assertStringContainsString(
@@ -165,6 +174,31 @@ class WP_Origin_End_To_End_Test extends TestCase {
 		$this->assertNotSame( 0, $push_result['code'], 'Theme base JSON edits should have been rejected.' );
 		$this->assertStringContainsString( 'Push rejected because theme base files are read-only in WP Origin.', $push_result['output'] );
 		$this->run_cmd( array( 'git', '-C', $clone_dir, 'reset', '--hard', 'HEAD~1' ) );
+
+		$global_styles_files = glob( $clone_dir . '/wp_global_styles/*.json' );
+		$this->assertNotEmpty( $global_styles_files, 'Expected an editable Global Styles overlay.' );
+		$global_styles_path = $global_styles_files[0];
+		file_put_contents(
+			$global_styles_path,
+			'{' . "\n"
+			. "\t" . '"version": 3,' . "\n"
+			. "\t" . '"styles": {' . "\n"
+			. "\t\t" . '"color": {' . "\n"
+			. "\t\t\t" . '"background": "#123456",' . "\n"
+			. "\t\t\t" . '"text": "#ffffff"' . "\n"
+			. "\t\t" . '}' . "\n"
+			. "\t" . '}' . "\n"
+			. '}'
+		);
+		$this->commit_and_push(
+			$clone_dir,
+			substr( $global_styles_path, strlen( $clone_dir ) + 1 ),
+			'Customize global styles from Git'
+		);
+		$this->assertStringContainsString( '#123456', $this->curl_get( $this->base_url . '/' ) );
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'pull', '--rebase', 'origin', 'trunk' ) );
+		$this->assertStringContainsString( '#123456', file_get_contents( $global_styles_path ) );
+		$this->assertStringNotContainsString( 'isGlobalStylesUserThemeJSON', file_get_contents( $global_styles_path ) );
 
 		$footer_files = glob( $clone_dir . '/wp_template_part/*/footer.html' );
 		$this->assertNotEmpty( $footer_files, 'Expected an active theme footer template part.' );

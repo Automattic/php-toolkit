@@ -119,6 +119,7 @@ test -f "$CLONE_DIR/wp_template/blog-home.html"
 find "$CLONE_DIR/wp_template" -mindepth 2 -name '*.html' | grep -q .
 find "$CLONE_DIR/wp_template_part" -mindepth 2 -name '*.html' | grep -q .
 find "$CLONE_DIR/wp_theme" -mindepth 2 -maxdepth 2 -name theme.json | grep -q .
+find "$CLONE_DIR/wp_global_styles" -maxdepth 1 -name '*.json' | grep -q .
 test -f "$CLONE_DIR/wp_guideline/skills/wp-origin/SKILL.md"
 test -f "$CLONE_DIR/wp_guideline/skills/wp-origin-template-editor/SKILL.md"
 test -L "$CLONE_DIR/.agents/skills"
@@ -139,6 +140,7 @@ grep -Fq 'name: "wp-origin"' "$CLONE_DIR/wp_guideline/skills/wp-origin/SKILL.md"
 grep -Fq 'description: "Guide for coding agents working in a WP Origin checkout of a WordPress site."' "$CLONE_DIR/wp_guideline/skills/wp-origin/SKILL.md"
 grep -Fq '# WP Origin AGENTS.md' "$CLONE_DIR/wp_guideline/skills/wp-origin/SKILL.md"
 grep -Fq 'This repository is a Git checkout of a WordPress site' "$CLONE_DIR/wp_guideline/skills/wp-origin/SKILL.md"
+grep -Fq '`wp_global_styles/{theme}.json` contains the editable Global Styles overlay' "$CLONE_DIR/wp_guideline/skills/wp-origin/SKILL.md"
 grep -Fq 'do not create flattened files such as `wp_template_part/twentytwentyfive-footer.html`' "$CLONE_DIR/wp_guideline/skills/wp-origin/SKILL.md"
 grep -Fq 'The customized database post keeps the slug `footer` and stores `twentytwentyfive` in the `wp_theme` taxonomy.' "$CLONE_DIR/wp_guideline/skills/wp-origin/SKILL.md"
 head -n 1 "$CLONE_DIR/wp_guideline/skills/wp-origin-template-editor/SKILL.md" | grep -Fxq -- '---'
@@ -147,6 +149,7 @@ grep -Fq 'description: "Edit WP Origin block theme templates and template parts 
 grep -Fq '# WP Origin Template Editor' "$CLONE_DIR/wp_guideline/skills/wp-origin-template-editor/SKILL.md"
 grep -Fq 'maps to the template-part ID `twentytwentyfive//footer`' "$CLONE_DIR/wp_guideline/skills/wp-origin-template-editor/SKILL.md"
 grep -Fq 'Do not flatten theme-scoped paths into files such as `wp_template_part/twentytwentyfive-footer.html`' "$CLONE_DIR/wp_guideline/skills/wp-origin-template-editor/SKILL.md"
+grep -Fq 'Edit `wp_global_styles/{theme}.json` when the user asks for site-wide theme.json-style changes.' "$CLONE_DIR/wp_guideline/skills/wp-origin-template-editor/SKILL.md"
 grep -Fq 'Prefer editable core blocks' "$CLONE_DIR/wp_guideline/skills/wp-origin-template-editor/SKILL.md"
 grep -Fq 'Run `git status --short` before committing or pushing' "$CLONE_DIR/wp_guideline/skills/wp-origin-template-editor/SKILL.md"
 grep -Fq 'This repository is a Git checkout of a WordPress site' "$CLONE_DIR/.agents/skills/wp-origin/SKILL.md"
@@ -187,6 +190,29 @@ if PUSH_OUTPUT="$(git push origin trunk 2>&1)"; then
 fi
 assert_push_summary_contains "$PUSH_OUTPUT" 'Push rejected because theme base files are read-only in WP Origin.'
 git reset --hard HEAD~1 >/dev/null
+
+GLOBAL_STYLES_PATH="$(find "$CLONE_DIR/wp_global_styles" -maxdepth 1 -name '*.json' | head -n 1)"
+GLOBAL_STYLES_RELATIVE="${GLOBAL_STYLES_PATH#$CLONE_DIR/}"
+cat > "$GLOBAL_STYLES_PATH" <<'JSON'
+{
+	"version": 3,
+	"styles": {
+		"color": {
+			"background": "#123456",
+			"text": "#ffffff"
+		}
+	}
+}
+JSON
+git add "$GLOBAL_STYLES_RELATIVE"
+git commit -m "Customize global styles from Git"
+PUSH_OUTPUT="$(git push origin trunk 2>&1)"
+assert_push_summary_contains "$PUSH_OUTPUT" 'WP Origin applied 1 content change:'
+assert_push_summary_contains "$PUSH_OUTPUT" 'wp_global_styles'
+curl -sS -f "$BASE_URL/" | grep -Fq '#123456'
+git pull --rebase origin trunk
+grep -Fq '#123456' "$GLOBAL_STYLES_PATH"
+! grep -Fq 'isGlobalStylesUserThemeJSON' "$GLOBAL_STYLES_PATH"
 
 BASE_FOOTER_PATH="$(find "$CLONE_DIR/wp_template_part" -mindepth 2 -maxdepth 2 -name footer.html | head -n 1)"
 BASE_FOOTER_RELATIVE="${BASE_FOOTER_PATH#$CLONE_DIR/}"
