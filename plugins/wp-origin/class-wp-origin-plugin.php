@@ -9,6 +9,10 @@ use WordPress\Git\Model\TreeEntry;
 use WordPress\Markdown\MarkdownConsumer;
 use WordPress\Markdown\MarkdownProducer;
 
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 /**
  * WP Origin – exposes WordPress as a Git remote.
  *
@@ -365,7 +369,7 @@ SKILL;
 			}
 		}
 
-		echo $result->get_data();
+		echo $result->get_data(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Git Smart HTTP response bodies are binary protocol data; escaping corrupts them.
 
 		return true;
 	}
@@ -791,7 +795,7 @@ SKILL;
 				continue;
 			}
 
-			$content = file_get_contents( $full_path );
+			$content = file_get_contents( $full_path ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Reads a local theme/template file, not a remote URL.
 			if ( false === $content ) {
 				continue;
 			}
@@ -812,7 +816,7 @@ SKILL;
 			return;
 		}
 
-		$content = file_get_contents( $theme_json_path );
+		$content = file_get_contents( $theme_json_path ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Reads a local theme.json file, not a remote URL.
 		if ( false === $content ) {
 			return;
 		}
@@ -1456,7 +1460,7 @@ SKILL;
 		}
 
 		if ( is_wp_error( $post_id ) ) {
-			throw new Exception( $post_id->get_error_message() );
+			throw new Exception( esc_html( $post_id->get_error_message() ) );
 		}
 
 		$post = get_post( $post_id );
@@ -1500,7 +1504,7 @@ SKILL;
 		}
 
 		if ( is_wp_error( $post_id ) ) {
-			throw new Exception( $post_id->get_error_message() );
+			throw new Exception( esc_html( $post_id->get_error_message() ) );
 		}
 
 		self::assign_raw_block_theme_slug( $post_id, $identity['theme'] );
@@ -1553,7 +1557,7 @@ SKILL;
 		}
 
 		if ( is_wp_error( $post_id ) ) {
-			throw new Exception( $post_id->get_error_message() );
+			throw new Exception( esc_html( $post_id->get_error_message() ) );
 		}
 
 		self::assign_post_theme_slug( $post_id, $theme_slug );
@@ -1581,7 +1585,7 @@ SKILL;
 		self::path_to_global_styles_theme_slug( $path );
 		$config = json_decode( $json, true );
 		if ( JSON_ERROR_NONE !== json_last_error() ) {
-			throw new Exception( 'Push rejected because Global Styles JSON is invalid: ' . json_last_error_msg() );
+			throw new Exception( 'Push rejected because Global Styles JSON is invalid: ' . esc_html( json_last_error_msg() ) );
 		}
 		if ( ! is_array( $config ) ) {
 			throw new Exception( 'Push rejected because Global Styles files must contain a JSON object.' );
@@ -1679,13 +1683,13 @@ SKILL;
 		}
 
 		if ( is_wp_error( $post_id ) ) {
-			throw new Exception( $post_id->get_error_message() );
+			throw new Exception( esc_html( $post_id->get_error_message() ) );
 		}
 
 		$term_id   = self::get_or_create_guideline_type_term_id( $guideline_type_slug );
 		$set_terms = wp_set_object_terms( $post_id, array( $term_id ), 'wp_guideline_type' );
 		if ( is_wp_error( $set_terms ) ) {
-			throw new Exception( $set_terms->get_error_message() );
+			throw new Exception( esc_html( $set_terms->get_error_message() ) );
 		}
 
 		$post = get_post( $post_id );
@@ -2012,7 +2016,7 @@ SKILL;
 
 		$terms = wp_set_object_terms( $post_id, array( $theme_slug ), 'wp_theme' );
 		if ( is_wp_error( $terms ) ) {
-			throw new Exception( $terms->get_error_message() );
+			throw new Exception( esc_html( $terms->get_error_message() ) );
 		}
 	}
 
@@ -2122,7 +2126,7 @@ SKILL;
 		);
 
 		if ( is_wp_error( $inserted ) ) {
-			throw new Exception( $inserted->get_error_message() );
+			throw new Exception( esc_html( $inserted->get_error_message() ) );
 		}
 
 		return (int) $inserted['term_id'];
@@ -2136,8 +2140,8 @@ SKILL;
 		throw new Exception(
 			sprintf(
 				'Push rejected because "%s" is not a supported %s status.',
-				$post_status,
-				$post_type
+				esc_html( $post_status ),
+				esc_html( $post_type )
 			)
 		);
 	}
@@ -2226,6 +2230,6 @@ SKILL;
 			return false;
 		}
 
-		throw new ErrorException( $message, 0, $severity, $file, $line );
+		throw new ErrorException( esc_html( $message ), 0, (int) $severity, esc_html( $file ), (int) $line );
 	}
 }

@@ -8,6 +8,10 @@
  *              workflow only.
  */
 
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 add_filter( 'wp_origin_seed_batch_size', static function () {
 	return 5;
 } );

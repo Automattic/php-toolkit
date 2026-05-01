@@ -1,6 +1,11 @@
 <?php
+// phpcs:disable WordPress.WP.AlternativeFunctions -- These E2E tests run outside WordPress and exercise HTTP/git behavior directly.
 
 use PHPUnit\Framework\TestCase;
+
+if ( ! defined( 'ABSPATH' ) && ! class_exists( TestCase::class ) ) {
+	exit;
+}
 
 /**
  * End-to-end test for the wp-origin plugin against a real WordPress

@@ -1,5 +1,9 @@
 <?php
 
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 $wp_origin_phar = 'phar://' . __DIR__ . '/php-toolkit.phar';
 
 if ( ! class_exists( 'Composer\\Autoload\\ClassLoader' ) ) {

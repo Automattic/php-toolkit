@@ -3,6 +3,10 @@
 use WordPress\Git\GitRepository;
 use WordPress\Git\Model\Commit;
 
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 /**
  * Async, resumable initial-import seeder for WP Origin.
  *
@@ -156,7 +160,7 @@ class WP_Origin_Seeder {
 			global $wpdb;
 			$table = $wpdb->prefix . WP_Origin_Plugin::TABLE_PREFIX . 'files';
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
-			if ( ! $wpdb->get_var( "SHOW TABLES LIKE '" . esc_sql( $table ) . "'" ) ) {
+			if ( ! $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $table ) ) ) {
 				return array();
 			}
 			$repository = WP_Origin_Plugin::open_repository();
@@ -276,11 +280,16 @@ class WP_Origin_Seeder {
 	private static function initialize() {
 		global $wpdb;
 
-		$types_in    = "'" . implode( "','", array_map( 'esc_sql', WP_Origin_Plugin::get_supported_post_types() ) ) . "'";
-		$statuses_in = "'" . implode( "','", array_map( 'esc_sql', WP_Origin_Plugin::$supported_post_statuses ) ) . "'";
-		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.DirectDatabaseQuery
+		$post_types          = WP_Origin_Plugin::get_supported_post_types();
+		$post_statuses       = WP_Origin_Plugin::$supported_post_statuses;
+		$post_type_markers   = implode( ', ', array_fill( 0, count( $post_types ), '%s' ) );
+		$post_status_markers = implode( ', ', array_fill( 0, count( $post_statuses ), '%s' ) );
+		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare,WordPress.DB.DirectDatabaseQuery
 		$total = (int) $wpdb->get_var(
-			"SELECT COUNT(*) FROM {$wpdb->posts} WHERE post_type IN ($types_in) AND post_status IN ($statuses_in)"
+			$wpdb->prepare(
+				"SELECT COUNT(*) FROM {$wpdb->posts} WHERE post_type IN ($post_type_markers) AND post_status IN ($post_status_markers)",
+				array_merge( $post_types, $post_statuses )
+			)
 		);
 		// phpcs:enable
 
@@ -506,19 +515,20 @@ class WP_Origin_Seeder {
 	private static function next_batch( $after_id ) {
 		global $wpdb;
 
-		$types_in    = "'" . implode( "','", array_map( 'esc_sql', WP_Origin_Plugin::get_supported_post_types() ) ) . "'";
-		$statuses_in = "'" . implode( "','", array_map( 'esc_sql', WP_Origin_Plugin::$supported_post_statuses ) ) . "'";
-		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.DirectDatabaseQuery
+		$post_types          = WP_Origin_Plugin::get_supported_post_types();
+		$post_statuses       = WP_Origin_Plugin::$supported_post_statuses;
+		$post_type_markers   = implode( ', ', array_fill( 0, count( $post_types ), '%s' ) );
+		$post_status_markers = implode( ', ', array_fill( 0, count( $post_statuses ), '%s' ) );
+		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber,WordPress.DB.DirectDatabaseQuery
 		$ids = $wpdb->get_col(
 			$wpdb->prepare(
 				"SELECT ID FROM {$wpdb->posts}
-				WHERE post_type IN ($types_in)
-				AND post_status IN ($statuses_in)
+				WHERE post_type IN ($post_type_markers)
+				AND post_status IN ($post_status_markers)
 				AND ID > %d
 				ORDER BY ID ASC
 				LIMIT %d",
-				intval( $after_id ),
-				self::batch_size()
+				array_merge( $post_types, $post_statuses, array( intval( $after_id ), self::batch_size() ) )
 			)
 		);
 		// phpcs:enable

@@ -1,5 +1,9 @@
 <?php
 
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 if ( ! class_exists( 'Composer\\Autoload\\ClassLoader' ) ) {
 	require_once __DIR__ . '/../../vendor/composer/ClassLoader.php';
 }

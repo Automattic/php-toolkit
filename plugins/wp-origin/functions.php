@@ -1,5 +1,9 @@
 <?php
 
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 if ( ! function_exists( 'wp_install_skill' ) ) {
 	function wp_install_skill( string $source_identifier, string $title, string $excerpt, string $content, array $extras = array() ) {
 		if ( '' === $source_identifier ) {
