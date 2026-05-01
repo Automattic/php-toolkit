@@ -646,6 +646,7 @@ SKILL;
 			}
 		}
 
+		self::add_default_agent_guidance_files( $files, $has_guideline_skills, $agent_guide_skill_path );
 		self::add_global_styles_overlay_file( $files );
 
 		if ( $has_guideline_skills ) {
@@ -671,6 +672,40 @@ SKILL;
 		ksort( $files );
 
 		return $files;
+	}
+
+	private static function add_default_agent_guidance_files( &$files, &$has_guideline_skills, &$agent_guide_skill_path ) {
+		$default_skills = array(
+			self::AGENT_SKILL_SLUG => array(
+				'description' => 'Guide for coding agents working in a WP Origin checkout of a WordPress site.',
+				'content'     => self::get_default_agent_skill_content(),
+			),
+			self::TEMPLATE_EDITOR_SKILL_SLUG => array(
+				'description' => 'Edit WP Origin block theme templates and template parts as raw Gutenberg HTML while preserving Site Editor compatibility.',
+				'content'     => self::get_default_template_editor_skill_content(),
+			),
+		);
+
+		foreach ( $default_skills as $slug => $skill ) {
+			$path = 'wp_guideline/skills/' . $slug . '/SKILL.md';
+			if ( ! isset( $files[ $path ] ) ) {
+				$files[ $path ] = array(
+					'post'    => null,
+					'mode'    => TreeEntry::FILE_MODE_REGULAR_NON_EXECUTABLE,
+					'content' => self::format_skill_markdown(
+						$slug,
+						$skill['description'],
+						$skill['content']
+					),
+				);
+			}
+
+			$has_guideline_skills = true;
+		}
+
+		if ( ! $agent_guide_skill_path ) {
+			$agent_guide_skill_path = 'wp_guideline/skills/' . self::AGENT_SKILL_SLUG . '/SKILL.md';
+		}
 	}
 
 	public static function export_theme_base_content() {
@@ -1021,15 +1056,23 @@ SKILL;
 	}
 
 	private static function export_guideline_skill_to_markdown( WP_Post $post ) {
+		return self::format_skill_markdown(
+			$post->post_name,
+			trim( $post->post_excerpt ),
+			$post->post_content
+		);
+	}
+
+	private static function format_skill_markdown( $name, $description, $content ) {
 		$frontmatter = array(
 			'---',
-			'name: ' . self::quote_yaml_scalar( $post->post_name ),
-			'description: ' . self::quote_yaml_scalar( trim( $post->post_excerpt ) ),
+			'name: ' . self::quote_yaml_scalar( $name ),
+			'description: ' . self::quote_yaml_scalar( $description ),
 			'---',
 			'',
 		);
 
-		return implode( "\n", $frontmatter ) . ltrim( $post->post_content, "\r\n" );
+		return implode( "\n", $frontmatter ) . ltrim( $content, "\r\n" );
 	}
 
 	private static function quote_yaml_scalar( $value ) {

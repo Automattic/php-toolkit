@@ -75,6 +75,7 @@ The guiding rule is that users must not lose data. If a conversion cannot preser
 
 - **Guidelines and agent portability** (Priority: Medium)
   - When Gutenberg's Guidelines experiment is available, export `wp_guideline` posts under `wp_guideline/{type}/`.
+  - When Guidelines is not available, still export WP Origin's built-in agent guide and template-editing skill as generated read-only checkout files so agents receive the same operational guidance.
   - Store guideline skills as agent-portable skill directories, such as `wp_guideline/skills/{slug}/SKILL.md`.
   - Expose guideline skills through `.agents/skills` and `.claude/skills` directory symlinks so agents can discover the same canonical skill content.
   - Install default WP Origin coding-agent skills when Guidelines is available, including a general checkout guide and a focused block theme template-editing skill.
