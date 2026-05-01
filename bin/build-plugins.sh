@@ -36,3 +36,11 @@ cd $DIST_DIR
 zip -r url-updater.zip url-updater/
 cd $PROJECT_DIR
 rm -rf $DIST_DIR/url-updater
+
+mkdir -p $DIST_DIR/wp-origin
+cp -r $PROJECT_DIR/plugins/wp-origin/!(Tests|docker-demo|docs|blueprint-e2e.json|wp-origin-dev-bootstrap.php) $DIST_DIR/wp-origin
+cp $PROJECT_DIR/dist/php-toolkit.phar $DIST_DIR/wp-origin/php-toolkit.phar
+cd $DIST_DIR
+zip -r wp-origin.zip wp-origin/
+cd $PROJECT_DIR
+rm -rf $DIST_DIR/wp-origin

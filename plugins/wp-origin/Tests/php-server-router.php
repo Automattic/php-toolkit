@@ -1,4 +1,10 @@
 <?php
+// phpcs:disable WordPress.Security.ValidatedSanitizedInput,WordPress.WP.AlternativeFunctions -- This router runs before WordPress loads.
+
+if ( ! defined( 'ABSPATH' ) && 'cli-server' !== PHP_SAPI ) {
+	exit;
+}
+
 // Router for `php -S` running WordPress as the document root.
 //
 // PHP's built-in webserver does not run .htaccess, does not synthesise

@@ -9,6 +9,10 @@ use WordPress\Git\Model\TreeEntry;
 use WordPress\Markdown\MarkdownConsumer;
 use WordPress\Markdown\MarkdownProducer;
 
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 /**
  * WP Origin – exposes WordPress as a Git remote.
  *
@@ -245,7 +249,6 @@ SKILL;
 	}
 
 	public static function check_permissions( WP_REST_Request $request ) {
-		$git_path = self::build_git_path( $request );
 		if ( ! is_user_logged_in() ) {
 			return new WP_Error(
 				'wp_origin_auth_required',
@@ -254,12 +257,34 @@ SKILL;
 			);
 		}
 
-		if ( self::is_push_request( $git_path ) && ! current_user_can( 'edit_posts' ) ) {
+		if ( ! self::current_user_can_read_exported_content() ) {
 			return new WP_Error(
 				'wp_origin_forbidden',
-				'You do not have permission to push content changes.',
+				'You do not have permission to read all WP Origin content.',
 				array( 'status' => 403 )
 			);
+		}
+
+		return true;
+	}
+
+	private static function current_user_can_read_exported_content() {
+		$post_ids = get_posts(
+			array(
+				'post_type'      => self::get_export_post_types(),
+				'post_status'    => self::$supported_post_statuses,
+				'posts_per_page' => -1,
+				'fields'         => 'ids',
+				'no_found_rows'  => true,
+				'orderby'        => 'ID',
+				'order'          => 'ASC',
+			)
+		);
+
+		foreach ( $post_ids as $post_id ) {
+			if ( ! current_user_can( 'read_post', intval( $post_id ) ) ) {
+				return false;
+			}
 		}
 
 		return true;
@@ -365,7 +390,7 @@ SKILL;
 			}
 		}
 
-		echo $result->get_data();
+		echo $result->get_data(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Git Smart HTTP response bodies are binary protocol data; escaping corrupts them.
 
 		return true;
 	}
@@ -625,8 +650,8 @@ SKILL;
 		$has_guideline_skills   = false;
 		$agent_guide_skill_path = null;
 		foreach ( $posts as $post ) {
-			if ( ! current_user_can( 'read_post', $post->ID ) ) {
-				continue;
+			if ( ! current_user_can( 'read_post', intval( $post->ID ) ) ) {
+				throw new Exception( 'Git export rejected because you do not have permission to read all WP Origin content.' );
 			}
 
 			$path    = self::build_markdown_path( $post );
@@ -791,7 +816,7 @@ SKILL;
 				continue;
 			}
 
-			$content = file_get_contents( $full_path );
+			$content = file_get_contents( $full_path ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Reads a local theme/template file, not a remote URL.
 			if ( false === $content ) {
 				continue;
 			}
@@ -812,7 +837,7 @@ SKILL;
 			return;
 		}
 
-		$content = file_get_contents( $theme_json_path );
+		$content = file_get_contents( $theme_json_path ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Reads a local theme.json file, not a remote URL.
 		if ( false === $content ) {
 			return;
 		}
@@ -1415,6 +1440,7 @@ SKILL;
 			isset( $metadata['status'] ) ? $metadata['status'] : ( $existing_post ? $existing_post->post_status : 'draft' )
 		);
 		self::validate_post_status( $post_status, $post_type );
+		self::assert_can_set_post_status( $post_type, $post_status, $existing_post );
 
 		if (
 			$existing_post &&
@@ -1456,7 +1482,7 @@ SKILL;
 		}
 
 		if ( is_wp_error( $post_id ) ) {
-			throw new Exception( $post_id->get_error_message() );
+			throw new Exception( esc_html( $post_id->get_error_message() ) );
 		}
 
 		$post = get_post( $post_id );
@@ -1489,6 +1515,7 @@ SKILL;
 			$post_id = wp_update_post( wp_slash( $postarr ), true );
 		} else {
 			self::assert_can_create_post_type( $post_type );
+			self::assert_can_set_post_status( $post_type, 'publish' );
 			$postarr = array(
 				'post_type'    => $post_type,
 				'post_name'    => $slug,
@@ -1500,7 +1527,7 @@ SKILL;
 		}
 
 		if ( is_wp_error( $post_id ) ) {
-			throw new Exception( $post_id->get_error_message() );
+			throw new Exception( esc_html( $post_id->get_error_message() ) );
 		}
 
 		self::assign_raw_block_theme_slug( $post_id, $identity['theme'] );
@@ -1542,6 +1569,7 @@ SKILL;
 			$post_id = wp_update_post( wp_slash( $postarr ), true );
 		} else {
 			self::assert_can_create_post_type( 'wp_global_styles' );
+			self::assert_can_set_post_status( 'wp_global_styles', 'publish' );
 			$postarr = array(
 				'post_type'    => 'wp_global_styles',
 				'post_name'    => 'wp-global-styles-' . rawurlencode( $theme_slug ),
@@ -1553,7 +1581,7 @@ SKILL;
 		}
 
 		if ( is_wp_error( $post_id ) ) {
-			throw new Exception( $post_id->get_error_message() );
+			throw new Exception( esc_html( $post_id->get_error_message() ) );
 		}
 
 		self::assign_post_theme_slug( $post_id, $theme_slug );
@@ -1581,7 +1609,7 @@ SKILL;
 		self::path_to_global_styles_theme_slug( $path );
 		$config = json_decode( $json, true );
 		if ( JSON_ERROR_NONE !== json_last_error() ) {
-			throw new Exception( 'Push rejected because Global Styles JSON is invalid: ' . json_last_error_msg() );
+			throw new Exception( 'Push rejected because Global Styles JSON is invalid: ' . esc_html( json_last_error_msg() ) );
 		}
 		if ( ! is_array( $config ) ) {
 			throw new Exception( 'Push rejected because Global Styles files must contain a JSON object.' );
@@ -1643,6 +1671,7 @@ SKILL;
 			isset( $metadata['status'] ) ? $metadata['status'] : ( $existing_post ? $existing_post->post_status : 'draft' )
 		);
 		self::validate_post_status( $post_status, 'wp_guideline' );
+		self::assert_can_set_post_status( 'wp_guideline', $post_status, $existing_post );
 
 		if (
 			$existing_post &&
@@ -1679,13 +1708,13 @@ SKILL;
 		}
 
 		if ( is_wp_error( $post_id ) ) {
-			throw new Exception( $post_id->get_error_message() );
+			throw new Exception( esc_html( $post_id->get_error_message() ) );
 		}
 
 		$term_id   = self::get_or_create_guideline_type_term_id( $guideline_type_slug );
 		$set_terms = wp_set_object_terms( $post_id, array( $term_id ), 'wp_guideline_type' );
 		if ( is_wp_error( $set_terms ) ) {
-			throw new Exception( $set_terms->get_error_message() );
+			throw new Exception( esc_html( $set_terms->get_error_message() ) );
 		}
 
 		$post = get_post( $post_id );
@@ -2012,7 +2041,7 @@ SKILL;
 
 		$terms = wp_set_object_terms( $post_id, array( $theme_slug ), 'wp_theme' );
 		if ( is_wp_error( $terms ) ) {
-			throw new Exception( $terms->get_error_message() );
+			throw new Exception( esc_html( $terms->get_error_message() ) );
 		}
 	}
 
@@ -2122,7 +2151,7 @@ SKILL;
 		);
 
 		if ( is_wp_error( $inserted ) ) {
-			throw new Exception( $inserted->get_error_message() );
+			throw new Exception( esc_html( $inserted->get_error_message() ) );
 		}
 
 		return (int) $inserted['term_id'];
@@ -2136,8 +2165,8 @@ SKILL;
 		throw new Exception(
 			sprintf(
 				'Push rejected because "%s" is not a supported %s status.',
-				$post_status,
-				$post_type
+				esc_html( $post_status ),
+				esc_html( $post_type )
 			)
 		);
 	}
@@ -2203,9 +2232,32 @@ SKILL;
 
 	private static function assert_can_create_post_type( $post_type ) {
 		$post_type_object = get_post_type_object( $post_type );
-		$edit_posts_cap   = $post_type_object && isset( $post_type_object->cap->edit_posts ) ? $post_type_object->cap->edit_posts : 'edit_posts';
-		if ( ! current_user_can( $edit_posts_cap ) ) {
+		$create_posts_cap = $post_type_object && isset( $post_type_object->cap->create_posts ) ? $post_type_object->cap->create_posts : '';
+		if ( '' === $create_posts_cap && $post_type_object && isset( $post_type_object->cap->edit_posts ) ) {
+			$create_posts_cap = $post_type_object->cap->edit_posts;
+		}
+		if ( '' === $create_posts_cap ) {
+			$create_posts_cap = 'edit_posts';
+		}
+		if ( ! current_user_can( $create_posts_cap ) ) {
 			throw new Exception( 'Push rejected because you do not have permission to create this post type.' );
+		}
+	}
+
+	private static function assert_can_set_post_status( $post_type, $post_status, $existing_post = null ) {
+		if ( $existing_post && $existing_post->post_status === $post_status ) {
+			return;
+		}
+		if ( ! in_array( $post_status, array( 'publish', 'future', 'private' ), true ) ) {
+			return;
+		}
+
+		$post_type_object  = get_post_type_object( $post_type );
+		$publish_posts_cap = $post_type_object && isset( $post_type_object->cap->publish_posts )
+			? $post_type_object->cap->publish_posts
+			: 'publish_posts';
+		if ( ! current_user_can( $publish_posts_cap ) ) {
+			throw new Exception( 'Push rejected because you do not have permission to publish this post type.' );
 		}
 	}
 
@@ -2226,6 +2278,6 @@ SKILL;
 			return false;
 		}
 
-		throw new ErrorException( $message, 0, $severity, $file, $line );
+		throw new ErrorException( esc_html( $message ), 0, (int) $severity, esc_html( $file ), (int) $line );
 	}
 }

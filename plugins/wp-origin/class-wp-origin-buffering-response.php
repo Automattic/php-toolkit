@@ -2,6 +2,10 @@
 
 use WordPress\HttpServer\Response\ResponseWriteStream;
 
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 class WP_Origin_Buffering_Response implements ResponseWriteStream {
 	const MARKER_HEADER = 'X-WP-Origin-Git-Response';
 

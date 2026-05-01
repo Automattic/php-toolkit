@@ -1,5 +1,9 @@
 <?php
 
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 /**
  * Admin UI for WP Origin: a Tools → "WP Origin" page that shows the
  * seeder's progress with a live progress bar, plus a small REST
@@ -81,7 +85,7 @@ class WP_Origin_Admin {
 		// so the user never lands on "Queued. Waiting for the first
 		// cron tick." — by the time they see the progress bar it's
 		// already moving and several commits exist.
-		self::drive_seeder( 1.5 );
+		WP_Origin_Seeder::drive( 1.5 );
 		$progress   = WP_Origin_Seeder::get_progress();
 		$nonce      = wp_create_nonce( 'wp_rest' );
 		$status_url = esc_url_raw( rest_url( self::REST_NAMESPACE . self::STATUS_ROUTE ) );
