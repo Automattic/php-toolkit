@@ -100,11 +100,92 @@ class WP_Origin_End_To_End_Test extends TestCase {
 		$this->assertStringNotContainsString( 'Seed batch', $result['output'] );
 	}
 
+	public function testCloneFailsClosedWhenPageParentIsNotExported() {
+		$suffix    = uniqid( 'trashed-parent-' );
+		$parent_id = $this->create_page_via_rest(
+			array(
+				'slug'    => 'parent-' . $suffix,
+				'title'   => 'Parent ' . $suffix,
+				'status'  => 'publish',
+				'content' => '<!-- wp:paragraph --><p>Parent ' . $suffix . '</p><!-- /wp:paragraph -->',
+			)
+		);
+		$this->create_page_via_rest(
+			array(
+				'slug'    => 'child-' . $suffix,
+				'title'   => 'Child ' . $suffix,
+				'status'  => 'publish',
+				'parent'  => $parent_id,
+				'content' => '<!-- wp:paragraph --><p>Child ' . $suffix . '</p><!-- /wp:paragraph -->',
+			)
+		);
+
+		try {
+			$this->delete_page_via_rest( $parent_id );
+			$result = $this->run_cmd(
+				array( 'git', '-c', 'protocol.version=2', 'clone', $this->remote_url(), $this->work_dir . '/trashed-parent' ),
+				true
+			);
+			$this->assertNotSame( 0, $result['code'], 'Clone should fail closed when an exported page has a trashed parent.' );
+		} finally {
+			$this->update_page_via_rest( $parent_id, array( 'status' => 'publish' ) );
+		}
+	}
+
 	public function testFullRoundTrip() {
+		$hierarchy_suffix = uniqid( 'hierarchy-' );
+		$parent_a_slug    = 'parent-a-' . $hierarchy_suffix;
+		$parent_b_slug    = 'parent-b-' . $hierarchy_suffix;
+		$child_slug       = 'shared-child-' . $hierarchy_suffix;
+		$parent_a_id      = $this->create_page_via_rest(
+			array(
+				'slug'    => $parent_a_slug,
+				'title'   => 'Parent A ' . $hierarchy_suffix,
+				'status'  => 'publish',
+				'content' => '<!-- wp:paragraph --><p>Parent A ' . $hierarchy_suffix . '</p><!-- /wp:paragraph -->',
+			)
+		);
+		$parent_b_id      = $this->create_page_via_rest(
+			array(
+				'slug'    => $parent_b_slug,
+				'title'   => 'Parent B ' . $hierarchy_suffix,
+				'status'  => 'publish',
+				'content' => '<!-- wp:paragraph --><p>Parent B ' . $hierarchy_suffix . '</p><!-- /wp:paragraph -->',
+			)
+		);
+		$this->create_page_via_rest(
+			array(
+				'slug'    => $child_slug,
+				'title'   => 'Shared Child A ' . $hierarchy_suffix,
+				'status'  => 'publish',
+				'parent'  => $parent_a_id,
+				'content' => '<!-- wp:paragraph --><p>Shared Child A ' . $hierarchy_suffix . '</p><!-- /wp:paragraph -->',
+			)
+		);
+		$this->create_page_via_rest(
+			array(
+				'slug'    => $child_slug,
+				'title'   => 'Shared Child B ' . $hierarchy_suffix,
+				'status'  => 'publish',
+				'parent'  => $parent_b_id,
+				'content' => '<!-- wp:paragraph --><p>Shared Child B ' . $hierarchy_suffix . '</p><!-- /wp:paragraph -->',
+			)
+		);
+
 		$clone_dir = $this->clone_repo( 'clone' );
 
 		$this->assertFileExists( $clone_dir . '/post/hello-world.md' );
 		$this->assertFileExists( $clone_dir . '/page/sample-page.md' );
+		$this->assertFileExists( $clone_dir . '/page/' . $parent_a_slug . '/' . $child_slug . '.md' );
+		$this->assertFileExists( $clone_dir . '/page/' . $parent_b_slug . '/' . $child_slug . '.md' );
+		$this->assertStringContainsString(
+			'Shared Child A ' . $hierarchy_suffix,
+			file_get_contents( $clone_dir . '/page/' . $parent_a_slug . '/' . $child_slug . '.md' )
+		);
+		$this->assertStringContainsString(
+			'Shared Child B ' . $hierarchy_suffix,
+			file_get_contents( $clone_dir . '/page/' . $parent_b_slug . '/' . $child_slug . '.md' )
+		);
 		$this->assertFileExists( $clone_dir . '/wp_template/blog-home.html' );
 		$this->assertNotEmpty( glob( $clone_dir . '/wp_template/*/*.html' ), 'Expected active theme base templates to be exported.' );
 		$this->assertNotEmpty( glob( $clone_dir . '/wp_template_part/*/*.html' ), 'Expected active theme base template parts to be exported.' );
@@ -165,6 +246,33 @@ class WP_Origin_End_To_End_Test extends TestCase {
 		$sample_page_id = $this->fetch_id_by_slug( 'sample-page', 'pages' );
 
 		$this->configure_git( $clone_dir );
+
+		$git_child_slug = 'git-child-' . $hierarchy_suffix;
+		file_put_contents(
+			$clone_dir . '/page/' . $parent_a_slug . '/' . $git_child_slug . '.md',
+			"---\nstatus: \"publish\"\ntitle: \"Git Child $hierarchy_suffix\"\n---\n\nNested child from Git.\n"
+		);
+		$this->commit_and_push(
+			$clone_dir,
+			'page/' . $parent_a_slug . '/' . $git_child_slug . '.md',
+			'Create nested child page from Git'
+		);
+		$git_child_id = $this->fetch_id_by_slug( $git_child_slug, 'pages' );
+		$git_child    = $this->fetch_rest_item( $git_child_id, 'pages' );
+		$this->assertSame( $parent_a_id, intval( $git_child['parent'] ) );
+		$this->assertStringContainsString( 'Nested child from Git', $git_child['content']['raw'] );
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'pull', '--rebase', 'origin', 'trunk' ) );
+
+		unlink( $clone_dir . '/page/' . $parent_a_slug . '.md' );
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'add', '-A' ) );
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'commit', '-m', 'Reject parent page delete with children' ) );
+		$push_result = $this->run_cmd(
+			array( 'git', '-C', $clone_dir, 'push', 'origin', 'trunk' ),
+			true
+		);
+		$this->assertNotSame( 0, $push_result['code'], 'Parent page deletion with remaining children should have been rejected.' );
+		$this->assertStringContainsString( 'Push rejected because deleting a parent page while keeping nested child page files would move child content.', $push_result['output'] );
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'reset', '--hard', 'HEAD~1' ) );
 
 		// Theme source JSON is exported for context, not edited through
 		// WP Origin.
@@ -307,7 +415,7 @@ class WP_Origin_End_To_End_Test extends TestCase {
 		// 6) Create a new post and delete an existing page in one push.
 		file_put_contents(
 			$clone_dir . '/post/created-from-git.md',
-			"---\ntype: \"post\"\nslug: \"created-from-git\"\nstatus: \"publish\"\ntitle: \"Created From Git\"\n---\n\nCreated from Git.\n"
+			"---\nstatus: \"publish\"\ntitle: \"Created From Git\"\n---\n\nCreated from Git.\n"
 		);
 		unlink( $clone_dir . '/page/sample-page.md' );
 		$this->run_cmd( array( 'git', '-C', $clone_dir, 'add', '-A' ) );
@@ -321,8 +429,414 @@ class WP_Origin_End_To_End_Test extends TestCase {
 		);
 		$this->assertSame( 'trash', $this->fetch_status( $sample_page_id, 'pages' ) );
 
-		// 7) Stale push: an out-of-date local commit must be rejected.
+		// 7) The Git path is the content identity; front matter cannot
+		// smuggle a different ID or slug.
 		$this->run_cmd( array( 'git', '-C', $clone_dir, 'pull', '--rebase', 'origin', 'trunk' ) );
+		file_put_contents(
+			$clone_dir . '/post/rejected-id-frontmatter.md',
+			"---\nid: \"1\"\nstatus: \"publish\"\ntitle: \"Rejected ID Front Matter\"\n---\n\nThis push must be rejected.\n"
+		);
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'add', 'post/rejected-id-frontmatter.md' ) );
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'commit', '-m', 'Reject post id front matter' ) );
+		$push_result = $this->run_cmd(
+			array( 'git', '-C', $clone_dir, 'push', 'origin', 'trunk' ),
+			true
+		);
+		$this->assertNotSame( 0, $push_result['code'], 'ID front matter should have been rejected.' );
+		$this->assertStringContainsString( 'Push rejected because Markdown front matter must not include an id.', $push_result['output'] );
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'reset', '--hard', 'HEAD~1' ) );
+
+		file_put_contents(
+			$clone_dir . '/post/rejected-slug-frontmatter.md',
+			"---\nslug: \"rejected-slug-frontmatter\"\nstatus: \"publish\"\ntitle: \"Rejected Slug Front Matter\"\n---\n\nThis push must be rejected.\n"
+		);
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'add', 'post/rejected-slug-frontmatter.md' ) );
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'commit', '-m', 'Reject post slug front matter' ) );
+		$push_result = $this->run_cmd(
+			array( 'git', '-C', $clone_dir, 'push', 'origin', 'trunk' ),
+			true
+		);
+		$this->assertNotSame( 0, $push_result['code'], 'Slug front matter should have been rejected.' );
+		$this->assertStringContainsString( 'Push rejected because Markdown front matter must not include a slug.', $push_result['output'] );
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'reset', '--hard', 'HEAD~1' ) );
+
+		file_put_contents(
+			$clone_dir . '/post/rejected-type-frontmatter.md',
+			"---\ntype: \"post\"\nstatus: \"publish\"\ntitle: \"Rejected Type Front Matter\"\n---\n\nThis push must be rejected.\n"
+		);
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'add', 'post/rejected-type-frontmatter.md' ) );
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'commit', '-m', 'Reject post type front matter' ) );
+		$push_result = $this->run_cmd(
+			array( 'git', '-C', $clone_dir, 'push', 'origin', 'trunk' ),
+			true
+		);
+		$this->assertNotSame( 0, $push_result['code'], 'Type front matter should have been rejected.' );
+		$this->assertStringContainsString( 'Push rejected because Markdown front matter must not include a type.', $push_result['output'] );
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'reset', '--hard', 'HEAD~1' ) );
+
+		mkdir( $clone_dir . '/post/nested-path' );
+		file_put_contents(
+			$clone_dir . '/post/nested-path/rejected-nested-path.md',
+			"---\nstatus: \"publish\"\ntitle: \"Rejected Nested Path\"\n---\n\nThis push must be rejected.\n"
+		);
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'add', 'post/nested-path/rejected-nested-path.md' ) );
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'commit', '-m', 'Reject nested post path' ) );
+		$push_result = $this->run_cmd(
+			array( 'git', '-C', $clone_dir, 'push', 'origin', 'trunk' ),
+			true
+		);
+		$this->assertNotSame( 0, $push_result['code'], 'Nested post paths should have been rejected.' );
+		$this->assertStringContainsString( 'Push rejected because post Markdown files must use post/<slug>.md paths.', $push_result['output'] );
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'reset', '--hard', 'HEAD~1' ) );
+
+		file_put_contents(
+			$clone_dir . '/post/Rejected Upper Slug.md',
+			"---\nstatus: \"publish\"\ntitle: \"Rejected Upper Slug\"\n---\n\nThis push must be rejected.\n"
+		);
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'add', 'post/Rejected Upper Slug.md' ) );
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'commit', '-m', 'Reject noncanonical post slug' ) );
+		$push_result = $this->run_cmd(
+			array( 'git', '-C', $clone_dir, 'push', 'origin', 'trunk' ),
+			true
+		);
+		$this->assertNotSame( 0, $push_result['code'], 'Noncanonical post slugs should have been rejected.' );
+		$this->assertStringContainsString( 'Push rejected because Markdown file slugs must already match WordPress slug formatting.', $push_result['output'] );
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'reset', '--hard', 'HEAD~1' ) );
+
+		mkdir( $clone_dir . '/wp_template/Bad Theme' );
+		file_put_contents(
+			$clone_dir . '/wp_template/Bad Theme/rejected-raw-path.html',
+			'<!-- wp:paragraph --><p>This push must be rejected.</p><!-- /wp:paragraph -->'
+		);
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'add', 'wp_template/Bad Theme/rejected-raw-path.html' ) );
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'commit', '-m', 'Reject noncanonical template theme path' ) );
+		$push_result = $this->run_cmd(
+			array( 'git', '-C', $clone_dir, 'push', 'origin', 'trunk' ),
+			true
+		);
+		$this->assertNotSame( 0, $push_result['code'], 'Noncanonical template theme paths should have been rejected.' );
+		$this->assertStringContainsString( 'Push rejected because template theme path segments must already match WordPress slug formatting.', $push_result['output'] );
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'reset', '--hard', 'HEAD~1' ) );
+
+		file_put_contents(
+			$clone_dir . '/wp_template/Rejected Raw Slug.html',
+			'<!-- wp:paragraph --><p>This push must be rejected.</p><!-- /wp:paragraph -->'
+		);
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'add', 'wp_template/Rejected Raw Slug.html' ) );
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'commit', '-m', 'Reject noncanonical template slug path' ) );
+		$push_result = $this->run_cmd(
+			array( 'git', '-C', $clone_dir, 'push', 'origin', 'trunk' ),
+			true
+		);
+		$this->assertNotSame( 0, $push_result['code'], 'Noncanonical template slug paths should have been rejected.' );
+		$this->assertStringContainsString( 'Push rejected because template file slugs must already match WordPress slug formatting.', $push_result['output'] );
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'reset', '--hard', 'HEAD~1' ) );
+
+		file_put_contents(
+			$clone_dir . '/wp_template/rejected-plain-html.html',
+			"<div>This push must be rejected.</div>\n"
+		);
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'add', 'wp_template/rejected-plain-html.html' ) );
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'commit', '-m', 'Reject plain template HTML' ) );
+		$push_result = $this->run_cmd(
+			array( 'git', '-C', $clone_dir, 'push', 'origin', 'trunk' ),
+			true
+		);
+		$this->assertNotSame( 0, $push_result['code'], 'Plain template HTML should have been rejected.' );
+		$this->assertStringContainsString( 'Push rejected because template HTML files must contain serialized Gutenberg block markup.', $push_result['output'] );
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'reset', '--hard', 'HEAD~1' ) );
+
+		file_put_contents(
+			$clone_dir . '/wp_global_styles/Bad-Theme.json',
+			"{\"version\":3,\"settings\":{},\"styles\":{}}\n"
+		);
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'add', 'wp_global_styles/Bad-Theme.json' ) );
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'commit', '-m', 'Reject noncanonical Global Styles path' ) );
+		$push_result = $this->run_cmd(
+			array( 'git', '-C', $clone_dir, 'push', 'origin', 'trunk' ),
+			true
+		);
+		$this->assertNotSame( 0, $push_result['code'], 'Noncanonical Global Styles filenames should have been rejected.' );
+		$this->assertStringContainsString( 'Push rejected because the Global Styles theme filename must already match WordPress slug formatting.', $push_result['output'] );
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'reset', '--hard', 'HEAD~1' ) );
+
+		if ( @symlink( '../post/hello-world.md', $clone_dir . '/post/rejected-symlink.md' ) ) {
+			$this->run_cmd( array( 'git', '-C', $clone_dir, 'add', 'post/rejected-symlink.md' ) );
+			$this->run_cmd( array( 'git', '-C', $clone_dir, 'commit', '-m', 'Reject arbitrary symlink' ) );
+			$push_result = $this->run_cmd(
+				array( 'git', '-C', $clone_dir, 'push', 'origin', 'trunk' ),
+				true
+			);
+			$this->assertNotSame( 0, $push_result['code'], 'Arbitrary symlinks should have been rejected.' );
+			$this->assertStringContainsString( 'Push rejected because symlink files are generated by WP Origin and cannot be created or modified.', $push_result['output'] );
+			$this->run_cmd( array( 'git', '-C', $clone_dir, 'reset', '--hard', 'HEAD~1' ) );
+		}
+
+		if ( is_link( $clone_dir . '/AGENTS.md' ) ) {
+			$this->run_cmd( array( 'git', '-C', $clone_dir, 'rm', 'AGENTS.md' ) );
+			$this->run_cmd( array( 'git', '-C', $clone_dir, 'commit', '-m', 'Reject generated symlink deletion' ) );
+			$push_result = $this->run_cmd(
+				array( 'git', '-C', $clone_dir, 'push', 'origin', 'trunk' ),
+				true
+			);
+			$this->assertNotSame( 0, $push_result['code'], 'Generated symlink deletion should have been rejected.' );
+			$this->assertStringContainsString( 'Push rejected because symlink files are generated by WP Origin and cannot be deleted or modified.', $push_result['output'] );
+			$this->run_cmd( array( 'git', '-C', $clone_dir, 'reset', '--hard', 'HEAD~1' ) );
+		}
+
+		file_put_contents(
+			$clone_dir . '/post/rejected-executable.md',
+			"---\nstatus: \"publish\"\ntitle: \"Rejected Executable\"\n---\n\nThis push must be rejected.\n"
+		);
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'add', 'post/rejected-executable.md' ) );
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'update-index', '--chmod=+x', 'post/rejected-executable.md' ) );
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'commit', '-m', 'Reject executable content file' ) );
+		$push_result = $this->run_cmd(
+			array( 'git', '-C', $clone_dir, 'push', 'origin', 'trunk' ),
+			true
+		);
+		$this->assertNotSame( 0, $push_result['code'], 'Executable content files should have been rejected.' );
+		$this->assertStringContainsString( 'Push rejected because executable file modes are not supported by WP Origin content exports.', $push_result['output'] );
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'reset', '--hard', 'HEAD~1' ) );
+
+		file_put_contents(
+			$clone_dir . '/post/rejected-multi-ref.md',
+			"---\nstatus: \"publish\"\ntitle: \"Rejected Multi Ref\"\n---\n\nThis push must be rejected before WordPress writes.\n"
+		);
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'add', 'post/rejected-multi-ref.md' ) );
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'commit', '-m', 'Reject multi-ref push' ) );
+		$push_result = $this->run_cmd(
+			array( 'git', '-C', $clone_dir, 'push', 'origin', 'HEAD:trunk', 'HEAD:refs/heads/rejected-multi-ref' ),
+			true
+		);
+		$this->assertNotSame( 0, $push_result['code'], 'Multi-ref pushes should have been rejected.' );
+		$this->assertStringContainsString( 'Push rejected because WP Origin only accepts one ref update at a time.', $push_result['output'] );
+		$this->assert_slug_absent( 'rejected-multi-ref', 'posts' );
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'reset', '--hard', 'HEAD~1' ) );
+
+		$push_result = $this->run_cmd(
+			array( 'git', '-C', $clone_dir, 'push', 'origin', ':trunk' ),
+			true
+		);
+		$this->assertNotSame( 0, $push_result['code'], 'Deleting trunk should have been rejected.' );
+		$this->assertStringContainsString( 'Push rejected because deleting trunk is not supported.', $push_result['output'] );
+
+		// 8) Push validation must finish before any WordPress writes.
+		file_put_contents(
+			$clone_dir . '/page/atomic-valid-page.md',
+			"---\nstatus: \"publish\"\ntitle: \"Atomic Valid Page\"\n---\n\nThis page must not be written if the push is rejected.\n"
+		);
+		file_put_contents(
+			$clone_dir . '/post/atomic-invalid-status.md',
+			"---\nstatus: \"invalid-status\"\ntitle: \"Atomic Invalid Status\"\n---\n\nThis push must be rejected.\n"
+		);
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'add', 'page/atomic-valid-page.md', 'post/atomic-invalid-status.md' ) );
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'commit', '-m', 'Reject atomic partial writes' ) );
+		$push_result = $this->run_cmd(
+			array( 'git', '-C', $clone_dir, 'push', 'origin', 'trunk' ),
+			true
+		);
+		$this->assertNotSame( 0, $push_result['code'], 'Invalid status push should have been rejected.' );
+		$this->assertStringContainsString( 'Push rejected because "invalid-status" is not a supported post status.', $push_result['output'] );
+		$this->assert_slug_absent( 'atomic-valid-page', 'pages' );
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'reset', '--hard', 'HEAD~1' ) );
+
+		file_put_contents(
+			$clone_dir . '/post/rejected-frontmatter.md',
+			"---\nstatus: \"publish\"\ntitle: \"Rejected Front Matter\"\n\nThis push must be rejected.\n"
+		);
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'add', 'post/rejected-frontmatter.md' ) );
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'commit', '-m', 'Reject malformed front matter' ) );
+		$push_result = $this->run_cmd(
+			array( 'git', '-C', $clone_dir, 'push', 'origin', 'trunk' ),
+			true
+		);
+		$this->assertNotSame( 0, $push_result['code'], 'Malformed front matter should have been rejected.' );
+		$this->assertStringContainsString( 'Push rejected because Markdown front matter is missing its closing --- fence.', $push_result['output'] );
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'reset', '--hard', 'HEAD~1' ) );
+
+		file_put_contents(
+			$clone_dir . '/post/rejected-invalid-date.md',
+			"---\nstatus: \"publish\"\ndate: \"not a date\"\ntitle: \"Rejected Invalid Date\"\n---\n\nThis push must be rejected.\n"
+		);
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'add', 'post/rejected-invalid-date.md' ) );
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'commit', '-m', 'Reject invalid front matter date' ) );
+		$push_result = $this->run_cmd(
+			array( 'git', '-C', $clone_dir, 'push', 'origin', 'trunk' ),
+			true
+		);
+		$this->assertNotSame( 0, $push_result['code'], 'Invalid date front matter should have been rejected.' );
+		$this->assertStringContainsString( 'Push rejected because Markdown front matter date is invalid.', $push_result['output'] );
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'reset', '--hard', 'HEAD~1' ) );
+
+		file_put_contents(
+			$clone_dir . '/post/rejected-impossible-date.md',
+			"---\nstatus: \"publish\"\ndate: \"2024-02-31\"\ntitle: \"Rejected Impossible Date\"\n---\n\nThis push must be rejected.\n"
+		);
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'add', 'post/rejected-impossible-date.md' ) );
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'commit', '-m', 'Reject impossible front matter date' ) );
+		$push_result = $this->run_cmd(
+			array( 'git', '-C', $clone_dir, 'push', 'origin', 'trunk' ),
+			true
+		);
+		$this->assertNotSame( 0, $push_result['code'], 'Impossible date front matter should have been rejected.' );
+		$this->assertStringContainsString( 'Push rejected because Markdown front matter date is invalid.', $push_result['output'] );
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'reset', '--hard', 'HEAD~1' ) );
+
+		file_put_contents(
+			$clone_dir . '/post/rejected-scheduled-no-date.md',
+			"---\nstatus: \"scheduled\"\ntitle: \"Rejected Scheduled No Date\"\n---\n\nThis push must be rejected.\n"
+		);
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'add', 'post/rejected-scheduled-no-date.md' ) );
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'commit', '-m', 'Reject scheduled post without date' ) );
+		$push_result = $this->run_cmd(
+			array( 'git', '-C', $clone_dir, 'push', 'origin', 'trunk' ),
+			true
+		);
+		$this->assertNotSame( 0, $push_result['code'], 'Scheduled posts without dates should have been rejected.' );
+		$this->assertStringContainsString( 'Push rejected because scheduled posts must include a future date.', $push_result['output'] );
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'reset', '--hard', 'HEAD~1' ) );
+
+		file_put_contents(
+			$clone_dir . '/post/rejected-scheduled-past-date.md',
+			"---\nstatus: \"scheduled\"\ndate: \"2000-01-01T00:00:00Z\"\ntitle: \"Rejected Scheduled Past Date\"\n---\n\nThis push must be rejected.\n"
+		);
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'add', 'post/rejected-scheduled-past-date.md' ) );
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'commit', '-m', 'Reject scheduled post with past date' ) );
+		$push_result = $this->run_cmd(
+			array( 'git', '-C', $clone_dir, 'push', 'origin', 'trunk' ),
+			true
+		);
+			$this->assertNotSame( 0, $push_result['code'], 'Scheduled posts with past dates should have been rejected.' );
+			$this->assertStringContainsString( 'Push rejected because scheduled posts must include a date in the future.', $push_result['output'] );
+			$this->run_cmd( array( 'git', '-C', $clone_dir, 'reset', '--hard', 'HEAD~1' ) );
+
+			file_put_contents(
+				$clone_dir . '/post/rejected-published-future-date.md',
+				"---\nstatus: \"publish\"\ndate: \"2099-01-01T00:00:00Z\"\ntitle: \"Rejected Published Future Date\"\n---\n\nThis push must be rejected.\n"
+			);
+			$this->run_cmd( array( 'git', '-C', $clone_dir, 'add', 'post/rejected-published-future-date.md' ) );
+			$this->run_cmd( array( 'git', '-C', $clone_dir, 'commit', '-m', 'Reject published post with future date' ) );
+			$push_result = $this->run_cmd(
+				array( 'git', '-C', $clone_dir, 'push', 'origin', 'trunk' ),
+				true
+			);
+			$this->assertNotSame( 0, $push_result['code'], 'Published posts with future dates should have been rejected.' );
+			$this->assertStringContainsString( 'Push rejected because published posts must not include a future date.', $push_result['output'] );
+			$this->run_cmd( array( 'git', '-C', $clone_dir, 'reset', '--hard', 'HEAD~1' ) );
+
+			file_put_contents(
+				$clone_dir . '/post/rejected-nul-byte.md',
+				"---\nstatus: \"publish\"\ntitle: \"Rejected NUL Byte\"\n---\n\nBefore " . "\0" . " after.\n"
+		);
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'add', 'post/rejected-nul-byte.md' ) );
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'commit', '-m', 'Reject NUL byte content' ) );
+		$push_result = $this->run_cmd(
+			array( 'git', '-C', $clone_dir, 'push', 'origin', 'trunk' ),
+			true
+		);
+		$this->assertNotSame( 0, $push_result['code'], 'NUL byte content should have been rejected.' );
+		$this->assertStringContainsString( 'Push rejected because content files must not contain NUL bytes.', $push_result['output'] );
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'reset', '--hard', 'HEAD~1' ) );
+
+		file_put_contents(
+			$clone_dir . '/post/rejected-array-title.md',
+			"---\nstatus: \"publish\"\ntitle:\n  - \"Array Title\"\n---\n\nThis push must be rejected.\n"
+		);
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'add', 'post/rejected-array-title.md' ) );
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'commit', '-m', 'Reject array front matter title' ) );
+		$push_result = $this->run_cmd(
+			array( 'git', '-C', $clone_dir, 'push', 'origin', 'trunk' ),
+			true
+		);
+		$this->assertNotSame( 0, $push_result['code'], 'Array title front matter should have been rejected.' );
+		$this->assertStringContainsString( 'Push rejected because Markdown front matter field "title" must be a scalar string or number.', $push_result['output'] );
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'reset', '--hard', 'HEAD~1' ) );
+
+		file_put_contents(
+			$clone_dir . '/post/rejected-unknown-frontmatter.md',
+			"---\nstatus: \"publish\"\nauthor: \"admin\"\ntitle: \"Rejected Unknown Front Matter\"\n---\n\nThis push must be rejected.\n"
+		);
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'add', 'post/rejected-unknown-frontmatter.md' ) );
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'commit', '-m', 'Reject unknown front matter' ) );
+		$push_result = $this->run_cmd(
+			array( 'git', '-C', $clone_dir, 'push', 'origin', 'trunk' ),
+			true
+		);
+		$this->assertNotSame( 0, $push_result['code'], 'Unknown front matter should have been rejected.' );
+		$this->assertStringContainsString( 'Push rejected because Markdown front matter field "author" is not supported.', $push_result['output'] );
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'reset', '--hard', 'HEAD~1' ) );
+
+		file_put_contents(
+			$clone_dir . '/post/rejected-block-markup.md',
+			"---\nstatus: \"publish\"\ntitle: \"Rejected Block Markup\"\n---\n\n<!-- wp:group {bad json} -->\nBroken block markup.\n<!-- /wp:group -->\n"
+		);
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'add', 'post/rejected-block-markup.md' ) );
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'commit', '-m', 'Reject malformed block markup' ) );
+		$push_result = $this->run_cmd(
+			array( 'git', '-C', $clone_dir, 'push', 'origin', 'trunk' ),
+			true
+		);
+		$this->assertNotSame( 0, $push_result['code'], 'Malformed block markup should have been rejected.' );
+		$this->assertStringContainsString( 'Push rejected because the content contains malformed Gutenberg block', $push_result['output'] );
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'reset', '--hard', 'HEAD~1' ) );
+
+		file_put_contents(
+			$clone_dir . '/post/rejected-mismatched-blocks.md',
+			"---\nstatus: \"publish\"\ntitle: \"Rejected Mismatched Blocks\"\n---\n\n<!-- wp:paragraph -->\n<p>Broken block markup.</p>\n<!-- /wp:group -->\n"
+		);
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'add', 'post/rejected-mismatched-blocks.md' ) );
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'commit', '-m', 'Reject mismatched block markup' ) );
+		$push_result = $this->run_cmd(
+			array( 'git', '-C', $clone_dir, 'push', 'origin', 'trunk' ),
+			true
+		);
+		$this->assertNotSame( 0, $push_result['code'], 'Mismatched block delimiters should have been rejected.' );
+		$this->assertStringContainsString( 'Push rejected because the content contains mismatched Gutenberg block delimiters.', $push_result['output'] );
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'reset', '--hard', 'HEAD~1' ) );
+
+		file_put_contents(
+			$clone_dir . '/post/rejected-raw-block-in-markdown.md',
+			"---\nstatus: \"publish\"\ntitle: \"Rejected Raw Block In Markdown\"\n---\n\n<!-- wp:acme/custom-block-2 {\"flag\":true} /-->\n"
+		);
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'add', 'post/rejected-raw-block-in-markdown.md' ) );
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'commit', '-m', 'Reject raw block in Markdown' ) );
+		$push_result = $this->run_cmd(
+			array( 'git', '-C', $clone_dir, 'push', 'origin', 'trunk' ),
+			true
+		);
+		$this->assertNotSame( 0, $push_result['code'], 'Raw block delimiters in Markdown should have been rejected.' );
+		$this->assertStringContainsString( 'Push rejected because Markdown content must not embed raw Gutenberg block delimiters inside HTML blocks.', $push_result['output'] );
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'reset', '--hard', 'HEAD~1' ) );
+
+		file_put_contents(
+			$clone_dir . '/wp_template/custom-acme-block.html',
+			'<!-- wp:acme/custom-block-2 {"flag":true} /-->'
+		);
+		$this->commit_and_push( $clone_dir, 'wp_template/custom-acme-block.html', 'Accept custom block markup' );
+
+		file_put_contents(
+			$clone_dir . '/post/delete-restore-e2e.md',
+			"---\nstatus: \"publish\"\ntitle: \"Delete Restore E2E\"\n---\n\nRestore the same WordPress post.\n"
+		);
+		$this->commit_and_push( $clone_dir, 'post/delete-restore-e2e.md', 'Create delete restore post' );
+		$restore_id = $this->fetch_id_by_slug( 'delete-restore-e2e', 'posts' );
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'pull', '--rebase', 'origin', 'trunk' ) );
+		unlink( $clone_dir . '/post/delete-restore-e2e.md' );
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'add', '-A' ) );
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'commit', '-m', 'Trash delete restore post' ) );
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'push', 'origin', 'trunk' ) );
+		$this->assertSame( 'trash', $this->fetch_status( $restore_id, 'posts' ) );
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'pull', '--rebase', 'origin', 'trunk' ) );
+		file_put_contents(
+			$clone_dir . '/post/delete-restore-e2e.md',
+			"---\nstatus: \"publish\"\ntitle: \"Delete Restore E2E\"\n---\n\nRestored through Git.\n"
+		);
+		$this->commit_and_push( $clone_dir, 'post/delete-restore-e2e.md', 'Restore delete restore post' );
+		$this->assertSame( $restore_id, $this->fetch_id_by_slug( 'delete-restore-e2e', 'posts' ) );
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'pull', '--rebase', 'origin', 'trunk' ) );
+
+		// 9) Stale push: an out-of-date local commit must be rejected.
 		$this->edit_file(
 			$clone_dir . '/post/hello-world.md',
 			'Updated from Git ~~from editor~~',
@@ -344,15 +858,17 @@ class WP_Origin_End_To_End_Test extends TestCase {
 		);
 		$this->assertNotSame( 0, $push_result['code'], 'Stale push should have been rejected.' );
 
-		// 8) Persistence proof: a brand-new clone (no shared state with
+		// 10) Persistence proof: a brand-new clone (no shared state with
 		// $clone_dir) must see every commit and file from above.
 		$fresh = $this->clone_repo( 'fresh' );
 		$this->assertFileExists( $fresh . '/post/hello-world.md' );
 		$this->assertFileExists( $fresh . '/post/created-from-git.md' );
 		$this->assertFileExists( $fresh . '/wp_template/blog-home.html' );
 		$this->assertFileExists( $fresh . '/wp_template/custom-blog-card.html' );
+		$this->assertFileExists( $fresh . '/wp_template/custom-acme-block.html' );
 		$this->assertFileDoesNotExist( $fresh . '/page/sample-page.md' );
 		$this->assertFileDoesNotExist( $fresh . '/wp_template/renamed-blog-card.html' );
+		$this->assertFileExists( $fresh . '/post/delete-restore-e2e.md' );
 		$this->assertStringContainsString(
 			'Template updated from Git',
 			file_get_contents( $fresh . '/wp_template/blog-home.html' )
@@ -361,12 +877,16 @@ class WP_Origin_End_To_End_Test extends TestCase {
 			'Created template from Git',
 			file_get_contents( $fresh . '/wp_template/custom-blog-card.html' )
 		);
+		$this->assertStringContainsString(
+			'wp:acme/custom-block-2',
+			file_get_contents( $fresh . '/wp_template/custom-acme-block.html' )
+		);
 		$log = $this->run_cmd( array( 'git', '-C', $fresh, 'log', '--format=%s' ) );
 		$this->assertStringContainsString( 'Update hello world from Git', $log['output'] );
 		$this->assertStringContainsString( 'Update template HTML from Git', $log['output'] );
 		$this->assertStringContainsString( 'Create and delete content from Git', $log['output'] );
 
-		// 9) The CPT-based persistence model is gone.
+		// 11) The CPT-based persistence model is gone.
 		$this->assertNotSame(
 			200,
 			$this->http_status( $this->base_url . '/wp-json/wp/v2/types/wp_origin_commit' )
@@ -419,6 +939,15 @@ class WP_Origin_End_To_End_Test extends TestCase {
 		return intval( $items[0]['id'] );
 	}
 
+	private function assert_slug_absent( $slug, $endpoint ) {
+		$url = $this->base_url . '/wp-json/wp/v2/' . $endpoint
+			. '?slug=' . rawurlencode( $slug ) . '&context=edit';
+		$body  = $this->curl_get( $url );
+		$items = json_decode( $body, true );
+		$this->assertIsArray( $items, "Unexpected REST response for $endpoint?slug=$slug: $body" );
+		$this->assertSame( array(), $items, "Unexpected $endpoint match for slug $slug" );
+	}
+
 	private function fetch_content( $id, $endpoint ) {
 		$body = $this->curl_get( $this->base_url . '/wp-json/wp/v2/' . $endpoint . '/' . $id . '?context=edit' );
 		$post = json_decode( $body, true );
@@ -431,6 +960,70 @@ class WP_Origin_End_To_End_Test extends TestCase {
 		$post = json_decode( $body, true );
 
 		return $post['status'];
+	}
+
+	private function fetch_rest_item( $id, $endpoint ) {
+		$body = $this->curl_get( $this->base_url . '/wp-json/wp/v2/' . $endpoint . '/' . $id . '?context=edit' );
+		$item = json_decode( $body, true );
+		$this->assertIsArray( $item, "Unexpected REST response for $endpoint/$id: $body" );
+
+		return $item;
+	}
+
+	private function create_page_via_rest( array $payload ) {
+		$ch = curl_init( $this->base_url . '/wp-json/wp/v2/pages?context=edit' );
+		curl_setopt_array(
+			$ch,
+			array(
+				CURLOPT_RETURNTRANSFER => true,
+				CURLOPT_CUSTOMREQUEST  => 'POST',
+				CURLOPT_HTTPHEADER     => array( $this->auth_header, 'Content-Type: application/json' ),
+				CURLOPT_POSTFIELDS     => wp_origin_e2e_json_encode( $payload ),
+			)
+		);
+		$response = curl_exec( $ch );
+		$status   = curl_getinfo( $ch, CURLINFO_HTTP_CODE );
+		curl_close( $ch );
+		$this->assertTrue( 200 === $status || 201 === $status, "REST page create failed: $response" );
+
+		$page = json_decode( $response, true );
+		$this->assertIsArray( $page, "Unexpected REST page create response: $response" );
+		$this->assertArrayHasKey( 'id', $page, "REST page create response had no ID: $response" );
+
+		return intval( $page['id'] );
+	}
+
+	private function update_page_via_rest( $id, array $payload ) {
+		$ch = curl_init( $this->base_url . '/wp-json/wp/v2/pages/' . $id . '?context=edit' );
+		curl_setopt_array(
+			$ch,
+			array(
+				CURLOPT_RETURNTRANSFER => true,
+				CURLOPT_CUSTOMREQUEST  => 'POST',
+				CURLOPT_HTTPHEADER     => array( $this->auth_header, 'Content-Type: application/json' ),
+				CURLOPT_POSTFIELDS     => wp_origin_e2e_json_encode( $payload ),
+			)
+		);
+		$response = curl_exec( $ch );
+		$status   = curl_getinfo( $ch, CURLINFO_HTTP_CODE );
+		curl_close( $ch );
+		$this->assertSame( 200, $status, "REST page update failed: $response" );
+	}
+
+	private function delete_page_via_rest( $id ) {
+		$ch = curl_init( $this->base_url . '/wp-json/wp/v2/pages/' . $id . '?context=edit' );
+		curl_setopt_array(
+			$ch,
+			array(
+				CURLOPT_RETURNTRANSFER => true,
+				CURLOPT_CUSTOMREQUEST  => 'DELETE',
+				CURLOPT_HTTPHEADER     => array( $this->auth_header ),
+			)
+		);
+		$response = curl_exec( $ch );
+		$status   = curl_getinfo( $ch, CURLINFO_HTTP_CODE );
+		curl_close( $ch );
+		$this->assertSame( 200, $status, "REST page delete failed: $response" );
 	}
 
 	private function update_post_via_rest( $id, array $payload ) {

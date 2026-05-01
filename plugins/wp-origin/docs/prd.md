@@ -1,541 +1,352 @@
 # PRD: WP Origin
 
-## 1. Product overview
+## 1. Product Overview
 
-### 1.1 Document title and version
+### 1.1 Document Title And Version
 
 - PRD: WP Origin
-- Version: 0.1
+- Version: 0.1 implementation refresh
+- Status: Pre-release
 
-### 1.2 Product summary
+### 1.2 Product Summary
 
-WP Origin makes WordPress content available as a Git remote where posts and pages are represented as Markdown files, and structural block entities can be represented as raw Gutenberg HTML files. A user or coding agent can run normal Git commands such as `clone`, `pull`, and `push`; WordPress remains the source of truth, and pushed files update WordPress content directly.
+WP Origin makes supported WordPress content available as a Git remote. Users and
+coding agents can run normal Git commands such as `clone`, `pull`, and `push`
+against `/wp-json/git/v1/md.git`, edit content locally, and push those changes
+back into WordPress.
 
-The MVP is a standalone WordPress plugin. It focuses on a happy path that proves the workflow works for posts and pages, while keeping the design open for media, block theme entities, custom post types, templates, navigation, and WordPress.com integration later.
+WordPress remains the source of truth. The plugin stores the Git object data it
+needs in WordPress database tables, exports the current WordPress state into a
+repository tree, and imports pushed changes through WordPress post APIs.
 
-The guiding rule is that users must not lose data. If a conversion cannot preserve a block safely, the plugin should preserve it as a fenced `gutenberg` code block or inline HTML, or reject the change with a clear error instead of silently dropping content.
+The main product rule is content safety. WP Origin should reject unsafe pushes
+before any WordPress content is changed. It should prefer a clear Git error over
+partial writes, lossy conversion, ambiguous identity, or silent normalization.
 
 ## 2. Goals
 
-### 2.1 Business goals
-
-- Prove that any WordPress site can behave like a Git remote for Markdown content.
-- Make WordPress content easier for agents and developer tools to read, edit, review, and version.
-- Create a credible standalone plugin path that can later inform WordPress.com or Jetpack integration.
-- Reuse php-toolkit Git, Markdown, and Data Liberation primitives where possible.
-
-### 2.2 User goals
-
-- Clone or pull site content as Markdown files.
-- Edit content locally in an editor, vault, or coding-agent workspace.
-- Push Markdown changes back to WordPress without visiting WP-Admin.
-- Keep using WP-Admin as normal while also allowing Git-based editing.
-- Rely on Git history locally for review, rollback, and conflict handling.
-- Add WordPress as any Git remote name, such as `origin`, `wp`, or `production`, without requiring the site to manage other external remotes.
-- Use the checked-out content in Obsidian-compatible Markdown workflows where possible.
-
-### 2.3 Non-goals
-
-- Do not version PHP code, themes, plugins, uploads, or the full database in the MVP.
-- Do not manage GitHub/GitLab/Bitbucket synchronization in the MVP. Users can still add those as separate remotes in their local clone.
-- Do not preserve a complete immutable Git object graph on the WordPress server in the MVP.
-- Do not support every WordPress post type, setting, template, navigation item, or media workflow in the first release.
-- Do not treat full block theme editing as MVP scope, but keep `wp_template`, `wp_template_part`, and `wp_navigation` visible as early follow-up candidates because they are post types under the hood.
-- Do not introduce external Composer dependencies or required PHP extensions beyond this repo's constraints.
-
-## 3. Users and permissions
-
-### 3.1 Key user types
-
-- **Site owner**: Wants simple local editing, backups, and agent-assisted content updates.
-- **Content editor**: Writes or reviews posts and pages in Markdown-friendly tools.
-- **Coding agent**: Reads, edits, commits, and pushes content changes on behalf of a user.
-- **Developer**: Installs, configures, debugs, and extends the plugin.
-
-### 3.2 Role-based access
-
-- **Unauthenticated users**: Cannot clone, pull, or push private site content.
-- **Users with read access**: Can clone or pull content they are allowed to read.
-- **Users with edit permissions**: Can push changes to posts or pages they are allowed to edit.
-- **Administrators**: Can configure enabled post types, endpoint behavior, and future advanced options.
-
-## 4. Functional requirements
-
-- **Git endpoint** (Priority: High)
-  - Expose a Git-compatible HTTP endpoint for Markdown content at `/wp-json/git/v1/md.git`.
-  - Support `git clone`, `git pull`, and `git push` for the MVP happy path.
-  - Keep the endpoint scoped to content, not code or database exports.
-
-- **Content export to Markdown** (Priority: High)
-  - Export posts and pages as Markdown files.
-  - Store files in predictable paths that mirror WordPress post type names, such as `post/{slug}.md` and `page/{slug}.md`.
-  - Include lean, established front matter such as title, date, status, and an explicit excerpt description.
-  - Preserve unsupported block markup as fenced `gutenberg` code blocks, or inline HTML when Markdown cannot represent it safely.
-  - Keep Markdown human-editable and compatible with common editors such as Obsidian wherever that does not weaken round-trip fidelity.
-
-- **Guidelines and agent portability** (Priority: Medium)
-  - When Gutenberg's Guidelines experiment is available, export `wp_guideline` posts under `wp_guideline/{type}/`.
-  - When Guidelines is not available, still export WP Origin's built-in agent guide and template-editing skill as generated read-only checkout files so agents receive the same operational guidance.
-  - Store guideline skills as agent-portable skill directories, such as `wp_guideline/skills/{slug}/SKILL.md`.
-  - Expose guideline skills through `.agents/skills` and `.claude/skills` directory symlinks so agents can discover the same canonical skill content.
-  - Install default WP Origin coding-agent skills when Guidelines is available, including a general checkout guide and a focused block theme template-editing skill.
-  - Expose `AGENTS.md` and `CLAUDE.md` as symlinks to the general WP Origin checkout guide.
-  - Store guideline skill bodies as content only in WordPress, and generate agent-required YAML front matter from WordPress title, slug, and excerpt on export.
-  - Keep the canonical `wp_guideline/` tree aligned with `wp_guideline_type` taxonomy terms, including `artifact`, `skill`, `plan`, and future instruction-like types.
-
-- **Markdown import to WordPress** (Priority: High)
-  - Convert pushed Markdown back into WordPress post content.
-  - Update existing posts by stable metadata when possible, then by path or slug as a fallback.
-  - Create new posts or pages when new Markdown files are pushed.
-  - Move deleted files to trash by default instead of permanently deleting content.
-
-- **Round-trip fidelity** (Priority: High)
-  - Treat `wp -> md -> wp` and `md -> wp -> md` as byte-preservation contracts for supported content.
-  - Detect byte changes using fixture-based tests that compare exact strings and content hashes, not rendered output.
-  - If exact preservation is not possible for a block, preserve it as an opaque `gutenberg` fence or reject the conversion instead of normalizing it.
-  - Avoid automatic newline, whitespace, attribute-order, or escaping changes unless the test fixture explicitly accepts them.
-
-- **Media handling** (Priority: Medium)
-  - Export referenced media files into an `attachment/` directory to mirror the WordPress `attachment` post type.
-  - Rewrite image references in Markdown to relative paths where possible.
-  - Import new or changed media files as WordPress attachments when safe.
-  - Track media hashes so unchanged binaries do not get reuploaded.
-  - Keep large media transfers streaming-first and reject pushes that exceed safe runtime limits.
-
-- **Block theme entities** (Priority: Medium)
-  - Support `wp_template`, `wp_template_part`, and `wp_navigation` once posts/pages round-trip safely.
-  - Represent these as explicit directories rather than mixing them into generic custom post type output.
-  - Export theme-provided base templates and template parts as `.html` files containing raw Gutenberg block markup, not Markdown, even before they have database customizations.
-  - Layer database customizations for `wp_template`, `wp_template_part`, and `wp_navigation` on top of the theme-provided base files at the same logical paths.
-  - Create a distinct theme-base commit before the WordPress customization/content commit so agents can distinguish hardcoded theme defaults from site-specific changes.
-  - Export theme-provided `theme.json` files under `wp_theme/{theme}/theme.json` for agent context.
-  - Export editable Global Styles overlays under `wp_global_styles/{theme}.json` so site-wide theme.json-style changes round-trip through the WordPress `wp_global_styles` post type instead of mutating theme source files.
-  - Do not include front matter in these `.html` files.
-  - Use the directory and path as identity: `wp_template/single.html` maps to post type `wp_template` and slug `single`.
-  - For theme-scoped templates and template parts, map `wp_template/{theme}/index.html` and `wp_template_part/{theme}/footer.html` to WordPress template IDs such as `{theme}//index` and `{theme}//footer`.
-  - Store pushed theme-scoped customizations using the WordPress identity model: the post slug remains the template slug, such as `footer`, while the `wp_theme` taxonomy term stores the theme, such as `twentytwentyfive`. Do not flatten these into slugs such as `twentytwentyfive-footer`.
-  - Allow pushed create and update operations for template HTML files; editing a theme-provided template creates a WordPress customization.
-  - Reject pushed deletes and renames for these files because the path is the identity and deletion can break site rendering.
-  - Reject pushed edits to `wp_theme/{theme}/theme.json` because WP Origin does not mutate theme source files.
-  - Allow pushed create and update operations for `wp_global_styles/{theme}.json`, adding WordPress's internal Global Styles safety flag on import and omitting it from the checkout.
-  - Reject pushed deletes and renames for Global Styles JSON overlays until reset semantics are explicit.
-  - Provide agent guidance for template edits that prefers editable core block markup, preserves custom blocks, avoids new `core/html` blocks for normal layout, uses WordPress-native full-width alignment patterns, and directs site-wide style changes to `wp_global_styles/{theme}.json`.
-  - Export model-facing guidance through `AGENTS.md`, `CLAUDE.md`, and a `wp-origin-template-editor` skill so agents understand that theme base files are context, `wp_theme` files are read-only, and nested theme paths such as `wp_template_part/twentytwentyfive/footer.html` must not be flattened.
-
-- **Conflict and safety checks** (Priority: High)
-  - Reject pushes that would overwrite newer WordPress edits unless the client has pulled the latest content.
-  - Create WordPress revisions for pushed updates.
-  - Fail closed when conversion would drop content or metadata.
-  - Return actionable Git/HTTP errors that explain what the user should do next.
-
-- **Configuration** (Priority: Medium)
-  - Allow administrators to enable the MVP for posts and pages.
-  - Keep custom post types disabled by default until explicitly supported.
-  - Provide a minimal admin-visible status or settings surface only when needed for setup.
-
-- **Extensibility** (Priority: Medium)
-  - Keep the content mapping small and explicit so media, custom post types, templates, and navigation can be added later.
-  - Keep server-side Git storage optional; the WordPress database is the MVP source of truth.
-
-## 5. Core experience
-
-1. An administrator activates WP Origin and enables Git access for content.
-2. A user authenticates with Git over HTTP Basic Auth using a WordPress application password.
-3. The user runs `git clone https://example.com/wp-json/git/v1/md.git` or adds the site as a remote with `git remote add wp https://example.com/wp-json/git/v1/md.git`.
-4. The cloned repository contains Markdown files for posts and pages, plus `.html` files for supported structural block entities when present.
-5. The user or agent edits files locally and commits normally.
-6. The user runs `git push wp trunk` or the equivalent command for the remote name they chose.
-7. WP Origin validates permissions, detects stale content, imports changed files back to WordPress content, and updates or creates posts.
-8. If a push cannot be applied safely, WP Origin rejects it with a clear error and leaves existing WordPress content unchanged.
-
-## 6. Technical considerations
-
-### 6.1 Integration points
-
-- WordPress REST API routes for Git Smart HTTP requests, using `/wp-json/git/v1/md.git` as the canonical route.
-- A routing layer that maps `/wp-json/git/v1/md.git/*` to Git protocol paths such as `/info/refs?service=git-upload-pack`, `/git-upload-pack`, `/info/refs?service=git-receive-pack`, and `/git-receive-pack`.
-- HTTP Basic Auth backed by WordPress application passwords.
-- WordPress post APIs for reading, creating, updating, trashing, and revisioning content.
-- php-toolkit Git component for Git protocol handling.
-- php-toolkit Markdown and Data Liberation components for Markdown/block conversions.
-
-### 6.2 Content format
-
-- Editorial posts and pages use Markdown bodies with YAML-style front matter.
-- Structural block entities use raw Gutenberg HTML with no front matter.
-- File paths are grouped by WordPress post type name, starting with `post/` and `page/`, with media under `attachment/` once media support lands.
-- Template-like structural paths use `.html`, for example `wp_template/single.html`, `wp_template_part/header.html`, and `wp_navigation/main.html`.
-- Theme-provided templates use theme-qualified nested paths such as `wp_template/{theme}/index.html` and `wp_template_part/{theme}/header.html`; pushed edits to those files create or update the matching WordPress customization.
-- Theme-qualified template paths are a file-system view of WordPress template IDs. For example, `wp_template_part/twentytwentyfive/footer.html` maps to `twentytwentyfive//footer` in the template-part REST API, backed by a `wp_template_part` post with `post_name=footer` and a `wp_theme=twentytwentyfive` term when customized.
-- Theme-provided JSON is exported as read-only context under `wp_theme/{theme}/theme.json`.
-- Editable Global Styles overlays are exported under `wp_global_styles/{theme}.json`. They map to `wp_global_styles` posts tagged with the matching `wp_theme` term; WP Origin strips the internal `isGlobalStylesUserThemeJSON` flag from Git and restores it on import.
-- The checkout includes agent-readable guidance: root `AGENTS.md` and `CLAUDE.md` point to the WP Origin guide, `.agents/skills` and `.claude/skills` expose the exported skills, and the template editor skill documents the theme-base overlay model and path identity rules.
-- Front matter should be stable enough for post/page round-trips but small enough for agents to understand.
-- Unknown or lossy blocks should round-trip using fenced `gutenberg` code blocks where possible, with raw HTML as a fallback.
-- The importer should also accept the existing `block` fence language as a compatibility alias.
-- Markdown should remain useful in Obsidian: front matter is allowed, links and images should prefer normal Markdown syntax, media references should prefer relative paths, and hidden metadata should be kept minimal.
-- If an Obsidian-friendly representation conflicts with binary-safe round-tripping, round-trip safety wins.
-- For structural `.html` files, WordPress keeps title, status, date, author, IDs, and other administrative metadata. WP Origin resolves IDs dynamically from path-derived post type and slug.
-
-### 6.3 Data storage and privacy
-
-- WordPress remains the canonical storage layer.
-- The MVP does not require a persistent `.git` directory on the server.
-- Local clones keep their own Git history.
-- Credentials must never be written into generated Markdown files or Git history.
-- Application passwords should be used only through HTTP auth and never serialized into the generated repository.
-- Private, draft, or restricted content must follow existing WordPress permissions.
-
-### 6.4 Scalability and performance
-
-- Use streaming where available for Git pack data and content conversion.
-- Start with posts and pages to keep repository size manageable.
-- Avoid loading all media or full site data into memory in the MVP.
-- Stream media files when exporting/importing and hash them incrementally.
-- Add limits and clear errors for large pushes that exceed PHP execution or memory limits.
-
-### 6.5 Potential challenges
-
-- WordPress is mutable while Git expects immutable object history.
-- Markdown conversion can be lossy for custom blocks and complex layouts.
-- The current Markdown conversion already notes some block attributes can be lost, so the MVP must test and reject cases that would silently flatten important content.
-- Git clients expect precise HTTP behavior.
-- Slug changes, deleted posts, trashed posts, and duplicate titles need stable mapping rules.
-- Media introduces binary data, large payloads, URL rewriting, deduplication, and attachment metadata concerns.
-- Block theme entities are post types, but their content is closer to site structure than editorial content and may need separate conflict rules.
-- Multiple agents and WP-Admin users can edit the same content concurrently.
-
-## 7. Prior art and repo fit
-
-- **`plugins/git-repo/git-repo.php`** already proves WordPress can sit behind a `GitEndpoint` and respond to Git upload/receive requests. It currently materializes a test Git repository and syncs WordPress content in an ad hoc way. WP Origin should reuse the idea but make the content mapping explicit and Markdown-first.
-- **`plugins/static-files-editor/DataSource.php`** models the opposite workflow: a WordPress plugin pulls from and pushes to an external Git remote. WP Origin should invert that relationship. The site itself is the remote, and the WordPress database remains the source of truth.
-- **`components/Git`** already supports pure-PHP Git repositories, commits, refs, protocol v2 discovery, fetch, receive-pack, `GitFilesystem`, and remote operations. The MVP should use these pieces rather than shelling out to the `git` binary.
-- **`components/Markdown`** already supports bidirectional Markdown and block markup conversion with front matter. It serializes blocks that cannot be represented as Markdown into fenced `block` code blocks; WP Origin should evolve that toward a more descriptive `gutenberg` fence while accepting `block` for compatibility.
-- **`components/DataLiberation`** supplies streaming-oriented content import/export primitives. That matters for future media and larger sites, even if the first MVP keeps the data scope small.
-- **`wp-plugin-template`** uses a simple docs-first planning flow with `docs/prd.md` and a minimal plugin entry file later. For now, WP Origin should stay documentation-only until the shape is agreed.
-
-## 8. Success metrics
-
-- A user can clone a test site and see posts and pages as Markdown.
-- A user can edit an existing post locally and push it back without data loss.
-- A user can create a new Markdown file and push it as a new post or page.
-- A stale push is rejected instead of overwriting newer WordPress edits.
-- Round-trip tests prove byte-for-byte stability for supported `wp -> md -> wp` and `md -> wp -> md` fixtures.
-- Unsupported blocks are preserved as fenced `gutenberg` payloads or HTML.
-- A Git smoke-test script can clone, edit, commit, push, pull, and verify the resulting WordPress content.
-- The MVP works in a normal standalone plugin environment without new external dependencies.
-
-## 9. Milestones
-
-- **Milestone 1: Round-trip contract tests**
-  - Add fixtures for simple Markdown, core blocks, nested blocks, unsupported blocks, front matter, whitespace, and representative media references.
-  - Assert exact byte preservation for `wp -> md -> wp` and `md -> wp -> md` where content is declared supported.
-  - Assert unsupported block preservation through `gutenberg` fences.
-  - Make these tests the prerequisite for endpoint work.
-
-- **Milestone 2: Git action test script**
-  - Add a script target, for example `bin/test-wp-origin-git-actions.sh`, that can run clone, pull, edit, commit, push, and verification against a local test site.
-  - Make the script fail loudly on changed bytes, missing files, unexpected WordPress content, auth failures, or stale push behavior.
-  - Keep the script usable by agents as an end-to-end acceptance harness.
-
-- **Milestone 3: Endpoint and authentication spike**
-  - Plugin boots.
-  - REST route exposes `/wp-json/git/v1/md.git`.
-  - Git endpoint accepts discovery/fetch requests in a local test environment.
-  - HTTP Basic Auth with application passwords works.
-
-- **Milestone 4: Pull posts and pages as Markdown**
-  - Posts and pages export into predictable `post/` and `page/` Markdown paths.
-  - Metadata front matter is included.
-  - `git clone` and `git pull` work for the happy path.
-
-- **Milestone 5: Push Markdown into WordPress**
-  - Existing posts can be updated.
-  - New posts/pages can be created.
-  - Deleted files move content to trash.
-  - WordPress revisions are created.
-
-- **Milestone 6: Safety and conflicts**
-  - Stale pushes are rejected.
-  - Lossy conversions fail closed.
-  - Errors are understandable from the Git client.
-
-- **Milestone 7: Media and block-theme exploration**
-  - Export referenced media into relative Markdown paths.
-  - Import safe new/changed media as attachments.
-  - Export theme-provided `wp_template` and `wp_template_part` files as raw `.html` Gutenberg block files before database customizations exist.
-  - Export `wp_navigation` and database customizations for `wp_template` and `wp_template_part` as raw `.html` Gutenberg block files.
-  - Export active theme `theme.json` as read-only agent context.
-  - Export active theme Global Styles overlay as editable JSON under `wp_global_styles/{theme}.json`.
-  - Allow create/update pushes for template `.html` files, including pushes that convert a theme-provided file into a WordPress customization using the correct `{theme}//{slug}` identity.
-  - Allow create/update pushes for Global Styles `.json` overlays.
-  - Reject delete/rename pushes for those `.html` files.
-  - Reject delete/rename pushes for Global Styles `.json` overlays.
-
-- **Milestone 8: MVP hardening**
-  - Document setup and supported workflows.
-  - Prepare a plugin zip or deployment path.
-
-## 10. Implementation plan
-
-### 10.1 Start with a narrow, testable MVP
-
-- Treat WordPress as the source of truth.
-- Expose only Markdown content, not PHP code, themes, uploads, or database dumps.
-- Support posts and pages first.
-- Preserve data over convenience: reject unsafe pushes rather than applying partial or lossy changes.
-- Frontload tests for the Markdown and block conversion components before building the Git endpoint.
-- Make every implementation step start with a failing fixture or smoke-test expectation so agents can keep moving independently.
-
-### 10.2 Stabilize Markdown round-tripping first
-
-- Add component-level fixtures for both directions:
-  - `wp -> md -> wp`
-  - `md -> wp -> md`
-- Compare exact bytes for supported content, including whitespace, newlines, attribute ordering, escaped characters, and fenced code block contents.
-- Add fixtures for regular Markdown, WordPress core blocks, nested blocks, raw HTML, unsupported blocks, `gutenberg` fences, legacy `block` fences, front matter, and representative Obsidian-style Markdown.
-- Add media reference fixtures before implementing full binary media transfer so URL rewriting can be stabilized early.
-- Keep unsupported or risky blocks opaque inside fenced `gutenberg` code blocks until a tested lossless Markdown representation exists.
-- Treat a changed fixture as a product decision, not incidental churn.
-
-### 10.3 Build the plugin foundation
-
-- Keep this as a docs-only proposal until the endpoint shape and content format are agreed.
-- When implementation begins, add the smallest possible plugin entry point under `plugins/wp-origin/`.
-- Use `/wp-json/git/v1/md.git` as the public Git URL.
-- Authenticate Git HTTP clients with HTTP Basic Auth backed by WordPress application passwords.
-- Add a capability check layer that separates read and write permissions.
-
-### 10.4 Introduce a Git action smoke-test script
-
-- Add a script target, for example `bin/test-wp-origin-git-actions.sh`, that can run against a local WordPress sandbox.
-- The script should create or reset fixture content in WordPress.
-- The script should clone from `/wp-json/git/v1/md.git` using an application password.
-- The script should verify expected files and exact Markdown bytes after clone.
-- The script should edit Markdown, commit, push, and verify exact WordPress post content.
-- The script should edit the WordPress post directly, pull, and verify the local file changed as expected.
-- The script should attempt a stale push and assert that it is rejected.
-- The script should include media fixtures once media support exists.
-
-### 10.5 Implement pull
-
-- Query posts and pages through WordPress APIs.
-- Convert each entity into a Markdown file:
-  - `post/{slug}.md`
-  - `page/{slug}.md`
-- Add front matter with the smallest useful metadata:
-  - `title`
-  - `date`
-  - `status`
-  - `description` when an explicit excerpt exists
-- Export human-facing status values while accepting both human-facing and WordPress-native values on push:
-  - `published` or `publish`
-  - `scheduled` or `future`
-  - `draft`
-  - `pending`
-  - `private`
-- Keep machine identity and conflict metadata out of Markdown front matter.
-- Use existing php-toolkit Markdown/Data Liberation conversion code where possible.
-- Use the Git component to serve a generated repository snapshot.
-- Verify with `git clone` and `git pull` against a local WordPress site.
-
-### 10.6 Implement push
-
-- Accept `git receive-pack` requests from a local clone.
-- Read the pushed tree and map changed files back to WordPress entities.
-- Match existing content by path and slug, while preserving backward compatibility with older front matter IDs when present.
-- Update existing posts with `wp_update_post()`.
-- Create new posts with `wp_insert_post()`.
-- Move deleted files to trash with `wp_trash_post()` instead of permanent deletion.
-- Create WordPress revisions through normal post update behavior.
-- Apply changes transactionally where practical; if any file fails validation, reject before mutating content.
-
-### 10.7 Add data-loss protections
-
-- Track identity and freshness in WP Origin's stored commit manifest instead of noisy Markdown front matter.
-- Reject pushes where the remote changed and the local clone needs to pull first.
-- Preserve unsupported blocks as fenced `gutenberg` payloads or inline HTML.
-- Reject files that would drop required metadata for an existing post.
-- Reject path traversal, unsupported directories, binary files, and unexpected extensions.
-- Reject round-trip changes that are not covered by an explicit fixture update.
-- Keep private/draft content behind WordPress permission checks.
-
-### 10.8 Add media support
-
-- Start with media referenced by posts/pages, not the whole media library.
-- Export attachments into a stable `attachment/` directory.
-- Rewrite image URLs to relative paths in Markdown.
-- Store enough metadata to map a file back to its attachment ID and source URL.
-- Hash binary files to detect unchanged media and avoid reuploads.
-- Add binary-safe tests that compare exported and imported media hashes.
-
-### 10.9 Add block theme entities
-
-- Add fixtures for `wp_template`, `wp_template_part`, and `wp_navigation`.
-- Keep them in explicit directories that mirror post type names: `wp_template/`, `wp_template_part/`, and `wp_navigation/`.
-- Store each entity as a `.html` file containing only `post_content` block markup.
-- Do not write front matter into structural `.html` files.
-- Resolve identity from path: directory is post type, the path below it without `.html` is slug, and database ID is looked up at import time.
-- Preserve block markup exactly; do not convert these files to Markdown.
-- Allow pushed creates and updates.
-- Reject pushed deletes and renames.
-- Decide later whether block theme entities belong in the same `md.git` remote or a separate remote/branch.
-
-### 10.10 Keep TDD useful for independent agents
-
-- Each task should include a failing test name, target fixture, and expected behavior before implementation begins.
-- Prefer small fixtures that isolate one rule: front matter, slug mapping, unsupported block preservation, media hash preservation, stale push rejection, and so on.
-- Add golden-file tests for content formats and smoke tests for Git workflows.
-- When a model changes behavior, it should update the fixture and add a short reason in the test name or fixture comment.
-- Keep a "known unsupported" fixture set so agents can add tests for future work without making the current MVP fail.
-
-### 10.11 Prepare the first demo
-
-- Document local setup and example commands:
-  - `git clone https://example.com/wp-json/git/v1/md.git`
-  - `git remote add wp https://example.com/wp-json/git/v1/md.git`
-  - edit `post/hello-world.md`
-  - `git commit -am "Update hello world"`
-  - `git push wp trunk`
-- Show WP-Admin edits flowing back through `git pull`.
-- Show a rejected stale push and the recovery path.
-- Show media references if the media milestone lands before the demo.
-- Keep broader custom post types and WordPress.com transport as explicit follow-up work.
-
-## 11. User stories
-
-### 11.1 Clone content as Markdown
-
-- **ID**: US-001
-- **Description**: As a content editor, I want to clone WordPress posts and pages as Markdown so that I can work with them locally.
-- **Acceptance criteria**:
-  - The user can authenticate with a Git client using HTTP Basic Auth and a WordPress application password.
-  - The clone contains Markdown files for supported posts and pages.
-  - Files are organized in predictable content-type directories.
-  - Files include metadata needed for safe round-trips.
-  - The site can be added using any local remote name, such as `wp` or `origin`.
-
-### 11.2 Pull the latest WordPress edits
-
-- **ID**: US-002
-- **Description**: As a coding agent, I want to pull the latest WordPress content so that I work from the current source of truth.
-- **Acceptance criteria**:
-  - Pull reflects changes made in WP-Admin since the last clone or pull.
-  - The local working tree updates using standard Git behavior.
-  - Deleted or trashed content is represented consistently.
-
-### 11.3 Push an edit to an existing post
-
-- **ID**: US-003
-- **Description**: As a user, I want to edit a Markdown file and push it so that the matching WordPress post is updated.
-- **Acceptance criteria**:
-  - The pushed file maps to the correct existing post.
-  - The post title, status, date, description, and content update according to supported metadata.
-  - A WordPress revision is created.
-  - The push does not modify unrelated content.
-
-### 11.4 Create content from a new Markdown file
-
-- **ID**: US-004
-- **Description**: As a user, I want to add a Markdown file and push it so that WordPress creates a new post or page.
-- **Acceptance criteria**:
-  - A new file under `post/` creates a post.
-  - A new file under `page/` creates a page.
-  - Missing metadata receives safe WordPress defaults.
-  - The response gives the Git client a successful push result when creation succeeds.
-
-### 11.5 Delete content safely
-
-- **ID**: US-005
-- **Description**: As a user, I want deleting a Markdown file to remove it from the Git view without accidentally destroying WordPress content permanently.
-- **Acceptance criteria**:
-  - A deleted Markdown file moves the matching WordPress post to trash by default.
-  - Permanently deleted content is not required for the MVP.
-  - The push is rejected if the matching content cannot be identified safely.
-
-### 11.6 Preserve complex blocks
-
-- **ID**: US-006
-- **Description**: As a site owner, I want complex WordPress blocks to survive Markdown round-trips so that using Git does not break my site.
-- **Acceptance criteria**:
-  - Supported blocks convert to Markdown.
-  - Unsupported blocks are preserved as fenced `gutenberg` payloads, HTML, or block markup.
-  - Legacy fenced `block` payloads are accepted on import.
-  - A push is rejected if conversion would silently drop content.
-
-### 11.7 Prevent unauthorized access
-
-- **ID**: US-007
-- **Description**: As a site owner, I want only authorized users to read or edit content through Git so that private content stays protected.
-- **Acceptance criteria**:
-  - Unauthenticated requests are rejected.
-  - Users cannot read content they could not read in WordPress.
-  - Users cannot push changes they could not make in WordPress.
-  - Authentication failures do not leak private content.
-
-### 11.8 Reject stale pushes
-
-- **ID**: US-008
-- **Description**: As a content editor, I want stale pushes to be rejected so that local edits do not overwrite newer WP-Admin changes.
-- **Acceptance criteria**:
-  - The plugin detects when WordPress content changed after the user's last fetched version.
-  - The push is rejected before applying partial updates.
-  - The error tells the user to pull and resolve the conflict locally.
-
-### 11.9 Preserve round-trip bytes
-
-- **ID**: US-009
-- **Description**: As a developer, I want exact round-trip tests so that agents can evolve the plugin without accidentally changing content serialization.
-- **Acceptance criteria**:
-  - Supported `wp -> md -> wp` fixtures produce identical bytes.
-  - Supported `md -> wp -> md` fixtures produce identical bytes.
-  - Unsupported content is preserved as an opaque `gutenberg` fence or rejected.
-  - Fixture changes require an explicit expected-output update.
-
-### 11.10 Work with Obsidian-friendly Markdown
-
-- **ID**: US-010
-- **Description**: As a user, I want cloned content to work naturally in Obsidian where possible so that my WordPress site can fit into Markdown-first writing workflows.
-- **Acceptance criteria**:
-  - Standard Markdown headings, links, images, lists, quotes, and code blocks remain readable in Obsidian.
-  - Front matter remains valid and understandable.
-  - Media references use relative paths where possible.
-  - WordPress-specific payloads render as ordinary code blocks instead of hidden or editor-breaking syntax.
-
-### 11.11 Sync referenced media
-
-- **ID**: US-011
-- **Description**: As a content editor, I want images referenced by posts and pages to move with the Markdown files so that local edits do not break media.
-- **Acceptance criteria**:
-  - Referenced media exports to a stable `attachment/` directory.
-  - Markdown image references point to relative media paths.
-  - Pushed new or changed media can become WordPress attachments when safe.
-  - Binary file hashes match after round-trip.
-
-### 11.12 Work with block theme content
-
-- **ID**: US-012
-- **Description**: As a site builder, I want block theme entities to be Git-addressable once content round-tripping is stable.
-- **Acceptance criteria**:
-  - `wp_template`, `wp_template_part`, and `wp_navigation` are documented as follow-up post-type targets.
-  - Files export under explicit post-type directories with `.html` extensions.
-  - Files contain raw Gutenberg block markup with no front matter.
-  - The path determines post type and slug.
-  - Pushed creates and updates are allowed.
-  - Pushed deletes and renames are rejected.
-  - Block markup is preserved exactly unless a tested representation change is explicitly accepted.
-
-## 12. Later-phase idea: Git hashes and WordPress revisions
-
-WordPress post revisions are similar to Git objects because they preserve historical snapshots of a post. They are not a complete Git object model: they do not represent a repository-wide tree, they can be pruned, they do not include every attachment or cross-post relationship, and WordPress does not naturally store parent commit metadata.
-
-A later phase could map synthetic Git commit hashes to WordPress revision sets:
-
-- Build a virtual tree from the current exported Markdown files.
-- Hash each exported file from exact bytes.
-- Map each file hash to a post revision ID, attachment ID/hash, or current post state.
-- Build a synthetic commit hash from the tree hash, parent synthetic commit hash, author, timestamp, and message.
-- Store the mapping in plugin metadata or a small custom table: synthetic commit hash -> file paths -> WordPress revision IDs/media hashes.
-- Use that mapping to make fetch/pull more Git-like without requiring the WordPress site to store a full `.git` object graph.
-
-This should stay out of the MVP unless the mutable virtual repository blocks normal clone/pull/push workflows.
+### 2.1 Product Goals
+
+- Let a WordPress site behave like a Git remote for supported content.
+- Make posts and pages readable and editable as Markdown.
+- Make block theme entities readable and editable as raw Gutenberg block files
+  where WordPress supports safe customization.
+- Give coding agents a checkout that includes operational guidance, skills, and
+  enough theme context to make safe edits.
+- Keep WP-Admin and Git editing compatible by rejecting stale pushes.
+- Keep repository identity stable through file paths, not hidden front matter
+  IDs.
+- Fail closed when a pushed tree cannot be applied safely.
+
+### 2.2 User Goals
+
+- Clone or pull site content into a local editor, vault, or agent workspace.
+- Review content changes with normal Git diffs before applying them to
+  WordPress.
+- Push scoped content changes without visiting WP-Admin.
+- Pull recent WP-Admin edits before local work.
+- Use Git conflict handling when local and WordPress edits overlap.
+- Keep WordPress permissions, publishing behavior, revisions, and rendering as
+  the source of truth.
+
+### 2.3 Non-Goals For 0.1
+
+- Do not version PHP code, plugins, theme source, uploads, or arbitrary database
+  tables.
+- Do not sync WordPress to GitHub, GitLab, Bitbucket, or another external Git
+  host. Users may add those as separate local remotes.
+- Do not mirror the full media library. Media import/export remains future work.
+- Do not support arbitrary custom post types until each content mapping is
+  explicit and tested.
+- Do not rely on front matter IDs, slugs, or post types for identity.
+- Do not provide reset/delete semantics for template and Global Styles files
+  until the product behavior is explicit.
+- Do not require Composer packages or PHP extensions beyond this repository's
+  constraints.
+
+## 3. Users And Permissions
+
+### 3.1 User Types
+
+- **Site owner**: Installs WP Origin and wants safer backups, review, and
+  agent-assisted edits.
+- **Content editor**: Writes or reviews posts and pages in local tools.
+- **Site builder**: Edits templates, template parts, navigation posts, and Global
+  Styles where supported.
+- **Coding agent**: Pulls the current checkout, edits files, commits, and pushes
+  on behalf of an authenticated user.
+- **Developer**: Extends, debugs, and tests the plugin.
+
+### 3.2 Access Model
+
+- Unauthenticated requests cannot clone, pull, or push.
+- Git over HTTPS is expected to use HTTP Basic Auth with WordPress application
+  passwords, or another REST authentication layer that authenticates the request
+  as a WordPress user.
+- Clone and pull expose a whole repository snapshot, so the user must be allowed
+  to read the exported repository. Users with broad editorial access can read the
+  full export; otherwise every exported object must be readable to that user.
+- Push checks permissions for each changed object.
+- Creating content requires the relevant create capability for the post type.
+- Updating or trashing content requires permission to edit or delete that object.
+- Publishing, scheduling, or making content private requires the corresponding
+  WordPress capabilities.
+
+## 4. Git Endpoint And Protocol Scope
+
+- The canonical remote URL is `/wp-json/git/v1/md.git`.
+- The repository branch is `trunk`.
+- Pushes may update only one ref at a time.
+- Pushes to branches other than `trunk` are rejected.
+- Deleting `trunk` is rejected.
+- Stale pushes are rejected when WordPress content changed after the client last
+  fetched the remote state.
+- If a push is rejected, WordPress content must remain unchanged.
+
+## 5. Repository Layout
+
+Current exported paths:
+
+- `post/{slug}.md` for posts.
+- `page/{slug}.md` for top-level pages.
+- `page/{parent}/{child}.md` for hierarchical pages.
+- `wp_template/{slug}.html` and `wp_template/{theme}/{slug}.html` for templates.
+- `wp_template_part/{theme}/{slug}.html` for template parts.
+- `wp_navigation/{slug}.html` for navigation posts.
+- `wp_theme/{theme}/theme.json` for read-only theme JSON context.
+- `wp_global_styles/{theme}.json` for editable Global Styles overlays.
+- `wp_guideline/skills/{slug}/SKILL.md` for Gutenberg Guidelines skills and WP
+  Origin's built-in agent skills.
+- `AGENTS.md`, `CLAUDE.md`, `.agents/skills`, and `.claude/skills` as generated
+  or symlinked agent guidance when available.
+
+Paths are part of the content identity. WP Origin should reject unsupported
+directories, unexpected extensions, path traversal, non-canonical slugs, and
+ambiguous mappings.
+
+WP Origin's built-in agent skills are generated when no matching Guideline
+exists. If Gutenberg Guidelines are unavailable, those generated skills are
+read-only checkout context. If Guidelines are available, editing the canonical
+`wp_guideline/skills/{slug}/SKILL.md` file can create or update the matching
+Guideline, while generated aliases such as `AGENTS.md` and `.agents/skills`
+remain read-only.
+
+## 6. Posts And Pages
+
+### 6.1 Markdown Format
+
+Posts and pages are Markdown files with a small YAML-style front matter block.
+Supported front matter fields are:
+
+- `title`
+- `date`
+- `status`
+- `description`
+
+Unsupported front matter is rejected. This includes `id`, `slug`, `type`,
+unknown keys, arrays, booleans, and null values. Machine identity stays out of
+Markdown so that users and agents do not accidentally edit hidden routing data.
+
+`date_gmt` and `modified_gmt` are not exported. WordPress remains responsible
+for canonical timestamps and revisions.
+
+### 6.2 Status Values
+
+Exports use human-facing values where useful:
+
+- `published` for WordPress `publish`
+- `scheduled` for WordPress `future`
+- `draft`
+- `pending`
+- `private`
+
+Imports accept both human-facing and WordPress-native values for published and
+scheduled content: `published` or `publish`, and `scheduled` or `future`.
+
+Scheduled/future content must have a future date. Published content with a
+future date is rejected.
+
+### 6.3 Identity And Page Hierarchy
+
+Post identity comes from `post/{slug}.md`.
+
+Page identity comes from the page path:
+
+- `page/about.md` maps to the top-level `about` page.
+- `page/company/about.md` maps to the child page `about` under parent `company`.
+
+The same child slug may exist under different page parents because the full path
+distinguishes them. Creating or updating a nested page requires the exported
+parent page to exist. Export fails closed if a published/exported page has a
+trashed, non-exported, invalid, or cyclic parent.
+
+Deleting a post or page file moves the matching WordPress object to trash.
+Re-adding the same path restores the trashed object instead of creating a
+duplicate.
+
+Deleting a parent page while descendant page files remain is rejected.
+
+## 7. Structural Block Entities
+
+Structural block entities are stored as raw Gutenberg block markup, not
+Markdown, and do not use front matter.
+
+Supported files:
+
+- `wp_template/*.html`
+- `wp_template/{theme}/*.html`
+- `wp_template_part/{theme}/*.html`
+- `wp_navigation/*.html`
+
+Push behavior:
+
+- Creates and updates are allowed where WordPress supports the corresponding
+  customization.
+- Editing a theme-provided template or template part creates or updates the
+  WordPress customization for that theme and slug.
+- Deletes and renames are rejected for template, template part, navigation, and
+  Global Styles files until reset semantics are explicit.
+- `wp_theme/{theme}/theme.json` is read-only context and cannot be edited.
+- `wp_global_styles/{theme}.json` is editable JSON. WP Origin strips WordPress's
+  internal Global Styles safety flag on export and restores it on import.
+  Global Styles files must contain a JSON object.
+
+Raw block files are validated before import. Malformed Gutenberg delimiters,
+malformed JSON attributes, mismatched or unclosed blocks, NUL bytes, and content
+that would normalize into surprising block structure are rejected.
+
+## 8. Import Safety
+
+WP Origin validates and plans the full pushed range before mutating WordPress.
+This is required for single-commit and multi-commit pushes: if any changed file
+or later commit is invalid, no earlier WordPress writes may remain.
+
+Push validation rejects:
+
+- Unsupported paths or extensions.
+- Path traversal and non-canonical slugs.
+- User-authored symlinks, except generated checkout guidance that remains
+  unchanged.
+- Executable file modes.
+- NUL bytes and binary content in text formats.
+- Malformed Markdown front matter.
+- Unsupported front matter fields or scalar types.
+- Malformed Gutenberg block markup.
+- Edits to read-only theme JSON files.
+- Invalid Global Styles JSON, including JSON arrays.
+- Deletes or renames for template, template part, navigation, and Global Styles
+  files.
+- Creates, edits, or deletes of generated guidance symlinks.
+- Parent page deletes while child page files still exist.
+- Multi-ref pushes, non-`trunk` pushes, and `trunk` deletion.
+- Pushes based on a stale remote state.
+
+Errors should be actionable from a Git client and should explain whether the
+user needs to pull/rebase, fix a file, change permissions, or avoid an
+unsupported operation.
+
+## 9. Conflict Model
+
+Before accepting a push, WP Origin refreshes the remote view from WordPress. If
+WordPress changed since the client's base commit, the push is rejected. The user
+or agent must pull, rebase or merge locally, resolve conflicts, and push again.
+
+This keeps WordPress as the source of truth and avoids overwriting WP-Admin
+edits with stale local content.
+
+## 10. Core User Flows
+
+### 10.1 Clone
+
+1. A user authenticates with Basic Auth and an application password.
+2. The user runs `git clone https://example.com/wp-json/git/v1/md.git`.
+3. The clone checks out `trunk`.
+4. The working tree contains supported WordPress content and agent guidance.
+
+### 10.2 Edit A Post Or Page
+
+1. The user edits `post/{slug}.md`, `page/{slug}.md`, or a nested page path.
+2. The user commits locally.
+3. The user pushes to `trunk`.
+4. WP Origin validates the whole push, checks permissions, updates WordPress,
+   and lets WordPress create revisions.
+
+### 10.3 Create Content
+
+1. The user adds a new `post/{slug}.md` or page file.
+2. Front matter is optional except where WordPress behavior requires a value.
+3. WP Origin creates the matching post or page using safe WordPress defaults.
+4. Nested pages require an existing exported parent path.
+
+### 10.4 Delete And Restore Content
+
+1. Deleting a post or page file trashes the matching WordPress object.
+2. Re-adding the same file path restores that trashed object.
+3. The plugin rejects deletes that would leave exported child pages orphaned.
+
+### 10.5 Edit Block Theme Content
+
+1. The user edits a supported `.html` block entity file or
+   `wp_global_styles/{theme}.json`.
+2. WP Origin validates raw block markup or JSON before writing.
+3. Theme source files remain read-only.
+4. Deletes and renames are rejected.
+
+### 10.6 Resolve A Stale Push
+
+1. A user edits content in WP-Admin after another user cloned.
+2. The stale local clone attempts to push.
+3. WP Origin rejects the push before writing WordPress content.
+4. The local user pulls, rebases or merges, resolves conflicts, and pushes the
+   resolved tree.
+
+## 11. Testing And Reliability
+
+The plugin should keep a mix of focused unit tests and end-to-end Git flow tests.
+
+Required coverage:
+
+- Clone, pull, commit, push, and fresh clone verification.
+- Basic Auth for clone and push.
+- REST/WP-Admin edits flowing back through Git.
+- Stale push rejection.
+- Multi-file and multi-commit push rejection without partial WordPress writes.
+- Malformed front matter rejection.
+- Rejection of `id`, `slug`, `type`, and unknown front matter fields.
+- Malformed Gutenberg block markup rejection.
+- Template/global-style delete and rename rejection.
+- Read-only theme JSON rejection.
+- Nested page export, creation, update, conflict, and parent delete behavior.
+- Delete-to-trash and restore-from-trash behavior.
+- Editor/admin permission boundaries for clone and push.
+- Symlink, executable mode, unsupported path, binary/NUL, and path traversal
+  rejection.
+
+The smoke-test script should remain usable by agents as an acceptance harness
+against a local WordPress playground or sandbox site.
+
+## 12. Future Work
+
+- Media mirroring for referenced attachments, including relative Markdown links,
+  binary hashing, and safe import of new media.
+- Explicit reset semantics for templates, template parts, navigation, and Global
+  Styles.
+- Additional post types with explicit path and permission rules.
+- Better large-site pagination, streaming, and memory limits.
+- Optional mapping between Git commits and WordPress revision sets.
+- WordPress.com or Jetpack transport once the standalone plugin behavior is
+  stable.
+
+## 13. Success Metrics
+
+- A user can clone a test site and see supported content as files.
+- A user can edit an existing post/page locally and push it without data loss.
+- A user can create a new post/page from a pushed file.
+- A user can safely trash and restore content through file deletion/re-addition.
+- Block theme files and Global Styles overlays round-trip through supported
+  create/update flows.
+- Unsafe pushes fail before any WordPress content changes.
+- Stale pushes are rejected and recoverable through normal Git pull/rebase
+  workflows.
+- End-to-end tests can prove the repository view and WordPress state agree after
+  each supported flow.
