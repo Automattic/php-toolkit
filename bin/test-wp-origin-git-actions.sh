@@ -356,8 +356,6 @@ file_put_contents($path, $markdown);
 php -r '
 $path = $argv[1];
 $markdown = "---\n"
-	. "type: \"page\"\n"
-	. "slug: \"page-from-git\"\n"
 	. "status: \"publish\"\n"
 	. "title: \"Page From Git\"\n"
 	. "---\n\n"
@@ -410,6 +408,133 @@ echo $page["status"];
 ')"
 [ "$TRASHED_PAGE_STATUS" = "trash" ]
 git pull --rebase origin trunk
+
+php -r '
+$path = $argv[1];
+$markdown = "---\n"
+	. "id: \"1\"\n"
+	. "status: \"publish\"\n"
+	. "title: \"Rejected ID Front Matter\"\n"
+	. "---\n\n"
+	. "This push must be rejected.\n";
+file_put_contents($path, $markdown);
+' "$CLONE_DIR/post/rejected-id-frontmatter.md"
+git add post/rejected-id-frontmatter.md
+git commit -m "Reject post id front matter"
+if PUSH_OUTPUT="$(git push origin trunk 2>&1)"; then
+	echo "Expected id front matter push to fail." >&2
+	exit 1
+fi
+assert_push_summary_contains "$PUSH_OUTPUT" 'Push rejected because Markdown front matter must not include an id.'
+git reset --hard HEAD~1 >/dev/null
+
+php -r '
+$path = $argv[1];
+$markdown = "---\n"
+	. "slug: \"rejected-slug-frontmatter\"\n"
+	. "status: \"publish\"\n"
+	. "title: \"Rejected Slug Front Matter\"\n"
+	. "---\n\n"
+	. "This push must be rejected.\n";
+file_put_contents($path, $markdown);
+' "$CLONE_DIR/post/rejected-slug-frontmatter.md"
+git add post/rejected-slug-frontmatter.md
+git commit -m "Reject post slug front matter"
+if PUSH_OUTPUT="$(git push origin trunk 2>&1)"; then
+	echo "Expected slug front matter push to fail." >&2
+	exit 1
+fi
+assert_push_summary_contains "$PUSH_OUTPUT" 'Push rejected because Markdown front matter must not include a slug.'
+git reset --hard HEAD~1 >/dev/null
+
+php -r '
+$path = $argv[1];
+$markdown = "---\n"
+	. "type: \"post\"\n"
+	. "status: \"publish\"\n"
+	. "title: \"Rejected Type Front Matter\"\n"
+	. "---\n\n"
+	. "This push must be rejected.\n";
+file_put_contents($path, $markdown);
+' "$CLONE_DIR/post/rejected-type-frontmatter.md"
+git add post/rejected-type-frontmatter.md
+git commit -m "Reject post type front matter"
+if PUSH_OUTPUT="$(git push origin trunk 2>&1)"; then
+	echo "Expected type front matter push to fail." >&2
+	exit 1
+fi
+assert_push_summary_contains "$PUSH_OUTPUT" 'Push rejected because Markdown front matter must not include a type.'
+git reset --hard HEAD~1 >/dev/null
+
+php -r '
+file_put_contents(
+	$argv[1],
+	"---\nstatus: \"publish\"\ntitle: \"Atomic Valid Page\"\n---\n\nThis page must not be written if the push is rejected.\n"
+);
+file_put_contents(
+	$argv[2],
+	"---\nstatus: \"invalid-status\"\ntitle: \"Atomic Invalid Status\"\n---\n\nThis push must be rejected.\n"
+);
+' "$CLONE_DIR/page/atomic-valid-page.md" "$CLONE_DIR/post/atomic-invalid-status.md"
+git add page/atomic-valid-page.md post/atomic-invalid-status.md
+git commit -m "Reject atomic partial writes"
+if PUSH_OUTPUT="$(git push origin trunk 2>&1)"; then
+	echo "Expected atomic invalid status push to fail." >&2
+	exit 1
+fi
+assert_push_summary_contains "$PUSH_OUTPUT" 'Push rejected because "invalid-status" is not a supported post status.'
+curl -sS -f -H "Authorization: Basic $AUTH_HEADER" "$BASE_URL/wp-json/wp/v2/pages?slug=atomic-valid-page&context=edit" | php -r '
+$pages = json_decode(stream_get_contents(STDIN), true);
+if (array() !== $pages) {
+	exit(1);
+}
+'
+git reset --hard HEAD~1 >/dev/null
+
+php -r '
+file_put_contents(
+	$argv[1],
+	"---\nstatus: \"publish\"\ntitle: \"Rejected Front Matter\"\n\nThis push must be rejected.\n"
+);
+' "$CLONE_DIR/post/rejected-frontmatter.md"
+git add post/rejected-frontmatter.md
+git commit -m "Reject malformed front matter"
+if PUSH_OUTPUT="$(git push origin trunk 2>&1)"; then
+	echo "Expected malformed front matter push to fail." >&2
+	exit 1
+fi
+assert_push_summary_contains "$PUSH_OUTPUT" 'Push rejected because Markdown front matter is missing its closing --- fence.'
+git reset --hard HEAD~1 >/dev/null
+
+php -r '
+file_put_contents(
+	$argv[1],
+	"---\nstatus: \"publish\"\ntitle: \"Rejected Block Markup\"\n---\n\n<!-- wp:group {bad json} -->\nBroken block markup.\n<!-- /wp:group -->\n"
+);
+' "$CLONE_DIR/post/rejected-block-markup.md"
+git add post/rejected-block-markup.md
+git commit -m "Reject malformed block markup"
+if PUSH_OUTPUT="$(git push origin trunk 2>&1)"; then
+	echo "Expected malformed block markup push to fail." >&2
+	exit 1
+fi
+assert_push_summary_contains "$PUSH_OUTPUT" 'Push rejected because the content contains malformed Gutenberg block'
+git reset --hard HEAD~1 >/dev/null
+
+php -r '
+file_put_contents(
+	$argv[1],
+	"---\nstatus: \"publish\"\ntitle: \"Rejected Mismatched Blocks\"\n---\n\n<!-- wp:paragraph -->\n<p>Broken block markup.</p>\n<!-- /wp:group -->\n"
+);
+' "$CLONE_DIR/post/rejected-mismatched-blocks.md"
+git add post/rejected-mismatched-blocks.md
+git commit -m "Reject mismatched block markup"
+if PUSH_OUTPUT="$(git push origin trunk 2>&1)"; then
+	echo "Expected mismatched block markup push to fail." >&2
+	exit 1
+fi
+assert_push_summary_contains "$PUSH_OUTPUT" 'Push rejected because the content contains mismatched Gutenberg block delimiters.'
+git reset --hard HEAD~1 >/dev/null
 
 php -r '
 $path = $argv[1];

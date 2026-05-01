@@ -269,6 +269,10 @@ SKILL;
 	}
 
 	private static function current_user_can_read_exported_content() {
+		if ( current_user_can( 'edit_others_posts' ) ) {
+			return true;
+		}
+
 		$post_ids = get_posts(
 			array(
 				'post_type'      => self::get_export_post_types(),
@@ -649,8 +653,9 @@ SKILL;
 		$files                  = array();
 		$has_guideline_skills   = false;
 		$agent_guide_skill_path = null;
+		$can_read_all_exports   = current_user_can( 'edit_others_posts' );
 		foreach ( $posts as $post ) {
-			if ( ! current_user_can( 'read_post', intval( $post->ID ) ) ) {
+			if ( ! $can_read_all_exports && ! current_user_can( 'read_post', intval( $post->ID ) ) ) {
 				throw new Exception( 'Git export rejected because you do not have permission to read all WP Origin content.' );
 			}
 
@@ -1185,17 +1190,7 @@ SKILL;
 			self::validate_single_commit_content_changes( $repository, $commit_hash );
 		}
 
-		foreach ( $commit_hashes as $index => $commit_hash ) {
-			// Conflict checks against WordPress's current modified_gmt only
-			// make sense for the first commit in the push range — every
-			// subsequent commit is being applied on top of the WP state we
-			// just produced, so per-file modified_gmt comparisons would
-			// spuriously fail.
-			$push_summary = array_merge(
-				$push_summary,
-				self::apply_single_commit_to_wordpress( $repository, $commit_hash, 0 !== $index )
-			);
-		}
+		$push_summary = self::apply_repository_diff_to_wordpress( $repository, $old_commit, $new_commit, false );
 
 		return $push_summary;
 	}
@@ -1245,18 +1240,16 @@ SKILL;
 		}
 	}
 
-	private static function apply_single_commit_to_wordpress( GitRepository $repository, $commit_hash, $skip_modified_checks ) {
-		$commit = $repository->read_object( $commit_hash )->as_commit();
-		self::validate_push_commit( $repository, $commit );
-
-		$parent_hash = empty( $commit->parents ) ? Commit::NULL_HASH : $commit->get_first_parent_hash();
-		$old_files   = Commit::is_null_hash( $parent_hash )
+	private static function apply_repository_diff_to_wordpress( GitRepository $repository, $old_commit, $new_commit, $skip_modified_checks ) {
+		$old_files = Commit::is_null_hash( $old_commit )
 			? array()
-			: self::read_repository_entries_from_commit( $repository, $parent_hash );
-		$new_files   = self::read_repository_entries_from_commit( $repository, $commit_hash );
+			: self::read_repository_entries_from_commit( $repository, $old_commit );
+		$new_files = self::read_repository_entries_from_commit( $repository, $new_commit );
 
 		$updated_post_ids = array();
 		$changes          = array();
+		$upsert_plans     = array();
+		$trash_plans      = array();
 		self::reject_deleted_raw_block_files( $old_files, $new_files );
 		self::reject_deleted_theme_base_files( $old_files, $new_files );
 		self::reject_deleted_global_styles_files( $old_files, $new_files );
@@ -1269,16 +1262,22 @@ SKILL;
 				continue;
 			}
 
-			$applied = self::upsert_post_from_markdown(
+			$planned = self::upsert_post_from_markdown(
 				$path,
 				$entry['content'],
-				array( 'skip_modified_check' => $skip_modified_checks )
+				array(
+					'dry_run'             => true,
+					'skip_modified_check' => $skip_modified_checks,
+				)
 			);
-			$post_id = $applied['post_id'];
+			$post_id = $planned['post_id'];
 			if ( $post_id ) {
 				$updated_post_ids[ $post_id ] = true;
-				$changes[]                    = $applied['change'];
 			}
+			$upsert_plans[] = array(
+				'path'    => $path,
+				'content' => $entry['content'],
+			);
 		}
 
 		foreach ( $old_files as $path => $entry ) {
@@ -1290,10 +1289,7 @@ SKILL;
 			}
 
 			$metadata = self::parse_markdown_metadata( $entry['content'] );
-			$post_id  = isset( $metadata['id'] ) ? intval( $metadata['id'] ) : 0;
-			if ( ! $post_id ) {
-				$post_id = self::find_post_id_by_path_metadata( $path, $metadata );
-			}
+			$post_id  = self::find_post_id_by_path_metadata( $path, $metadata );
 
 			if ( ! $post_id || isset( $updated_post_ids[ $post_id ] ) ) {
 				continue;
@@ -1307,10 +1303,28 @@ SKILL;
 			}
 			self::assert_can_edit_post( $post_id );
 
-			$post      = get_post( $post_id );
-			$changes[] = self::build_push_summary_item( 'trashed', $post, $path );
+			$trash_plans[] = array(
+				'post_id' => $post_id,
+				'path'    => $path,
+			);
+		}
 
-			if ( false === wp_trash_post( $post_id ) ) {
+		foreach ( $upsert_plans as $plan ) {
+			$applied = self::upsert_post_from_markdown(
+				$plan['path'],
+				$plan['content'],
+				array( 'skip_modified_check' => $skip_modified_checks )
+			);
+			if ( $applied['post_id'] ) {
+				$changes[] = $applied['change'];
+			}
+		}
+
+		foreach ( $trash_plans as $plan ) {
+			$post      = get_post( $plan['post_id'] );
+			$changes[] = self::build_push_summary_item( 'trashed', $post, $plan['path'] );
+
+			if ( false === wp_trash_post( $plan['post_id'] ) ) {
 				throw new Exception( 'Push rejected because WordPress could not trash the deleted content.' );
 			}
 		}
@@ -1410,34 +1424,27 @@ SKILL;
 			return self::upsert_guideline_from_markdown( $path, $markdown, $options );
 		}
 		if ( self::is_raw_block_post_type( $post_type ) ) {
-			return self::upsert_raw_block_post_from_html( $path, $markdown );
+			return self::upsert_raw_block_post_from_html( $path, $markdown, $options );
 		}
 		if ( 'wp_global_styles' === $post_type ) {
-			return self::upsert_global_styles_from_json( $path, $markdown );
+			return self::upsert_global_styles_from_json( $path, $markdown, $options );
 		}
 
+		self::assert_markdown_front_matter_is_closed( $markdown );
 		$consumer = new MarkdownConsumer( $markdown );
 		$result   = $consumer->consume();
+		self::assert_block_markup_is_safe( $result->get_block_markup() );
 		$metadata = array();
 		foreach ( $result->get_all_metadata() as $key => $value ) {
 			$metadata[ $key ] = is_array( $value ) ? reset( $value ) : $value;
 		}
 
-		if ( isset( $metadata['type'] ) && $metadata['type'] !== $post_type ) {
-			throw new Exception( 'Push rejected because the file post type does not match its directory.' );
-		}
-		if ( isset( $metadata['slug'] ) && $metadata['slug'] !== $slug ) {
-			throw new Exception( 'Push rejected because the file slug does not match its filename.' );
-		}
-		$post_id = isset( $metadata['id'] ) ? intval( $metadata['id'] ) : 0;
-		if ( $post_id && get_post( $post_id ) ) {
-			$existing_post = get_post( $post_id );
-		} else {
-			$post_id       = self::find_post_id_by_path_metadata( $path, $metadata );
-			$existing_post = $post_id ? get_post( $post_id ) : null;
-		}
-		$post_status = self::normalize_frontmatter_status(
-			isset( $metadata['status'] ) ? $metadata['status'] : ( $existing_post ? $existing_post->post_status : 'draft' )
+		self::reject_identity_frontmatter( $metadata );
+		$post_id        = self::find_post_id_by_path_metadata( $path, $metadata );
+		$existing_post  = $post_id ? get_post( $post_id ) : null;
+		$default_status = $existing_post && 'trash' !== $existing_post->post_status ? $existing_post->post_status : 'draft';
+		$post_status    = self::normalize_frontmatter_status(
+			isset( $metadata['status'] ) ? $metadata['status'] : $default_status
 		);
 		self::validate_post_status( $post_status, $post_type );
 		self::assert_can_set_post_status( $post_type, $post_status, $existing_post );
@@ -1459,7 +1466,7 @@ SKILL;
 
 		$postarr = array(
 			'post_type'    => $post_type,
-			'post_name'    => isset( $metadata['slug'] ) ? $metadata['slug'] : $slug,
+			'post_name'    => $slug,
 			'post_title'   => isset( $metadata['title'] ) ? $metadata['title'] : ucwords( str_replace( '-', ' ', $slug ) ),
 			'post_status'  => $post_status,
 			'post_content' => $result->get_block_markup(),
@@ -1474,7 +1481,16 @@ SKILL;
 			$postarr['post_excerpt'] = $metadata['description'];
 		}
 
+		$change_action = $existing_post && 'trash' === $existing_post->post_status ? 'restored' : ( $existing_post ? 'updated' : 'created' );
+		if ( ! empty( $options['dry_run'] ) ) {
+			return array(
+				'post_id' => $existing_post ? intval( $existing_post->ID ) : 0,
+				'change'  => null,
+			);
+		}
+
 		if ( $existing_post ) {
+			$existing_post = self::restore_trashed_post_before_update( $existing_post );
 			$postarr['ID'] = $existing_post->ID;
 			$post_id       = wp_update_post( wp_slash( $postarr ), true );
 		} else {
@@ -1490,15 +1506,16 @@ SKILL;
 		return array(
 			'post_id' => $post_id,
 			'change'  => self::build_push_summary_item(
-				$existing_post ? 'updated' : 'created',
+				$change_action,
 				$post,
 				$path
 			),
 		);
 	}
 
-	private static function upsert_raw_block_post_from_html( $path, $html ) {
+	private static function upsert_raw_block_post_from_html( $path, $html, $options = array() ) {
 		self::assert_raw_block_html_has_no_front_matter( $html );
+		self::assert_block_markup_is_safe( $html );
 
 		$identity      = self::path_to_raw_block_identity( $path );
 		$post_type     = $identity['post_type'];
@@ -1512,7 +1529,6 @@ SKILL;
 				'ID'           => $existing_post->ID,
 				'post_content' => $html,
 			);
-			$post_id = wp_update_post( wp_slash( $postarr ), true );
 		} else {
 			self::assert_can_create_post_type( $post_type );
 			self::assert_can_set_post_status( $post_type, 'publish' );
@@ -1523,6 +1539,18 @@ SKILL;
 				'post_status'  => 'publish',
 				'post_content' => $html,
 			);
+		}
+
+		if ( ! empty( $options['dry_run'] ) ) {
+			return array(
+				'post_id' => $existing_post ? intval( $existing_post->ID ) : 0,
+				'change'  => null,
+			);
+		}
+
+		if ( $existing_post ) {
+			$post_id = wp_update_post( wp_slash( $postarr ), true );
+		} else {
 			$post_id = wp_insert_post( wp_slash( $postarr ), true );
 		}
 
@@ -1544,7 +1572,7 @@ SKILL;
 		);
 	}
 
-	private static function upsert_global_styles_from_json( $path, $json ) {
+	private static function upsert_global_styles_from_json( $path, $json, $options = array() ) {
 		$config        = self::parse_global_styles_json( $path, $json );
 		$theme_slug    = self::path_to_global_styles_theme_slug( $path );
 		$post_id       = self::find_global_styles_post_id_by_theme_slug( $theme_slug, false );
@@ -1566,7 +1594,6 @@ SKILL;
 				'ID'           => $existing_post->ID,
 				'post_content' => $post_content,
 			);
-			$post_id = wp_update_post( wp_slash( $postarr ), true );
 		} else {
 			self::assert_can_create_post_type( 'wp_global_styles' );
 			self::assert_can_set_post_status( 'wp_global_styles', 'publish' );
@@ -1577,6 +1604,18 @@ SKILL;
 				'post_status'  => 'publish',
 				'post_content' => $post_content,
 			);
+		}
+
+		if ( ! empty( $options['dry_run'] ) ) {
+			return array(
+				'post_id' => $existing_post ? intval( $existing_post->ID ) : 0,
+				'change'  => null,
+			);
+		}
+
+		if ( $existing_post ) {
+			$post_id = wp_update_post( wp_slash( $postarr ), true );
+		} else {
 			$post_id = wp_insert_post( wp_slash( $postarr ), true );
 		}
 
@@ -1629,6 +1668,95 @@ SKILL;
 		}
 	}
 
+	private static function assert_markdown_front_matter_is_closed( $markdown ) {
+		if (
+			preg_match( '/\A---\r?\n/', $markdown ) &&
+			! preg_match( '/\A---\r?\n.*?\r?\n---(?:\r?\n|\z)/s', $markdown )
+		) {
+			throw new Exception( 'Push rejected because Markdown front matter is missing its closing --- fence.' );
+		}
+	}
+
+	private static function assert_block_markup_is_safe( $block_markup ) {
+		if (
+			false === strpos( $block_markup, '<!-- wp:' ) &&
+			false === strpos( $block_markup, '<!-- /wp:' )
+		) {
+			return;
+		}
+
+		self::assert_block_delimiters_are_well_formed( $block_markup );
+		self::assert_parsed_blocks_are_safe( parse_blocks( $block_markup ) );
+	}
+
+	private static function assert_block_delimiters_are_well_formed( $block_markup ) {
+		if ( ! preg_match_all( '/<!--\s*\/?wp:.*?-->/s', $block_markup, $matches ) ) {
+			throw new Exception( 'Push rejected because the content contains malformed Gutenberg block markup.' );
+		}
+
+		$stack = array();
+		foreach ( $matches[0] as $token ) {
+			if (
+				! preg_match(
+					'/\A<!--\s+(?P<closer>\/)?wp:(?P<namespace>[a-z][a-z0-9_-]*\/)?(?P<name>[a-z][a-z0-9_-]*)(?P<attrs>\s+\{.*\})?\s+(?P<void>\/)?-->\z/s',
+					$token,
+					$token_match
+				)
+			) {
+				throw new Exception( 'Push rejected because the content contains malformed Gutenberg block markup.' );
+			}
+
+			$is_closer = isset( $token_match['closer'] ) && '' !== $token_match['closer'];
+			$is_void   = isset( $token_match['void'] ) && '' !== $token_match['void'];
+			$namespace = isset( $token_match['namespace'] ) && '' !== $token_match['namespace'] ? $token_match['namespace'] : 'core/';
+			$name      = $namespace . $token_match['name'];
+
+			if ( isset( $token_match['attrs'] ) && '' !== $token_match['attrs'] ) {
+				json_decode( trim( $token_match['attrs'] ), true );
+				if ( JSON_ERROR_NONE !== json_last_error() ) {
+					throw new Exception( 'Push rejected because the content contains malformed Gutenberg block attributes.' );
+				}
+			}
+
+			if ( $is_closer ) {
+				if ( $is_void || ( isset( $token_match['attrs'] ) && '' !== $token_match['attrs'] ) ) {
+					throw new Exception( 'Push rejected because the content contains malformed Gutenberg block markup.' );
+				}
+				if ( empty( $stack ) || array_pop( $stack ) !== $name ) {
+					throw new Exception( 'Push rejected because the content contains mismatched Gutenberg block delimiters.' );
+				}
+			} elseif ( ! $is_void ) {
+				$stack[] = $name;
+			}
+		}
+
+		if ( ! empty( $stack ) ) {
+			throw new Exception( 'Push rejected because the content contains unclosed Gutenberg block delimiters.' );
+		}
+	}
+
+	private static function assert_parsed_blocks_are_safe( $blocks ) {
+		foreach ( $blocks as $block ) {
+			$block_name   = isset( $block['blockName'] ) ? $block['blockName'] : null;
+			$attrs        = array_key_exists( 'attrs', $block ) ? $block['attrs'] : array();
+			$inner_html   = isset( $block['innerHTML'] ) ? $block['innerHTML'] : '';
+			$inner_blocks = isset( $block['innerBlocks'] ) && is_array( $block['innerBlocks'] ) ? $block['innerBlocks'] : array();
+
+			if ( null === $block_name && self::contains_block_delimiter( $inner_html ) ) {
+				throw new Exception( 'Push rejected because the content contains malformed Gutenberg block markup.' );
+			}
+			if ( null !== $block_name && ! is_array( $attrs ) ) {
+				throw new Exception( 'Push rejected because the content contains malformed Gutenberg block attributes.' );
+			}
+
+			self::assert_parsed_blocks_are_safe( $inner_blocks );
+		}
+	}
+
+	private static function contains_block_delimiter( $html ) {
+		return false !== strpos( $html, '<!-- wp:' ) || false !== strpos( $html, '<!-- /wp:' );
+	}
+
 	private static function is_array_list( $items ) {
 		$index = 0;
 		foreach ( $items as $key => $value ) {
@@ -1654,21 +1782,21 @@ SKILL;
 			$skill_document = self::split_guideline_skill_markdown( $markdown );
 			$metadata       = $skill_document['metadata'];
 			$markdown       = $skill_document['content'];
+			self::assert_block_markup_is_safe( $markdown );
+			self::reject_identity_frontmatter( $metadata );
 			if ( isset( $metadata['name'] ) && $metadata['name'] !== $slug ) {
 				throw new Exception( 'Push rejected because the skill name front matter does not match its directory.' );
 			}
-		}
-
-		$post_id = isset( $metadata['id'] ) ? intval( $metadata['id'] ) : 0;
-		if ( $post_id && get_post( $post_id ) ) {
-			$existing_post = get_post( $post_id );
 		} else {
-			$post_id       = self::find_post_id_by_path_metadata( $path, $metadata );
-			$existing_post = $post_id ? get_post( $post_id ) : null;
+			self::assert_block_markup_is_safe( $markdown );
 		}
 
-		$post_status = self::normalize_frontmatter_status(
-			isset( $metadata['status'] ) ? $metadata['status'] : ( $existing_post ? $existing_post->post_status : 'draft' )
+		$post_id       = self::find_post_id_by_path_metadata( $path, $metadata );
+		$existing_post = $post_id ? get_post( $post_id ) : null;
+
+		$default_status = $existing_post && 'trash' !== $existing_post->post_status ? $existing_post->post_status : 'draft';
+		$post_status    = self::normalize_frontmatter_status(
+			isset( $metadata['status'] ) ? $metadata['status'] : $default_status
 		);
 		self::validate_post_status( $post_status, 'wp_guideline' );
 		self::assert_can_set_post_status( 'wp_guideline', $post_status, $existing_post );
@@ -1700,7 +1828,16 @@ SKILL;
 			$postarr['post_excerpt'] = $metadata['description'];
 		}
 
+		$change_action = $existing_post && 'trash' === $existing_post->post_status ? 'restored' : ( $existing_post ? 'updated' : 'created' );
+		if ( ! empty( $options['dry_run'] ) ) {
+			return array(
+				'post_id' => $existing_post ? intval( $existing_post->ID ) : 0,
+				'change'  => null,
+			);
+		}
+
 		if ( $existing_post ) {
+			$existing_post = self::restore_trashed_post_before_update( $existing_post );
 			$postarr['ID'] = $existing_post->ID;
 			$post_id       = wp_update_post( wp_slash( $postarr ), true );
 		} else {
@@ -1722,7 +1859,7 @@ SKILL;
 		return array(
 			'post_id' => $post_id,
 			'change'  => self::build_push_summary_item(
-				$existing_post ? 'updated' : 'created',
+				$change_action,
 				$post,
 				$path
 			),
@@ -1858,6 +1995,35 @@ SKILL;
 		return isset( $statuses[ $key ] ) ? $statuses[ $key ] : $post_status;
 	}
 
+	private static function reject_identity_frontmatter( $metadata ) {
+		if ( isset( $metadata['id'] ) ) {
+			throw new Exception( 'Push rejected because Markdown front matter must not include an id. The file path is the content identity.' );
+		}
+		if ( isset( $metadata['slug'] ) ) {
+			throw new Exception( 'Push rejected because Markdown front matter must not include a slug. Rename the file path only when creating distinct content.' );
+		}
+		if ( isset( $metadata['type'] ) ) {
+			throw new Exception( 'Push rejected because Markdown front matter must not include a type. The directory determines the post type.' );
+		}
+	}
+
+	private static function restore_trashed_post_before_update( WP_Post $post ) {
+		if ( 'trash' !== $post->post_status ) {
+			return $post;
+		}
+
+		if ( false === wp_untrash_post( $post->ID ) ) {
+			throw new Exception( 'Push rejected because WordPress could not restore the trashed content for this path.' );
+		}
+
+		$restored = get_post( $post->ID );
+		if ( ! $restored ) {
+			throw new Exception( 'Push rejected because WordPress could not reload the restored content.' );
+		}
+
+		return $restored;
+	}
+
 	private static function find_post_id_by_path_metadata( $path, $metadata, $include_trash = true ) {
 		$post_type = self::path_to_post_type( $path );
 		if ( self::is_raw_block_post_type( $post_type ) ) {
@@ -1870,7 +2036,9 @@ SKILL;
 			);
 		}
 
-		$slug     = isset( $metadata['slug'] ) ? $metadata['slug'] : self::path_to_slug( $path );
+		unset( $metadata );
+
+		$slug     = self::path_to_slug( $path );
 		$statuses = $include_trash
 			? array_merge( self::$supported_post_statuses, array( 'trash' ) )
 			: self::$supported_post_statuses;
@@ -1885,7 +2053,22 @@ SKILL;
 		);
 
 		if ( empty( $posts ) ) {
-			return 0;
+			if ( ! $include_trash ) {
+				return 0;
+			}
+
+			$posts = get_posts(
+				array(
+					'post_type'      => $post_type,
+					'name'           => $slug . '__trashed',
+					'post_status'    => array( 'trash' ),
+					'posts_per_page' => 1,
+					'fields'         => 'ids',
+				)
+			);
+			if ( empty( $posts ) ) {
+				return 0;
+			}
 		}
 
 		return intval( $posts[0] );
@@ -2113,6 +2296,7 @@ SKILL;
 		$metadata = array();
 		$content  = $markdown;
 
+		self::assert_markdown_front_matter_is_closed( $markdown );
 		if ( preg_match( '/\A---\r?\n.*?\r?\n---(?:\r?\n|\z)/s', $markdown, $matches ) ) {
 			$metadata = self::parse_markdown_metadata( $markdown );
 			$content  = substr( $markdown, strlen( $matches[0] ) );
