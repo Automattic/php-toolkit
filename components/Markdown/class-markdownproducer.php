@@ -325,6 +325,8 @@ class MarkdownProducer implements DataFormatProducer {
 
 				case '+DEL':
 				case '-DEL':
+				case '+S':
+				case '-S':
 					$markdown .= '~~';
 					break;
 

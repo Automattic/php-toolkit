@@ -20,11 +20,11 @@ use WordPress\Git\Model\Commit;
  *                  posts to Markdown, creates a "Seed batch" commit on
  *                  `refs/heads/_wp_origin_seed`, and re-schedules
  *                  itself when the time/memory budget is up.
- *   finalizing   → all batches done. Build a single parent-less
- *                  "Initial import from WordPress" commit pointing at
- *                  the seed branch's tree, and set
- *                  `refs/heads/trunk` to it. The seed branch goes
- *                  away.
+ *   finalizing   → all batches done. Keep the parent-less theme base
+ *                  commit when one exists, build a single
+ *                  "Initial import from WordPress" overlay commit
+ *                  pointing at the seed branch's tree, and set
+ *                  `refs/heads/trunk` to it. The seed branch goes away.
  *   done         → repository is open for clone/pull/push.
  *   failed       → an exception aborted seeding; admins can retry
  *                  from the admin page.
@@ -286,19 +286,23 @@ class WP_Origin_Seeder {
 
 		$existing   = self::get_progress_storage();
 		$tick_count = isset( $existing['tick_count'] ) ? intval( $existing['tick_count'] ) : 0;
-		update_option(
-			self::PROGRESS_OPTION,
-			array(
-				'processed'    => 0,
-				'total'        => $total,
-				'last_id'      => 0,
-				'tick_count'   => $tick_count,
-				'started_at'   => time(),
-				'last_tick_at' => time(),
-				'message'      => sprintf( 'Found %d content items to import.', $total ),
-			),
-			false
+		$progress   = array(
+			'processed'    => 0,
+			'total'        => $total,
+			'last_id'      => 0,
+			'tick_count'   => $tick_count,
+			'started_at'   => time(),
+			'last_tick_at' => time(),
+			'message'      => sprintf( 'Found %d content items to import.', $total ),
 		);
+
+		$theme_base_oid = self::initialize_theme_base_commit();
+		if ( $theme_base_oid ) {
+			$progress['theme_base_oid'] = $theme_base_oid;
+			$progress['message']        = sprintf( 'Found %d content items to import after staging theme base files.', $total );
+		}
+
+		update_option( self::PROGRESS_OPTION, $progress, false );
 
 		// If there's nothing to import, skip straight to finalization so
 		// trunk gets an empty initial commit and clones stop being
@@ -308,6 +312,44 @@ class WP_Origin_Seeder {
 		} else {
 			update_option( self::STATE_OPTION, self::STATE_IN_PROGRESS, false );
 		}
+	}
+
+	private static function initialize_theme_base_commit() {
+		$theme_base_files = WP_Origin_Plugin::export_theme_base_content();
+		if ( empty( $theme_base_files ) ) {
+			return '';
+		}
+
+		$updates = array();
+		foreach ( $theme_base_files as $path => $entry ) {
+			$updates[ $path ] = $entry['content'];
+		}
+
+		$repository = WP_Origin_Plugin::open_repository();
+		if ( ! $repository->branch_exists( self::SEED_BRANCH ) ) {
+			$repository->set_branch_tip( self::SEED_BRANCH, Commit::NULL_HASH );
+		}
+		$repository->set_branch_tip( 'HEAD', 'ref: ' . self::SEED_BRANCH . "\n" );
+
+		$identity = WP_Origin_Plugin::repository_identity( $repository );
+		$now      = gmdate( Commit::DATE_FORMAT );
+		$base_oid = $repository->commit(
+			array(
+				'updates' => $updates,
+				'commit'  => array(
+					'message'        => WP_Origin_Plugin::THEME_BASE_COMMIT_MESSAGE,
+					'author'         => $identity,
+					'author_date'    => $now,
+					'committer'      => $identity,
+					'committer_date' => $now,
+				),
+			)
+		);
+
+		$repository->set_branch_tip( WP_Origin_Plugin::THEME_BASE_REF, $base_oid );
+		$repository->set_branch_tip( 'HEAD', "ref: refs/heads/trunk\n" );
+
+		return $base_oid;
 	}
 
 	private static function process_batches() {
@@ -390,10 +432,13 @@ class WP_Origin_Seeder {
 		$repository = WP_Origin_Plugin::open_repository();
 		$repository->set_branch_tip( 'HEAD', "ref: refs/heads/trunk\n" );
 
-		$seed_tip = $repository->get_branch_tip( self::SEED_BRANCH );
+		$seed_tip = $repository->branch_exists( self::SEED_BRANCH )
+			? $repository->get_branch_tip( self::SEED_BRANCH )
+			: Commit::NULL_HASH;
 		$progress = self::get_progress_storage();
 		$identity = WP_Origin_Plugin::repository_identity( $repository );
 		$now      = gmdate( Commit::DATE_FORMAT );
+		$base_oid = isset( $progress['theme_base_oid'] ) ? $progress['theme_base_oid'] : '';
 
 		if ( ! is_string( $seed_tip ) || '' === $seed_tip || Commit::is_null_hash( $seed_tip ) ) {
 			// Nothing was staged (empty site). Create an empty initial
@@ -415,23 +460,33 @@ class WP_Origin_Seeder {
 		} else {
 			$seed_commit = $repository->read_object( $seed_tip )->as_commit();
 
-			// Build a single parent-less commit pointing at the seed
-			// branch's final tree. This becomes trunk's only commit, so
-			// clones see one clean "Initial import from WordPress"
-			// regardless of how many seed batches ran.
-			$initial             = new Commit(
-				array(
-					'tree'           => $seed_commit->tree,
-					'parents'        => array(),
-					'author'         => $identity,
-					'author_date'    => $now,
-					'committer'      => $identity,
-					'committer_date' => $now,
-					'message'        => 'Initial import from WordPress',
-				)
-			);
-			$initial_oid         = $repository->add_object( 'commit', $initial->get_commit_string() );
-			$progress['message'] = sprintf( 'Initial import complete. %d posts imported.', intval( $progress['processed'] ) );
+			if ( $base_oid && $seed_tip === $base_oid ) {
+				$initial_oid         = $base_oid;
+				$progress['message'] = 'Initial import complete (theme base only).';
+			} else {
+				$parents = array();
+				if ( $base_oid ) {
+					$parents[] = $base_oid;
+				}
+
+				// Build a single commit pointing at the seed branch's
+				// final tree. This becomes trunk's content overlay, so
+				// clones see one clean "Initial import from WordPress"
+				// regardless of how many seed batches ran.
+				$initial             = new Commit(
+					array(
+						'tree'           => $seed_commit->tree,
+						'parents'        => $parents,
+						'author'         => $identity,
+						'author_date'    => $now,
+						'committer'      => $identity,
+						'committer_date' => $now,
+						'message'        => 'Initial import from WordPress',
+					)
+				);
+				$initial_oid         = $repository->add_object( 'commit', $initial->get_commit_string() );
+				$progress['message'] = sprintf( 'Initial import complete. %d posts imported.', intval( $progress['processed'] ) );
+			}
 		}
 
 		$repository->set_branch_tip( 'refs/heads/trunk', $initial_oid );

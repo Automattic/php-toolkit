@@ -107,15 +107,29 @@ wait_for_seed_done() {
 
 wait_for_seed_done
 git -c protocol.version=2 clone "$REMOTE_AUTH_URL" "$CLONE_DIR"
+if [ -n "$(git -C "$CLONE_DIR" status --porcelain)" ]; then
+	git -C "$CLONE_DIR" status --short >&2
+	echo "Expected a clean worktree immediately after clone." >&2
+	exit 1
+fi
 
 test -f "$CLONE_DIR/post/hello-world.md"
 test -f "$CLONE_DIR/page/sample-page.md"
+test -f "$CLONE_DIR/wp_template/blog-home.html"
+find "$CLONE_DIR/wp_template" -mindepth 2 -name '*.html' | grep -q .
+find "$CLONE_DIR/wp_template_part" -mindepth 2 -name '*.html' | grep -q .
+find "$CLONE_DIR/wp_theme" -mindepth 2 -maxdepth 2 -name theme.json | grep -q .
+find "$CLONE_DIR/wp_global_styles" -maxdepth 1 -name '*.json' | grep -q .
 test -f "$CLONE_DIR/wp_guideline/skills/wp-origin/SKILL.md"
+test -f "$CLONE_DIR/wp_guideline/skills/wp-origin-template-editor/SKILL.md"
 test -L "$CLONE_DIR/.agents/skills"
 test -L "$CLONE_DIR/.claude/skills"
 test -L "$CLONE_DIR/AGENTS.md"
 test -L "$CLONE_DIR/CLAUDE.md"
 grep -q 'Hello from WordPress' "$CLONE_DIR/post/hello-world.md"
+grep -q 'Template from WordPress' "$CLONE_DIR/wp_template/blog-home.html"
+git -C "$CLONE_DIR" log --format=%s --reverse | sed -n '1p' | grep -Fxq 'Initial theme base from WordPress'
+git -C "$CLONE_DIR" log --format=%s --reverse | sed -n '2p' | grep -Fxq 'Initial import from WordPress'
 grep -Fq 'title: "Hello World"' "$CLONE_DIR/post/hello-world.md"
 grep -Fq 'status: "published"' "$CLONE_DIR/post/hello-world.md"
 grep -Fq 'description: "Hand-authored summary."' "$CLONE_DIR/post/hello-world.md"
@@ -126,8 +140,22 @@ grep -Fq 'name: "wp-origin"' "$CLONE_DIR/wp_guideline/skills/wp-origin/SKILL.md"
 grep -Fq 'description: "Guide for coding agents working in a WP Origin checkout of a WordPress site."' "$CLONE_DIR/wp_guideline/skills/wp-origin/SKILL.md"
 grep -Fq '# WP Origin AGENTS.md' "$CLONE_DIR/wp_guideline/skills/wp-origin/SKILL.md"
 grep -Fq 'This repository is a Git checkout of a WordPress site' "$CLONE_DIR/wp_guideline/skills/wp-origin/SKILL.md"
+grep -Fq '`wp_global_styles/{theme}.json` contains the editable Global Styles overlay' "$CLONE_DIR/wp_guideline/skills/wp-origin/SKILL.md"
+grep -Fq 'do not create flattened files such as `wp_template_part/twentytwentyfive-footer.html`' "$CLONE_DIR/wp_guideline/skills/wp-origin/SKILL.md"
+grep -Fq 'The customized database post keeps the slug `footer` and stores `twentytwentyfive` in the `wp_theme` taxonomy.' "$CLONE_DIR/wp_guideline/skills/wp-origin/SKILL.md"
+head -n 1 "$CLONE_DIR/wp_guideline/skills/wp-origin-template-editor/SKILL.md" | grep -Fxq -- '---'
+grep -Fq 'name: "wp-origin-template-editor"' "$CLONE_DIR/wp_guideline/skills/wp-origin-template-editor/SKILL.md"
+grep -Fq 'description: "Edit WP Origin block theme templates and template parts as raw Gutenberg HTML while preserving Site Editor compatibility."' "$CLONE_DIR/wp_guideline/skills/wp-origin-template-editor/SKILL.md"
+grep -Fq '# WP Origin Template Editor' "$CLONE_DIR/wp_guideline/skills/wp-origin-template-editor/SKILL.md"
+grep -Fq 'maps to the template-part ID `twentytwentyfive//footer`' "$CLONE_DIR/wp_guideline/skills/wp-origin-template-editor/SKILL.md"
+grep -Fq 'Do not flatten theme-scoped paths into files such as `wp_template_part/twentytwentyfive-footer.html`' "$CLONE_DIR/wp_guideline/skills/wp-origin-template-editor/SKILL.md"
+grep -Fq 'Edit `wp_global_styles/{theme}.json` when the user asks for site-wide theme.json-style changes.' "$CLONE_DIR/wp_guideline/skills/wp-origin-template-editor/SKILL.md"
+grep -Fq 'Prefer editable core blocks' "$CLONE_DIR/wp_guideline/skills/wp-origin-template-editor/SKILL.md"
+grep -Fq 'Run `git status --short` before committing or pushing' "$CLONE_DIR/wp_guideline/skills/wp-origin-template-editor/SKILL.md"
 grep -Fq 'This repository is a Git checkout of a WordPress site' "$CLONE_DIR/.agents/skills/wp-origin/SKILL.md"
+grep -Fq '# WP Origin Template Editor' "$CLONE_DIR/.agents/skills/wp-origin-template-editor/SKILL.md"
 grep -Fq 'This repository is a Git checkout of a WordPress site' "$CLONE_DIR/.claude/skills/wp-origin/SKILL.md"
+grep -Fq '# WP Origin Template Editor' "$CLONE_DIR/.claude/skills/wp-origin-template-editor/SKILL.md"
 grep -Fq 'This repository is a Git checkout of a WordPress site' "$CLONE_DIR/AGENTS.md"
 grep -Fq 'This repository is a Git checkout of a WordPress site' "$CLONE_DIR/CLAUDE.md"
 [ "$(readlink "$CLONE_DIR/.agents/skills")" = "../wp_guideline/skills" ]
@@ -151,6 +179,71 @@ echo count($revisions);
 cd "$CLONE_DIR"
 git config user.name "WP Origin E2E"
 git config user.email "wp-origin-e2e@example.com"
+
+THEME_JSON_PATH="$(find "$CLONE_DIR/wp_theme" -mindepth 2 -maxdepth 2 -name theme.json | head -n 1)"
+printf '\n' >> "$THEME_JSON_PATH"
+git add "$THEME_JSON_PATH"
+git commit -m "Edit theme base JSON from Git"
+if PUSH_OUTPUT="$(git push origin trunk 2>&1)"; then
+	echo "Expected theme base JSON push to fail." >&2
+	exit 1
+fi
+assert_push_summary_contains "$PUSH_OUTPUT" 'Push rejected because theme base files are read-only in WP Origin.'
+git reset --hard HEAD~1 >/dev/null
+
+GLOBAL_STYLES_PATH="$(find "$CLONE_DIR/wp_global_styles" -maxdepth 1 -name '*.json' | head -n 1)"
+GLOBAL_STYLES_RELATIVE="${GLOBAL_STYLES_PATH#$CLONE_DIR/}"
+cat > "$GLOBAL_STYLES_PATH" <<'JSON'
+{
+	"version": 3,
+	"styles": {
+		"color": {
+			"background": "#123456",
+			"text": "#ffffff"
+		}
+	}
+}
+JSON
+git add "$GLOBAL_STYLES_RELATIVE"
+git commit -m "Customize global styles from Git"
+PUSH_OUTPUT="$(git push origin trunk 2>&1)"
+assert_push_summary_contains "$PUSH_OUTPUT" 'WP Origin applied 1 content change:'
+assert_push_summary_contains "$PUSH_OUTPUT" 'wp_global_styles'
+curl -sS -f "$BASE_URL/" | grep -Fq '#123456'
+git pull --rebase origin trunk
+grep -Fq '#123456' "$GLOBAL_STYLES_PATH"
+! grep -Fq 'isGlobalStylesUserThemeJSON' "$GLOBAL_STYLES_PATH"
+
+BASE_FOOTER_PATH="$(find "$CLONE_DIR/wp_template_part" -mindepth 2 -maxdepth 2 -name footer.html | head -n 1)"
+BASE_FOOTER_RELATIVE="${BASE_FOOTER_PATH#$CLONE_DIR/}"
+BASE_FOOTER_THEME="$(printf '%s' "$BASE_FOOTER_RELATIVE" | cut -d/ -f2)"
+cat > "$BASE_FOOTER_PATH" <<'HTML'
+<!-- wp:group {"align":"full","style":{"color":{"background":"#ff0000"}},"layout":{"type":"constrained"}} -->
+<div class="wp-block-group alignfull" style="background-color:#ff0000">
+	<!-- wp:paragraph {"style":{"color":{"text":"#ffffff"}}} -->
+	<p style="color:#ffffff">Theme footer customized from Git</p>
+	<!-- /wp:paragraph -->
+</div>
+<!-- /wp:group -->
+HTML
+git add "$BASE_FOOTER_RELATIVE"
+git commit -m "Customize theme footer from Git"
+PUSH_OUTPUT="$(git push origin trunk 2>&1)"
+assert_push_summary_contains "$PUSH_OUTPUT" 'WP Origin applied 1 content change:'
+assert_push_summary_contains "$PUSH_OUTPUT" 'wp_template_part'
+
+curl -sS -f -H "Authorization: Basic $AUTH_HEADER" "$BASE_URL/wp-json/wp/v2/template-parts/$BASE_FOOTER_THEME//footer?context=edit" | php -r '
+$part = json_decode(stream_get_contents(STDIN), true);
+if (!is_array($part) || "custom" !== $part["source"] || 0 === strpos((string) $part["wp_id"], "0")) {
+	exit(1);
+}
+if (false === strpos($part["content"]["raw"], "Theme footer customized from Git")) {
+	exit(1);
+}
+'
+curl -sS -f "$BASE_URL/" | grep -Fq 'Theme footer customized from Git'
+git pull --rebase origin trunk
+test ! -f "$CLONE_DIR/wp_template_part/$BASE_FOOTER_THEME-footer.html"
 
 php -r '
 $path = $argv[1];
@@ -177,6 +270,51 @@ echo count($revisions);
 ')"
 [ "$REVISION_COUNT_AFTER_UPDATE" -gt "$REVISION_COUNT_BEFORE" ]
 git pull --rebase origin trunk
+
+EDITOR_UPDATE_PAYLOAD='{"content":"<!-- wp:heading --><h2 class=\"wp-block-heading\">Updated from Git <s>from editor</s></h2><!-- /wp:heading -->"}'
+curl -sS \
+	-X POST \
+	-H "Authorization: Basic $AUTH_HEADER" \
+	-H "Content-Type: application/json" \
+	-d "$EDITOR_UPDATE_PAYLOAD" \
+	-f \
+	"$BASE_URL/wp-json/wp/v2/posts/$POST_ID?context=edit" >/dev/null
+
+git pull --rebase origin trunk
+grep -Fq '## Updated from Git ~~from editor~~' "$CLONE_DIR/post/hello-world.md"
+
+php -r '
+$path = $argv[1];
+$contents = file_get_contents($path);
+$contents = str_replace("Template from WordPress", "Template updated from Git", $contents);
+file_put_contents($path, $contents);
+' "$CLONE_DIR/wp_template/blog-home.html"
+
+printf '%s' '<!-- wp:paragraph --><p>Created template from Git.</p><!-- /wp:paragraph -->' > "$CLONE_DIR/wp_template/custom-blog-card.html"
+git add wp_template/blog-home.html wp_template/custom-blog-card.html
+git commit -m "Update template HTML from Git"
+PUSH_OUTPUT="$(git push origin trunk 2>&1)"
+assert_push_summary_contains "$PUSH_OUTPUT" 'WP Origin applied 2 content changes:'
+assert_push_summary_contains "$PUSH_OUTPUT" 'wp_template'
+
+rm "$CLONE_DIR/wp_template/custom-blog-card.html"
+git add -A
+git commit -m "Delete template HTML from Git"
+if PUSH_OUTPUT="$(git push origin trunk 2>&1)"; then
+	echo "Expected template deletion push to fail." >&2
+	exit 1
+fi
+assert_push_summary_contains "$PUSH_OUTPUT" 'Push rejected because template HTML files cannot be deleted or renamed.'
+git reset --hard HEAD~1 >/dev/null
+
+git mv wp_template/custom-blog-card.html wp_template/renamed-blog-card.html
+git commit -m "Rename template HTML from Git"
+if PUSH_OUTPUT="$(git push origin trunk 2>&1)"; then
+	echo "Expected template rename push to fail." >&2
+	exit 1
+fi
+assert_push_summary_contains "$PUSH_OUTPUT" 'Push rejected because template HTML files cannot be deleted or renamed.'
+git reset --hard HEAD~1 >/dev/null
 
 php -r '
 $path = $argv[1];

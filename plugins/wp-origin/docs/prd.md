@@ -9,7 +9,7 @@
 
 ### 1.2 Product summary
 
-WP Origin makes WordPress content available as a Git remote where posts and pages are represented as Markdown files. A user or coding agent can run normal Git commands such as `clone`, `pull`, and `push`; WordPress remains the source of truth, and pushed Markdown updates WordPress content directly.
+WP Origin makes WordPress content available as a Git remote where posts and pages are represented as Markdown files, and structural block entities can be represented as raw Gutenberg HTML files. A user or coding agent can run normal Git commands such as `clone`, `pull`, and `push`; WordPress remains the source of truth, and pushed files update WordPress content directly.
 
 The MVP is a standalone WordPress plugin. It focuses on a happy path that proves the workflow works for posts and pages, while keeping the design open for media, block theme entities, custom post types, templates, navigation, and WordPress.com integration later.
 
@@ -75,9 +75,11 @@ The guiding rule is that users must not lose data. If a conversion cannot preser
 
 - **Guidelines and agent portability** (Priority: Medium)
   - When Gutenberg's Guidelines experiment is available, export `wp_guideline` posts under `wp_guideline/{type}/`.
+  - When Guidelines is not available, still export WP Origin's built-in agent guide and template-editing skill as generated read-only checkout files so agents receive the same operational guidance.
   - Store guideline skills as agent-portable skill directories, such as `wp_guideline/skills/{slug}/SKILL.md`.
   - Expose guideline skills through `.agents/skills` and `.claude/skills` directory symlinks so agents can discover the same canonical skill content.
-  - Install a default WP Origin coding-agent skill when Guidelines is available and expose `AGENTS.md` and `CLAUDE.md` as symlinks to it.
+  - Install default WP Origin coding-agent skills when Guidelines is available, including a general checkout guide and a focused block theme template-editing skill.
+  - Expose `AGENTS.md` and `CLAUDE.md` as symlinks to the general WP Origin checkout guide.
   - Store guideline skill bodies as content only in WordPress, and generate agent-required YAML front matter from WordPress title, slug, and excerpt on export.
   - Keep the canonical `wp_guideline/` tree aligned with `wp_guideline_type` taxonomy terms, including `artifact`, `skill`, `plan`, and future instruction-like types.
 
@@ -101,9 +103,24 @@ The guiding rule is that users must not lose data. If a conversion cannot preser
   - Keep large media transfers streaming-first and reject pushes that exceed safe runtime limits.
 
 - **Block theme entities** (Priority: Medium)
-  - Explore `wp_template`, `wp_template_part`, and `wp_navigation` after posts/pages round-trip safely.
+  - Support `wp_template`, `wp_template_part`, and `wp_navigation` once posts/pages round-trip safely.
   - Represent these as explicit directories rather than mixing them into generic custom post type output.
-  - Apply the same non-lossy `gutenberg` fence strategy because these entities are block markup-heavy.
+  - Export theme-provided base templates and template parts as `.html` files containing raw Gutenberg block markup, not Markdown, even before they have database customizations.
+  - Layer database customizations for `wp_template`, `wp_template_part`, and `wp_navigation` on top of the theme-provided base files at the same logical paths.
+  - Create a distinct theme-base commit before the WordPress customization/content commit so agents can distinguish hardcoded theme defaults from site-specific changes.
+  - Export theme-provided `theme.json` files under `wp_theme/{theme}/theme.json` for agent context.
+  - Export editable Global Styles overlays under `wp_global_styles/{theme}.json` so site-wide theme.json-style changes round-trip through the WordPress `wp_global_styles` post type instead of mutating theme source files.
+  - Do not include front matter in these `.html` files.
+  - Use the directory and path as identity: `wp_template/single.html` maps to post type `wp_template` and slug `single`.
+  - For theme-scoped templates and template parts, map `wp_template/{theme}/index.html` and `wp_template_part/{theme}/footer.html` to WordPress template IDs such as `{theme}//index` and `{theme}//footer`.
+  - Store pushed theme-scoped customizations using the WordPress identity model: the post slug remains the template slug, such as `footer`, while the `wp_theme` taxonomy term stores the theme, such as `twentytwentyfive`. Do not flatten these into slugs such as `twentytwentyfive-footer`.
+  - Allow pushed create and update operations for template HTML files; editing a theme-provided template creates a WordPress customization.
+  - Reject pushed deletes and renames for these files because the path is the identity and deletion can break site rendering.
+  - Reject pushed edits to `wp_theme/{theme}/theme.json` because WP Origin does not mutate theme source files.
+  - Allow pushed create and update operations for `wp_global_styles/{theme}.json`, adding WordPress's internal Global Styles safety flag on import and omitting it from the checkout.
+  - Reject pushed deletes and renames for Global Styles JSON overlays until reset semantics are explicit.
+  - Provide agent guidance for template edits that prefers editable core block markup, preserves custom blocks, avoids new `core/html` blocks for normal layout, uses WordPress-native full-width alignment patterns, and directs site-wide style changes to `wp_global_styles/{theme}.json`.
+  - Export model-facing guidance through `AGENTS.md`, `CLAUDE.md`, and a `wp-origin-template-editor` skill so agents understand that theme base files are context, `wp_theme` files are read-only, and nested theme paths such as `wp_template_part/twentytwentyfive/footer.html` must not be flattened.
 
 - **Conflict and safety checks** (Priority: High)
   - Reject pushes that would overwrite newer WordPress edits unless the client has pulled the latest content.
@@ -122,13 +139,13 @@ The guiding rule is that users must not lose data. If a conversion cannot preser
 
 ## 5. Core experience
 
-1. An administrator activates WP Origin and enables Git access for Markdown content.
+1. An administrator activates WP Origin and enables Git access for content.
 2. A user authenticates with Git over HTTP Basic Auth using a WordPress application password.
 3. The user runs `git clone https://example.com/wp-json/git/v1/md.git` or adds the site as a remote with `git remote add wp https://example.com/wp-json/git/v1/md.git`.
-4. The cloned repository contains Markdown files for posts and pages, plus enough metadata to map files back to WordPress content.
-5. The user or agent edits Markdown locally and commits normally.
+4. The cloned repository contains Markdown files for posts and pages, plus `.html` files for supported structural block entities when present.
+5. The user or agent edits files locally and commits normally.
 6. The user runs `git push wp trunk` or the equivalent command for the remote name they chose.
-7. WP Origin validates permissions, detects stale content, converts Markdown back to WordPress content, and updates or creates posts.
+7. WP Origin validates permissions, detects stale content, imports changed files back to WordPress content, and updates or creates posts.
 8. If a push cannot be applied safely, WP Origin rejects it with a clear error and leaves existing WordPress content unchanged.
 
 ## 6. Technical considerations
@@ -144,13 +161,21 @@ The guiding rule is that users must not lose data. If a conversion cannot preser
 
 ### 6.2 Content format
 
-- Markdown body with YAML-style front matter.
-- File paths grouped by WordPress post type name, starting with `post/` and `page/`, with media under `attachment/` once media support lands.
-- Front matter should be stable enough for round-trips but small enough for agents to understand.
+- Editorial posts and pages use Markdown bodies with YAML-style front matter.
+- Structural block entities use raw Gutenberg HTML with no front matter.
+- File paths are grouped by WordPress post type name, starting with `post/` and `page/`, with media under `attachment/` once media support lands.
+- Template-like structural paths use `.html`, for example `wp_template/single.html`, `wp_template_part/header.html`, and `wp_navigation/main.html`.
+- Theme-provided templates use theme-qualified nested paths such as `wp_template/{theme}/index.html` and `wp_template_part/{theme}/header.html`; pushed edits to those files create or update the matching WordPress customization.
+- Theme-qualified template paths are a file-system view of WordPress template IDs. For example, `wp_template_part/twentytwentyfive/footer.html` maps to `twentytwentyfive//footer` in the template-part REST API, backed by a `wp_template_part` post with `post_name=footer` and a `wp_theme=twentytwentyfive` term when customized.
+- Theme-provided JSON is exported as read-only context under `wp_theme/{theme}/theme.json`.
+- Editable Global Styles overlays are exported under `wp_global_styles/{theme}.json`. They map to `wp_global_styles` posts tagged with the matching `wp_theme` term; WP Origin strips the internal `isGlobalStylesUserThemeJSON` flag from Git and restores it on import.
+- The checkout includes agent-readable guidance: root `AGENTS.md` and `CLAUDE.md` point to the WP Origin guide, `.agents/skills` and `.claude/skills` expose the exported skills, and the template editor skill documents the theme-base overlay model and path identity rules.
+- Front matter should be stable enough for post/page round-trips but small enough for agents to understand.
 - Unknown or lossy blocks should round-trip using fenced `gutenberg` code blocks where possible, with raw HTML as a fallback.
 - The importer should also accept the existing `block` fence language as a compatibility alias.
 - Markdown should remain useful in Obsidian: front matter is allowed, links and images should prefer normal Markdown syntax, media references should prefer relative paths, and hidden metadata should be kept minimal.
 - If an Obsidian-friendly representation conflicts with binary-safe round-tripping, round-trip safety wins.
+- For structural `.html` files, WordPress keeps title, status, date, author, IDs, and other administrative metadata. WP Origin resolves IDs dynamically from path-derived post type and slug.
 
 ### 6.3 Data storage and privacy
 
@@ -238,7 +263,14 @@ The guiding rule is that users must not lose data. If a conversion cannot preser
 - **Milestone 7: Media and block-theme exploration**
   - Export referenced media into relative Markdown paths.
   - Import safe new/changed media as attachments.
-  - Prototype read-only export of `wp_template`, `wp_template_part`, and `wp_navigation`.
+  - Export theme-provided `wp_template` and `wp_template_part` files as raw `.html` Gutenberg block files before database customizations exist.
+  - Export `wp_navigation` and database customizations for `wp_template` and `wp_template_part` as raw `.html` Gutenberg block files.
+  - Export active theme `theme.json` as read-only agent context.
+  - Export active theme Global Styles overlay as editable JSON under `wp_global_styles/{theme}.json`.
+  - Allow create/update pushes for template `.html` files, including pushes that convert a theme-provided file into a WordPress customization using the correct `{theme}//{slug}` identity.
+  - Allow create/update pushes for Global Styles `.json` overlays.
+  - Reject delete/rename pushes for those `.html` files.
+  - Reject delete/rename pushes for Global Styles `.json` overlays.
 
 - **Milestone 8: MVP hardening**
   - Document setup and supported workflows.
@@ -337,11 +369,16 @@ The guiding rule is that users must not lose data. If a conversion cannot preser
 - Hash binary files to detect unchanged media and avoid reuploads.
 - Add binary-safe tests that compare exported and imported media hashes.
 
-### 10.9 Explore block theme entities
+### 10.9 Add block theme entities
 
-- Add read-only fixtures for `wp_template`, `wp_template_part`, and `wp_navigation`.
+- Add fixtures for `wp_template`, `wp_template_part`, and `wp_navigation`.
 - Keep them in explicit directories that mirror post type names: `wp_template/`, `wp_template_part/`, and `wp_navigation/`.
-- Preserve block markup exactly until there is a safe higher-level Markdown representation.
+- Store each entity as a `.html` file containing only `post_content` block markup.
+- Do not write front matter into structural `.html` files.
+- Resolve identity from path: directory is post type, the path below it without `.html` is slug, and database ID is looked up at import time.
+- Preserve block markup exactly; do not convert these files to Markdown.
+- Allow pushed creates and updates.
+- Reject pushed deletes and renames.
 - Decide later whether block theme entities belong in the same `md.git` remote or a separate remote/branch.
 
 ### 10.10 Keep TDD useful for independent agents
@@ -475,14 +512,18 @@ The guiding rule is that users must not lose data. If a conversion cannot preser
   - Pushed new or changed media can become WordPress attachments when safe.
   - Binary file hashes match after round-trip.
 
-### 11.12 Explore block theme content
+### 11.12 Work with block theme content
 
 - **ID**: US-012
-- **Description**: As a site builder, I want block theme entities to become Git-addressable once content round-tripping is stable.
+- **Description**: As a site builder, I want block theme entities to be Git-addressable once content round-tripping is stable.
 - **Acceptance criteria**:
   - `wp_template`, `wp_template_part`, and `wp_navigation` are documented as follow-up post-type targets.
-  - Early support starts read-only.
-  - Block markup is preserved exactly unless a tested Markdown representation exists.
+  - Files export under explicit post-type directories with `.html` extensions.
+  - Files contain raw Gutenberg block markup with no front matter.
+  - The path determines post type and slug.
+  - Pushed creates and updates are allowed.
+  - Pushed deletes and renames are rejected.
+  - Block markup is preserved exactly unless a tested representation change is explicitly accepted.
 
 ## 12. Later-phase idea: Git hashes and WordPress revisions
 

@@ -87,7 +87,7 @@ jobs:
           wp --path="$WP_DIR" option update permalink_structure '/%postname%/'
           wp --path="$WP_DIR" rewrite flush --hard
 
-      - name: Seed Hello World post and Sample Page
+      - name: Seed Hello World post, Sample Page, and Template
         run: |
           wp --path="$WP_DIR" post update 1 \
             --post_title='Hello World' \
@@ -96,6 +96,12 @@ jobs:
           wp --path="$WP_DIR" post update 2 \
             --post_title='Sample Page' \
             --post_content='<!-- wp:paragraph --><p>Page from WordPress</p><!-- /wp:paragraph -->' \
+            --post_status=publish
+          wp --path="$WP_DIR" post create \
+            --post_type=wp_template \
+            --post_name='blog-home' \
+            --post_title='Blog Home' \
+            --post_content='<!-- wp:group --><div class="wp-block-group"><!-- wp:paragraph --><p>Template from WordPress</p><!-- /wp:paragraph --></div><!-- /wp:group -->' \
             --post_status=publish
 
       - name: Generate bulk posts to force multi-tick seeding
