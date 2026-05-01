@@ -248,6 +248,20 @@ class WP_Origin_End_To_End_Test extends TestCase {
 		// server before the next push.
 		$this->run_cmd( array( 'git', '-C', $clone_dir, 'pull', '--rebase', 'origin', 'trunk' ) );
 
+		// 2a) A WordPress editor save with Gutenberg inline markup must
+		// create a visible Git delta on the next fetch.
+		$this->update_post_via_rest(
+			$post_id,
+			array(
+				'content' => '<!-- wp:heading --><h2 class="wp-block-heading">Updated from Git <s>from editor</s></h2><!-- /wp:heading -->',
+			)
+		);
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'pull', '--rebase', 'origin', 'trunk' ) );
+		$this->assertStringContainsString(
+			'## Updated from Git ~~from editor~~',
+			file_get_contents( $clone_dir . '/post/hello-world.md' )
+		);
+
 		// 3) Update and create template HTML files without front matter.
 		$this->edit_file(
 			$clone_dir . '/wp_template/blog-home.html',
@@ -306,7 +320,7 @@ class WP_Origin_End_To_End_Test extends TestCase {
 		$this->run_cmd( array( 'git', '-C', $clone_dir, 'pull', '--rebase', 'origin', 'trunk' ) );
 		$this->edit_file(
 			$clone_dir . '/post/hello-world.md',
-			'Updated from Git',
+			'Updated from Git ~~from editor~~',
 			'Stale local edit'
 		);
 		$this->run_cmd( array( 'git', '-C', $clone_dir, 'add', 'post/hello-world.md' ) );

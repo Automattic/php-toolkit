@@ -271,6 +271,18 @@ echo count($revisions);
 [ "$REVISION_COUNT_AFTER_UPDATE" -gt "$REVISION_COUNT_BEFORE" ]
 git pull --rebase origin trunk
 
+EDITOR_UPDATE_PAYLOAD='{"content":"<!-- wp:heading --><h2 class=\"wp-block-heading\">Updated from Git <s>from editor</s></h2><!-- /wp:heading -->"}'
+curl -sS \
+	-X POST \
+	-H "Authorization: Basic $AUTH_HEADER" \
+	-H "Content-Type: application/json" \
+	-d "$EDITOR_UPDATE_PAYLOAD" \
+	-f \
+	"$BASE_URL/wp-json/wp/v2/posts/$POST_ID?context=edit" >/dev/null
+
+git pull --rebase origin trunk
+grep -Fq '## Updated from Git ~~from editor~~' "$CLONE_DIR/post/hello-world.md"
+
 php -r '
 $path = $argv[1];
 $contents = file_get_contents($path);

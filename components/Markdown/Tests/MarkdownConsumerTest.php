@@ -166,6 +166,10 @@ HTML
 				'markdown' => '**Bold** and *Italic*',
 				'expected' => '<!-- wp:paragraph --><p><b>Bold</b> and <em>Italic</em></p><!-- /wp:paragraph -->',
 			),
+			'Strikethrough text' => array(
+				'markdown' => 'Keep ~~this~~',
+				'expected' => '<!-- wp:paragraph --><p>Keep <s>this</s></p><!-- /wp:paragraph -->',
+			),
 			'A blockquote' => array(
 				'markdown' => '> A simple blockquote',
 				'expected' => '<!-- wp:quote --><blockquote class="wp-block-quote"><!-- wp:paragraph --><p>A simple blockquote</p><!-- /wp:paragraph --></blockquote><!-- /wp:quote -->',

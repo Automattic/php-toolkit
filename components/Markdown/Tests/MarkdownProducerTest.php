@@ -131,6 +131,10 @@ HTML
 				'blocks' => '<!-- wp:paragraph --><p><b>Bold</b> and <em>Italic</em></p><!-- /wp:paragraph -->',
 				'expected' => "**Bold** and *Italic*\n\n",
 			),
+			'Strikethrough text' => array(
+				'blocks' => '<!-- wp:paragraph --><p>Keep <s>this</s> and <del>that</del></p><!-- /wp:paragraph -->',
+				'expected' => "Keep ~~this~~ and ~~that~~\n\n",
+			),
 			'A blockquote' => array(
 				'blocks' => '<!-- wp:quote --><blockquote class="wp-block-quote"><!-- wp:paragraph --><p>A simple blockquote</p><!-- /wp:paragraph --></blockquote><!-- /wp:quote -->',
 				'expected' => "> A simple blockquote\n> \n> \n\n",
