@@ -136,7 +136,7 @@ This repository is a Git checkout of a WordPress site exposed by WP Origin. Word
 ## Repository Layout
 
 - `post/{slug}.md` contains WordPress posts.
-- `page/{slug}.md` contains WordPress pages.
+- `page/{slug}.md` and `page/{parent}/{slug}.md` contain WordPress pages.
 - `wp_template/{slug}.html`, `wp_template_part/{slug}.html`, and `wp_navigation/{slug}.html` contain raw Gutenberg block markup for structural site entities. Theme-qualified WordPress slugs may appear as nested paths such as `wp_template_part/{theme}/header.html`.
 - `wp_theme/{theme}/theme.json` contains read-only theme-provided design settings for agent context.
 - `wp_global_styles/{theme}.json` contains the editable Global Styles overlay for the active theme. Edit this file for site-wide styles and settings instead of editing `wp_theme/{theme}/theme.json`.
@@ -313,11 +313,23 @@ SKILL;
 				return $response->to_rest_response();
 			}
 
-			$repository = self::open_repository();
-			self::sync_repository_from_wordpress( $repository );
-
 			$git_path     = self::build_git_path( $request );
 			$request_body = file_get_contents( 'php://input' );
+			$repository   = self::open_repository();
+			try {
+				self::sync_repository_from_wordpress( $repository );
+			} catch ( Throwable $exception ) {
+				$service = self::git_service_from_request( $git_path, $request );
+				if ( $service ) {
+					return self::build_protocol_error_response(
+						$service,
+						self::get_throwable_message( $exception )
+					);
+				}
+
+				throw $exception;
+			}
+
 			$current_head = $repository->get_branch_tip( 'refs/heads/' . self::DEFAULT_BRANCH );
 
 			$push_header = null;
@@ -327,6 +339,12 @@ SKILL;
 					return self::build_protocol_error_response(
 						'git-receive-pack',
 						'Invalid push request.'
+					);
+				}
+				if ( isset( $push_header['error'] ) ) {
+					return self::build_protocol_error_response(
+						'git-receive-pack',
+						$push_header['error']
 					);
 				}
 
@@ -444,6 +462,15 @@ SKILL;
 		}
 
 		return $path;
+	}
+
+	private static function git_service_from_request( $git_path, WP_REST_Request $request ) {
+		unset( $request );
+		if ( '/git-upload-pack' === $git_path || '/git-receive-pack' === $git_path ) {
+			return ltrim( $git_path, '/' );
+		}
+
+		return '';
 	}
 
 	private static function is_push_request( $git_path ) {
@@ -659,7 +686,11 @@ SKILL;
 				throw new Exception( 'Git export rejected because you do not have permission to read all WP Origin content.' );
 			}
 
-			$path    = self::build_markdown_path( $post );
+			$path = self::build_markdown_path( $post );
+			if ( isset( $files[ $path ] ) ) {
+				throw new Exception( 'Git export rejected because multiple WordPress entities map to the same WP Origin path: ' . esc_html( $path ) );
+			}
+
 			$content = self::export_post_to_markdown( $post );
 
 			$files[ $path ] = array(
@@ -932,6 +963,9 @@ SKILL;
 					self::get_post_theme_slug( $post_or_type )
 				);
 			}
+			if ( 'page' === $post_or_type->post_type ) {
+				return self::build_page_markdown_path( $post_or_type );
+			}
 
 			return ltrim( $post_or_type->post_type . '/' . $post_or_type->post_name . '.md', '/' );
 		}
@@ -944,6 +978,32 @@ SKILL;
 		}
 
 		return ltrim( $post_or_type . '/' . $slug . '.md', '/' );
+	}
+
+	private static function build_page_markdown_path( WP_Post $post ) {
+		$segments  = array( $post->post_name );
+		$seen      = array( intval( $post->ID ) => true );
+		$parent_id = intval( $post->post_parent );
+
+		while ( $parent_id > 0 ) {
+			if ( ! empty( $seen[ $parent_id ] ) ) {
+				throw new Exception( 'Git export rejected because a WordPress page hierarchy contains a cycle.' );
+			}
+
+			$parent = get_post( $parent_id );
+			if ( ! $parent || 'page' !== $parent->post_type ) {
+				throw new Exception( 'Git export rejected because a WordPress page has an invalid parent.' );
+			}
+			if ( ! in_array( $parent->post_status, self::$supported_post_statuses, true ) ) {
+				throw new Exception( 'Git export rejected because a WordPress page has a non-exported parent page. Restore, publish, or reparent the child page before cloning.' );
+			}
+
+			array_unshift( $segments, $parent->post_name );
+			$seen[ $parent_id ] = true;
+			$parent_id          = intval( $parent->post_parent );
+		}
+
+		return 'page/' . implode( '/', $segments ) . '.md';
 	}
 
 	private static function build_raw_block_path( $post_type, $slug, $theme_slug = '' ) {
@@ -1217,9 +1277,12 @@ SKILL;
 			: self::read_repository_entries_from_commit( $repository, $parent_hash );
 		$new_files   = self::read_repository_entries_from_commit( $repository, $commit_hash );
 
+		self::reject_symlink_file_changes( $old_files, $new_files );
+		self::reject_executable_file_changes( $old_files, $new_files );
 		self::reject_deleted_raw_block_files( $old_files, $new_files );
 		self::reject_deleted_theme_base_files( $old_files, $new_files );
 		self::reject_deleted_global_styles_files( $old_files, $new_files );
+		self::reject_deleted_page_parent_files_with_remaining_children( $old_files, $new_files );
 
 		foreach ( $new_files as $path => $entry ) {
 			if ( isset( $old_files[ $path ] ) && self::repository_entries_match( $old_files[ $path ], $entry ) ) {
@@ -1233,6 +1296,7 @@ SKILL;
 			}
 			if ( self::is_raw_block_path( $path ) ) {
 				self::assert_raw_block_html_has_no_front_matter( $entry['content'] );
+				self::assert_raw_block_html_has_block_markup( $entry['content'] );
 			}
 			if ( self::is_global_styles_path( $path ) ) {
 				self::assert_global_styles_json_is_valid( $path, $entry['content'] );
@@ -1250,9 +1314,12 @@ SKILL;
 		$changes          = array();
 		$upsert_plans     = array();
 		$trash_plans      = array();
+		self::reject_symlink_file_changes( $old_files, $new_files );
+		self::reject_executable_file_changes( $old_files, $new_files );
 		self::reject_deleted_raw_block_files( $old_files, $new_files );
 		self::reject_deleted_theme_base_files( $old_files, $new_files );
 		self::reject_deleted_global_styles_files( $old_files, $new_files );
+		self::reject_deleted_page_parent_files_with_remaining_children( $old_files, $new_files );
 
 		foreach ( $new_files as $path => $entry ) {
 			if ( isset( $old_files[ $path ] ) && self::repository_entries_match( $old_files[ $path ], $entry ) ) {
@@ -1417,7 +1484,78 @@ SKILL;
 		}
 	}
 
+	private static function reject_deleted_page_parent_files_with_remaining_children( $old_files, $new_files ) {
+		foreach ( $old_files as $path => $entry ) {
+			if ( isset( $new_files[ $path ] ) ) {
+				continue;
+			}
+			if ( TreeEntry::FILE_MODE_SYMBOLIC_LINK === $entry['mode'] || ! self::is_page_markdown_path( $path ) ) {
+				continue;
+			}
+
+			$descendant_prefix = self::page_descendant_prefix_from_path( $path );
+			if ( '' === $descendant_prefix ) {
+				continue;
+			}
+
+			foreach ( $new_files as $new_path => $new_entry ) {
+				unset( $new_entry );
+				if ( 0 === strpos( $new_path, $descendant_prefix ) ) {
+					throw new Exception( 'Push rejected because deleting a parent page while keeping nested child page files would move child content. Delete the nested child page files too, or keep the parent page.' );
+				}
+			}
+		}
+	}
+
+	private static function is_page_markdown_path( $path ) {
+		$segments = explode( '/', ltrim( $path, '/' ) );
+		return isset( $segments[0] )
+			&& 'page' === $segments[0]
+			&& 'md' === pathinfo( basename( $path ), PATHINFO_EXTENSION );
+	}
+
+	private static function page_descendant_prefix_from_path( $path ) {
+		$relative_path = substr( ltrim( $path, '/' ), strlen( 'page/' ) );
+		if ( '.md' !== substr( $relative_path, - strlen( '.md' ) ) ) {
+			return '';
+		}
+
+		return 'page/' . substr( $relative_path, 0, - strlen( '.md' ) ) . '/';
+	}
+
+	private static function reject_symlink_file_changes( $old_files, $new_files ) {
+		foreach ( $new_files as $path => $entry ) {
+			if ( TreeEntry::FILE_MODE_SYMBOLIC_LINK !== $entry['mode'] ) {
+				continue;
+			}
+			if ( ! isset( $old_files[ $path ] ) || ! self::repository_entries_match( $old_files[ $path ], $entry ) ) {
+				throw new Exception( 'Push rejected because symlink files are generated by WP Origin and cannot be created or modified.' );
+			}
+		}
+
+		foreach ( $old_files as $path => $entry ) {
+			if ( TreeEntry::FILE_MODE_SYMBOLIC_LINK !== $entry['mode'] ) {
+				continue;
+			}
+			if ( ! isset( $new_files[ $path ] ) || ! self::repository_entries_match( $entry, $new_files[ $path ] ) ) {
+				throw new Exception( 'Push rejected because symlink files are generated by WP Origin and cannot be deleted or modified.' );
+			}
+		}
+	}
+
+	private static function reject_executable_file_changes( $old_files, $new_files ) {
+		foreach ( $new_files as $path => $entry ) {
+			if ( TreeEntry::FILE_MODE_REGULAR_EXECUTABLE !== $entry['mode'] ) {
+				continue;
+			}
+			if ( ! isset( $old_files[ $path ] ) || ! self::repository_entries_match( $old_files[ $path ], $entry ) ) {
+				throw new Exception( 'Push rejected because executable file modes are not supported by WP Origin content exports.' );
+			}
+		}
+	}
+
 	private static function upsert_post_from_markdown( $path, $markdown, $options = array() ) {
+		self::assert_content_has_no_nul_bytes( $markdown );
 		$post_type = self::path_to_post_type( $path );
 		$slug      = self::path_to_slug( $path );
 		if ( 'wp_guideline' === $post_type ) {
@@ -1440,6 +1578,10 @@ SKILL;
 		}
 
 		self::reject_identity_frontmatter( $metadata );
+		$metadata       = self::normalize_supported_frontmatter(
+			$metadata,
+			array( 'title', 'date', 'status', 'description' )
+		);
 		$post_id        = self::find_post_id_by_path_metadata( $path, $metadata );
 		$existing_post  = $post_id ? get_post( $post_id ) : null;
 		$default_status = $existing_post && 'trash' !== $existing_post->post_status ? $existing_post->post_status : 'draft';
@@ -1448,6 +1590,7 @@ SKILL;
 		);
 		self::validate_post_status( $post_status, $post_type );
 		self::assert_can_set_post_status( $post_type, $post_status, $existing_post );
+		$post_parent = 'page' === $post_type ? self::path_to_page_parent_id( $path, false ) : 0;
 
 		if (
 			$existing_post &&
@@ -1471,8 +1614,12 @@ SKILL;
 			'post_status'  => $post_status,
 			'post_content' => $result->get_block_markup(),
 		);
+		if ( 'page' === $post_type ) {
+			$postarr['post_parent'] = $post_parent;
+		}
 
 		$post_date_gmt = self::frontmatter_date_to_mysql_gmt( $metadata );
+		self::assert_frontmatter_date_matches_status( $post_status, $post_date_gmt );
 		if ( '' !== $post_date_gmt ) {
 			$postarr['post_date_gmt'] = $post_date_gmt;
 			$postarr['post_date']     = get_date_from_gmt( $post_date_gmt );
@@ -1514,7 +1661,9 @@ SKILL;
 	}
 
 	private static function upsert_raw_block_post_from_html( $path, $html, $options = array() ) {
+		self::assert_content_has_no_nul_bytes( $html );
 		self::assert_raw_block_html_has_no_front_matter( $html );
+		self::assert_raw_block_html_has_block_markup( $html );
 		self::assert_block_markup_is_safe( $html );
 
 		$identity      = self::path_to_raw_block_identity( $path );
@@ -1573,6 +1722,7 @@ SKILL;
 	}
 
 	private static function upsert_global_styles_from_json( $path, $json, $options = array() ) {
+		self::assert_content_has_no_nul_bytes( $json );
 		$config        = self::parse_global_styles_json( $path, $json );
 		$theme_slug    = self::path_to_global_styles_theme_slug( $path );
 		$post_id       = self::find_global_styles_post_id_by_theme_slug( $theme_slug, false );
@@ -1668,6 +1818,18 @@ SKILL;
 		}
 	}
 
+	private static function assert_content_has_no_nul_bytes( $content ) {
+		if ( false !== strpos( $content, "\0" ) ) {
+			throw new Exception( 'Push rejected because content files must not contain NUL bytes.' );
+		}
+	}
+
+	private static function assert_raw_block_html_has_block_markup( $html ) {
+		if ( false === strpos( $html, '<!-- wp:' ) ) {
+			throw new Exception( 'Push rejected because template HTML files must contain serialized Gutenberg block markup.' );
+		}
+	}
+
 	private static function assert_markdown_front_matter_is_closed( $markdown ) {
 		if (
 			preg_match( '/\A---\r?\n/', $markdown ) &&
@@ -1745,6 +1907,9 @@ SKILL;
 			if ( null === $block_name && self::contains_block_delimiter( $inner_html ) ) {
 				throw new Exception( 'Push rejected because the content contains malformed Gutenberg block markup.' );
 			}
+			if ( 'core/html' === $block_name && ( ! empty( $inner_blocks ) || self::contains_block_delimiter( $inner_html ) ) ) {
+				throw new Exception( 'Push rejected because Markdown content must not embed raw Gutenberg block delimiters inside HTML blocks.' );
+			}
 			if ( null !== $block_name && ! is_array( $attrs ) ) {
 				throw new Exception( 'Push rejected because the content contains malformed Gutenberg block attributes.' );
 			}
@@ -1784,6 +1949,10 @@ SKILL;
 			$markdown       = $skill_document['content'];
 			self::assert_block_markup_is_safe( $markdown );
 			self::reject_identity_frontmatter( $metadata );
+			$metadata = self::normalize_supported_frontmatter(
+				$metadata,
+				array( 'name', 'description' )
+			);
 			if ( isset( $metadata['name'] ) && $metadata['name'] !== $slug ) {
 				throw new Exception( 'Push rejected because the skill name front matter does not match its directory.' );
 			}
@@ -1939,12 +2108,20 @@ SKILL;
 
 	private static function frontmatter_date_to_mysql_gmt( $metadata ) {
 		if ( isset( $metadata['date'] ) && '' !== trim( (string) $metadata['date'] ) ) {
-			return self::parse_frontmatter_date( $metadata['date'] );
+			$parsed = self::parse_frontmatter_date( $metadata['date'] );
+			if ( '' === $parsed ) {
+				throw new Exception( 'Push rejected because Markdown front matter date is invalid.' );
+			}
+
+			return $parsed;
 		}
 		if ( isset( $metadata['date_gmt'] ) && '' !== trim( (string) $metadata['date_gmt'] ) ) {
-			$timestamp = self::timestamp_from_gmt_string( $metadata['date_gmt'] );
+			$parsed = self::parse_frontmatter_date( $metadata['date_gmt'] );
+			if ( '' === $parsed ) {
+				throw new Exception( 'Push rejected because Markdown front matter date_gmt is invalid.' );
+			}
 
-			return false === $timestamp ? '' : gmdate( 'Y-m-d H:i:s', $timestamp );
+			return $parsed;
 		}
 
 		return '';
@@ -1957,14 +2134,57 @@ SKILL;
 		}
 
 		if ( preg_match( '/^\d{4}-\d{2}-\d{2}$/', $date ) ) {
-			$timestamp = strtotime( $date . ' 00:00:00 UTC' );
-		} elseif ( preg_match( '/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}$/', $date ) ) {
-			$timestamp = strtotime( $date . ' UTC' );
-		} else {
-			$timestamp = strtotime( $date );
+			return self::parse_frontmatter_date_format( $date . ' 00:00:00', 'Y-m-d H:i:s', $date . ' 00:00:00' );
 		}
 
-		return false === $timestamp ? '' : gmdate( 'Y-m-d H:i:s', $timestamp );
+		if ( preg_match( '/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}Z$/', $date ) ) {
+			$normalized = str_replace( 'T', ' ', substr( $date, 0, -1 ) );
+
+			return self::parse_frontmatter_date_format( $normalized, 'Y-m-d H:i:s', $normalized );
+		}
+
+		if ( preg_match( '/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}$/', $date ) ) {
+			$normalized = str_replace( 'T', ' ', $date );
+
+			return self::parse_frontmatter_date_format( $normalized, 'Y-m-d H:i:s', $normalized );
+		}
+
+		return '';
+	}
+
+	private static function parse_frontmatter_date_format( $date, $format, $expected ) {
+		$timezone = new DateTimeZone( 'UTC' );
+		$datetime = DateTime::createFromFormat( '!' . $format, $date, $timezone );
+		$errors   = DateTime::getLastErrors();
+		if (
+			false === $datetime ||
+			(
+				is_array( $errors ) &&
+				( 0 !== $errors['warning_count'] || 0 !== $errors['error_count'] )
+			) ||
+			$datetime->format( $format ) !== $expected
+		) {
+			return '';
+		}
+
+		return $datetime->format( 'Y-m-d H:i:s' );
+	}
+
+	private static function assert_frontmatter_date_matches_status( $post_status, $post_date_gmt ) {
+		if ( '' === $post_date_gmt ) {
+			if ( 'future' === $post_status ) {
+				throw new Exception( 'Push rejected because scheduled posts must include a future date.' );
+			}
+			return;
+		}
+
+		$timestamp = self::timestamp_from_gmt_string( $post_date_gmt );
+		if ( 'future' === $post_status && ( false === $timestamp || $timestamp <= time() ) ) {
+			throw new Exception( 'Push rejected because scheduled posts must include a date in the future.' );
+		}
+		if ( 'publish' === $post_status && false !== $timestamp && $timestamp > time() ) {
+			throw new Exception( 'Push rejected because published posts must not include a future date. Use scheduled status for future-dated content.' );
+		}
 	}
 
 	private static function frontmatter_status_from_post_status( $post_status ) {
@@ -2007,6 +2227,38 @@ SKILL;
 		}
 	}
 
+	private static function normalize_supported_frontmatter( $metadata, $allowed_keys ) {
+		$allowed = array();
+		foreach ( $allowed_keys as $key ) {
+			$allowed[ $key ] = true;
+		}
+
+		$normalized = array();
+		foreach ( $metadata as $key => $value ) {
+			$key = (string) $key;
+			if ( ! isset( $allowed[ $key ] ) ) {
+				throw new Exception(
+					sprintf(
+						'Push rejected because Markdown front matter field "%s" is not supported.',
+						esc_html( $key )
+					)
+				);
+			}
+			if ( ! is_scalar( $value ) || is_bool( $value ) ) {
+				throw new Exception(
+					sprintf(
+						'Push rejected because Markdown front matter field "%s" must be a scalar string or number.',
+						esc_html( $key )
+					)
+				);
+			}
+
+			$normalized[ $key ] = (string) $value;
+		}
+
+		return $normalized;
+	}
+
 	private static function restore_trashed_post_before_update( WP_Post $post ) {
 		if ( 'trash' !== $post->post_status ) {
 			return $post;
@@ -2035,6 +2287,9 @@ SKILL;
 				$include_trash
 			);
 		}
+		if ( 'page' === $post_type ) {
+			return self::find_page_id_by_path( $path, $include_trash );
+		}
 
 		unset( $metadata );
 
@@ -2054,6 +2309,7 @@ SKILL;
 
 		if ( empty( $posts ) ) {
 			if ( ! $include_trash ) {
+				self::reject_unsupported_status_slug_collision( $post_type, $slug, self::$supported_post_statuses );
 				return 0;
 			}
 
@@ -2067,11 +2323,126 @@ SKILL;
 				)
 			);
 			if ( empty( $posts ) ) {
+				self::reject_unsupported_status_slug_collision(
+					$post_type,
+					$slug,
+					array_merge( self::$supported_post_statuses, array( 'trash' ) )
+				);
 				return 0;
 			}
 		}
 
 		return intval( $posts[0] );
+	}
+
+	private static function find_page_id_by_path( $path, $include_trash = true ) {
+		$slugs     = self::path_to_page_slugs( $path );
+		$slug      = array_pop( $slugs );
+		$parent_id = self::resolve_page_parent_id( $slugs, $include_trash );
+		$statuses  = $include_trash
+			? array_merge( self::$supported_post_statuses, array( 'trash' ) )
+			: self::$supported_post_statuses;
+		$posts     = get_posts(
+			array(
+				'post_type'      => 'page',
+				'name'           => $slug,
+				'post_parent'    => $parent_id,
+				'post_status'    => $statuses,
+				'posts_per_page' => 1,
+				'fields'         => 'ids',
+			)
+		);
+
+		if ( empty( $posts ) ) {
+			if ( ! $include_trash ) {
+				self::reject_unsupported_status_slug_collision( 'page', $slug, self::$supported_post_statuses, $parent_id );
+				return 0;
+			}
+
+			$posts = get_posts(
+				array(
+					'post_type'      => 'page',
+					'name'           => $slug . '__trashed',
+					'post_parent'    => $parent_id,
+					'post_status'    => array( 'trash' ),
+					'posts_per_page' => 1,
+					'fields'         => 'ids',
+				)
+			);
+			if ( empty( $posts ) ) {
+				self::reject_unsupported_status_slug_collision(
+					'page',
+					$slug,
+					array_merge( self::$supported_post_statuses, array( 'trash' ) ),
+					$parent_id
+				);
+				return 0;
+			}
+		}
+
+		return intval( $posts[0] );
+	}
+
+	private static function resolve_page_parent_id( $parent_slugs, $include_trash = true ) {
+		$parent_id = 0;
+		$statuses  = $include_trash
+			? array_merge( self::$supported_post_statuses, array( 'trash' ) )
+			: self::$supported_post_statuses;
+
+		foreach ( $parent_slugs as $slug ) {
+			$parents = get_posts(
+				array(
+					'post_type'      => 'page',
+					'name'           => $slug,
+					'post_parent'    => $parent_id,
+					'post_status'    => $statuses,
+					'posts_per_page' => 1,
+					'fields'         => 'ids',
+				)
+			);
+			if ( empty( $parents ) ) {
+				throw new Exception( 'Push rejected because nested page paths must reference existing WordPress parent pages.' );
+			}
+
+			$parent_id = intval( $parents[0] );
+		}
+
+		return $parent_id;
+	}
+
+	private static function path_to_page_parent_id( $path, $include_trash = true ) {
+		$slugs = self::path_to_page_slugs( $path );
+		array_pop( $slugs );
+
+		return self::resolve_page_parent_id( $slugs, $include_trash );
+	}
+
+	private static function reject_unsupported_status_slug_collision( $post_type, $slug, $allowed_statuses, $post_parent = null ) {
+		$args = array(
+			'post_type'      => $post_type,
+			'name'           => $slug,
+			'post_status'    => self::get_all_post_status_names(),
+			'posts_per_page' => 1,
+		);
+		if ( null !== $post_parent ) {
+			$args['post_parent'] = $post_parent;
+		}
+
+		$posts = get_posts( $args );
+		if ( empty( $posts ) || in_array( $posts[0]->post_status, $allowed_statuses, true ) ) {
+			return;
+		}
+
+		throw new Exception( 'Push rejected because a non-exported WordPress post already uses this file path slug.' );
+	}
+
+	private static function get_all_post_status_names() {
+		$statuses = get_post_stati( array(), 'names' );
+		if ( is_array( $statuses ) && ! empty( $statuses ) ) {
+			return array_values( $statuses );
+		}
+
+		return array_merge( self::$supported_post_statuses, array( 'trash', 'auto-draft', 'inherit' ) );
 	}
 
 	private static function find_raw_block_post_id_by_path( $path, $include_trash = true ) {
@@ -2136,6 +2507,7 @@ SKILL;
 	private static function path_to_slug( $path ) {
 		if ( self::is_guideline_skill_path( $path ) ) {
 			$segments = explode( '/', ltrim( $path, '/' ) );
+			self::assert_markdown_slug_is_canonical( $segments[2] );
 			return $segments[2];
 		}
 		if ( self::is_raw_block_path( $path ) ) {
@@ -2150,12 +2522,51 @@ SKILL;
 			return self::path_to_global_styles_theme_slug( $path );
 		}
 
+		$segments = explode( '/', ltrim( $path, '/' ) );
+		if ( 'post' === $segments[0] && 2 !== count( $segments ) ) {
+			throw new Exception( 'Push rejected because post Markdown files must use post/<slug>.md paths.' );
+		}
+		if ( 'page' === $segments[0] ) {
+			$slugs = self::path_to_page_slugs( $path );
+
+			return end( $slugs );
+		}
+
 		$basename = basename( $path );
 		if ( 'md' !== pathinfo( $basename, PATHINFO_EXTENSION ) ) {
 			throw new Exception( 'Push rejected because only Markdown files are supported.' );
 		}
 
-		return pathinfo( $basename, PATHINFO_FILENAME );
+		$slug = pathinfo( $basename, PATHINFO_FILENAME );
+		self::assert_markdown_slug_is_canonical( $slug );
+
+		return $slug;
+	}
+
+	private static function path_to_page_slugs( $path ) {
+		$segments = explode( '/', ltrim( $path, '/' ) );
+		if ( count( $segments ) < 2 || 'page' !== $segments[0] ) {
+			throw new Exception( 'Push rejected because page Markdown files must use page/<slug>.md or page/<parent>/<slug>.md paths.' );
+		}
+
+		$basename = array_pop( $segments );
+		if ( 'md' !== pathinfo( $basename, PATHINFO_EXTENSION ) ) {
+			throw new Exception( 'Push rejected because only Markdown files are supported.' );
+		}
+
+		$slugs   = array_slice( $segments, 1 );
+		$slugs[] = pathinfo( $basename, PATHINFO_FILENAME );
+		foreach ( $slugs as $slug ) {
+			self::assert_markdown_slug_is_canonical( $slug );
+		}
+
+		return $slugs;
+	}
+
+	private static function assert_markdown_slug_is_canonical( $slug ) {
+		if ( '' === $slug || sanitize_title( $slug ) !== $slug ) {
+			throw new Exception( 'Push rejected because Markdown file slugs must already match WordPress slug formatting.' );
+		}
 	}
 
 	private static function path_to_raw_block_identity( $path ) {
@@ -2173,9 +2584,17 @@ SKILL;
 			$parts = explode( '/', $slug_path );
 			if ( count( $parts ) > 1 ) {
 				$theme_slug = array_shift( $parts );
-				$slug_path  = implode( '/', $parts );
+				self::assert_repository_slug_path_is_canonical(
+					$theme_slug,
+					'Push rejected because template theme path segments must already match WordPress slug formatting.'
+				);
+				$slug_path = implode( '/', $parts );
 			}
 		}
+		self::assert_repository_slug_path_is_canonical(
+			$slug_path,
+			'Push rejected because template file slugs must already match WordPress slug formatting.'
+		);
 
 		return array(
 			'post_type' => $post_type,
@@ -2197,11 +2616,21 @@ SKILL;
 		}
 
 		$theme_slug = pathinfo( $basename, PATHINFO_FILENAME );
-		if ( '' === $theme_slug || self::sanitize_repository_path_segment( $theme_slug ) !== $theme_slug ) {
-			throw new Exception( 'Push rejected because the Global Styles theme filename is not supported.' );
-		}
+		self::assert_repository_slug_path_is_canonical(
+			$theme_slug,
+			'Push rejected because the Global Styles theme filename must already match WordPress slug formatting.'
+		);
 
 		return $theme_slug;
+	}
+
+	private static function assert_repository_slug_path_is_canonical( $slug_path, $message ) {
+		$segments = explode( '/', $slug_path );
+		foreach ( $segments as $segment ) {
+			if ( '' === $segment || sanitize_title( $segment ) !== $segment ) {
+				throw new Exception( $message );
+			}
+		}
 	}
 
 	private static function assign_raw_block_theme_slug( $post_id, $theme_slug ) {
@@ -2398,14 +2827,75 @@ SKILL;
 	}
 
 	private static function parse_push_header( $request_bytes ) {
-		if ( ! preg_match( '/([0-9a-f]{40}) ([0-9a-f]{40}) refs\\/heads\\/' . self::DEFAULT_BRANCH . '/', $request_bytes, $matches ) ) {
+		$commands = self::parse_push_commands( $request_bytes );
+		if ( empty( $commands ) ) {
 			return false;
+		}
+		if ( 1 !== count( $commands ) ) {
+			return array(
+				'error' => 'Push rejected because WP Origin only accepts one ref update at a time.',
+			);
+		}
+
+		$command = $commands[0];
+		if ( 'refs/heads/' . self::DEFAULT_BRANCH !== $command['ref'] ) {
+			return array(
+				'error' => 'Push rejected because WP Origin only accepts pushes to trunk.',
+			);
+		}
+		if ( Commit::is_null_hash( $command['new_oid'] ) ) {
+			return array(
+				'error' => 'Push rejected because deleting trunk is not supported.',
+			);
 		}
 
 		return array(
-			'old_oid' => $matches[1],
-			'new_oid' => $matches[2],
+			'old_oid' => $command['old_oid'],
+			'new_oid' => $command['new_oid'],
 		);
+	}
+
+	private static function parse_push_commands( $request_bytes ) {
+		$commands = array();
+		$offset   = 0;
+		$length   = strlen( $request_bytes );
+
+		while ( $offset + 4 <= $length ) {
+			$line_length_hex = substr( $request_bytes, $offset, 4 );
+			if ( ! ctype_xdigit( $line_length_hex ) ) {
+				break;
+			}
+
+			$line_length = hexdec( $line_length_hex );
+			$offset     += 4;
+			if ( 0 === $line_length ) {
+				break;
+			}
+			if ( $line_length < 4 || $offset + $line_length - 4 > $length ) {
+				break;
+			}
+
+			$line    = substr( $request_bytes, $offset, $line_length - 4 );
+			$offset += $line_length - 4;
+			$line    = explode( "\0", $line, 2 );
+			$line    = rtrim( $line[0], "\r\n" );
+
+			if (
+				preg_match(
+					'/\A(?P<old_oid>[0-9a-f]{40}) (?P<new_oid>[0-9a-f]{40}) (?P<ref>\S+)\z/',
+					$line,
+					$matches
+				)
+			) {
+				$commands[] = array(
+					'old_oid' => $matches['old_oid'],
+					'new_oid' => $matches['new_oid'],
+					'ref'     => $matches['ref'],
+				);
+			}
+		}
+
+		return $commands;
 	}
 
 	private static function assert_can_edit_post( $post_id ) {

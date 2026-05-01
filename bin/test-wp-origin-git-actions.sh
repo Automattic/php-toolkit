@@ -19,6 +19,7 @@ fi
 
 CREDENTIALS_FILE="$ROOT_DIR/.context/wp-origin-e2e-$PORT.json"
 BLUEPRINT_FILE="$WORK_DIR/blueprint-e2e.json"
+MU_PLUGINS_DIR="$WORK_DIR/mu-plugins"
 
 if command -v wp-playground >/dev/null 2>&1; then
 	PLAYGROUND_CMD="wp-playground"
@@ -39,7 +40,13 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 mkdir -p "$ROOT_DIR/.context"
+mkdir -p "$MU_PLUGINS_DIR"
 rm -f "$PLAYGROUND_LOG" "$CREDENTIALS_FILE"
+cp "$ROOT_DIR/plugins/wp-origin/Tests/ci-mu-test-helper.php" "$MU_PLUGINS_DIR/wp-origin-ci-test-helper.php"
+cat > "$MU_PLUGINS_DIR/wp-origin-e2e-auth.php" <<'PHP'
+<?php
+add_filter( 'wp_is_application_passwords_available', '__return_true' );
+PHP
 
 cd "$ROOT_DIR"
 sed "s|__WP_ORIGIN_CREDENTIALS_FILE__|/workspace/.context/$(basename "$CREDENTIALS_FILE")|g" "$BLUEPRINT_TEMPLATE" > "$BLUEPRINT_FILE"
@@ -56,6 +63,7 @@ $PLAYGROUND_CMD server \
 	--mount="$ROOT_DIR/vendor:/wordpress/wp-content/vendor" \
 	--mount="$ROOT_DIR/components:/wordpress/wp-content/components" \
 	--mount="$ROOT_DIR/plugins/wp-origin:/wordpress/wp-content/plugins/wp-origin" \
+	--mount="$MU_PLUGINS_DIR:/wordpress/wp-content/mu-plugins" \
 	>"$PLAYGROUND_LOG" 2>&1 &
 PLAYGROUND_PID=$!
 
@@ -105,7 +113,68 @@ wait_for_seed_done() {
 	exit 1
 }
 
+create_page() {
+	SLUG_ARG="$1"
+	TITLE_ARG="$2"
+	PARENT_ARG="$3"
+	CONTENT_ARG="$4"
+	RESPONSE="$(
+		php -r '
+		$payload = array(
+			"slug"    => $argv[1],
+			"title"   => $argv[2],
+			"status"  => "publish",
+			"content" => "<!-- wp:paragraph --><p>" . $argv[4] . "</p><!-- /wp:paragraph -->",
+		);
+		if ("0" !== $argv[3]) {
+			$payload["parent"] = (int) $argv[3];
+		}
+		echo json_encode($payload);
+		' "$SLUG_ARG" "$TITLE_ARG" "$PARENT_ARG" "$CONTENT_ARG" |
+			curl -sS -f \
+				-X POST \
+				-H "Authorization: Basic $AUTH_HEADER" \
+				-H "Content-Type: application/json" \
+				--data-binary @- \
+				"$BASE_URL/wp-json/wp/v2/pages?context=edit"
+	)"
+	printf '%s' "$RESPONSE" | php -r '
+	$page = json_decode(stream_get_contents(STDIN), true);
+	if (!is_array($page) || !isset($page["id"])) {
+		exit(1);
+	}
+	echo (int) $page["id"];
+	'
+}
+
 wait_for_seed_done
+HIERARCHY_SUFFIX="hierarchy-$(date +%s)-$$"
+PARENT_A_SLUG="parent-a-$HIERARCHY_SUFFIX"
+PARENT_B_SLUG="parent-b-$HIERARCHY_SUFFIX"
+SHARED_CHILD_SLUG="shared-child-$HIERARCHY_SUFFIX"
+PARENT_A_ID="$(create_page "$PARENT_A_SLUG" "Parent A $HIERARCHY_SUFFIX" 0 "Parent A $HIERARCHY_SUFFIX")"
+PARENT_B_ID="$(create_page "$PARENT_B_SLUG" "Parent B $HIERARCHY_SUFFIX" 0 "Parent B $HIERARCHY_SUFFIX")"
+create_page "$SHARED_CHILD_SLUG" "Shared Child A $HIERARCHY_SUFFIX" "$PARENT_A_ID" "Shared Child A $HIERARCHY_SUFFIX" >/dev/null
+create_page "$SHARED_CHILD_SLUG" "Shared Child B $HIERARCHY_SUFFIX" "$PARENT_B_ID" "Shared Child B $HIERARCHY_SUFFIX" >/dev/null
+
+TRASHED_PARENT_SUFFIX="trashed-parent-$(date +%s)-$$"
+TRASHED_PARENT_ID="$(create_page "parent-$TRASHED_PARENT_SUFFIX" "Parent $TRASHED_PARENT_SUFFIX" 0 "Parent $TRASHED_PARENT_SUFFIX")"
+create_page "child-$TRASHED_PARENT_SUFFIX" "Child $TRASHED_PARENT_SUFFIX" "$TRASHED_PARENT_ID" "Child $TRASHED_PARENT_SUFFIX" >/dev/null
+curl -sS -f \
+	-X DELETE \
+	-H "Authorization: Basic $AUTH_HEADER" \
+	"$BASE_URL/wp-json/wp/v2/pages/$TRASHED_PARENT_ID?context=edit" >/dev/null
+if git -c protocol.version=2 ls-remote "$REMOTE_AUTH_URL" >/dev/null 2>&1; then
+	echo "Expected clone advertisement to fail while a published page has a trashed parent." >&2
+	exit 1
+fi
+curl -sS -f \
+	-X POST \
+	-H "Authorization: Basic $AUTH_HEADER" \
+	-H "Content-Type: application/json" \
+	-d '{"status":"publish"}' \
+	"$BASE_URL/wp-json/wp/v2/pages/$TRASHED_PARENT_ID?context=edit" >/dev/null
+
 git -c protocol.version=2 clone "$REMOTE_AUTH_URL" "$CLONE_DIR"
 if [ -n "$(git -C "$CLONE_DIR" status --porcelain)" ]; then
 	git -C "$CLONE_DIR" status --short >&2
@@ -115,6 +184,10 @@ fi
 
 test -f "$CLONE_DIR/post/hello-world.md"
 test -f "$CLONE_DIR/page/sample-page.md"
+test -f "$CLONE_DIR/page/$PARENT_A_SLUG/$SHARED_CHILD_SLUG.md"
+test -f "$CLONE_DIR/page/$PARENT_B_SLUG/$SHARED_CHILD_SLUG.md"
+grep -Fq "Shared Child A $HIERARCHY_SUFFIX" "$CLONE_DIR/page/$PARENT_A_SLUG/$SHARED_CHILD_SLUG.md"
+grep -Fq "Shared Child B $HIERARCHY_SUFFIX" "$CLONE_DIR/page/$PARENT_B_SLUG/$SHARED_CHILD_SLUG.md"
 test -f "$CLONE_DIR/wp_template/blog-home.html"
 find "$CLONE_DIR/wp_template" -mindepth 2 -name '*.html' | grep -q .
 find "$CLONE_DIR/wp_template_part" -mindepth 2 -name '*.html' | grep -q .
@@ -179,6 +252,44 @@ echo count($revisions);
 cd "$CLONE_DIR"
 git config user.name "WP Origin E2E"
 git config user.email "wp-origin-e2e@example.com"
+
+GIT_CHILD_SLUG="git-child-$HIERARCHY_SUFFIX"
+cat > "$CLONE_DIR/page/$PARENT_A_SLUG/$GIT_CHILD_SLUG.md" <<MARKDOWN
+---
+status: "publish"
+title: "Git Child $HIERARCHY_SUFFIX"
+---
+
+Nested child from Git.
+MARKDOWN
+git add "page/$PARENT_A_SLUG/$GIT_CHILD_SLUG.md"
+git commit -m "Create nested child page from Git"
+PUSH_OUTPUT="$(git push origin trunk 2>&1)"
+assert_push_summary_contains "$PUSH_OUTPUT" 'WP Origin applied 1 content change:'
+assert_push_summary_contains "$PUSH_OUTPUT" "$GIT_CHILD_SLUG"
+curl -sS -f -H "Authorization: Basic $AUTH_HEADER" "$BASE_URL/wp-json/wp/v2/pages?slug=$GIT_CHILD_SLUG&context=edit" | php -r '
+$pages = json_decode(stream_get_contents(STDIN), true);
+if (!is_array($pages) || empty($pages)) {
+	exit(1);
+}
+if ((int) $argv[1] !== (int) $pages[0]["parent"]) {
+	exit(1);
+}
+if (false === strpos($pages[0]["content"]["raw"], "Nested child from Git")) {
+	exit(1);
+}
+' "$PARENT_A_ID"
+git pull --rebase origin trunk
+
+rm "$CLONE_DIR/page/$PARENT_A_SLUG.md"
+git add -A
+git commit -m "Reject parent page delete with children"
+if PUSH_OUTPUT="$(git push origin trunk 2>&1)"; then
+	echo "Expected parent page deletion with remaining children to fail." >&2
+	exit 1
+fi
+assert_push_summary_contains "$PUSH_OUTPUT" 'Push rejected because deleting a parent page while keeping nested child page files would move child content.'
+git reset --hard HEAD~1 >/dev/null
 
 THEME_JSON_PATH="$(find "$CLONE_DIR/wp_theme" -mindepth 2 -maxdepth 2 -name theme.json | head -n 1)"
 printf '\n' >> "$THEME_JSON_PATH"
@@ -466,6 +577,142 @@ fi
 assert_push_summary_contains "$PUSH_OUTPUT" 'Push rejected because Markdown front matter must not include a type.'
 git reset --hard HEAD~1 >/dev/null
 
+mkdir -p "$CLONE_DIR/post/nested-path"
+php -r '
+file_put_contents(
+	$argv[1],
+	"---\nstatus: \"publish\"\ntitle: \"Rejected Nested Path\"\n---\n\nThis push must be rejected.\n"
+);
+' "$CLONE_DIR/post/nested-path/rejected-nested-path.md"
+git add post/nested-path/rejected-nested-path.md
+git commit -m "Reject nested post path"
+if PUSH_OUTPUT="$(git push origin trunk 2>&1)"; then
+	echo "Expected nested post path push to fail." >&2
+	exit 1
+fi
+assert_push_summary_contains "$PUSH_OUTPUT" 'Push rejected because post Markdown files must use post/<slug>.md paths.'
+git reset --hard HEAD~1 >/dev/null
+
+php -r '
+file_put_contents(
+	$argv[1],
+	"---\nstatus: \"publish\"\ntitle: \"Rejected Upper Slug\"\n---\n\nThis push must be rejected.\n"
+);
+' "$CLONE_DIR/post/Rejected Upper Slug.md"
+git add "post/Rejected Upper Slug.md"
+git commit -m "Reject noncanonical post slug"
+if PUSH_OUTPUT="$(git push origin trunk 2>&1)"; then
+	echo "Expected noncanonical post slug push to fail." >&2
+	exit 1
+fi
+assert_push_summary_contains "$PUSH_OUTPUT" 'Push rejected because Markdown file slugs must already match WordPress slug formatting.'
+git reset --hard HEAD~1 >/dev/null
+
+mkdir -p "$CLONE_DIR/wp_template/Bad Theme"
+printf '%s' '<!-- wp:paragraph --><p>This push must be rejected.</p><!-- /wp:paragraph -->' > "$CLONE_DIR/wp_template/Bad Theme/rejected-raw-path.html"
+git add "wp_template/Bad Theme/rejected-raw-path.html"
+git commit -m "Reject noncanonical template theme path"
+if PUSH_OUTPUT="$(git push origin trunk 2>&1)"; then
+	echo "Expected noncanonical template theme path push to fail." >&2
+	exit 1
+fi
+assert_push_summary_contains "$PUSH_OUTPUT" 'Push rejected because template theme path segments must already match WordPress slug formatting.'
+git reset --hard HEAD~1 >/dev/null
+
+printf '%s' '<!-- wp:paragraph --><p>This push must be rejected.</p><!-- /wp:paragraph -->' > "$CLONE_DIR/wp_template/Rejected Raw Slug.html"
+git add "wp_template/Rejected Raw Slug.html"
+git commit -m "Reject noncanonical template slug path"
+if PUSH_OUTPUT="$(git push origin trunk 2>&1)"; then
+	echo "Expected noncanonical template slug path push to fail." >&2
+	exit 1
+fi
+assert_push_summary_contains "$PUSH_OUTPUT" 'Push rejected because template file slugs must already match WordPress slug formatting.'
+git reset --hard HEAD~1 >/dev/null
+
+printf '%s\n' '<div>This push must be rejected.</div>' > "$CLONE_DIR/wp_template/rejected-plain-html.html"
+git add wp_template/rejected-plain-html.html
+git commit -m "Reject plain template HTML"
+if PUSH_OUTPUT="$(git push origin trunk 2>&1)"; then
+	echo "Expected plain template HTML push to fail." >&2
+	exit 1
+fi
+assert_push_summary_contains "$PUSH_OUTPUT" 'Push rejected because template HTML files must contain serialized Gutenberg block markup.'
+git reset --hard HEAD~1 >/dev/null
+
+printf '%s\n' '{"version":3,"settings":{},"styles":{}}' > "$CLONE_DIR/wp_global_styles/Bad-Theme.json"
+git add wp_global_styles/Bad-Theme.json
+git commit -m "Reject noncanonical Global Styles path"
+if PUSH_OUTPUT="$(git push origin trunk 2>&1)"; then
+	echo "Expected noncanonical Global Styles path push to fail." >&2
+	exit 1
+fi
+assert_push_summary_contains "$PUSH_OUTPUT" 'Push rejected because the Global Styles theme filename must already match WordPress slug formatting.'
+git reset --hard HEAD~1 >/dev/null
+
+ln -s ../post/hello-world.md "$CLONE_DIR/post/rejected-symlink.md"
+git add post/rejected-symlink.md
+git commit -m "Reject arbitrary symlink"
+if PUSH_OUTPUT="$(git push origin trunk 2>&1)"; then
+	echo "Expected arbitrary symlink push to fail." >&2
+	exit 1
+fi
+assert_push_summary_contains "$PUSH_OUTPUT" 'Push rejected because symlink files are generated by WP Origin and cannot be created or modified.'
+git reset --hard HEAD~1 >/dev/null
+
+if [ -L "$CLONE_DIR/AGENTS.md" ]; then
+	git rm AGENTS.md
+	git commit -m "Reject generated symlink deletion"
+	if PUSH_OUTPUT="$(git push origin trunk 2>&1)"; then
+		echo "Expected generated symlink deletion push to fail." >&2
+		exit 1
+	fi
+	assert_push_summary_contains "$PUSH_OUTPUT" 'Push rejected because symlink files are generated by WP Origin and cannot be deleted or modified.'
+	git reset --hard HEAD~1 >/dev/null
+fi
+
+php -r '
+file_put_contents(
+	$argv[1],
+	"---\nstatus: \"publish\"\ntitle: \"Rejected Executable\"\n---\n\nThis push must be rejected.\n"
+);
+' "$CLONE_DIR/post/rejected-executable.md"
+git add post/rejected-executable.md
+git update-index --chmod=+x post/rejected-executable.md
+git commit -m "Reject executable content file"
+if PUSH_OUTPUT="$(git push origin trunk 2>&1)"; then
+	echo "Expected executable content file push to fail." >&2
+	exit 1
+fi
+assert_push_summary_contains "$PUSH_OUTPUT" 'Push rejected because executable file modes are not supported by WP Origin content exports.'
+git reset --hard HEAD~1 >/dev/null
+
+php -r '
+file_put_contents(
+	$argv[1],
+	"---\nstatus: \"publish\"\ntitle: \"Rejected Multi Ref\"\n---\n\nThis push must be rejected before WordPress writes.\n"
+);
+' "$CLONE_DIR/post/rejected-multi-ref.md"
+git add post/rejected-multi-ref.md
+git commit -m "Reject multi-ref push"
+if PUSH_OUTPUT="$(git push origin HEAD:trunk HEAD:refs/heads/rejected-multi-ref 2>&1)"; then
+	echo "Expected multi-ref push to fail." >&2
+	exit 1
+fi
+assert_push_summary_contains "$PUSH_OUTPUT" 'Push rejected because WP Origin only accepts one ref update at a time.'
+curl -sS -f -H "Authorization: Basic $AUTH_HEADER" "$BASE_URL/wp-json/wp/v2/posts?slug=rejected-multi-ref&context=edit" | php -r '
+$posts = json_decode(stream_get_contents(STDIN), true);
+if (array() !== $posts) {
+	exit(1);
+}
+'
+git reset --hard HEAD~1 >/dev/null
+
+if PUSH_OUTPUT="$(git push origin :trunk 2>&1)"; then
+	echo "Expected trunk deletion push to fail." >&2
+	exit 1
+fi
+assert_push_summary_contains "$PUSH_OUTPUT" 'Push rejected because deleting trunk is not supported.'
+
 php -r '
 file_put_contents(
 	$argv[1],
@@ -509,6 +756,126 @@ git reset --hard HEAD~1 >/dev/null
 php -r '
 file_put_contents(
 	$argv[1],
+	"---\nstatus: \"publish\"\ndate: \"not a date\"\ntitle: \"Rejected Invalid Date\"\n---\n\nThis push must be rejected.\n"
+);
+' "$CLONE_DIR/post/rejected-invalid-date.md"
+git add post/rejected-invalid-date.md
+git commit -m "Reject invalid front matter date"
+if PUSH_OUTPUT="$(git push origin trunk 2>&1)"; then
+	echo "Expected invalid date front matter push to fail." >&2
+	exit 1
+fi
+assert_push_summary_contains "$PUSH_OUTPUT" 'Push rejected because Markdown front matter date is invalid.'
+git reset --hard HEAD~1 >/dev/null
+
+php -r '
+file_put_contents(
+	$argv[1],
+	"---\nstatus: \"scheduled\"\ntitle: \"Rejected Scheduled No Date\"\n---\n\nThis push must be rejected.\n"
+);
+' "$CLONE_DIR/post/rejected-scheduled-no-date.md"
+git add post/rejected-scheduled-no-date.md
+git commit -m "Reject scheduled post without date"
+if PUSH_OUTPUT="$(git push origin trunk 2>&1)"; then
+	echo "Expected scheduled post without date push to fail." >&2
+	exit 1
+fi
+assert_push_summary_contains "$PUSH_OUTPUT" 'Push rejected because scheduled posts must include a future date.'
+git reset --hard HEAD~1 >/dev/null
+
+php -r '
+file_put_contents(
+	$argv[1],
+	"---\nstatus: \"scheduled\"\ndate: \"2000-01-01T00:00:00Z\"\ntitle: \"Rejected Scheduled Past Date\"\n---\n\nThis push must be rejected.\n"
+);
+' "$CLONE_DIR/post/rejected-scheduled-past-date.md"
+git add post/rejected-scheduled-past-date.md
+git commit -m "Reject scheduled post with past date"
+if PUSH_OUTPUT="$(git push origin trunk 2>&1)"; then
+	echo "Expected scheduled post with past date push to fail." >&2
+	exit 1
+fi
+assert_push_summary_contains "$PUSH_OUTPUT" 'Push rejected because scheduled posts must include a date in the future.'
+git reset --hard HEAD~1 >/dev/null
+
+php -r '
+file_put_contents(
+	$argv[1],
+	"---\nstatus: \"publish\"\ndate: \"2099-01-01T00:00:00Z\"\ntitle: \"Rejected Published Future Date\"\n---\n\nThis push must be rejected.\n"
+);
+' "$CLONE_DIR/post/rejected-published-future-date.md"
+git add post/rejected-published-future-date.md
+git commit -m "Reject published post with future date"
+if PUSH_OUTPUT="$(git push origin trunk 2>&1)"; then
+	echo "Expected published post with future date push to fail." >&2
+	exit 1
+fi
+assert_push_summary_contains "$PUSH_OUTPUT" 'Push rejected because published posts must not include a future date.'
+git reset --hard HEAD~1 >/dev/null
+
+php -r '
+file_put_contents(
+	$argv[1],
+	"---\nstatus: \"publish\"\ntitle: \"Rejected NUL Byte\"\n---\n\nBefore " . "\0" . " after.\n"
+);
+' "$CLONE_DIR/post/rejected-nul-byte.md"
+git add post/rejected-nul-byte.md
+git commit -m "Reject NUL byte content"
+if PUSH_OUTPUT="$(git push origin trunk 2>&1)"; then
+	echo "Expected NUL byte content push to fail." >&2
+	exit 1
+fi
+assert_push_summary_contains "$PUSH_OUTPUT" 'Push rejected because content files must not contain NUL bytes.'
+git reset --hard HEAD~1 >/dev/null
+
+php -r '
+file_put_contents(
+	$argv[1],
+	"---\nstatus: \"publish\"\ndate: \"2024-02-31\"\ntitle: \"Rejected Impossible Date\"\n---\n\nThis push must be rejected.\n"
+);
+' "$CLONE_DIR/post/rejected-impossible-date.md"
+git add post/rejected-impossible-date.md
+git commit -m "Reject impossible front matter date"
+if PUSH_OUTPUT="$(git push origin trunk 2>&1)"; then
+	echo "Expected impossible date front matter push to fail." >&2
+	exit 1
+fi
+assert_push_summary_contains "$PUSH_OUTPUT" 'Push rejected because Markdown front matter date is invalid.'
+git reset --hard HEAD~1 >/dev/null
+
+php -r '
+file_put_contents(
+	$argv[1],
+	"---\nstatus: \"publish\"\ntitle:\n  - \"Array Title\"\n---\n\nThis push must be rejected.\n"
+);
+' "$CLONE_DIR/post/rejected-array-title.md"
+git add post/rejected-array-title.md
+git commit -m "Reject array front matter title"
+if PUSH_OUTPUT="$(git push origin trunk 2>&1)"; then
+	echo "Expected array title front matter push to fail." >&2
+	exit 1
+fi
+assert_push_summary_contains "$PUSH_OUTPUT" 'Push rejected because Markdown front matter field "title" must be a scalar string or number.'
+git reset --hard HEAD~1 >/dev/null
+
+php -r '
+file_put_contents(
+	$argv[1],
+	"---\nstatus: \"publish\"\nauthor: \"admin\"\ntitle: \"Rejected Unknown Front Matter\"\n---\n\nThis push must be rejected.\n"
+);
+' "$CLONE_DIR/post/rejected-unknown-frontmatter.md"
+git add post/rejected-unknown-frontmatter.md
+git commit -m "Reject unknown front matter"
+if PUSH_OUTPUT="$(git push origin trunk 2>&1)"; then
+	echo "Expected unknown front matter push to fail." >&2
+	exit 1
+fi
+assert_push_summary_contains "$PUSH_OUTPUT" 'Push rejected because Markdown front matter field "author" is not supported.'
+git reset --hard HEAD~1 >/dev/null
+
+php -r '
+file_put_contents(
+	$argv[1],
 	"---\nstatus: \"publish\"\ntitle: \"Rejected Block Markup\"\n---\n\n<!-- wp:group {bad json} -->\nBroken block markup.\n<!-- /wp:group -->\n"
 );
 ' "$CLONE_DIR/post/rejected-block-markup.md"
@@ -535,6 +902,26 @@ if PUSH_OUTPUT="$(git push origin trunk 2>&1)"; then
 fi
 assert_push_summary_contains "$PUSH_OUTPUT" 'Push rejected because the content contains mismatched Gutenberg block delimiters.'
 git reset --hard HEAD~1 >/dev/null
+
+php -r '
+file_put_contents(
+	$argv[1],
+	"---\nstatus: \"publish\"\ntitle: \"Rejected Raw Block In Markdown\"\n---\n\n<!-- wp:acme/custom-block-2 {\"flag\":true} /-->\n"
+);
+' "$CLONE_DIR/post/rejected-raw-block-in-markdown.md"
+git add post/rejected-raw-block-in-markdown.md
+git commit -m "Reject raw block in Markdown"
+if PUSH_OUTPUT="$(git push origin trunk 2>&1)"; then
+	echo "Expected raw block in Markdown push to fail." >&2
+	exit 1
+fi
+assert_push_summary_contains "$PUSH_OUTPUT" 'Push rejected because Markdown content must not embed raw Gutenberg block delimiters inside HTML blocks.'
+git reset --hard HEAD~1 >/dev/null
+
+printf '%s' '<!-- wp:acme/custom-block-2 {"flag":true} /-->' > "$CLONE_DIR/wp_template/custom-acme-block.html"
+git add wp_template/custom-acme-block.html
+git commit -m "Accept custom block markup"
+git push origin trunk
 
 php -r '
 $path = $argv[1];
