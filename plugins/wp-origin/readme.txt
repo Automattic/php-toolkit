@@ -36,7 +36,7 @@ After activation, WP Origin prepares an initial Git view of supported site conte
 
 `/wp-json/git/v1/md.git`
 
-Users authenticate with WordPress application passwords over HTTP Basic Auth. A local clone contains files such as:
+Users authenticate through WordPress REST authentication. The built-in Application Passwords feature is the usual Git-over-HTTPS option when it is available, and other REST authentication plugins can work if they authenticate the request as a WordPress user. A local clone contains files such as:
 
 * `post/{slug}.md` for posts.
 * `page/{slug}.md` for pages.
@@ -70,7 +70,17 @@ Posts, pages, supported block theme templates, template parts, navigation posts,
 
 = Who can push changes? =
 
-Authenticated users must be able to edit posts. Administrators can also use the seeder status screen.
+Users must be authenticated and able to read every exported WordPress object to clone or pull the Git repository. This avoids exposing private, draft, pending, or future content through Git history.
+
+For pushes, WP Origin checks permissions for each changed object. Updating or trashing existing content requires permission to edit that specific post. Creating new files requires permission to create that post type, and publishing or scheduling content requires the relevant publish capability.
+
+Administrators can also use the seeder status screen.
+
+= Does WP Origin enable Application Passwords? =
+
+No. WP Origin does not enable or force any authentication method. It works with WordPress users that are already authenticated for REST requests and have the required capabilities.
+
+The built-in WordPress Application Passwords feature is the default way to use Git over HTTPS when it is available on the site. Other REST authentication plugins may also work if they authenticate the request as a WordPress user before WP Origin's permission checks run.
 
 = Can I still edit content in WP-Admin? =
 

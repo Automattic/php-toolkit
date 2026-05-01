@@ -249,7 +249,6 @@ SKILL;
 	}
 
 	public static function check_permissions( WP_REST_Request $request ) {
-		$git_path = self::build_git_path( $request );
 		if ( ! is_user_logged_in() ) {
 			return new WP_Error(
 				'wp_origin_auth_required',
@@ -258,12 +257,34 @@ SKILL;
 			);
 		}
 
-		if ( self::is_push_request( $git_path ) && ! current_user_can( 'edit_posts' ) ) {
+		if ( ! self::current_user_can_read_exported_content() ) {
 			return new WP_Error(
 				'wp_origin_forbidden',
-				'You do not have permission to push content changes.',
+				'You do not have permission to read all WP Origin content.',
 				array( 'status' => 403 )
 			);
+		}
+
+		return true;
+	}
+
+	private static function current_user_can_read_exported_content() {
+		$post_ids = get_posts(
+			array(
+				'post_type'      => self::get_export_post_types(),
+				'post_status'    => self::$supported_post_statuses,
+				'posts_per_page' => -1,
+				'fields'         => 'ids',
+				'no_found_rows'  => true,
+				'orderby'        => 'ID',
+				'order'          => 'ASC',
+			)
+		);
+
+		foreach ( $post_ids as $post_id ) {
+			if ( ! current_user_can( 'read_post', intval( $post_id ) ) ) {
+				return false;
+			}
 		}
 
 		return true;
@@ -629,8 +650,8 @@ SKILL;
 		$has_guideline_skills   = false;
 		$agent_guide_skill_path = null;
 		foreach ( $posts as $post ) {
-			if ( ! current_user_can( 'read_post', $post->ID ) ) {
-				continue;
+			if ( ! current_user_can( 'read_post', intval( $post->ID ) ) ) {
+				throw new Exception( 'Git export rejected because you do not have permission to read all WP Origin content.' );
 			}
 
 			$path    = self::build_markdown_path( $post );
@@ -1419,6 +1440,7 @@ SKILL;
 			isset( $metadata['status'] ) ? $metadata['status'] : ( $existing_post ? $existing_post->post_status : 'draft' )
 		);
 		self::validate_post_status( $post_status, $post_type );
+		self::assert_can_set_post_status( $post_type, $post_status, $existing_post );
 
 		if (
 			$existing_post &&
@@ -1493,6 +1515,7 @@ SKILL;
 			$post_id = wp_update_post( wp_slash( $postarr ), true );
 		} else {
 			self::assert_can_create_post_type( $post_type );
+			self::assert_can_set_post_status( $post_type, 'publish' );
 			$postarr = array(
 				'post_type'    => $post_type,
 				'post_name'    => $slug,
@@ -1546,6 +1569,7 @@ SKILL;
 			$post_id = wp_update_post( wp_slash( $postarr ), true );
 		} else {
 			self::assert_can_create_post_type( 'wp_global_styles' );
+			self::assert_can_set_post_status( 'wp_global_styles', 'publish' );
 			$postarr = array(
 				'post_type'    => 'wp_global_styles',
 				'post_name'    => 'wp-global-styles-' . rawurlencode( $theme_slug ),
@@ -1647,6 +1671,7 @@ SKILL;
 			isset( $metadata['status'] ) ? $metadata['status'] : ( $existing_post ? $existing_post->post_status : 'draft' )
 		);
 		self::validate_post_status( $post_status, 'wp_guideline' );
+		self::assert_can_set_post_status( 'wp_guideline', $post_status, $existing_post );
 
 		if (
 			$existing_post &&
@@ -2207,9 +2232,32 @@ SKILL;
 
 	private static function assert_can_create_post_type( $post_type ) {
 		$post_type_object = get_post_type_object( $post_type );
-		$edit_posts_cap   = $post_type_object && isset( $post_type_object->cap->edit_posts ) ? $post_type_object->cap->edit_posts : 'edit_posts';
-		if ( ! current_user_can( $edit_posts_cap ) ) {
+		$create_posts_cap = $post_type_object && isset( $post_type_object->cap->create_posts ) ? $post_type_object->cap->create_posts : '';
+		if ( '' === $create_posts_cap && $post_type_object && isset( $post_type_object->cap->edit_posts ) ) {
+			$create_posts_cap = $post_type_object->cap->edit_posts;
+		}
+		if ( '' === $create_posts_cap ) {
+			$create_posts_cap = 'edit_posts';
+		}
+		if ( ! current_user_can( $create_posts_cap ) ) {
 			throw new Exception( 'Push rejected because you do not have permission to create this post type.' );
+		}
+	}
+
+	private static function assert_can_set_post_status( $post_type, $post_status, $existing_post = null ) {
+		if ( $existing_post && $existing_post->post_status === $post_status ) {
+			return;
+		}
+		if ( ! in_array( $post_status, array( 'publish', 'future', 'private' ), true ) ) {
+			return;
+		}
+
+		$post_type_object  = get_post_type_object( $post_type );
+		$publish_posts_cap = $post_type_object && isset( $post_type_object->cap->publish_posts )
+			? $post_type_object->cap->publish_posts
+			: 'publish_posts';
+		if ( ! current_user_can( $publish_posts_cap ) ) {
+			throw new Exception( 'Push rejected because you do not have permission to publish this post type.' );
 		}
 	}
 
