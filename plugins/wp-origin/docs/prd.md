@@ -124,9 +124,8 @@ Paths are part of the content identity. WP Origin should reject unsupported
 directories, unexpected extensions, path traversal, non-canonical slugs, and
 ambiguous mappings.
 
-WP Origin's built-in agent skills are generated when no matching Guideline
-exists. If Gutenberg Guidelines are unavailable, those generated skills are
-read-only checkout context. If Guidelines are available, editing the canonical
+WP Origin's built-in agent skills are generated only when Gutenberg Guidelines
+are enabled and no matching Guideline exists. Editing the canonical
 `wp_guideline/skills/{slug}/SKILL.md` file can create or update the matching
 Guideline, while generated aliases such as `AGENTS.md` and `.agents/skills`
 remain read-only.
