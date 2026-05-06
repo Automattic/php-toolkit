@@ -125,6 +125,16 @@ class WP_Origin_Plugin {
 		return post_type_exists( 'wp_guideline' ) && taxonomy_exists( 'wp_guideline_type' );
 	}
 
+	private static function guidelines_enabled() {
+		if ( self::guidelines_available() ) {
+			return true;
+		}
+
+		$experiments = get_option( 'gutenberg-experiments' );
+
+		return is_array( $experiments ) && ! empty( $experiments['gutenberg-guidelines'] );
+	}
+
 	private static function get_default_agent_skill_content() {
 		return <<<'SKILL'
 # WP Origin AGENTS.md
@@ -736,6 +746,10 @@ SKILL;
 	}
 
 	private static function add_default_agent_guidance_files( &$files, &$has_guideline_skills, &$agent_guide_skill_path ) {
+		if ( ! self::guidelines_enabled() ) {
+			return;
+		}
+
 		$default_skills = array(
 			self::AGENT_SKILL_SLUG => array(
 				'description' => 'Guide for coding agents working in a WP Origin checkout of a WordPress site.',
@@ -1236,6 +1250,51 @@ SKILL;
 			'AGENTS.md' => $skill_path,
 			'CLAUDE.md' => $skill_path,
 		);
+	}
+
+	public static function get_default_agent_guidance_preview_files() {
+		if ( ! self::guidelines_enabled() ) {
+			return array();
+		}
+
+		$files          = array();
+		$default_skills = array(
+			self::AGENT_SKILL_SLUG => array(
+				'description' => 'Guide for coding agents working in a WP Origin checkout of a WordPress site.',
+				'content'     => self::get_default_agent_skill_content(),
+			),
+			self::TEMPLATE_EDITOR_SKILL_SLUG => array(
+				'description' => 'Edit WP Origin block theme templates and template parts as raw Gutenberg HTML while preserving Site Editor compatibility.',
+				'content'     => self::get_default_template_editor_skill_content(),
+			),
+		);
+
+		foreach ( $default_skills as $slug => $skill ) {
+			$files[ 'wp_guideline/skills/' . $slug . '/SKILL.md' ] = array(
+				'mode'    => TreeEntry::FILE_MODE_REGULAR_NON_EXECUTABLE,
+				'content' => self::format_skill_markdown(
+					$slug,
+					$skill['description'],
+					$skill['content']
+				),
+			);
+		}
+
+		foreach ( self::get_agent_skills_directory_symlink_paths() as $path => $target ) {
+			$files[ $path ] = array(
+				'mode'    => TreeEntry::FILE_MODE_SYMBOLIC_LINK,
+				'content' => $target,
+			);
+		}
+
+		foreach ( self::get_agent_entrypoint_symlink_paths( 'wp_guideline/skills/' . self::AGENT_SKILL_SLUG . '/SKILL.md' ) as $path => $target ) {
+			$files[ $path ] = array(
+				'mode'    => TreeEntry::FILE_MODE_SYMBOLIC_LINK,
+				'content' => $target,
+			);
+		}
+
+		return $files;
 	}
 
 	public static function repository_identity( GitRepository $repository ) {

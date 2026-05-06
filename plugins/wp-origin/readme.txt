@@ -53,7 +53,7 @@ Markdown files use a small front matter contract: `title`, `date`, `status`, and
 
 Structural block files use raw Gutenberg block markup with no front matter so they can round-trip through WordPress without being forced into Markdown.
 
-WP Origin's built-in agent skills are generated when no matching Guideline exists. If Gutenberg Guidelines are unavailable, those generated skills are read-only checkout context. If Guidelines are available, edit the canonical `wp_guideline/skills/{slug}/SKILL.md` file; generated aliases such as `AGENTS.md` and `.agents/skills` remain read-only.
+WP Origin's built-in agent skills are generated only when Gutenberg Guidelines are enabled and no matching Guideline exists. Edit the canonical `wp_guideline/skills/{slug}/SKILL.md` file; generated aliases such as `AGENTS.md` and `.agents/skills` remain read-only.
 
 = Safety model =
 

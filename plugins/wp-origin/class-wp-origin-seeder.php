@@ -2,6 +2,7 @@
 
 use WordPress\Git\GitRepository;
 use WordPress\Git\Model\Commit;
+use WordPress\Git\Model\TreeEntry;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -128,14 +129,14 @@ class WP_Origin_Seeder {
 		return $state ? $state : self::STATE_PENDING;
 	}
 
-	public static function get_progress() {
+	public static function get_progress( $include_checkout = true ) {
 		$progress = get_option( self::PROGRESS_OPTION, array() );
 		$state    = self::get_state();
 		$total    = isset( $progress['total'] ) ? intval( $progress['total'] ) : 0;
 		$done     = isset( $progress['processed'] ) ? intval( $progress['processed'] ) : 0;
 		$percent  = self::STATE_DONE === $state ? 100 : ( $total > 0 ? min( 99, intval( floor( $done * 100 / $total ) ) ) : 0 );
 
-		return array(
+		$response = array(
 			'state'       => $state,
 			'percent'     => $percent,
 			'processed'   => $done,
@@ -147,6 +148,11 @@ class WP_Origin_Seeder {
 			'finished_at' => isset( $progress['finished_at'] ) ? intval( $progress['finished_at'] ) : 0,
 			'commits'     => self::get_commit_log( 25 ),
 		);
+		if ( $include_checkout ) {
+			$response['checkout'] = self::get_checkout_preview();
+		}
+
+		return $response;
 	}
 
 	/**
@@ -208,12 +214,302 @@ class WP_Origin_Seeder {
 		return $commits;
 	}
 
+	/**
+	 * Return a small, safe preview of the current repository tree for
+	 * the first-run admin shell. This is intentionally bounded so the
+	 * polling endpoint stays cheap on large sites.
+	 */
+	public static function get_checkout_preview( $file_limit = 120, $content_limit = 16, $content_length = 6000 ) {
+		$preview = array(
+			'available'  => false,
+			'branch'     => 'trunk',
+			'head'       => '',
+			'files'      => array(),
+			'truncated'  => false,
+			'path_count' => 0,
+		);
+
+		try {
+			global $wpdb;
+			$table = $wpdb->prefix . WP_Origin_Plugin::TABLE_PREFIX . 'files';
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+			if ( ! $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $table ) ) ) {
+				return $preview;
+			}
+
+			$repository = WP_Origin_Plugin::open_repository();
+			$tip        = self::get_preview_tip( $repository );
+			if ( ! $tip ) {
+				return $preview;
+			}
+
+			$commit = $repository->read_object( $tip )->as_commit();
+			if ( Commit::is_null_hash( $commit->tree ) ) {
+				$preview['available'] = true;
+				$preview['head']      = substr( $tip, 0, 7 );
+
+				return $preview;
+			}
+
+			$files                   = array();
+			$remaining_content_slots = max( 0, intval( $content_limit ) );
+			$truncated               = false;
+			self::add_checkout_preview_priority_paths(
+				$repository,
+				$tip,
+				$files,
+				max( 1, intval( $content_length ) )
+			);
+			self::add_checkout_preview_default_guidance_files(
+				$files,
+				max( 1, intval( $content_length ) )
+			);
+			self::collect_checkout_preview_files(
+				$repository,
+				$commit->tree,
+				'',
+				$files,
+				$remaining_content_slots,
+				max( 1, intval( $file_limit ) ),
+				max( 1, intval( $content_length ) ),
+				$truncated
+			);
+
+			$preview['available']  = true;
+			$preview['head']       = substr( $tip, 0, 7 );
+			$preview['files']      = $files;
+			$preview['truncated']  = $truncated;
+			$preview['path_count'] = count( $files );
+		} catch ( Throwable $exception ) {
+			return $preview;
+		}
+
+		return $preview;
+	}
+
+	private static function get_preview_tip( GitRepository $repository ) {
+		foreach ( array( 'refs/heads/trunk', self::SEED_BRANCH ) as $ref ) {
+			try {
+				if ( ! $repository->branch_exists( $ref ) ) {
+					continue;
+				}
+				$candidate = $repository->get_branch_tip( $ref );
+			} catch ( Throwable $exception ) {
+				continue;
+			}
+			if ( is_string( $candidate ) && '' !== $candidate && ! Commit::is_null_hash( $candidate ) ) {
+				return $candidate;
+			}
+		}
+
+		return '';
+	}
+
+	private static function collect_checkout_preview_files( GitRepository $repository, $tree_hash, $prefix, &$files, &$remaining_content_slots, $file_limit, $content_length, &$truncated ) {
+		if ( count( $files ) >= $file_limit ) {
+			$truncated = true;
+
+			return;
+		}
+
+		$tree    = $repository->read_object( $tree_hash )->as_tree();
+		$entries = $tree->entries;
+		ksort( $entries );
+		foreach ( $entries as $entry ) {
+			if ( count( $files ) >= $file_limit ) {
+				$truncated = true;
+
+				return;
+			}
+
+			$path = ltrim( $prefix . '/' . $entry->name, '/' );
+			if ( self::checkout_preview_has_path( $files, $path ) ) {
+				continue;
+			}
+			if ( TreeEntry::FILE_MODE_DIRECTORY === $entry->get_mode_bucket() ) {
+				self::collect_checkout_preview_files(
+					$repository,
+					$entry->hash,
+					$path,
+					$files,
+					$remaining_content_slots,
+					$file_limit,
+					$content_length,
+					$truncated
+				);
+				continue;
+			}
+
+			if (
+				TreeEntry::FILE_MODE_REGULAR_NON_EXECUTABLE !== $entry->get_mode_bucket() &&
+				TreeEntry::FILE_MODE_REGULAR_EXECUTABLE !== $entry->get_mode_bucket() &&
+				TreeEntry::FILE_MODE_SYMBOLIC_LINK !== $entry->get_mode_bucket()
+			) {
+				continue;
+			}
+
+			$file = array(
+				'path' => $path,
+				'mode' => $entry->get_mode_bucket(),
+				'type' => TreeEntry::FILE_MODE_SYMBOLIC_LINK === $entry->get_mode_bucket() ? 'symlink' : 'file',
+			);
+
+			if ( TreeEntry::FILE_MODE_SYMBOLIC_LINK === $entry->get_mode_bucket() ) {
+				$content         = $repository->read_object( $entry->hash )->consume_all();
+				$file['size']    = strlen( $content );
+				$file['content'] = $content;
+			} elseif ( $remaining_content_slots > 0 && self::is_checkout_preview_content_path( $path ) ) {
+				$content         = $repository->read_object( $entry->hash )->consume_all();
+				$file['size']    = strlen( $content );
+				$file['content'] = self::trim_checkout_preview_content( $content, $content_length );
+				--$remaining_content_slots;
+			}
+
+			$files[] = $file;
+		}
+	}
+
+	private static function add_checkout_preview_priority_paths( GitRepository $repository, $commit_hash, &$files, $content_length ) {
+		foreach ( self::get_checkout_preview_priority_paths() as $path ) {
+			self::add_checkout_preview_file_from_path(
+				$repository,
+				$commit_hash,
+				$path,
+				$files,
+				$content_length
+			);
+		}
+	}
+
+	private static function get_checkout_preview_priority_paths() {
+		return array(
+			'.agents/skills',
+			'.claude/skills',
+			'AGENTS.md',
+			'CLAUDE.md',
+			'wp_guideline/skills/wp-origin/SKILL.md',
+			'wp_guideline/skills/wp-origin-template-editor/SKILL.md',
+		);
+	}
+
+	private static function add_checkout_preview_file_from_path( GitRepository $repository, $commit_hash, $path, &$files, $content_length ) {
+		if ( self::checkout_preview_has_path( $files, $path ) ) {
+			return;
+		}
+
+		try {
+			$entry = self::find_checkout_preview_entry_by_path( $repository, $commit_hash, $path );
+			if ( ! $entry || TreeEntry::FILE_MODE_DIRECTORY === $entry->get_mode_bucket() ) {
+				return;
+			}
+			if (
+				TreeEntry::FILE_MODE_REGULAR_NON_EXECUTABLE !== $entry->get_mode_bucket() &&
+				TreeEntry::FILE_MODE_REGULAR_EXECUTABLE !== $entry->get_mode_bucket() &&
+				TreeEntry::FILE_MODE_SYMBOLIC_LINK !== $entry->get_mode_bucket()
+			) {
+				return;
+			}
+
+			$content = $repository->read_object( $entry->hash )->consume_all();
+			$file    = array(
+				'path'    => $path,
+				'mode'    => $entry->get_mode_bucket(),
+				'type'    => TreeEntry::FILE_MODE_SYMBOLIC_LINK === $entry->get_mode_bucket() ? 'symlink' : 'file',
+				'size'    => strlen( $content ),
+				'content' => TreeEntry::FILE_MODE_SYMBOLIC_LINK === $entry->get_mode_bucket()
+					? $content
+					: self::trim_checkout_preview_content( $content, $content_length ),
+			);
+			$files[] = $file;
+		} catch ( Throwable $exception ) {
+			return;
+		}
+	}
+
+	private static function find_checkout_preview_entry_by_path( GitRepository $repository, $commit_hash, $path ) {
+		$commit = $repository->read_object( $commit_hash )->as_commit();
+		if ( Commit::is_null_hash( $commit->tree ) ) {
+			return null;
+		}
+
+		$tree_hash = $commit->tree;
+		$segments  = explode( '/', trim( $path, '/' ) );
+		foreach ( $segments as $index => $segment ) {
+			$tree = $repository->read_object( $tree_hash )->as_tree();
+			if ( ! $tree->has_entry( $segment ) ) {
+				return null;
+			}
+
+			$entry = $tree->get_entry( $segment );
+			if ( count( $segments ) - 1 === $index ) {
+				return $entry;
+			}
+			if ( TreeEntry::FILE_MODE_DIRECTORY !== $entry->get_mode_bucket() ) {
+				return null;
+			}
+			$tree_hash = $entry->hash;
+		}
+
+		return null;
+	}
+
+	private static function checkout_preview_has_path( $files, $path ) {
+		foreach ( $files as $file ) {
+			if ( isset( $file['path'] ) && $path === $file['path'] ) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	private static function add_checkout_preview_default_guidance_files( &$files, $content_length ) {
+		foreach ( WP_Origin_Plugin::get_default_agent_guidance_preview_files() as $path => $entry ) {
+			if ( self::checkout_preview_has_path( $files, $path ) ) {
+				continue;
+			}
+			if ( ! isset( $entry['mode'], $entry['content'] ) ) {
+				continue;
+			}
+
+			$content = (string) $entry['content'];
+			$mode    = $entry['mode'];
+			$files[] = array(
+				'path'    => $path,
+				'mode'    => $mode,
+				'type'    => TreeEntry::FILE_MODE_SYMBOLIC_LINK === $mode ? 'symlink' : 'file',
+				'size'    => strlen( $content ),
+				'content' => TreeEntry::FILE_MODE_SYMBOLIC_LINK === $mode
+					? $content
+					: self::trim_checkout_preview_content( $content, $content_length ),
+			);
+		}
+	}
+
+	private static function is_checkout_preview_content_path( $path ) {
+		$extension = strtolower( pathinfo( $path, PATHINFO_EXTENSION ) );
+		if ( in_array( $extension, array( 'md', 'html', 'json', 'txt' ), true ) ) {
+			return true;
+		}
+
+		return in_array( $path, array( 'AGENTS.md', 'CLAUDE.md' ), true );
+	}
+
+	private static function trim_checkout_preview_content( $content, $max_length ) {
+		$max_length = intval( $max_length );
+		if ( strlen( $content ) <= $max_length ) {
+			return $content;
+		}
+
+		return substr( $content, 0, $max_length ) . "\n... output truncated ...\n";
+	}
+
 	public static function is_ready() {
 		return self::STATE_DONE === self::get_state();
 	}
 
 	public static function not_ready_message() {
-		$progress = self::get_progress();
+		$progress = self::get_progress( false );
 		if ( self::STATE_FAILED === $progress['state'] ) {
 			return 'WP Origin import failed: ' . $progress['message'];
 		}

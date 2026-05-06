@@ -86,6 +86,7 @@ jobs:
             --skip-email
           wp --path="$WP_DIR" option update permalink_structure '/%postname%/'
           wp --path="$WP_DIR" rewrite flush --hard
+          wp --path="$WP_DIR" option update gutenberg-experiments '{"gutenberg-guidelines":true}' --format=json
 
       - name: Seed Hello World post, Sample Page, and Template
         run: |
