@@ -241,11 +241,30 @@ class WP_Origin_End_To_End_Test extends TestCase {
 		);
 
 		// Capture the page ID up front: WordPress mangles the slug to
-		// `sample-page__trashed` once we trash the page in step 6, so a
+		// `renamed-sample-page__trashed` once we trash the page in step 6, so a
 		// later slug lookup would not find it.
 		$sample_page_id = $this->fetch_id_by_slug( 'sample-page', 'pages' );
+		$this->assertStringContainsString(
+			'id: "' . $sample_page_id . '"',
+			file_get_contents( $clone_dir . '/page/sample-page.md' )
+		);
 
 		$this->configure_git( $clone_dir );
+
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'mv', 'page/sample-page.md', 'page/renamed-sample-page.md' ) );
+		$this->edit_file(
+			$clone_dir . '/page/renamed-sample-page.md',
+			'Page from WordPress',
+			'Renamed page from Git'
+		);
+		$this->commit_and_push( $clone_dir, 'page/renamed-sample-page.md', 'Rename page from Git' );
+		$this->assertSame( $sample_page_id, $this->fetch_id_by_slug( 'renamed-sample-page', 'pages' ) );
+		$this->assert_slug_absent( 'sample-page', 'pages' );
+		$this->assertStringContainsString(
+			'Renamed page from Git',
+			$this->fetch_content( $sample_page_id, 'pages' )
+		);
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'pull', '--rebase', 'origin', 'trunk' ) );
 
 		$git_child_slug = 'git-child-' . $hierarchy_suffix;
 		file_put_contents(
@@ -417,7 +436,7 @@ class WP_Origin_End_To_End_Test extends TestCase {
 			$clone_dir . '/post/created-from-git.md',
 			"---\nstatus: \"publish\"\ntitle: \"Created From Git\"\n---\n\nCreated from Git.\n"
 		);
-		unlink( $clone_dir . '/page/sample-page.md' );
+		unlink( $clone_dir . '/page/renamed-sample-page.md' );
 		$this->run_cmd( array( 'git', '-C', $clone_dir, 'add', '-A' ) );
 		$this->run_cmd( array( 'git', '-C', $clone_dir, 'commit', '-m', 'Create and delete content from Git' ) );
 		$this->run_cmd( array( 'git', '-C', $clone_dir, 'push', 'origin', 'trunk' ) );
@@ -429,12 +448,12 @@ class WP_Origin_End_To_End_Test extends TestCase {
 		);
 		$this->assertSame( 'trash', $this->fetch_status( $sample_page_id, 'pages' ) );
 
-		// 7) The Git path is the content identity; front matter cannot
-		// smuggle a different ID or slug.
+		// 7) Front matter may carry the WordPress ID for rename
+		// continuity, but invalid IDs, slugs, and types are rejected.
 		$this->run_cmd( array( 'git', '-C', $clone_dir, 'pull', '--rebase', 'origin', 'trunk' ) );
 		file_put_contents(
 			$clone_dir . '/post/rejected-id-frontmatter.md',
-			"---\nid: \"1\"\nstatus: \"publish\"\ntitle: \"Rejected ID Front Matter\"\n---\n\nThis push must be rejected.\n"
+			"---\nid: \"0\"\nstatus: \"publish\"\ntitle: \"Rejected ID Front Matter\"\n---\n\nThis push must be rejected.\n"
 		);
 		$this->run_cmd( array( 'git', '-C', $clone_dir, 'add', 'post/rejected-id-frontmatter.md' ) );
 		$this->run_cmd( array( 'git', '-C', $clone_dir, 'commit', '-m', 'Reject post id front matter' ) );
@@ -443,7 +462,7 @@ class WP_Origin_End_To_End_Test extends TestCase {
 			true
 		);
 		$this->assertNotSame( 0, $push_result['code'], 'ID front matter should have been rejected.' );
-		$this->assertStringContainsString( 'Push rejected because Markdown front matter must not include an id.', $push_result['output'] );
+		$this->assertStringContainsString( 'Push rejected because Markdown front matter id must be a positive integer.', $push_result['output'] );
 		$this->run_cmd( array( 'git', '-C', $clone_dir, 'reset', '--hard', 'HEAD~1' ) );
 
 		file_put_contents(
@@ -867,6 +886,7 @@ class WP_Origin_End_To_End_Test extends TestCase {
 		$this->assertFileExists( $fresh . '/wp_template/custom-blog-card.html' );
 		$this->assertFileExists( $fresh . '/wp_template/custom-acme-block.html' );
 		$this->assertFileDoesNotExist( $fresh . '/page/sample-page.md' );
+		$this->assertFileDoesNotExist( $fresh . '/page/renamed-sample-page.md' );
 		$this->assertFileDoesNotExist( $fresh . '/wp_template/renamed-blog-card.html' );
 		$this->assertFileExists( $fresh . '/post/delete-restore-e2e.md' );
 		$this->assertStringContainsString(
@@ -883,6 +903,7 @@ class WP_Origin_End_To_End_Test extends TestCase {
 		);
 		$log = $this->run_cmd( array( 'git', '-C', $fresh, 'log', '--format=%s' ) );
 		$this->assertStringContainsString( 'Update hello world from Git', $log['output'] );
+		$this->assertStringContainsString( 'Rename page from Git', $log['output'] );
 		$this->assertStringContainsString( 'Update template HTML from Git', $log['output'] );
 		$this->assertStringContainsString( 'Create and delete content from Git', $log['output'] );
 

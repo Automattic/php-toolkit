@@ -207,7 +207,8 @@ grep -Fq 'title: "Hello World"' "$CLONE_DIR/post/hello-world.md"
 grep -Fq 'status: "published"' "$CLONE_DIR/post/hello-world.md"
 grep -Fq 'description: "Hand-authored summary."' "$CLONE_DIR/post/hello-world.md"
 grep -Eq '^date: "[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z"$' "$CLONE_DIR/post/hello-world.md"
-! grep -Eq '^(id|type|slug|date_gmt|modified_gmt):' "$CLONE_DIR/post/hello-world.md"
+grep -Eq '^id: "[1-9][0-9]*"$' "$CLONE_DIR/post/hello-world.md"
+! grep -Eq '^(type|slug|date_gmt|modified_gmt):' "$CLONE_DIR/post/hello-world.md"
 head -n 1 "$CLONE_DIR/wp_guideline/skills/wp-origin/SKILL.md" | grep -Fxq -- '---'
 grep -Fq 'name: "wp-origin"' "$CLONE_DIR/wp_guideline/skills/wp-origin/SKILL.md"
 grep -Fq 'description: "Guide for coding agents working in a WP Origin checkout of a WordPress site."' "$CLONE_DIR/wp_guideline/skills/wp-origin/SKILL.md"
@@ -252,6 +253,39 @@ echo count($revisions);
 cd "$CLONE_DIR"
 git config user.name "WP Origin E2E"
 git config user.email "wp-origin-e2e@example.com"
+
+grep -Fq "id: \"$PAGE_ID\"" "$CLONE_DIR/page/sample-page.md"
+git mv page/sample-page.md page/renamed-sample-page.md
+php -r '
+$path = $argv[1];
+$contents = file_get_contents($path);
+$contents = str_replace("Page from WordPress", "Renamed page from Git", $contents);
+file_put_contents($path, $contents);
+' "$CLONE_DIR/page/renamed-sample-page.md"
+git add -A
+git commit -m "Rename page from Git"
+PUSH_OUTPUT="$(git push origin trunk 2>&1)"
+assert_push_summary_contains "$PUSH_OUTPUT" 'WP Origin applied 1 content change:'
+assert_push_summary_contains "$PUSH_OUTPUT" '/renamed-sample-page/'
+curl -sS -f -H "Authorization: Basic $AUTH_HEADER" "$BASE_URL/wp-json/wp/v2/pages?slug=renamed-sample-page&context=edit" | php -r '
+$pages = json_decode(stream_get_contents(STDIN), true);
+if (!is_array($pages) || empty($pages)) {
+	exit(1);
+}
+if ((int) $argv[1] !== (int) $pages[0]["id"]) {
+	exit(1);
+}
+if (false === strpos($pages[0]["content"]["raw"], "Renamed page from Git")) {
+	exit(1);
+}
+' "$PAGE_ID"
+curl -sS -f -H "Authorization: Basic $AUTH_HEADER" "$BASE_URL/wp-json/wp/v2/pages?slug=sample-page&context=edit" | php -r '
+$pages = json_decode(stream_get_contents(STDIN), true);
+if (array() !== $pages) {
+	exit(1);
+}
+'
+git pull --rebase origin trunk
 
 GIT_CHILD_SLUG="git-child-$HIERARCHY_SUFFIX"
 cat > "$CLONE_DIR/page/$PARENT_A_SLUG/$GIT_CHILD_SLUG.md" <<MARKDOWN
@@ -474,14 +508,14 @@ $markdown = "---\n"
 file_put_contents($path, $markdown);
 ' "$CLONE_DIR/page/page-from-git.md"
 
-rm "$CLONE_DIR/page/sample-page.md"
-git add post/created-from-git.md page/page-from-git.md page/sample-page.md
+rm "$CLONE_DIR/page/renamed-sample-page.md"
+git add post/created-from-git.md page/page-from-git.md page/renamed-sample-page.md
 git commit -m "Create and delete content from Git"
 PUSH_OUTPUT="$(git push origin trunk 2>&1)"
 assert_push_summary_contains "$PUSH_OUTPUT" 'WP Origin applied 3 content changes:'
 assert_push_summary_contains "$PUSH_OUTPUT" '/created-from-git/'
 assert_push_summary_contains "$PUSH_OUTPUT" '/page-from-git/'
-assert_push_summary_contains "$PUSH_OUTPUT" '/sample-page/'
+assert_push_summary_contains "$PUSH_OUTPUT" '/renamed-sample-page/'
 
 CREATED_POST_CONTENT="$(curl -sS -f -H "Authorization: Basic $AUTH_HEADER" "$BASE_URL/wp-json/wp/v2/posts?slug=created-from-git&context=edit" | php -r '
 $posts = json_decode(stream_get_contents(STDIN), true);
@@ -523,7 +557,7 @@ git pull --rebase origin trunk
 php -r '
 $path = $argv[1];
 $markdown = "---\n"
-	. "id: \"1\"\n"
+	. "id: \"0\"\n"
 	. "status: \"publish\"\n"
 	. "title: \"Rejected ID Front Matter\"\n"
 	. "---\n\n"
@@ -536,7 +570,7 @@ if PUSH_OUTPUT="$(git push origin trunk 2>&1)"; then
 	echo "Expected id front matter push to fail." >&2
 	exit 1
 fi
-assert_push_summary_contains "$PUSH_OUTPUT" 'Push rejected because Markdown front matter must not include an id.'
+assert_push_summary_contains "$PUSH_OUTPUT" 'Push rejected because Markdown front matter id must be a positive integer.'
 git reset --hard HEAD~1 >/dev/null
 
 php -r '
