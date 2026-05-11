@@ -66,21 +66,21 @@ class WP_Origin_Seeder {
 	/**
 	 * Resolve budget knobs through filters. The defaults are the
 	 * production values; tests and unusual hosts can shrink them via
-	 * `wp_origin_seed_batch_size`,
-	 * `wp_origin_seed_time_budget_seconds`, and
-	 * `wp_origin_seed_tick_reschedule_seconds` to force the seeder to
+	 * `wporigin_seed_batch_size`,
+	 * `wporigin_seed_time_budget_seconds`, and
+	 * `wporigin_seed_tick_reschedule_seconds` to force the seeder to
 	 * span multiple cron ticks.
 	 */
 	private static function batch_size() {
-		return (int) apply_filters( 'wp_origin_seed_batch_size', self::BATCH_SIZE );
+		return (int) apply_filters( 'wporigin_seed_batch_size', self::BATCH_SIZE );
 	}
 
 	private static function time_budget_seconds() {
-		return (float) apply_filters( 'wp_origin_seed_time_budget_seconds', self::TIME_BUDGET_SECONDS );
+		return (float) apply_filters( 'wporigin_seed_time_budget_seconds', self::TIME_BUDGET_SECONDS );
 	}
 
 	private static function tick_reschedule_seconds() {
-		return (int) apply_filters( 'wp_origin_seed_tick_reschedule_seconds', self::TICK_RESCHEDULE_SECONDS );
+		return (int) apply_filters( 'wporigin_seed_tick_reschedule_seconds', self::TICK_RESCHEDULE_SECONDS );
 	}
 
 	public static function on_activation() {

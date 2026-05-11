@@ -4,56 +4,70 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-$wp_origin_toolkit = __DIR__ . '/php-toolkit';
+function wporigin_load_core_html_api() {
+	if ( class_exists( 'WP_HTML_Tag_Processor' ) && class_exists( 'WP_HTML_Processor' ) ) {
+		return;
+	}
 
-if ( ! class_exists( 'Composer\\Autoload\\ClassLoader' ) ) {
-	require_once $wp_origin_toolkit . '/vendor/composer/ClassLoader.php';
+	if ( ! defined( 'WPINC' ) ) {
+		return;
+	}
+
+	$wporigin_html_api_dir   = ABSPATH . WPINC . '/html-api/';
+	$wporigin_html_api_files = array(
+		'class-wp-html-span.php',
+		'class-wp-html-text-replacement.php',
+		'class-wp-html-attribute-token.php',
+		'class-wp-html-token.php',
+		'class-wp-html-decoder.php',
+		'class-wp-token-map.php',
+		'class-wp-html-tag-processor.php',
+		'class-wp-html-processor-state.php',
+		'class-wp-html-stack-event.php',
+		'class-wp-html-open-elements.php',
+		'class-wp-html-active-formatting-elements.php',
+		'class-wp-html-doctype-info.php',
+		'class-wp-html-unsupported-exception.php',
+		'class-wp-html-processor.php',
+	);
+
+	foreach ( $wporigin_html_api_files as $wporigin_html_api_file ) {
+		$wporigin_html_api_path = $wporigin_html_api_dir . $wporigin_html_api_file;
+		if ( is_file( $wporigin_html_api_path ) ) {
+			require_once $wporigin_html_api_path;
+		}
+	}
 }
 
-$wp_origin_loader = new Composer\Autoload\ClassLoader();
+function wporigin_load_toolkit_bundle() {
+	$wporigin_toolkit = __DIR__ . '/php-toolkit';
 
-$wp_origin_classmap        = require $wp_origin_toolkit . '/vendor/composer/autoload_classmap.php';
-$wp_origin_psr_log_path    = $wp_origin_toolkit . '/components/DataLiberation/vendor-patched/psr/log/src/';
-$wp_origin_psr_log_classes = array(
-	'Psr\\Log\\AbstractLogger'          => 'AbstractLogger.php',
-	'Psr\\Log\\InvalidArgumentException' => 'InvalidArgumentException.php',
-	'Psr\\Log\\LoggerAwareInterface'    => 'LoggerAwareInterface.php',
-	'Psr\\Log\\LoggerAwareTrait'        => 'LoggerAwareTrait.php',
-	'Psr\\Log\\LoggerInterface'         => 'LoggerInterface.php',
-	'Psr\\Log\\LoggerTrait'             => 'LoggerTrait.php',
-	'Psr\\Log\\LogLevel'                => 'LogLevel.php',
-	'Psr\\Log\\NullLogger'              => 'NullLogger.php',
-);
-foreach ( $wp_origin_psr_log_classes as $wp_origin_psr_log_class => $wp_origin_psr_log_file ) {
-	$wp_origin_classmap[ $wp_origin_psr_log_class ] = $wp_origin_psr_log_path . $wp_origin_psr_log_file;
+	wporigin_load_core_html_api();
+
+	if ( ! class_exists( 'Composer\\Autoload\\ClassLoader' ) ) {
+		require_once $wporigin_toolkit . '/vendor/composer/ClassLoader.php';
+	}
+
+	$wporigin_loader   = new Composer\Autoload\ClassLoader();
+	$wporigin_classmap = require $wporigin_toolkit . '/vendor/composer/autoload_classmap.php';
+	$wporigin_loader->addClassMap( $wporigin_classmap );
+
+	$wporigin_psr4 = require $wporigin_toolkit . '/vendor/composer/autoload_psr4.php';
+	foreach ( $wporigin_psr4 as $wporigin_prefix => $wporigin_paths ) {
+		$wporigin_loader->setPsr4( $wporigin_prefix, $wporigin_paths );
+	}
+
+	$wporigin_namespaces = require $wporigin_toolkit . '/vendor/composer/autoload_namespaces.php';
+	foreach ( $wporigin_namespaces as $wporigin_prefix => $wporigin_paths ) {
+		$wporigin_loader->set( $wporigin_prefix, $wporigin_paths );
+	}
+
+	$wporigin_loader->register( true );
+
+	$wporigin_files = require $wporigin_toolkit . '/vendor/composer/autoload_files.php';
+	foreach ( $wporigin_files as $wporigin_file ) {
+		require_once $wporigin_file;
+	}
 }
 
-$wp_origin_loader->addClassMap( $wp_origin_classmap );
-
-$wp_origin_psr4 = require $wp_origin_toolkit . '/vendor/composer/autoload_psr4.php';
-foreach ( $wp_origin_psr4 as $prefix => $paths ) {
-	$wp_origin_loader->setPsr4( $prefix, $paths );
-}
-
-$wp_origin_namespaces = require $wp_origin_toolkit . '/vendor/composer/autoload_namespaces.php';
-foreach ( $wp_origin_namespaces as $prefix => $paths ) {
-	$wp_origin_loader->set( $prefix, $paths );
-}
-
-$wp_origin_loader->register( true );
-
-$wp_origin_files = array(
-	$wp_origin_toolkit . '/components/DataLiberation/URL/functions.php',
-	$wp_origin_toolkit . '/components/Encoding/utf8.php',
-	$wp_origin_toolkit . '/components/Encoding/compat-utf8.php',
-	$wp_origin_toolkit . '/components/Encoding/utf8-encoder.php',
-	$wp_origin_toolkit . '/components/Filesystem/functions.php',
-	$wp_origin_toolkit . '/components/Zip/functions.php',
-	$wp_origin_toolkit . '/components/Polyfill/mbstring.php',
-	$wp_origin_toolkit . '/components/Polyfill/php-functions.php',
-	$wp_origin_toolkit . '/components/Git/functions.php',
-);
-
-foreach ( $wp_origin_files as $wp_origin_file ) {
-	require_once $wp_origin_file;
-}
+wporigin_load_toolkit_bundle();
