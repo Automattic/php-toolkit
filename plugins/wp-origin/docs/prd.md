@@ -58,7 +58,7 @@ partial writes, lossy conversion, ambiguous identity, or silent normalization.
 - Do not mirror the full media library. Media import/export remains future work.
 - Do not support arbitrary custom post types until each content mapping is
   explicit and tested.
-- Do not rely on front matter IDs, slugs, or post types for identity.
+- Do not rely on front matter slugs or post types for identity.
 - Do not provide reset/delete semantics for template and Global Styles files
   until the product behavior is explicit.
 - Do not require Composer packages or PHP extensions beyond this repository's
@@ -138,13 +138,14 @@ Posts and pages are Markdown files with a small YAML-style front matter block.
 Supported front matter fields are:
 
 - `title`
+- `id`
 - `date`
 - `status`
 - `description`
 
-Unsupported front matter is rejected. This includes `id`, `slug`, `type`,
-unknown keys, arrays, booleans, and null values. Machine identity stays out of
-Markdown so that users and agents do not accidentally edit hidden routing data.
+Unsupported front matter is rejected. This includes `slug`, `type`, unknown
+keys, arrays, booleans, and null values. The optional `id` field preserves
+WordPress identity across file renames.
 
 `date_gmt` and `modified_gmt` are not exported. WordPress remains responsible
 for canonical timestamps and revisions.
@@ -167,9 +168,11 @@ future date is rejected.
 
 ### 6.3 Identity And Page Hierarchy
 
-Post identity comes from `post/{slug}.md`.
+Post identity comes from front matter `id` when present, otherwise from
+`post/{slug}.md`.
 
-Page identity comes from the page path:
+Page identity comes from front matter `id` when present, otherwise from the
+page path:
 
 - `page/about.md` maps to the top-level `about` page.
 - `page/company/about.md` maps to the child page `about` under parent `company`.

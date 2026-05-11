@@ -159,6 +159,7 @@ This repository is a Git checkout of a WordPress site exposed by WP Origin. Word
 - `git pull` refreshes the checkout from the current WordPress site.
 - `git push` applies supported Markdown changes back to WordPress.
 - Pushed post and page changes create WordPress revisions.
+- Post and page front matter may include `id` so a file rename updates the same WordPress object.
 - Deleted post or page files are trashed in WordPress rather than permanently deleted.
 - If WordPress changed after your last pull, the push is rejected. Pull, review the diff, and then push again.
 
@@ -1107,6 +1108,7 @@ SKILL;
 		}
 
 		$metadata = array(
+			'id'     => array( (string) $post->ID ),
 			'title'  => array( $post->post_title ),
 			'date'   => array( self::format_post_date_for_frontmatter( $post ) ),
 			'status' => array( self::frontmatter_status_from_post_status( $post->post_status ) ),
@@ -1398,6 +1400,9 @@ SKILL;
 			);
 			$post_id = $planned['post_id'];
 			if ( $post_id ) {
+				if ( isset( $updated_post_ids[ $post_id ] ) ) {
+					throw new Exception( 'Push rejected because multiple Markdown files reference the same WordPress post ID.' );
+				}
 				$updated_post_ids[ $post_id ] = true;
 			}
 			$upsert_plans[] = array(
@@ -1636,10 +1641,10 @@ SKILL;
 			$metadata[ $key ] = is_array( $value ) ? reset( $value ) : $value;
 		}
 
-		self::reject_identity_frontmatter( $metadata );
+		self::reject_path_identity_frontmatter( $metadata );
 		$metadata       = self::normalize_supported_frontmatter(
 			$metadata,
-			array( 'title', 'date', 'status', 'description' )
+			array( 'id', 'title', 'date', 'status', 'description' )
 		);
 		$post_id        = self::find_post_id_by_path_metadata( $path, $metadata );
 		$existing_post  = $post_id ? get_post( $post_id ) : null;
@@ -2007,7 +2012,7 @@ SKILL;
 			$metadata       = $skill_document['metadata'];
 			$markdown       = $skill_document['content'];
 			self::assert_block_markup_is_safe( $markdown );
-			self::reject_identity_frontmatter( $metadata );
+			self::reject_path_identity_frontmatter( $metadata );
 			$metadata = self::normalize_supported_frontmatter(
 				$metadata,
 				array( 'name', 'description' )
@@ -2274,10 +2279,7 @@ SKILL;
 		return isset( $statuses[ $key ] ) ? $statuses[ $key ] : $post_status;
 	}
 
-	private static function reject_identity_frontmatter( $metadata ) {
-		if ( isset( $metadata['id'] ) ) {
-			throw new Exception( 'Push rejected because Markdown front matter must not include an id. The file path is the content identity.' );
-		}
+	private static function reject_path_identity_frontmatter( $metadata ) {
 		if ( isset( $metadata['slug'] ) ) {
 			throw new Exception( 'Push rejected because Markdown front matter must not include a slug. Rename the file path only when creating distinct content.' );
 		}
@@ -2347,10 +2349,16 @@ SKILL;
 			);
 		}
 		if ( 'page' === $post_type ) {
+			if ( isset( $metadata['id'] ) ) {
+				return self::find_post_id_by_frontmatter_id( $path, $metadata, $include_trash );
+			}
+
 			return self::find_page_id_by_path( $path, $include_trash );
 		}
 
-		unset( $metadata );
+		if ( isset( $metadata['id'] ) ) {
+			return self::find_post_id_by_frontmatter_id( $path, $metadata, $include_trash );
+		}
 
 		$slug     = self::path_to_slug( $path );
 		$statuses = $include_trash
@@ -2392,6 +2400,44 @@ SKILL;
 		}
 
 		return intval( $posts[0] );
+	}
+
+	private static function find_post_id_by_frontmatter_id( $path, $metadata, $include_trash ) {
+		$post_type = self::path_to_post_type( $path );
+		$id        = self::normalize_frontmatter_post_id( $metadata['id'] );
+		$post      = get_post( $id );
+
+		if ( ! $post ) {
+			throw new Exception( 'Push rejected because Markdown front matter id does not reference an existing WordPress post.' );
+		}
+		if ( $post_type !== $post->post_type ) {
+			throw new Exception( 'Push rejected because Markdown front matter id references a different WordPress post type.' );
+		}
+
+		$statuses = $include_trash
+			? array_merge( self::$supported_post_statuses, array( 'trash' ) )
+			: self::$supported_post_statuses;
+		if ( ! in_array( $post->post_status, $statuses, true ) ) {
+			throw new Exception( 'Push rejected because Markdown front matter id references a non-exported WordPress post.' );
+		}
+
+		$path_metadata = $metadata;
+		unset( $path_metadata['id'] );
+		$path_post_id = self::find_post_id_by_path_metadata( $path, $path_metadata, $include_trash );
+		if ( $path_post_id && $path_post_id !== $id ) {
+			throw new Exception( 'Push rejected because Markdown front matter id conflicts with the WordPress post already mapped to this file path.' );
+		}
+
+		return $id;
+	}
+
+	private static function normalize_frontmatter_post_id( $id ) {
+		$id = trim( (string) $id );
+		if ( ! preg_match( '/^[1-9][0-9]*$/', $id ) ) {
+			throw new Exception( 'Push rejected because Markdown front matter id must be a positive integer.' );
+		}
+
+		return intval( $id );
 	}
 
 	private static function find_page_id_by_path( $path, $include_trash = true ) {
