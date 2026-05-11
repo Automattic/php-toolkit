@@ -13,6 +13,60 @@ cd $PROJECT_DIR
 rm -rf $DIST_DIR
 mkdir -p $DIST_DIR
 
+copy_php_toolkit_library_bundle() {
+	local target_dir=$1
+	local toolkit_components=(
+		BlockParser
+		ByteStream
+		DataLiberation
+		Encoding
+		Filesystem
+		Git
+		HTML
+		HttpClient
+		HttpServer
+		Markdown
+		Polyfill
+		XML
+		Zip
+	)
+
+	mkdir -p "$target_dir/components" "$target_dir/vendor"
+	for component in "${toolkit_components[@]}"; do
+		rsync -a \
+			--exclude='*.dist' \
+			--exclude='*.json' \
+			--exclude='*.lock' \
+			--exclude='*.md' \
+			--exclude='*.neon' \
+			--exclude='*.properties' \
+			--exclude='*.sh' \
+			--exclude='*.xml' \
+			--exclude='*.yaml' \
+			--exclude='*.yml' \
+			--exclude='Makefile' \
+			--exclude='plugin.php' \
+			--exclude='rector.php' \
+			--exclude='bin/' \
+			--exclude='examples/' \
+			--exclude='test/' \
+			--exclude='test_old/' \
+			--exclude='tests/' \
+			--exclude='Tests/' \
+			--exclude='Test/' \
+			--exclude='vendor-bin/' \
+			--exclude='vendor-patched/autoload.php' \
+			--exclude='vendor-patched/composer/' \
+			"$PROJECT_DIR/components/$component/" \
+			"$target_dir/components/$component/"
+	done
+	mkdir -p "$target_dir/vendor/composer"
+	cp "$PROJECT_DIR/vendor/composer/ClassLoader.php" "$target_dir/vendor/composer/"
+	cp "$PROJECT_DIR/vendor/composer/autoload_classmap.php" "$target_dir/vendor/composer/"
+	cp "$PROJECT_DIR/vendor/composer/autoload_namespaces.php" "$target_dir/vendor/composer/"
+	cp "$PROJECT_DIR/vendor/composer/autoload_psr4.php" "$target_dir/vendor/composer/"
+}
+
 cp -r $PROJECT_DIR/plugins/data-liberation $DIST_DIR
 cp $PROJECT_DIR/dist/php-toolkit.phar $DIST_DIR/data-liberation/php-toolkit.phar
 cd $DIST_DIR
@@ -38,8 +92,8 @@ cd $PROJECT_DIR
 rm -rf $DIST_DIR/url-updater
 
 mkdir -p $DIST_DIR/wp-origin
-cp -r $PROJECT_DIR/plugins/wp-origin/!(Tests|docker-demo|docs|blueprint-e2e.json|wp-origin-dev-bootstrap.php) $DIST_DIR/wp-origin
-cp $PROJECT_DIR/dist/php-toolkit.phar $DIST_DIR/wp-origin/php-toolkit.phar
+cp -r $PROJECT_DIR/plugins/wp-origin/!(Tests|docker-demo|docs|blueprint-e2e.json|wp-origin-dev-bootstrap.php|wp-origin-phar-bootstrap.php) $DIST_DIR/wp-origin
+copy_php_toolkit_library_bundle "$DIST_DIR/wp-origin/php-toolkit"
 cd $DIST_DIR
 zip -r wp-origin.zip wp-origin/
 cd $PROJECT_DIR
