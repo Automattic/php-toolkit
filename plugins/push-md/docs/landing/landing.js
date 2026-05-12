@@ -1,20 +1,19 @@
 (function () {
-	var transcript = document.querySelector( '.terminal-transcript' );
-	if ( transcript ) {
+	var source = document.querySelector( '.markdown-source' );
+	if ( source ) {
 		var prefersReducedMotion = window.matchMedia &&
 			window.matchMedia( '(prefers-reduced-motion: reduce)' ).matches;
-		var lines                = transcript.querySelectorAll( '.line' );
+		var lines                = source.querySelectorAll( '.md-line' );
 
 		if ( ! prefersReducedMotion && lines.length ) {
-			transcript.classList.add( 'is-enhanced' );
+			source.classList.add( 'is-enhanced' );
 			lines.forEach(
 				function ( line, index ) {
 					window.setTimeout(
 						function () {
 							line.classList.add( 'is-visible' );
-							transcript.scrollTop = transcript.scrollHeight;
 						},
-						Math.min( index * 95, 1800 )
+						Math.min( index * 80, 1200 )
 					);
 				}
 			);
@@ -32,11 +31,11 @@
 						return;
 					}
 
-						copyText( target.textContent ).then( onCopied );
-
-					function onCopied() {
-						markCopied( button );
-					}
+					copyText( target.textContent ).then(
+						function () {
+							markCopied( button );
+						}
+					);
 				}
 			);
 		}

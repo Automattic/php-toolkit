@@ -24,11 +24,11 @@
 		<a class="button button-primary" href="#install">Install plugin</a>
 	</header>
 
-	<main id="main">
+	<main id="main" class="markdown-document">
 		<section class="hero" id="top" aria-labelledby="hero-title">
-			<div class="hero-text">
-				<p class="eyebrow">WordPress-native Git for coding agents</p>
-				<h1 id="hero-title">Let coding agents work in Git. Keep WordPress in charge.</h1>
+			<div class="hero-copy">
+				<p class="file-label">page/push-md.md</p>
+				<h1 id="hero-title"><span class="md-token">#</span> Let coding agents work in Git. Keep WordPress in charge.</h1>
 				<p class="hero-subhead">
 					Push MD turns WordPress into a Git remote for supported content, so agents and
 					Markdown-first teams can clone, diff, commit, and push while WordPress remains
@@ -40,74 +40,72 @@
 				</div>
 			</div>
 
-			<div class="hero-visual" aria-label="Terminal showing a Push MD agent workflow">
-				<div class="terminal-window">
-					<div class="terminal-bar">
-						<div class="window-dots" aria-hidden="true">
-							<span></span>
-							<span></span>
-							<span></span>
-						</div>
-						<span>agent-workspace:~/my-site</span>
+			<div class="markdown-workbench" aria-label="Markdown editor and rendered Push MD preview">
+				<div class="editor-card">
+					<div class="editor-topline">
+						<span>page/home.md</span>
 						<span>trunk</span>
 					</div>
-					<pre class="terminal-transcript" aria-label="Push MD terminal transcript"><code><span class="line command">$ git clone https://example.com/wp-json/git/v1/md.git my-site</span>
-<span class="line output">Cloning into 'my-site'...</span>
-<span class="line success">remote: WordPress exported posts, pages, templates, styles, and skills</span>
-<span class="line command">$ cd my-site && tree -L 2</span>
-<span class="line output">.</span>
-<span class="line output">|-- AGENTS.md -> wp_guideline/skills/push-md/SKILL.md</span>
-<span class="line output">|-- page/home.md</span>
-<span class="line output">|-- post/launch-notes.md</span>
-<span class="line output">|-- wp_template_part/theme/footer.html</span>
-<span class="line command">$ codex "Update the homepage CTA and keep WordPress in charge"</span>
-<span class="line success">agent: edited page/home.md using Push MD guidance</span>
-<span class="line command">$ git diff -- page/home.md</span>
-<span class="line diff">- Build faster with another sync pipeline.</span>
-<span class="line diff">+ Let agents work in Git while WordPress stays authoritative.</span>
-<span class="line command">$ git commit -am "Update homepage CTA"</span>
-<span class="line output">[trunk 4f31a8c] Update homepage CTA</span>
-<span class="line command">$ git push origin trunk</span>
-<span class="line success">remote: checked WordPress permissions</span>
-<span class="line success">remote: stale pushes are rejected before writing</span>
-<span class="line success">remote: created WordPress revision</span>
-<span class="line success">remote: applied 1 content change through WordPress</span></code></pre>
+					<pre class="markdown-source" aria-label="Markdown source"><code><span class="md-line md-heading"># Let coding agents work in Git</span>
+<span class="md-line">WordPress stays authoritative while agents edit files.</span>
+<span class="md-line"></span>
+<span class="md-line md-heading">## Why this works</span>
+<span class="md-line">- WordPress is the Git remote.</span>
+<span class="md-line">- Existing roles decide who can read or push.</span>
+<span class="md-line">- Accepted pushes create WordPress revisions.</span>
+<span class="md-line">- WP-Admin edits become visible on pull.</span>
+<span class="md-line"></span>
+<span class="md-line md-heading">## Agent run</span>
+<span class="md-line md-code">git clone https://example.com/wp-json/git/v1/md.git my-site</span>
+<span class="md-line md-code">codex "Update the homepage CTA"</span>
+<span class="md-line md-code">git push origin trunk</span></code></pre>
 				</div>
 
-				<div class="source-badge" aria-label="Source of truth status">
-					<span class="source-badge-label">Source of truth</span>
-					<strong>WordPress</strong>
-					<span>REST auth, roles, revisions, and content APIs</span>
-				</div>
+				<article class="preview-card">
+					<p class="preview-kicker">Rendered by WordPress</p>
+					<h2>Let coding agents work in Git</h2>
+					<p>WordPress stays authoritative while agents edit files.</p>
+					<h3>Why this works</h3>
+					<ul>
+						<li>WordPress is the Git remote.</li>
+						<li>Roles decide who can read or push.</li>
+						<li>Accepted pushes create revisions.</li>
+					</ul>
+					<div class="remote-output">
+						<span>remote: checked WordPress permissions</span>
+						<span>remote: stale pushes are rejected before writing</span>
+						<span>remote: created WordPress revision</span>
+					</div>
+				</article>
 			</div>
 		</section>
 
 		<section class="authority-strip" id="permissions" aria-label="Why WordPress stays authoritative">
 			<article>
-				<span class="proof-kicker">No sync layer</span>
+				<p class="section-path">## no-sync-layer</p>
 				<h2>WordPress is the remote.</h2>
 				<p>Agents and editors clone directly from <code>/wp-json/git/v1/md.git</code> instead of pushing through another canonical repository.</p>
 			</article>
 			<article>
-				<span class="proof-kicker">No new users</span>
+				<p class="section-path">## no-new-users</p>
 				<h2>Use WordPress roles.</h2>
 				<p>Git over HTTPS uses WordPress authentication, including Application Passwords, and respects existing capabilities.</p>
 			</article>
 			<article>
-				<span class="proof-kicker">Revision-backed</span>
+				<p class="section-path">## revision-backed</p>
 				<h2>Pushes create revisions.</h2>
 				<p>Accepted content changes go through WordPress APIs, so publishing behavior, permissions, and revisions remain intact.</p>
 			</article>
 			<article>
-				<span class="proof-kicker">Admin-safe</span>
+				<p class="section-path">## admin-safe</p>
 				<h2>Pull admin edits first.</h2>
 				<p>WP-Admin edits become Git-visible on pull, and stale pushes are rejected before WordPress content is changed.</p>
 			</article>
 		</section>
 
-		<section class="workflow-section" id="how-it-works" aria-labelledby="workflow-title">
+		<section class="doc-section workflow-section" id="how-it-works" aria-labelledby="workflow-title">
 			<div class="section-copy">
-				<p class="eyebrow">One authority, many workers</p>
+				<p class="section-path"># how-it-works</p>
 				<h2 id="workflow-title">Use WordPress as the sync engine between agents.</h2>
 				<p>
 					Push MD gives every authenticated worker the same Git-shaped view of supported
@@ -115,33 +113,21 @@
 					WordPress, so there is no second source of truth drifting out of date.
 				</p>
 			</div>
-			<div class="flow-map" aria-label="WordPress coordinates agents and editors">
-				<div class="flow-node worker agent-a">
-					<span>Agent A</span>
-					<code>git pull</code>
-				</div>
-				<div class="flow-node worker agent-b">
-					<span>Agent B</span>
-					<code>git push</code>
-				</div>
-				<div class="flow-node worker editor">
-					<span>Local editor</span>
-					<code>Markdown</code>
-				</div>
-				<div class="flow-node worker admin">
-					<span>WP-Admin</span>
-					<code>revisions</code>
-				</div>
-				<div class="flow-node core">
-					<span>WordPress</span>
-					<strong>Git remote + permissions + revisions</strong>
+			<div class="flow-note" aria-label="WordPress coordinates agents and editors">
+				<pre><code>Agent A     -- git pull  --&gt; WordPress
+Agent B     -- git push  --&gt; WordPress
+Local editor -- Markdown --&gt; WordPress
+WP-Admin    -- revisions --&gt; WordPress</code></pre>
+				<div class="flow-core">
+					<strong>WordPress</strong>
+					<span>Git remote + permissions + revisions</span>
 				</div>
 			</div>
 		</section>
 
-		<section class="skills-section" id="agent-skills" aria-labelledby="skills-title">
+		<section class="doc-section skills-section" id="agent-skills" aria-labelledby="skills-title">
 			<div class="section-copy">
-				<p class="eyebrow">Portable guidance</p>
+				<p class="section-path"># agent-skills</p>
 				<h2 id="skills-title">The same WordPress guidance can travel with the checkout.</h2>
 				<p>
 					Push MD can export agent guidance through WordPress content guidelines. The
@@ -150,23 +136,16 @@
 					operations.
 				</p>
 			</div>
-			<div class="skills-grid">
-				<article class="skill-card">
-					<span class="skill-label">WordPress</span>
-					<h3>Content guidelines</h3>
-					<p>Site-specific editing rules live with WordPress content and stay visible to teams using WP-Admin.</p>
-				</article>
-				<article class="skill-card highlight">
-					<span class="skill-label">Push MD checkout</span>
-					<h3><code>AGENTS.md</code> and <code>SKILL.md</code></h3>
-					<p>Generated guidance lands beside Markdown, templates, and Global Styles so coding agents inherit the same rules.</p>
-				</article>
+			<div class="markdown-callout">
+				<p class="section-path">> portable skill files</p>
+				<h3><code>AGENTS.md</code> and <code>SKILL.md</code></h3>
+				<p>Generated guidance lands beside Markdown, templates, and Global Styles so coding agents inherit the same site rules.</p>
 			</div>
 		</section>
 
-		<section class="markdown-section" aria-labelledby="markdown-title">
+		<section class="doc-section markdown-section" aria-labelledby="markdown-title">
 			<div class="section-copy">
-				<p class="eyebrow">For Markdown and SSG people</p>
+				<p class="section-path"># markdown-and-ssg-workflows</p>
 				<h2 id="markdown-title">Use local-file workflows without replacing WordPress.</h2>
 				<p>
 					If you like Astro, Jekyll, or a Markdown vault, Push MD gives you a familiar
@@ -174,29 +153,33 @@
 					rendering, and the front end.
 				</p>
 			</div>
-			<div class="file-matrix" aria-label="Supported checkout file types">
-				<div>
+			<div class="markdown-table" aria-label="Supported checkout file types">
+				<div class="table-row table-head">
+					<span>Path</span>
+					<span>What it edits</span>
+				</div>
+				<div class="table-row">
 					<code>post/*.md</code>
 					<span>Posts as Markdown</span>
 				</div>
-				<div>
+				<div class="table-row">
 					<code>page/**/*.md</code>
 					<span>Pages and hierarchy</span>
 				</div>
-				<div>
+				<div class="table-row">
 					<code>wp_template_part/**/*.html</code>
 					<span>Raw Gutenberg block files</span>
 				</div>
-				<div>
+				<div class="table-row">
 					<code>wp_global_styles/*.json</code>
 					<span>Editable Global Styles overlays</span>
 				</div>
 			</div>
 		</section>
 
-		<section class="install-section" id="install" aria-labelledby="install-title">
-			<div class="install-copy">
-				<p class="eyebrow">Install and clone</p>
+		<section class="doc-section install-section" id="install" aria-labelledby="install-title">
+			<div class="section-copy">
+				<p class="section-path"># install-and-clone</p>
 				<h2 id="install-title">Start with the tools every agent already understands.</h2>
 				<p>
 					Install Push MD, authenticate with a WordPress Application Password, then clone
@@ -209,7 +192,7 @@
 					<li>Create or use a WordPress Application Password.</li>
 					<li>Clone the WordPress Git remote and work on <code>trunk</code>.</li>
 				</ol>
-				<div class="command-copy">
+				<div class="code-block">
 					<code id="clone-command">git clone https://example.com/wp-json/git/v1/md.git my-site</code>
 					<button class="copy-button" type="button" data-copy-target="clone-command">Copy</button>
 				</div>
