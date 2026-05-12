@@ -397,15 +397,20 @@ pre {
 
 .doc-section {
 	display: grid;
-	grid-template-columns: minmax(0, 0.82fr) minmax(0, 1.18fr);
-	gap: clamp(28px, 5vw, 76px);
-	align-items: center;
+	grid-template-columns: minmax(0, 1fr);
+	justify-items: start;
+	gap: 28px;
+	align-items: start;
 	padding: 78px 0;
 	border-top: 1px solid rgba(222, 214, 199, 0.7);
 }
 
+.doc-section > :not(.section-copy) {
+	width: min(100%, 980px);
+}
+
 .section-copy h2 {
-	max-width: 660px;
+	max-width: 920px;
 	font-family: var(--serif);
 	font-size: clamp(34px, 4.2vw, 58px);
 	line-height: 1.08;
@@ -413,7 +418,7 @@ pre {
 }
 
 .section-copy p {
-	max-width: 590px;
+	max-width: 720px;
 	margin: 18px 0 0;
 	font-size: 17px;
 }
