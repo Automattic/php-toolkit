@@ -16,7 +16,7 @@
 			<span>Push MD</span>
 		</a>
 		<nav class="site-nav" aria-label="Main navigation">
-			<a href="#how-it-works">How it works</a>
+			<a href="#how-it-works">Use cases</a>
 			<a href="#permissions">Permissions</a>
 			<a href="#agent-skills">Agent skills</a>
 			<a href="../README.md">Docs</a>
@@ -99,74 +99,64 @@
 			</article>
 		</section>
 
-		<section class="doc-section workflow-section" id="how-it-works" aria-labelledby="workflow-title">
+		<section class="doc-section use-cases-section" id="how-it-works" aria-labelledby="use-cases-title">
 			<div class="section-copy">
-				<h2 id="workflow-title"><span class="md-token">##</span> WordPress coordinates the work.</h2>
+				<h2 id="use-cases-title"><span class="md-token">##</span> Use cases</h2>
 				<p>
-					Push MD gives every authenticated worker the same Git-shaped view of supported
-					content. Coding agents, local editors, and WP-Admin all coordinate through
-					WordPress, so there is no second source of truth drifting out of date.
+					Push MD is for teams that want Git-shaped work without moving the source of
+					truth out of WordPress. Use it for agent runs, local Markdown edits, and
+					static-site-style publishing flows that still need WordPress roles and revisions.
 				</p>
 			</div>
-			<div class="flow-note" aria-label="WordPress coordinates agents and editors">
-				<pre><code>Agent A      -- git pull  --&gt; WordPress
-Agent B      -- git push  --&gt; WordPress
-Local editor -- Markdown  --&gt; WordPress
-WP-Admin     -- revisions --&gt; WordPress</code></pre>
-				<div class="flow-core">
-					<strong>WordPress</strong>
-					<span>Git remote + permissions + revisions</span>
-				</div>
-			</div>
-		</section>
 
-		<section class="doc-section skills-section" id="agent-skills" aria-labelledby="skills-title">
-			<div class="section-copy">
-				<h2 id="skills-title"><span class="md-token">##</span> Portable agent skills.</h2>
-				<p>
-					Push MD can export agent guidance through WordPress content guidelines. The
-					instructions your WordPress agent uses can appear in the coding-agent checkout,
-					so edits carry the same expectations about blocks, paths, permissions, and safe
-					operations.
-				</p>
-			</div>
-			<div class="markdown-callout">
-				<p class="callout-label">portable skill files</p>
-				<h3><code>AGENTS.md</code> and <code>SKILL.md</code></h3>
-				<p>Generated guidance lands beside Markdown, templates, and Global Styles so coding agents inherit the same site rules.</p>
-			</div>
-		</section>
+			<div class="use-case-list">
+				<article class="use-case-card" id="agent-skills">
+					<p class="callout-label">### coding agents</p>
+					<h3>Agents complete WordPress work through Git.</h3>
+					<p>
+						Give agents a normal checkout instead of a separate sync repo. WordPress
+						coordinates each run through authentication, stale-state checks, and revisions.
+					</p>
+					<ul class="task-list">
+						<li><code>[x]</code> Clone supported content from WordPress.</li>
+						<li><code>[x]</code> Edit Markdown, block templates, and styles locally.</li>
+						<li><code>[x]</code> Carry site guidance in <code>AGENTS.md</code> and <code>SKILL.md</code>.</li>
+						<li><code>[x]</code> Push only after WordPress accepts the change.</li>
+					</ul>
+				</article>
 
-		<section class="doc-section markdown-section" aria-labelledby="markdown-title">
-			<div class="section-copy">
-				<h2 id="markdown-title"><span class="md-token">##</span> Markdown edits, WordPress publishing.</h2>
-				<p>
-					If you like Astro, Jekyll, or a Markdown vault, Push MD gives you a familiar
-					file tree while WordPress keeps handling previews, publishing, permissions,
-					rendering, and the front end.
-				</p>
-			</div>
-			<div class="markdown-table" aria-label="Supported checkout file types">
-				<div class="table-row table-head">
-					<span>Path</span>
-					<span>What WordPress does</span>
-				</div>
-				<div class="table-row">
-					<code>post/*.md</code>
-					<span>Turns Markdown into posts and revisions</span>
-				</div>
-				<div class="table-row">
-					<code>page/**/*.md</code>
-					<span>Preserves page hierarchy and identity</span>
-				</div>
-				<div class="table-row">
-					<code>wp_template_part/**/*.html</code>
-					<span>Keeps block markup Site Editor friendly</span>
-				</div>
-				<div class="table-row">
-					<code>wp_global_styles/*.json</code>
-					<span>Applies editable Global Styles overlays</span>
-				</div>
+				<article class="use-case-card">
+					<p class="callout-label">### static site generators</p>
+					<h3>Work like a static site generator. Publish like WordPress.</h3>
+					<p>
+						If you like Astro, Jekyll, or a Markdown vault, use a local file tree while
+						WordPress keeps handling previews, roles, rendering, publishing, and revisions.
+					</p>
+					<ul class="task-list">
+						<li><code>[x]</code> Write posts and pages as Markdown.</li>
+						<li><code>[x]</code> Keep template parts as block HTML.</li>
+						<li><code>[x]</code> Version Global Styles as JSON.</li>
+						<li><code>[x]</code> Pull WP-Admin edits before the next local run.</li>
+					</ul>
+					<div class="file-map" aria-label="Static-site style file map">
+						<div>
+							<code>post/*.md</code>
+							<span>posts and revisions</span>
+						</div>
+						<div>
+							<code>page/**/*.md</code>
+							<span>pages and hierarchy</span>
+						</div>
+						<div>
+							<code>wp_template_part/**/*.html</code>
+							<span>Site Editor block markup</span>
+						</div>
+						<div>
+							<code>wp_global_styles/*.json</code>
+							<span>Global Styles overlays</span>
+						</div>
+					</div>
+				</article>
 			</div>
 		</section>
 
