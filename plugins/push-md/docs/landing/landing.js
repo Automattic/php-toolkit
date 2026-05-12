@@ -1,25 +1,4 @@
 (function () {
-	var source = document.querySelector( '.markdown-source' );
-	if ( source ) {
-		var prefersReducedMotion = window.matchMedia &&
-			window.matchMedia( '(prefers-reduced-motion: reduce)' ).matches;
-		var lines                = source.querySelectorAll( '.md-line' );
-
-		if ( ! prefersReducedMotion && lines.length ) {
-			source.classList.add( 'is-enhanced' );
-			lines.forEach(
-				function ( line, index ) {
-					window.setTimeout(
-						function () {
-							line.classList.add( 'is-visible' );
-						},
-						Math.min( index * 80, 1200 )
-					);
-				}
-			);
-		}
-	}
-
 	var copyButtons = document.querySelectorAll( '[data-copy-target]' );
 	copyButtons.forEach(
 		function ( button ) {
