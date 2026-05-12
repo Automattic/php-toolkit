@@ -183,11 +183,12 @@ pre {
 }
 
 .hero h1 {
-	max-width: 680px;
+	max-width: 720px;
 	font-family: var(--serif);
 	font-size: clamp(44px, 4.9vw, 68px);
 	font-weight: 700;
-	line-height: 0.96;
+	line-height: 1.08;
+	text-wrap: balance;
 }
 
 .md-token {
@@ -196,6 +197,13 @@ pre {
 	font-size: 0.72em;
 	font-weight: 760;
 	vertical-align: 0.08em;
+}
+
+.hero h1 .md-token {
+	display: inline-block;
+	margin-right: 0.08em;
+	font-size: 0.86em;
+	vertical-align: 0.02em;
 }
 
 .section-copy .md-token,
@@ -357,7 +365,7 @@ pre {
 
 .authority-strip h2 {
 	font-size: 19px;
-	line-height: 1.2;
+	line-height: 1.28;
 }
 
 .authority-strip p:last-child,
@@ -400,7 +408,8 @@ pre {
 	max-width: 660px;
 	font-family: var(--serif);
 	font-size: clamp(34px, 4.2vw, 58px);
-	line-height: 1.02;
+	line-height: 1.08;
+	text-wrap: balance;
 }
 
 .section-copy p {
@@ -632,7 +641,7 @@ pre {
 
 	.hero h1 {
 		font-size: 40px;
-		line-height: 1.02;
+		line-height: 1.1;
 	}
 
 	.hero-subhead,
