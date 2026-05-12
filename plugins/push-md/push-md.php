@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Push MD
  * Description: Edit WordPress content with Git, Markdown and block files, reviewable diffs, and safe pushes.
- * Version: 0.5.0
+ * Version: 0.6.0
  * Requires at least: 6.9
  * Requires PHP: 7.2
  * Author: Automattic
