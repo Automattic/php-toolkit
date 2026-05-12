@@ -406,7 +406,7 @@ pre {
 }
 
 .doc-section > :not(.section-copy) {
-	width: min(100%, 980px);
+	width: 100%;
 }
 
 .section-copy h2 {
