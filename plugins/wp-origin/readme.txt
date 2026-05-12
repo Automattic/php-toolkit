@@ -1,14 +1,14 @@
 === WP Origin ===
-Contributors: zieladam, artpi
+Contributors: zieladam, artpi, automattic
 Tags: git, markdown, content, workflow
 Requires at least: 6.9
 Tested up to: 6.9
 Requires PHP: 7.2
-Stable tag: 0.1.0
+Stable tag: 0.5.0
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-Use Git to read, review, and edit WordPress content as Markdown and block files.
+Edit WordPress content with Git, Markdown and block files, reviewable diffs, and safe pushes.
 
 == Description ==
 
@@ -121,8 +121,20 @@ No. The checkout is scoped to supported WordPress content. Theme-provided files 
 
 No. Media mirroring is planned future work. The current release does not mirror uploads or import attachment binaries.
 
+= Does WP Origin send site content to another service? =
+
+No. WP Origin does not send content to GitHub, Automattic, WordPress.org, or any other third-party service. It exposes a Git endpoint on the WordPress site where the plugin is installed, and authenticated users connect directly to that site's REST API.
+
+Because WP Origin represents supported WordPress content as Git history, authorized clones can include posts, pages, templates, navigation posts, Global Styles, Guidelines, and their prior Git revisions. Private, draft, pending, and future content may appear in the Git repository when the authenticated user is allowed to read the full export. Treat clone URLs, Application Passwords, and local clones as sensitive site access.
+
+= What happens when I uninstall WP Origin? =
+
+Uninstalling WP Origin removes its Git object-store database tables, seed progress options, transient import lock, and scheduled seed task. It does not delete WordPress posts, pages, templates, navigation posts, Global Styles, Guidelines, or other WordPress content.
+
+The removed tables contain WP Origin's derived Git repository history. Reinstalling WP Origin can seed a new repository from the current WordPress content, but it cannot restore the previous WP Origin Git history unless you kept a clone or database backup.
+
 == Changelog ==
 
-= 0.1.0 =
+= 0.5.0 =
 
 Initial release.

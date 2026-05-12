@@ -1,11 +1,12 @@
 <?php
 /**
  * Plugin Name: WP Origin
- * Description: Expose WordPress posts and pages as a Git remote backed by Markdown files.
- * Version: 0.1.0
+ * Description: Edit WordPress content with Git, Markdown and block files, reviewable diffs, and safe pushes.
+ * Version: 0.5.0
  * Requires at least: 6.9
  * Requires PHP: 7.2
- * Author: WordPress Contributors
+ * Author: Automattic
+ * Author URI: https://automattic.com/
  * License: GPL-2.0-or-later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
  * Text Domain: wp-origin
@@ -15,12 +16,14 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-if ( file_exists( __DIR__ . '/php-toolkit.phar' ) ) {
+if ( file_exists( __DIR__ . '/php-toolkit/vendor/composer/ClassLoader.php' ) ) {
+	require_once __DIR__ . '/wp-origin-toolkit-bootstrap.php';
+} elseif ( file_exists( __DIR__ . '/php-toolkit.phar' ) ) {
 	require_once __DIR__ . '/wp-origin-phar-bootstrap.php';
 } elseif ( file_exists( __DIR__ . '/wp-origin-dev-bootstrap.php' ) ) {
 	require_once __DIR__ . '/wp-origin-dev-bootstrap.php';
 } else {
-	wp_die( esc_html__( 'WP Origin is missing its bundled php-toolkit.phar dependency.', 'wp-origin' ) );
+	wp_die( esc_html__( 'WP Origin is missing its bundled PHP Toolkit dependency.', 'wp-origin' ) );
 }
 
 require_once __DIR__ . '/functions.php';

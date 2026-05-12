@@ -324,7 +324,11 @@ SKILL;
 				return $response->to_rest_response();
 			}
 
-			$git_path     = self::build_git_path( $request );
+			$git_path = self::build_git_path( $request );
+			if ( is_wp_error( $git_path ) ) {
+				return $git_path;
+			}
+
 			$request_body = file_get_contents( 'php://input' );
 			$repository   = self::open_repository();
 			try {
@@ -469,10 +473,31 @@ SKILL;
 
 		$query_params = $request->get_query_params();
 		if ( '/info/refs' === $path && isset( $query_params['service'] ) ) {
-			$path .= '?service=' . $query_params['service'];
+			$service = self::normalize_git_service( $query_params['service'] );
+			if ( '' === $service ) {
+				return new WP_Error(
+					'wp_origin_invalid_git_service',
+					'Unsupported Git service requested.',
+					array( 'status' => 400 )
+				);
+			}
+
+			$path .= '?service=' . $service;
 		}
 
 		return $path;
+	}
+
+	private static function normalize_git_service( $service ) {
+		if ( ! is_string( $service ) ) {
+			return '';
+		}
+
+		if ( 'git-upload-pack' === $service || 'git-receive-pack' === $service ) {
+			return $service;
+		}
+
+		return '';
 	}
 
 	private static function git_service_from_request( $git_path, WP_REST_Request $request ) {
@@ -2733,7 +2758,7 @@ SKILL;
 		$segments = explode( '/', $slug_path );
 		foreach ( $segments as $segment ) {
 			if ( '' === $segment || sanitize_title( $segment ) !== $segment ) {
-				throw new Exception( $message );
+				throw new Exception( esc_html( $message ) );
 			}
 		}
 	}

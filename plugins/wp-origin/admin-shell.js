@@ -1,4 +1,15 @@
 (function () {
+	var i18n              = window.wp && window.wp.i18n ? window.wp.i18n : {};
+	var __                = i18n.__ || function ( text ) {
+		return text;
+	};
+	var sprintf           = i18n.sprintf || function () {
+		var text = arguments[0];
+		for (var i = 1; i < arguments.length; i++) {
+			text = text.replace( /%(\d+\$)?[sd]/, arguments[i] );
+		}
+		return text;
+	};
 	var config            = window.wpOriginAdminShell || {};
 	var nonce             = config.nonce || '';
 	var statusUrl         = config.statusUrl || '';
@@ -39,13 +50,18 @@
 		statePillEl.classList.toggle( 'is-failed', progress.state === 'failed' );
 		barEl.style.width     = progress.percent + '%';
 		percentEl.textContent = progress.percent;
-		countsEl.textContent  = progress.processed + ' / ' + progress.total;
+		countsEl.textContent  = sprintf(
+			/* translators: 1: Imported item count, 2: Total item count. */
+			__( '%1$d / %2$d', 'wp-origin' ),
+			progress.processed,
+			progress.total
+		);
 		messageEl.textContent = progress.message;
 		renderCommits( progress.commits || [] );
 		if (previousState !== 'done' && progress.state === 'done' && ! hasAnnouncedReady) {
 			hasAnnouncedReady = true;
-			appendLine( 'remote: Initial import complete. The checkout is ready.', 'is-success' );
-			appendLine( 'Try: ls, git pull, git commit -m "Update content", git push', 'is-muted' );
+			appendLine( __( 'remote: Initial import complete. The checkout is ready.', 'wp-origin' ), 'is-success' );
+			appendLine( __( 'Try: ls, git pull, git commit -m "Update content", git push', 'wp-origin' ), 'is-muted' );
 		}
 	}
 
@@ -87,7 +103,7 @@
 		commitListEl.textContent = '';
 		if ( ! commits.length) {
 			var emptyItem         = document.createElement( 'li' );
-			emptyItem.textContent = 'No commits yet';
+			emptyItem.textContent = __( 'No commits yet', 'wp-origin' );
 			commitListEl.appendChild( emptyItem );
 			return;
 		}
@@ -117,7 +133,15 @@
 	}
 
 	function appendPrompt(command) {
-		appendLine( 'emulator:' + displayCwd() + '$ ' + command, 'is-accent' );
+		appendLine(
+			sprintf(
+				/* translators: 1: Current working directory, 2: Emulated shell command. */
+				__( 'emulator:%1$s$ %2$s', 'wp-origin' ),
+				displayCwd(),
+				command
+			),
+			'is-accent'
+		);
 	}
 
 	function displayCwd() {
@@ -126,32 +150,55 @@
 
 	function updatePrompt() {
 		cwdEl.textContent   = displayCwd();
-		titleEl.textContent = 'emulator:' + displayCwd();
+		titleEl.textContent = sprintf(
+			/* translators: %s: Current working directory. */
+			__( 'emulator:%s', 'wp-origin' ),
+			displayCwd()
+		);
 	}
 
 	function bootTranscript() {
 		outputEl.textContent = '';
-		appendLine( 'WP Origin command emulator', 'is-success' );
-		appendLine( 'This preview mirrors commands you can run in your real terminal after cloning.', 'is-muted' );
-		appendLine( 'No server shell is opened here, and emulator commands do not change WordPress.', 'is-muted' );
+		appendLine( __( 'WP Origin command emulator', 'wp-origin' ), 'is-success' );
+		appendLine( __( 'This preview mirrors commands you can run in your real terminal after cloning.', 'wp-origin' ), 'is-muted' );
+		appendLine( __( 'No server shell is opened here, and emulator commands do not change WordPress.', 'wp-origin' ), 'is-muted' );
 		appendLine( '' );
 		appendPrompt( cloneCommand );
-		appendLine( "Cloning into '" + checkoutDir + "'..." );
+		appendLine(
+			sprintf(
+				/* translators: %s: Checkout directory name. */
+				__( "Cloning into '%s'...", 'wp-origin' ),
+				checkoutDir
+			)
+		);
 		if (progress.state === 'done') {
-			appendLine( 'remote: Initial import complete.', 'is-success' );
+			appendLine( __( 'remote: Initial import complete.', 'wp-origin' ), 'is-success' );
 		} else {
-			appendLine( 'remote: Preparing WordPress content (' + progress.percent + '%)...', 'is-warning' );
+			appendLine(
+				sprintf(
+					/* translators: %d: Import progress percentage. */
+					__( 'remote: Preparing WordPress content (%d%%)...', 'wp-origin' ),
+					progress.percent
+				),
+				'is-warning'
+			);
 		}
-		appendLine( 'Receiving objects: ' + Math.max( 1, checkout.files.length ) + ' checkout entries' );
+		appendLine(
+			sprintf(
+				/* translators: %d: Number of checkout entries. */
+				__( 'Receiving objects: %d checkout entries', 'wp-origin' ),
+				Math.max( 1, checkout.files.length )
+			)
+		);
 		appendPrompt( 'cd ' + checkoutDir );
 		cwd = '/';
 		updatePrompt();
 		runCommand( 'git status', { silentHistory: true } );
 		if (checkout.files.length) {
 			runCommand( 'ls', { silentHistory: true } );
-			appendLine( 'Try: git pull, git commit -m "Update content", git push', 'is-muted' );
+			appendLine( __( 'Try: git pull, git commit -m "Update content", git push', 'wp-origin' ), 'is-muted' );
 		} else {
-			appendLine( 'The emulated file tree will appear here as soon as the first commit is staged.', 'is-muted' );
+			appendLine( __( 'The emulated file tree will appear here as soon as the first commit is staged.', 'wp-origin' ), 'is-muted' );
 		}
 	}
 
@@ -188,26 +235,33 @@
 		} else if (base === 'git') {
 			printGit( parts.slice( 1 ) );
 		} else {
-			appendLine( base + ': command not found. Try `help`.', 'is-error' );
+			appendLine(
+				sprintf(
+					/* translators: %s: Emulated shell command. */
+					__( '%s: command not found. Try `help`.', 'wp-origin' ),
+					base
+				),
+				'is-error'
+			);
 		}
 	}
 
 	function printHelp() {
-		appendLine( 'Emulated commands:', 'is-success' );
-		appendLine( '  ls [-l] [path]        list checkout files' );
-		appendLine( '  cd [path]             change directory' );
-		appendLine( '  pwd                   print current directory' );
-		appendLine( '  cat <file>            show a preview of a file' );
-		appendLine( '  tree [path]           show the checkout shape' );
-		appendLine( '  git status            show import and branch state' );
-		appendLine( '  git log --oneline     show recent WP Origin commits' );
-		appendLine( '  git remote -v         show the WordPress remote' );
-		appendLine( '  git pull              preview refreshing from WordPress' );
-		appendLine( '  git add <path>        preview staging a change' );
-		appendLine( '  git commit -m "..."   preview a local content commit' );
-		appendLine( '  git push              preview sending changes back' );
-		appendLine( '  clear                 clear the terminal' );
-		appendLine( 'Use the copy table below for the real terminal URL and clone command.', 'is-muted' );
+		appendLine( __( 'Emulated commands:', 'wp-origin' ), 'is-success' );
+		appendLine( __( '  ls [-l] [path]        list checkout files', 'wp-origin' ) );
+		appendLine( __( '  cd [path]             change directory', 'wp-origin' ) );
+		appendLine( __( '  pwd                   print current directory', 'wp-origin' ) );
+		appendLine( __( '  cat <file>            show a preview of a file', 'wp-origin' ) );
+		appendLine( __( '  tree [path]           show the checkout shape', 'wp-origin' ) );
+		appendLine( __( '  git status            show import and branch state', 'wp-origin' ) );
+		appendLine( __( '  git log --oneline     show recent WP Origin commits', 'wp-origin' ) );
+		appendLine( __( '  git remote -v         show the WordPress remote', 'wp-origin' ) );
+		appendLine( __( '  git pull              preview refreshing from WordPress', 'wp-origin' ) );
+		appendLine( __( '  git add <path>        preview staging a change', 'wp-origin' ) );
+		appendLine( __( '  git commit -m "..."   preview a local content commit', 'wp-origin' ) );
+		appendLine( __( '  git push              preview sending changes back', 'wp-origin' ) );
+		appendLine( __( '  clear                 clear the terminal', 'wp-origin' ) );
+		appendLine( __( 'Use the copy table below for the real terminal URL and clone command.', 'wp-origin' ), 'is-muted' );
 	}
 
 	function printLs(args) {
@@ -239,7 +293,14 @@
 			return;
 		}
 		if ( ! isDirectory( targetPath )) {
-			appendLine( 'ls: ' + target + ': No such file or directory', 'is-error' );
+			appendLine(
+				sprintf(
+					/* translators: %s: File path. */
+					__( 'ls: %s: No such file or directory', 'wp-origin' ),
+					target
+				),
+				'is-error'
+			);
 			return;
 		}
 
@@ -249,7 +310,7 @@
 	function printDirectoryEntries(targetPath, longForm) {
 		var entries = directoryEntries( targetPath );
 		if ( ! entries.length) {
-			appendLine( '(empty)', 'is-muted' );
+			appendLine( __( '(empty)', 'wp-origin' ), 'is-muted' );
 			return;
 		}
 		if (longForm) {
@@ -268,7 +329,14 @@
 			);
 		}
 		if (checkout.truncated) {
-			appendLine( 'Preview is limited to the first ' + checkout.path_count + ' paths.', 'is-muted' );
+			appendLine(
+				sprintf(
+					/* translators: %d: Total number of previewed paths. */
+					__( 'Preview is limited to the first %d paths.', 'wp-origin' ),
+					checkout.path_count
+				),
+				'is-muted'
+			);
 		}
 	}
 
@@ -296,7 +364,14 @@
 
 		var next = normalizePath( path );
 		if ( ! isDirectory( next )) {
-			appendLine( 'cd: ' + path + ': No such directory', 'is-error' );
+			appendLine(
+				sprintf(
+					/* translators: %s: Directory path. */
+					__( 'cd: %s: No such directory', 'wp-origin' ),
+					path
+				),
+				'is-error'
+			);
 			return;
 		}
 		cwd = next;
@@ -305,7 +380,7 @@
 
 	function printCat(path) {
 		if ( ! path) {
-			appendLine( 'cat: missing file operand', 'is-error' );
+			appendLine( __( 'cat: missing file operand', 'wp-origin' ), 'is-error' );
 			return;
 		}
 		var targetPath = normalizePath( path );
@@ -316,16 +391,30 @@
 			file = findFile( resolvePathForLookup( targetPath ) );
 		}
 		if ( ! file) {
-			appendLine( 'cat: ' + path + ': No such file', 'is-error' );
+			appendLine(
+				sprintf(
+					/* translators: %s: File path. */
+					__( 'cat: %s: No such file', 'wp-origin' ),
+					path
+				),
+				'is-error'
+			);
 			return;
 		}
 		if (file.type === 'symlink') {
-			appendLine( file.content || '(symlink target unavailable)' );
+			appendLine( file.content || __( '(symlink target unavailable)', 'wp-origin' ) );
 			return;
 		}
 		if (file.content === undefined) {
-			appendLine( 'Preview content for this file is not loaded in the shell.', 'is-warning' );
-			appendLine( 'Try: cat ' + sampleCatPath(), 'is-muted' );
+			appendLine( __( 'Preview content for this file is not loaded in the shell.', 'wp-origin' ), 'is-warning' );
+			appendLine(
+				sprintf(
+					/* translators: %s: Suggested file path. */
+					__( 'Try: cat %s', 'wp-origin' ),
+					sampleCatPath()
+				),
+				'is-muted'
+			);
 			return;
 		}
 		String( file.content ).split( /\r\n|\n|\r/ ).forEach(
@@ -338,13 +427,20 @@
 	function printTree(path) {
 		var root = normalizePath( path );
 		if ( ! isDirectory( root )) {
-			appendLine( 'tree: ' + path + ': No such directory', 'is-error' );
+			appendLine(
+				sprintf(
+					/* translators: %s: Directory path. */
+					__( 'tree: %s: No such directory', 'wp-origin' ),
+					path
+				),
+				'is-error'
+			);
 			return;
 		}
 		appendLine( root === '/' ? '.' : root.replace( /^\//, '' ) );
 		printTreeChildren( root, '', 0 );
 		if (checkout.truncated) {
-			appendLine( 'Preview is limited; clone or pull for the full tree.', 'is-muted' );
+			appendLine( __( 'Preview is limited; clone or pull for the full tree.', 'wp-origin' ), 'is-muted' );
 		}
 	}
 
@@ -367,51 +463,114 @@
 	function printGit(args) {
 		var subcommand = args[0] || '';
 		if (subcommand === 'status') {
-			appendLine( 'On branch trunk' );
+			appendLine( __( 'On branch trunk', 'wp-origin' ) );
 			if (progress.state === 'done') {
-				appendLine( 'Your branch is up to date with origin/trunk.', 'is-success' );
-				appendLine( 'nothing to commit, working tree clean' );
+				appendLine( __( 'Your branch is up to date with origin/trunk.', 'wp-origin' ), 'is-success' );
+				appendLine( __( 'nothing to commit, working tree clean', 'wp-origin' ) );
 			} else if (progress.state === 'failed') {
-				appendLine( 'remote: import failed: ' + progress.message, 'is-error' );
+				appendLine(
+					sprintf(
+						/* translators: %s: Import failure message. */
+						__( 'remote: import failed: %s', 'wp-origin' ),
+						progress.message
+					),
+					'is-error'
+				);
 			} else {
-				appendLine( 'remote: preparing repository (' + progress.percent + '%)', 'is-warning' );
-				appendLine( progress.processed + ' / ' + progress.total + ' content items imported' );
+				appendLine(
+					sprintf(
+						/* translators: %d: Import progress percentage. */
+						__( 'remote: preparing repository (%d%%)', 'wp-origin' ),
+						progress.percent
+					),
+					'is-warning'
+				);
+				appendLine(
+					sprintf(
+						/* translators: 1: Imported item count, 2: Total item count. */
+						__( '%1$d / %2$d content items imported', 'wp-origin' ),
+						progress.processed,
+						progress.total
+					)
+				);
 			}
 		} else if (subcommand === 'log') {
 			printGitLog();
 		} else if (subcommand === 'remote') {
-			appendLine( 'origin  ' + remoteUrl + ' (fetch)' );
-			appendLine( 'origin  ' + remoteUrl + ' (push)' );
+			appendLine(
+				sprintf(
+					/* translators: %s: Git remote URL. */
+					__( 'origin  %s (fetch)', 'wp-origin' ),
+					remoteUrl
+				)
+			);
+			appendLine(
+				sprintf(
+					/* translators: %s: Git remote URL. */
+					__( 'origin  %s (push)', 'wp-origin' ),
+					remoteUrl
+				)
+			);
 		} else if (subcommand === 'branch') {
-			appendLine( '* trunk' );
+			appendLine( __( '* trunk', 'wp-origin' ) );
 		} else if (subcommand === 'pull') {
 			if (progress.state === 'done') {
-				appendLine( 'From ' + remoteUrl );
-				appendLine( ' * branch            trunk      -> FETCH_HEAD' );
-				appendLine( 'Already up to date.', 'is-success' );
-				appendLine( 'In your real terminal, `git pull` refreshes this checkout from WordPress.', 'is-muted' );
+				appendLine(
+					sprintf(
+						/* translators: %s: Git remote URL. */
+						__( 'From %s', 'wp-origin' ),
+						remoteUrl
+					)
+				);
+				appendLine( __( ' * branch            trunk      -> FETCH_HEAD', 'wp-origin' ) );
+				appendLine( __( 'Already up to date.', 'wp-origin' ), 'is-success' );
+				appendLine( __( 'In your real terminal, `git pull` refreshes this checkout from WordPress.', 'wp-origin' ), 'is-muted' );
 			} else {
-				appendLine( 'Repository is still preparing. Try again shortly.', 'is-warning' );
+				appendLine( __( 'Repository is still preparing. Try again shortly.', 'wp-origin' ), 'is-warning' );
 			}
 		} else if (subcommand === 'add') {
-			appendLine( 'Staged in emulator only: ' + (args.slice( 1 ).join( ' ' ) || '.') );
-			appendLine( 'In your real terminal, `git add` stages file edits before committing.', 'is-muted' );
+			appendLine(
+				sprintf(
+					/* translators: %s: Path staged in the emulator. */
+					__( 'Staged in emulator only: %s', 'wp-origin' ),
+					args.slice( 1 ).join( ' ' ) || '.'
+				)
+			);
+			appendLine( __( 'In your real terminal, `git add` stages file edits before committing.', 'wp-origin' ), 'is-muted' );
 		} else if (subcommand === 'commit') {
 			printGitCommit( args.slice( 1 ) );
 		} else if (subcommand === 'push') {
 			printGitPush();
 		} else if (subcommand === 'clone') {
-			appendLine( "Cloning into '" + (args[2] || checkoutDir) + "'..." );
-			appendLine( 'remote: WP Origin at ' + remoteUrl );
-			appendLine( 'Receiving objects: ' + Math.max( 1, checkout.files.length ) );
+			appendLine(
+				sprintf(
+					/* translators: %s: Checkout directory name. */
+					__( "Cloning into '%s'...", 'wp-origin' ),
+					args[2] || checkoutDir
+				)
+			);
+			appendLine(
+				sprintf(
+					/* translators: %s: Git remote URL. */
+					__( 'remote: WP Origin at %s', 'wp-origin' ),
+					remoteUrl
+				)
+			);
+			appendLine(
+				sprintf(
+					/* translators: %d: Number of received objects. */
+					__( 'Receiving objects: %d', 'wp-origin' ),
+					Math.max( 1, checkout.files.length )
+				)
+			);
 		} else if (subcommand === 'checkout' && args[1] === 'trunk') {
-			appendLine( 'Already on trunk' );
+			appendLine( __( 'Already on trunk', 'wp-origin' ) );
 		} else if (subcommand === 'show' && args[1] && args[1].indexOf( 'HEAD:' ) === 0) {
 			printCat( args[1].replace( /^HEAD:/, '' ) );
 		} else if (subcommand === 'diff') {
-			appendLine( '(no local changes)', 'is-muted' );
+			appendLine( __( '(no local changes)', 'wp-origin' ), 'is-muted' );
 		} else {
-			appendLine( 'git: supported here: status, log, remote, branch, pull, add, commit, push, clone, checkout, show, diff', 'is-muted' );
+			appendLine( __( 'git: supported here: status, log, remote, branch, pull, add, commit, push, clone, checkout, show, diff', 'wp-origin' ), 'is-muted' );
 		}
 	}
 
@@ -424,28 +583,34 @@
 			}
 		}
 
-		appendLine( '[trunk emulated] ' + message );
-		appendLine( ' 1 file changed, 4 insertions(+), 1 deletion(-)' );
-		appendLine( 'This emulator does not create commits. In your real terminal, `git commit` records local file edits before `git push` sends them to WordPress.', 'is-muted' );
+		appendLine(
+			sprintf(
+				/* translators: %s: Commit message. */
+				__( '[trunk emulated] %s', 'wp-origin' ),
+				message
+			)
+		);
+		appendLine( __( ' 1 file changed, 4 insertions(+), 1 deletion(-)', 'wp-origin' ) );
+		appendLine( __( 'This emulator does not create commits. In your real terminal, `git commit` records local file edits before `git push` sends them to WordPress.', 'wp-origin' ), 'is-muted' );
 	}
 
 	function printGitPush() {
 		if (progress.state !== 'done') {
-			appendLine( 'remote: WP Origin is still preparing the repository.', 'is-warning' );
-			appendLine( 'Real pushes are accepted after the import reaches 100%.', 'is-muted' );
+			appendLine( __( 'remote: WP Origin is still preparing the repository.', 'wp-origin' ), 'is-warning' );
+			appendLine( __( 'Real pushes are accepted after the import reaches 100%.', 'wp-origin' ), 'is-muted' );
 			return;
 		}
 
-		appendLine( 'Enumerating objects: 5, done.' );
-		appendLine( 'Writing objects: 100% (3/3), 412 bytes | 412.00 KiB/s, done.' );
-		appendLine( 'remote: WP Origin would validate the pushed files, check permissions, and apply supported changes through WordPress.', 'is-success' );
-		appendLine( 'To actually push changes, clone the URL below, edit files locally, then run `git push origin trunk` in your real terminal.', 'is-muted' );
+		appendLine( __( 'Enumerating objects: 5, done.', 'wp-origin' ) );
+		appendLine( __( 'Writing objects: 100% (3/3), 412 bytes | 412.00 KiB/s, done.', 'wp-origin' ) );
+		appendLine( __( 'remote: WP Origin would validate the pushed files, check permissions, and apply supported changes through WordPress.', 'wp-origin' ), 'is-success' );
+		appendLine( __( 'To actually push changes, clone the URL below, edit files locally, then run `git push origin trunk` in your real terminal.', 'wp-origin' ), 'is-muted' );
 	}
 
 	function printGitLog() {
 		var commits = progress.commits || [];
 		if ( ! commits.length) {
-			appendLine( 'No commits yet. Import is still warming up.', 'is-warning' );
+			appendLine( __( 'No commits yet. Import is still warming up.', 'wp-origin' ), 'is-warning' );
 			return;
 		}
 		commits.forEach(
@@ -611,7 +776,7 @@
 		function () {
 			appendLine( '' );
 			appendPrompt( 'wp-origin seed retry' );
-			appendLine( 'Resetting the repository import...', 'is-warning' );
+			appendLine( __( 'Resetting the repository import...', 'wp-origin' ), 'is-warning' );
 			fetch(
 				retryUrl,
 				{
@@ -631,7 +796,7 @@
 	function copyText(value, button) {
 		function markCopied() {
 			var originalText   = button.textContent;
-			button.textContent = 'Copied';
+			button.textContent = __( 'Copied', 'wp-origin' );
 			button.classList.add( 'is-copied' );
 			setTimeout(
 				function () {

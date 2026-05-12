@@ -13,7 +13,7 @@ class WP_Origin_Admin {
 	const REST_NAMESPACE = 'wp-origin/v1';
 	const STATUS_ROUTE   = '/seed-status';
 	const RETRY_ROUTE    = '/seed-retry';
-	const ASSET_VERSION  = '0.1.0';
+	const ASSET_VERSION  = '0.5.0';
 
 	public static function bootstrap() {
 		add_action( 'admin_menu', array( __CLASS__, 'register_menu' ) );
@@ -46,10 +46,11 @@ class WP_Origin_Admin {
 		wp_enqueue_script(
 			'wp-origin-admin-shell',
 			plugins_url( 'admin-shell.js', $plugin_file ),
-			array(),
+			array( 'wp-i18n' ),
 			self::ASSET_VERSION,
 			true
 		);
+		wp_set_script_translations( 'wp-origin-admin-shell', 'wp-origin' );
 	}
 
 	public static function register_rest_routes() {
@@ -146,7 +147,10 @@ class WP_Origin_Admin {
 		);
 		$copy_remote_url_label = __( 'Copy remote URL', 'wp-origin' );
 		$copy_clone_label      = __( 'Copy clone command', 'wp-origin' );
+		$copy_branch_label     = __( 'Copy branch', 'wp-origin' );
 		$copy_setup_label      = __( 'Copy setup command', 'wp-origin' );
+		$copy_status_label     = __( 'Copy import status API URL', 'wp-origin' );
+		$copy_button_label     = __( 'Copy', 'wp-origin' );
 		$site_name             = get_bloginfo( 'name' );
 		$host                  = wp_parse_url( home_url(), PHP_URL_HOST );
 		if ( ! is_string( $host ) ) {
@@ -161,13 +165,26 @@ class WP_Origin_Admin {
 			'checkoutDir'     => $site_slug,
 			'initialProgress' => $progress,
 		);
+		wp_add_inline_script(
+			'wp-origin-admin-shell',
+			'window.wpOriginAdminShell = ' . wp_json_encode( $config ) . ';',
+			'before'
+		);
 		?>
 		<div class="wrap wp-origin-shell-page" id="wp-origin-admin">
 			<div class="wp-origin-shell-frame">
 				<div class="wp-origin-shell-header">
 					<div class="wp-origin-shell-title">
-						<h1>WP Origin</h1>
-						<p><?php echo esc_html( $site_name ); ?> as a Git checkout, live from WordPress.</p>
+						<h1><?php esc_html_e( 'WP Origin', 'wp-origin' ); ?></h1>
+						<p>
+							<?php
+							printf(
+								/* translators: %s: Site name. */
+								esc_html__( '%s as a Git checkout, live from WordPress.', 'wp-origin' ),
+								esc_html( $site_name )
+							);
+							?>
+						</p>
 					</div>
 					<div class="wp-origin-state-pill" id="wp-origin-state-pill">
 						<span class="wp-origin-state-dot" aria-hidden="true"></span>
@@ -176,17 +193,26 @@ class WP_Origin_Admin {
 				</div>
 
 				<div class="wp-origin-emulator-note">
-					<strong>Command emulator.</strong> This terminal is a guided preview of commands you can run in your real terminal after cloning WP Origin. It does not execute a server shell or write changes to the site.
+					<strong><?php esc_html_e( 'Command emulator.', 'wp-origin' ); ?></strong>
+					<?php esc_html_e( 'This terminal is a guided preview of commands you can run in your real terminal after cloning WP Origin. It does not execute a server shell or write changes to the site.', 'wp-origin' ); ?>
 				</div>
 
-				<div class="wp-origin-terminal" role="application" aria-label="WP Origin command emulator">
+				<div class="wp-origin-terminal" role="application" aria-label="<?php esc_attr_e( 'WP Origin command emulator', 'wp-origin' ); ?>">
 					<div class="wp-origin-terminal-bar">
 						<div class="wp-origin-terminal-controls" aria-hidden="true">
 							<span class="wp-origin-terminal-dot"></span>
 							<span class="wp-origin-terminal-dot"></span>
 							<span class="wp-origin-terminal-dot"></span>
 						</div>
-						<div id="wp-origin-terminal-title">emulator:~/<?php echo esc_html( $site_slug ); ?></div>
+						<div id="wp-origin-terminal-title">
+							<?php
+							printf(
+								/* translators: %s: Checkout directory name. */
+								esc_html__( 'emulator:~/%s', 'wp-origin' ),
+								esc_html( $site_slug )
+							);
+							?>
+						</div>
 						<div><?php echo esc_html( $host ); ?></div>
 					</div>
 					<div class="wp-origin-terminal-body">
@@ -198,59 +224,62 @@ class WP_Origin_Admin {
 								<span class="wp-origin-prompt-path" id="wp-origin-prompt-cwd">~/<?php echo esc_html( $site_slug ); ?></span>
 								<span class="wp-origin-prompt-mark">$</span>
 							</span>
-							<input class="wp-origin-terminal-input" id="wp-origin-terminal-input" type="text" autocomplete="off" spellcheck="false" placeholder="Type an emulated command" />
+							<input class="wp-origin-terminal-input" id="wp-origin-terminal-input" type="text" autocomplete="off" spellcheck="false" placeholder="<?php esc_attr_e( 'Type an emulated command', 'wp-origin' ); ?>" />
 						</label>
 					</div>
 				</div>
 
 				<div class="wp-origin-panel wp-origin-copy-panel">
-					<h2>Use In Your Terminal</h2>
-					<p>Use this Git remote with your WordPress username. When Git asks for a password, use an Application Password.</p>
+					<h2><?php esc_html_e( 'Use In Your Terminal', 'wp-origin' ); ?></h2>
+					<p><?php esc_html_e( 'Use this Git remote with your WordPress username. When Git asks for a password, use an Application Password.', 'wp-origin' ); ?></p>
 					<p>
-						<a href="<?php echo esc_url( admin_url( 'profile.php#application-passwords-section' ) ); ?>">Create or manage Application Passwords</a>
+						<a href="<?php echo esc_url( admin_url( 'profile.php#application-passwords-section' ) ); ?>"><?php esc_html_e( 'Create or manage Application Passwords', 'wp-origin' ); ?></a>
 					</p>
 					<table class="widefat striped wp-origin-copy-table">
 						<tbody>
 							<tr>
-								<th scope="row">Remote URL</th>
+								<th scope="row"><?php esc_html_e( 'Remote URL', 'wp-origin' ); ?></th>
 								<td><code><?php echo esc_html( $git_url ); ?></code></td>
-								<td><button type="button" class="button wp-origin-copy-button" data-copy-value="<?php echo esc_attr( $git_url ); ?>" aria-label="<?php echo esc_attr( $copy_remote_url_label ); ?>">Copy</button></td>
+								<td><button type="button" class="button wp-origin-copy-button" data-copy-value="<?php echo esc_attr( $git_url ); ?>" aria-label="<?php echo esc_attr( $copy_remote_url_label ); ?>"><?php echo esc_html( $copy_button_label ); ?></button></td>
 							</tr>
 							<tr>
-								<th scope="row">Clone command</th>
+								<th scope="row"><?php esc_html_e( 'Clone command', 'wp-origin' ); ?></th>
 								<td><code><?php echo esc_html( $clone_command ); ?></code></td>
-								<td><button type="button" class="button wp-origin-copy-button" data-copy-value="<?php echo esc_attr( $clone_command ); ?>" aria-label="<?php echo esc_attr( $copy_clone_label ); ?>">Copy</button></td>
+								<td><button type="button" class="button wp-origin-copy-button" data-copy-value="<?php echo esc_attr( $clone_command ); ?>" aria-label="<?php echo esc_attr( $copy_clone_label ); ?>"><?php echo esc_html( $copy_button_label ); ?></button></td>
 							</tr>
 							<tr>
-								<th scope="row">Branch</th>
+								<th scope="row"><?php esc_html_e( 'Branch', 'wp-origin' ); ?></th>
 								<td><code><?php echo esc_html( WP_Origin_Plugin::DEFAULT_BRANCH ); ?></code></td>
-								<td><button type="button" class="button wp-origin-copy-button" data-copy-value="<?php echo esc_attr( WP_Origin_Plugin::DEFAULT_BRANCH ); ?>">Copy</button></td>
+								<td><button type="button" class="button wp-origin-copy-button" data-copy-value="<?php echo esc_attr( WP_Origin_Plugin::DEFAULT_BRANCH ); ?>" aria-label="<?php echo esc_attr( $copy_branch_label ); ?>"><?php echo esc_html( $copy_button_label ); ?></button></td>
 							</tr>
 							<tr>
-								<th scope="row">Connect an existing repo</th>
+								<th scope="row"><?php esc_html_e( 'Connect an existing repo', 'wp-origin' ); ?></th>
 								<td><code><?php echo esc_html( $existing_repo_command ); ?></code></td>
-								<td><button type="button" class="button wp-origin-copy-button" data-copy-value="<?php echo esc_attr( $existing_repo_command ); ?>" aria-label="<?php echo esc_attr( $copy_setup_label ); ?>">Copy</button></td>
+								<td><button type="button" class="button wp-origin-copy-button" data-copy-value="<?php echo esc_attr( $existing_repo_command ); ?>" aria-label="<?php echo esc_attr( $copy_setup_label ); ?>"><?php echo esc_html( $copy_button_label ); ?></button></td>
 							</tr>
 							<tr>
-								<th scope="row">Import status API</th>
+								<th scope="row"><?php esc_html_e( 'Import status API', 'wp-origin' ); ?></th>
 								<td><code><?php echo esc_html( $status_url ); ?></code></td>
-								<td><button type="button" class="button wp-origin-copy-button" data-copy-value="<?php echo esc_attr( $status_url ); ?>">Copy</button></td>
+								<td><button type="button" class="button wp-origin-copy-button" data-copy-value="<?php echo esc_attr( $status_url ); ?>" aria-label="<?php echo esc_attr( $copy_status_label ); ?>"><?php echo esc_html( $copy_button_label ); ?></button></td>
 							</tr>
 						</tbody>
 					</table>
 				</div>
 
 				<div class="wp-origin-panel wp-origin-commit-panel">
-					<h2>Commit History</h2>
+					<h2><?php esc_html_e( 'Commit History', 'wp-origin' ); ?></h2>
 					<ul class="wp-origin-commit-list" id="wp-origin-commit-list"></ul>
 				</div>
 
 				<div class="wp-origin-panel wp-origin-import-panel">
 					<div class="wp-origin-import-header">
-						<h2>Import Status</h2>
+						<h2><?php esc_html_e( 'Import Status', 'wp-origin' ); ?></h2>
 						<div class="wp-origin-retry-row">
-							<span>Seed state: <code id="wp-origin-state-copy"><?php echo esc_html( $progress['state'] ); ?></code></span>
-							<button type="button" class="button" id="wp-origin-retry">Retry import</button>
+							<span>
+								<?php esc_html_e( 'Seed state:', 'wp-origin' ); ?>
+								<code id="wp-origin-state-copy"><?php echo esc_html( $progress['state'] ); ?></code>
+							</span>
+							<button type="button" class="button" id="wp-origin-retry"><?php esc_html_e( 'Retry import', 'wp-origin' ); ?></button>
 						</div>
 					</div>
 					<div class="wp-origin-progress-track">
@@ -258,14 +287,14 @@ class WP_Origin_Admin {
 					</div>
 					<div class="wp-origin-progress-meta">
 						<span><span id="wp-origin-percent"><?php echo intval( $progress['percent'] ); ?></span>%</span>
-						<span><span id="wp-origin-counts"><?php echo intval( $progress['processed'] ); ?> / <?php echo intval( $progress['total'] ); ?></span> items</span>
+						<span>
+							<span id="wp-origin-counts"><?php echo intval( $progress['processed'] ); ?> / <?php echo intval( $progress['total'] ); ?></span>
+							<?php esc_html_e( 'items', 'wp-origin' ); ?>
+						</span>
 					</div>
 					<p class="wp-origin-message" id="wp-origin-message"><?php echo esc_html( $progress['message'] ); ?></p>
 				</div>
 			</div>
-			<script>
-			window.wpOriginAdminShell = <?php echo wp_json_encode( $config ); ?>;
-			</script>
 		</div>
 		<?php
 	}
