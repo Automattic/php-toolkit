@@ -209,8 +209,8 @@ COMMIT
 		$repo->commit(
 			array(
 				'updates' => array(
-					'wp_guideline/skills/wp-origin/SKILL.md'                 => 'WP Origin guide',
-					'wp_guideline/skills/wp-origin-template-editor/SKILL.md' => 'Template editor guide',
+					'wp_guideline/skills/push-md/SKILL.md'                 => 'Push MD guide',
+					'wp_guideline/skills/push-md-template-editor/SKILL.md' => 'Template editor guide',
 				),
 			)
 		);
@@ -219,8 +219,8 @@ COMMIT
 
 		$this->assertSame(
 			array(
-				'wp-origin-template-editor',
-				'wp-origin',
+				'push-md-template-editor',
+				'push-md',
 			),
 			array_keys( $tree->entries )
 		);

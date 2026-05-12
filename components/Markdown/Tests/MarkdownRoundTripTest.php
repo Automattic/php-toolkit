@@ -18,11 +18,11 @@ use WordPress\Markdown\MarkdownProducer;
  *   md -> wp -> md  (Markdown to block markup and back to Markdown)
  *   wp -> md -> wp  (Block markup to Markdown and back to block markup)
  *
- * "md -> wp -> md" is the primary contract for the WP Origin workflow: agents
+ * "md -> wp -> md" is the primary contract for the Push MD workflow: agents
  * edit Markdown locally, push to WordPress, then pull back. The pulled
  * Markdown must match what was pushed, byte for byte.
  *
- * "wp -> md -> wp" tests that a WordPress post exported via WP Origin and then
+ * "wp -> md -> wp" tests that a WordPress post exported via Push MD and then
  * pushed back produces the same block markup. Leading/trailing whitespace
  * inside block comments is normalized away because WordPress itself normalizes
  * it on next save.

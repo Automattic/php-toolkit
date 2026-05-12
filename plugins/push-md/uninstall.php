@@ -1,23 +1,23 @@
 <?php
 /**
- * Uninstall cleanup for WP Origin.
+ * Uninstall cleanup for Push MD.
  *
- * Deletes WP Origin's derived Git repository storage and seeder state.
+ * Deletes Push MD's derived Git repository storage and seeder state.
  * WordPress posts, pages, templates, and other source content remain intact.
  *
- * @package WPOrigin
+ * @package PushMD
  */
 
 if ( ! defined( 'WP_UNINSTALL_PLUGIN' ) ) {
 	exit;
 }
 
-wp_origin_uninstall_cleanup();
+pmd_uninstall_cleanup();
 
 /**
  * Clean up every site in multisite installs, or the current site otherwise.
  */
-function wp_origin_uninstall_cleanup() {
+function pmd_uninstall_cleanup() {
 	if ( is_multisite() && function_exists( 'get_sites' ) && function_exists( 'switch_to_blog' ) && function_exists( 'restore_current_blog' ) ) {
 		$offset = 0;
 		$number = 100;
@@ -33,7 +33,7 @@ function wp_origin_uninstall_cleanup() {
 
 			foreach ( $site_ids as $site_id ) {
 				switch_to_blog( (int) $site_id );
-				wp_origin_uninstall_cleanup_site();
+				pmd_uninstall_cleanup_site();
 				restore_current_blog();
 			}
 
@@ -43,27 +43,27 @@ function wp_origin_uninstall_cleanup() {
 		return;
 	}
 
-	wp_origin_uninstall_cleanup_site();
+	pmd_uninstall_cleanup_site();
 }
 
 /**
- * Clean up WP Origin data for the current site.
+ * Clean up Push MD data for the current site.
  */
-function wp_origin_uninstall_cleanup_site() {
-	delete_option( 'wp_origin_seed_state' );
-	delete_option( 'wp_origin_seed_progress' );
-	delete_transient( 'wp_origin_seed_lock' );
-	wp_clear_scheduled_hook( 'wp_origin_seed_tick' );
-	wp_origin_uninstall_drop_repository_tables();
+function pmd_uninstall_cleanup_site() {
+	delete_option( 'pmd_seed_state' );
+	delete_option( 'pmd_seed_progress' );
+	delete_transient( 'pmd_seed_lock' );
+	wp_clear_scheduled_hook( 'pmd_seed_tick' );
+	pmd_uninstall_drop_repository_tables();
 }
 
 /**
  * Drop the per-site Git object-store tables.
  */
-function wp_origin_uninstall_drop_repository_tables() {
+function pmd_uninstall_drop_repository_tables() {
 	global $wpdb;
 
-	$table_prefix = preg_replace( '/[^A-Za-z0-9_]/', '', $wpdb->prefix . 'wp_origin_' );
+	$table_prefix = preg_replace( '/[^A-Za-z0-9_]/', '', $wpdb->prefix . 'pmd_' );
 	$tables       = array(
 		$table_prefix . 'files',
 		$table_prefix . 'directory_entries',

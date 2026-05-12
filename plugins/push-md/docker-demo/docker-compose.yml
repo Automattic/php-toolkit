@@ -16,7 +16,7 @@ services:
       db:
         condition: service_healthy
     ports:
-      - "${WP_ORIGIN_DEMO_PORT:-8090}:80"
+      - "${PUSH_MD_DEMO_PORT:-8090}:80"
     environment:
       WORDPRESS_DB_HOST: db:3306
       WORDPRESS_DB_USER: root
@@ -42,7 +42,7 @@ services:
       WORDPRESS_DB_USER: root
       WORDPRESS_DB_PASSWORD: root
       WORDPRESS_DB_NAME: wp
-      WP_ORIGIN_DEMO_HOST: ${WP_ORIGIN_DEMO_HOST:-localhost:8090}
+      PUSH_MD_DEMO_HOST: ${PUSH_MD_DEMO_HOST:-localhost:8090}
     volumes:
       - wp:/var/www/html
       - ../../..:/srv/php-toolkit:ro

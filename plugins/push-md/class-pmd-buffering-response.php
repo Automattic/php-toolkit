@@ -6,8 +6,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-class WP_Origin_Buffering_Response implements ResponseWriteStream {
-	const MARKER_HEADER = 'X-WP-Origin-Git-Response';
+class PMD_Buffering_Response implements ResponseWriteStream {
+	const MARKER_HEADER = 'X-Push-MD-Git-Response';
 
 	private $http_code = 200;
 	private $headers   = array();

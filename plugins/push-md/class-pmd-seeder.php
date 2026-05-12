@@ -9,7 +9,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
- * Async, resumable initial-import seeder for WP Origin.
+ * Async, resumable initial-import seeder for Push MD.
  *
  * The plugin's first run on an existing WordPress install needs to
  * convert every supported post and page into a Markdown file and put
@@ -23,7 +23,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  *   pending      → newly activated; a single cron tick is queued.
  *   in_progress  → batches are running. Each tick converts a chunk of
  *                  posts to Markdown, creates a "Seed batch" commit on
- *                  `refs/heads/_wp_origin_seed`, and re-schedules
+ *                  `refs/heads/_pmd_seed`, and re-schedules
  *                  itself when the time/memory budget is up.
  *   finalizing   → all batches done. Keep the parent-less theme base
  *                  commit when one exists, build a single
@@ -40,13 +40,13 @@ if ( ! defined( 'ABSPATH' ) ) {
  *
  * No Action Scheduler dependency — plain WP-Cron only.
  */
-class WP_Origin_Seeder {
+class PMD_Seeder {
 
-	const STATE_OPTION    = 'wp_origin_seed_state';
-	const PROGRESS_OPTION = 'wp_origin_seed_progress';
-	const SEED_BRANCH     = 'refs/heads/_wp_origin_seed';
-	const CRON_HOOK       = 'wp_origin_seed_tick';
-	const LOCK_TRANSIENT  = 'wp_origin_seed_lock';
+	const STATE_OPTION    = 'pmd_seed_state';
+	const PROGRESS_OPTION = 'pmd_seed_progress';
+	const SEED_BRANCH     = 'refs/heads/_pmd_seed';
+	const CRON_HOOK       = 'pmd_seed_tick';
+	const LOCK_TRANSIENT  = 'pmd_seed_lock';
 
 	const STATE_PENDING     = 'pending';
 	const STATE_IN_PROGRESS = 'in_progress';
@@ -66,21 +66,21 @@ class WP_Origin_Seeder {
 	/**
 	 * Resolve budget knobs through filters. The defaults are the
 	 * production values; tests and unusual hosts can shrink them via
-	 * `wporigin_seed_batch_size`,
-	 * `wporigin_seed_time_budget_seconds`, and
-	 * `wporigin_seed_tick_reschedule_seconds` to force the seeder to
+	 * `pmd_seed_batch_size`,
+	 * `pmd_seed_time_budget_seconds`, and
+	 * `pmd_seed_tick_reschedule_seconds` to force the seeder to
 	 * span multiple cron ticks.
 	 */
 	private static function batch_size() {
-		return (int) apply_filters( 'wporigin_seed_batch_size', self::BATCH_SIZE );
+		return (int) apply_filters( 'pmd_seed_batch_size', self::BATCH_SIZE );
 	}
 
 	private static function time_budget_seconds() {
-		return (float) apply_filters( 'wporigin_seed_time_budget_seconds', self::TIME_BUDGET_SECONDS );
+		return (float) apply_filters( 'pmd_seed_time_budget_seconds', self::TIME_BUDGET_SECONDS );
 	}
 
 	private static function tick_reschedule_seconds() {
-		return (int) apply_filters( 'wporigin_seed_tick_reschedule_seconds', self::TICK_RESCHEDULE_SECONDS );
+		return (int) apply_filters( 'pmd_seed_tick_reschedule_seconds', self::TICK_RESCHEDULE_SECONDS );
 	}
 
 	public static function on_activation() {
@@ -94,7 +94,7 @@ class WP_Origin_Seeder {
 		// Without this, re-activating after a partial seed hits PK
 		// collisions on /objects/ paths the moment Git tries to write
 		// a blob it had already started writing last time.
-		WP_Origin_Plugin::drop_repository_tables();
+		PMD_Plugin::drop_repository_tables();
 
 		update_option( self::STATE_OPTION, self::STATE_PENDING, false );
 		update_option(
@@ -120,7 +120,7 @@ class WP_Origin_Seeder {
 		delete_option( self::PROGRESS_OPTION );
 		delete_transient( self::LOCK_TRANSIENT );
 		wp_clear_scheduled_hook( self::CRON_HOOK );
-		WP_Origin_Plugin::drop_repository_tables();
+		PMD_Plugin::drop_repository_tables();
 	}
 
 	public static function get_state() {
@@ -164,12 +164,12 @@ class WP_Origin_Seeder {
 	public static function get_commit_log( $limit = 25 ) {
 		try {
 			global $wpdb;
-			$table = $wpdb->prefix . WP_Origin_Plugin::TABLE_PREFIX . 'files';
+			$table = $wpdb->prefix . PMD_Plugin::TABLE_PREFIX . 'files';
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 			if ( ! $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $table ) ) ) {
 				return array();
 			}
-			$repository = WP_Origin_Plugin::open_repository();
+			$repository = PMD_Plugin::open_repository();
 		} catch ( Throwable $exception ) {
 			return array();
 		}
@@ -231,13 +231,13 @@ class WP_Origin_Seeder {
 
 		try {
 			global $wpdb;
-			$table = $wpdb->prefix . WP_Origin_Plugin::TABLE_PREFIX . 'files';
+			$table = $wpdb->prefix . PMD_Plugin::TABLE_PREFIX . 'files';
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 			if ( ! $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $table ) ) ) {
 				return $preview;
 			}
 
-			$repository = WP_Origin_Plugin::open_repository();
+			$repository = PMD_Plugin::open_repository();
 			$tip        = self::get_preview_tip( $repository );
 			if ( ! $tip ) {
 				return $preview;
@@ -387,8 +387,8 @@ class WP_Origin_Seeder {
 			'.claude/skills',
 			'AGENTS.md',
 			'CLAUDE.md',
-			'wp_guideline/skills/wp-origin/SKILL.md',
-			'wp_guideline/skills/wp-origin-template-editor/SKILL.md',
+			'wp_guideline/skills/push-md/SKILL.md',
+			'wp_guideline/skills/push-md-template-editor/SKILL.md',
 		);
 	}
 
@@ -464,7 +464,7 @@ class WP_Origin_Seeder {
 	}
 
 	private static function add_checkout_preview_default_guidance_files( &$files, $content_length ) {
-		foreach ( WP_Origin_Plugin::get_default_agent_guidance_preview_files() as $path => $entry ) {
+		foreach ( PMD_Plugin::get_default_agent_guidance_preview_files() as $path => $entry ) {
 			if ( self::checkout_preview_has_path( $files, $path ) ) {
 				continue;
 			}
@@ -511,11 +511,11 @@ class WP_Origin_Seeder {
 	public static function not_ready_message() {
 		$progress = self::get_progress( false );
 		if ( self::STATE_FAILED === $progress['state'] ) {
-			return 'WP Origin import failed: ' . $progress['message'];
+			return 'Push MD import failed: ' . $progress['message'];
 		}
 
 		return sprintf(
-			'WP Origin is preparing the repository (%d%%, %d / %d posts). Please try again shortly.',
+			'Push MD is preparing the repository (%d%%, %d / %d posts). Please try again shortly.',
 			$progress['percent'],
 			$progress['processed'],
 			$progress['total']
@@ -576,8 +576,8 @@ class WP_Origin_Seeder {
 	private static function initialize() {
 		global $wpdb;
 
-		$post_types          = WP_Origin_Plugin::get_supported_post_types();
-		$post_statuses       = WP_Origin_Plugin::$supported_post_statuses;
+		$post_types          = PMD_Plugin::get_supported_post_types();
+		$post_statuses       = PMD_Plugin::$supported_post_statuses;
 		$post_type_markers   = implode( ', ', array_fill( 0, count( $post_types ), '%s' ) );
 		$post_status_markers = implode( ', ', array_fill( 0, count( $post_statuses ), '%s' ) );
 		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare,WordPress.DB.DirectDatabaseQuery
@@ -620,7 +620,7 @@ class WP_Origin_Seeder {
 	}
 
 	private static function initialize_theme_base_commit() {
-		$theme_base_files = WP_Origin_Plugin::export_theme_base_content();
+		$theme_base_files = PMD_Plugin::export_theme_base_content();
 		if ( empty( $theme_base_files ) ) {
 			return '';
 		}
@@ -630,19 +630,19 @@ class WP_Origin_Seeder {
 			$updates[ $path ] = $entry['content'];
 		}
 
-		$repository = WP_Origin_Plugin::open_repository();
+		$repository = PMD_Plugin::open_repository();
 		if ( ! $repository->branch_exists( self::SEED_BRANCH ) ) {
 			$repository->set_branch_tip( self::SEED_BRANCH, Commit::NULL_HASH );
 		}
 		$repository->set_branch_tip( 'HEAD', 'ref: ' . self::SEED_BRANCH . "\n" );
 
-		$identity = WP_Origin_Plugin::repository_identity( $repository );
+		$identity = PMD_Plugin::repository_identity( $repository );
 		$now      = gmdate( Commit::DATE_FORMAT );
 		$base_oid = $repository->commit(
 			array(
 				'updates' => $updates,
 				'commit'  => array(
-					'message'        => WP_Origin_Plugin::THEME_BASE_COMMIT_MESSAGE,
+					'message'        => PMD_Plugin::THEME_BASE_COMMIT_MESSAGE,
 					'author'         => $identity,
 					'author_date'    => $now,
 					'committer'      => $identity,
@@ -651,14 +651,14 @@ class WP_Origin_Seeder {
 			)
 		);
 
-		$repository->set_branch_tip( WP_Origin_Plugin::THEME_BASE_REF, $base_oid );
+		$repository->set_branch_tip( PMD_Plugin::THEME_BASE_REF, $base_oid );
 		$repository->set_branch_tip( 'HEAD', "ref: refs/heads/trunk\n" );
 
 		return $base_oid;
 	}
 
 	private static function process_batches() {
-		$repository = WP_Origin_Plugin::open_repository();
+		$repository = PMD_Plugin::open_repository();
 		// Stage seed commits on a side branch so trunk stays empty (and
 		// clones keep being rejected) until finalization. The branch
 		// file must exist before commit() runs, otherwise it falls back
@@ -685,13 +685,13 @@ class WP_Origin_Seeder {
 			$last_id   = $progress['last_id'];
 			$processed = $progress['processed'];
 			foreach ( $batch as $post ) {
-				$path             = WP_Origin_Plugin::build_markdown_path( $post );
-				$updates[ $path ] = WP_Origin_Plugin::export_post_to_markdown( $post );
+				$path             = PMD_Plugin::build_markdown_path( $post );
+				$updates[ $path ] = PMD_Plugin::export_post_to_markdown( $post );
 				$last_id          = $post->ID;
 				++$processed;
 			}
 
-			$identity = WP_Origin_Plugin::repository_identity( $repository );
+			$identity = PMD_Plugin::repository_identity( $repository );
 			$now      = gmdate( Commit::DATE_FORMAT );
 			$repository->commit(
 				array(
@@ -734,14 +734,14 @@ class WP_Origin_Seeder {
 	}
 
 	private static function finalize() {
-		$repository = WP_Origin_Plugin::open_repository();
+		$repository = PMD_Plugin::open_repository();
 		$repository->set_branch_tip( 'HEAD', "ref: refs/heads/trunk\n" );
 
 		$seed_tip = $repository->branch_exists( self::SEED_BRANCH )
 			? $repository->get_branch_tip( self::SEED_BRANCH )
 			: Commit::NULL_HASH;
 		$progress = self::get_progress_storage();
-		$identity = WP_Origin_Plugin::repository_identity( $repository );
+		$identity = PMD_Plugin::repository_identity( $repository );
 		$now      = gmdate( Commit::DATE_FORMAT );
 		$base_oid = isset( $progress['theme_base_oid'] ) ? $progress['theme_base_oid'] : '';
 
@@ -811,8 +811,8 @@ class WP_Origin_Seeder {
 	private static function next_batch( $after_id ) {
 		global $wpdb;
 
-		$post_types          = WP_Origin_Plugin::get_supported_post_types();
-		$post_statuses       = WP_Origin_Plugin::$supported_post_statuses;
+		$post_types          = PMD_Plugin::get_supported_post_types();
+		$post_statuses       = PMD_Plugin::$supported_post_statuses;
 		$post_type_markers   = implode( ', ', array_fill( 0, count( $post_types ), '%s' ) );
 		$post_status_markers = implode( ', ', array_fill( 0, count( $post_statuses ), '%s' ) );
 		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber,WordPress.DB.DirectDatabaseQuery

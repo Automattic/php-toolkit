@@ -2,15 +2,15 @@
 # One-shot installer that fires inside the wordpress:cli container.
 # Waits for the wp service to populate /var/www/html, installs
 # WordPress, generates 120 posts so initial-import seeding visibly
-# spans many cron ticks, drops the WP Origin plugin source into place,
+# spans many cron ticks, drops the Push MD plugin source into place,
 # and installs the small-budget mu-plugin so each batch is one cron
 # tick (otherwise the host is fast enough to import 120 posts in a
 # single tick and the progress bar barely moves).
 #
 # The plugin is INTENTIONALLY left deactivated. Open
-# http://${WP_ORIGIN_DEMO_HOST:-localhost:8090}/wp-admin/plugins.php, click "Activate" on
-# WP Origin, then watch the progress bar at
-# http://${WP_ORIGIN_DEMO_HOST:-localhost:8090}/wp-admin/tools.php?page=wp-origin.
+# http://${PUSH_MD_DEMO_HOST:-localhost:8090}/wp-admin/plugins.php, click "Activate" on
+# Push MD, then watch the progress bar at
+# http://${PUSH_MD_DEMO_HOST:-localhost:8090}/wp-admin/tools.php?page=push-md.
 set -euo pipefail
 
 cd /var/www/html
@@ -24,8 +24,8 @@ done
 
 if ! wp core is-installed 2>/dev/null; then
 	wp core install \
-		--url=http://${WP_ORIGIN_DEMO_HOST:-localhost:8090} \
-		--title="WP Origin Demo" \
+		--url=http://${PUSH_MD_DEMO_HOST:-localhost:8090} \
+		--title="Push MD Demo" \
 		--admin_user=admin \
 		--admin_password=admin \
 		--admin_email=admin@example.com \
@@ -43,8 +43,8 @@ fi
 # Mount toolkit components and the plugin into wp-content. Symlinks
 # (not copies) so the user can keep editing code on the host and see
 # changes immediately.
-if [ ! -e wp-content/plugins/wp-origin ]; then
-	ln -s /srv/php-toolkit/plugins/wp-origin wp-content/plugins/wp-origin
+if [ ! -e wp-content/plugins/push-md ]; then
+	ln -s /srv/php-toolkit/plugins/push-md wp-content/plugins/push-md
 fi
 if [ ! -e wp-content/components ]; then
 	ln -s /srv/php-toolkit/components wp-content/components
@@ -57,28 +57,28 @@ fi
 # host CPU is, so the progress bar is visibly active. Remove this file
 # to see production-default behaviour.
 mkdir -p wp-content/mu-plugins
-cp /srv/php-toolkit/plugins/wp-origin/Tests/ci-mu-test-helper.php \
-	wp-content/mu-plugins/wp-origin-demo-budget.php
+cp /srv/php-toolkit/plugins/push-md/Tests/ci-mu-test-helper.php \
+	wp-content/mu-plugins/push-md-demo-budget.php
 
-# Ensure WP Origin is NOT activated yet — the user will press Activate.
-wp plugin deactivate wp-origin --quiet 2>/dev/null || true
+# Ensure Push MD is NOT activated yet — the user will press Activate.
+wp plugin deactivate push-md --quiet 2>/dev/null || true
 
 POST_COUNT=$(wp post list --post_type=post --post_status=publish --format=count)
 
 cat <<EOF
 
 ============================================================
-  WP Origin demo is ready.
+  Push MD demo is ready.
 
-  URL:    http://${WP_ORIGIN_DEMO_HOST:-localhost:8090}/wp-admin/
+  URL:    http://${PUSH_MD_DEMO_HOST:-localhost:8090}/wp-admin/
   user:   admin
   pass:   admin
   posts:  ${POST_COUNT} (plus default page)
 
-  1. Visit /wp-admin/plugins.php and click Activate on WP Origin.
-  2. Watch progress at /wp-admin/tools.php?page=wp-origin.
+  1. Visit /wp-admin/plugins.php and click Activate on Push MD.
+  2. Watch progress at /wp-admin/tools.php?page=push-md.
   3. Once the bar reaches 100%, clone with:
-        git clone http://admin:<app-password>@${WP_ORIGIN_DEMO_HOST:-localhost:8090}/wp-json/git/v1/md.git wp-origin
+        git clone http://admin:<app-password>@${PUSH_MD_DEMO_HOST:-localhost:8090}/wp-json/git/v1/md.git push-md
 
      Generate the app password from /wp-admin/profile.php first.
 ============================================================

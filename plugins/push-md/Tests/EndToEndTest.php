@@ -8,19 +8,19 @@ if ( ! defined( 'ABSPATH' ) && ! class_exists( TestCase::class ) ) {
 }
 
 /**
- * End-to-end test for the wp-origin plugin against a real WordPress
+ * End-to-end test for the push-md plugin against a real WordPress
  * install backed by the new wpdb-backed Git filesystem.
  *
- * Skips unless the CI workflow sets WP_ORIGIN_E2E_BASE_URL,
- * WP_ORIGIN_E2E_USERNAME, and WP_ORIGIN_E2E_PASSWORD. The CI workflow
- * (`.github/workflows/wp-origin-e2e.yml`) handles all of the WordPress
+ * Skips unless the CI workflow sets PUSH_MD_E2E_BASE_URL,
+ * PUSH_MD_E2E_USERNAME, and PUSH_MD_E2E_PASSWORD. The CI workflow
+ * (`.github/workflows/push-md-e2e.yml`) handles all of the WordPress
  * setup (MySQL, wp-cli install, plugin activation, Application Password
  * creation, php -S launch). This file only exercises the running
  * server with the real `git` CLI plus a few REST assertions, so the
  * green build is direct evidence that the plugin can clone, push,
  * pull, and round-trip content end-to-end.
  */
-class WP_Origin_End_To_End_Test extends TestCase {
+class PMD_End_To_End_Test extends TestCase {
 
 	private $base_url;
 	private $username;
@@ -30,18 +30,18 @@ class WP_Origin_End_To_End_Test extends TestCase {
 
 	/** @before */
 	public function set_up() {
-		$this->base_url = getenv( 'WP_ORIGIN_E2E_BASE_URL' );
-		$this->username = getenv( 'WP_ORIGIN_E2E_USERNAME' );
-		$this->password = getenv( 'WP_ORIGIN_E2E_PASSWORD' );
+		$this->base_url = getenv( 'PUSH_MD_E2E_BASE_URL' );
+		$this->username = getenv( 'PUSH_MD_E2E_USERNAME' );
+		$this->password = getenv( 'PUSH_MD_E2E_PASSWORD' );
 
 		if ( ! $this->base_url || ! $this->username || ! $this->password ) {
 			$this->markTestSkipped(
-				'Set WP_ORIGIN_E2E_BASE_URL, WP_ORIGIN_E2E_USERNAME, and WP_ORIGIN_E2E_PASSWORD to run.'
+				'Set PUSH_MD_E2E_BASE_URL, PUSH_MD_E2E_USERNAME, and PUSH_MD_E2E_PASSWORD to run.'
 			);
 		}
 
 		$this->auth_header = 'Authorization: Basic ' . base64_encode( $this->username . ':' . $this->password );
-		$this->work_dir    = sys_get_temp_dir() . '/wp-origin-e2e-' . uniqid();
+		$this->work_dir    = sys_get_temp_dir() . '/push-md-e2e-' . uniqid();
 		mkdir( $this->work_dir, 0700, true );
 	}
 
@@ -53,7 +53,7 @@ class WP_Origin_End_To_End_Test extends TestCase {
 	}
 
 	public function testSeedStatusReportsDone() {
-		$body  = $this->curl_get( $this->base_url . '/wp-json/wp-origin/v1/seed-status' );
+		$body  = $this->curl_get( $this->base_url . '/wp-json/push-md/v1/seed-status' );
 		$state = json_decode( $body, true );
 		$this->assertIsArray( $state, "Unexpected seed-status response: $body" );
 		$this->assertSame( 'done', $state['state'], "Seeder is not done: $body" );
@@ -68,7 +68,7 @@ class WP_Origin_End_To_End_Test extends TestCase {
 		// every batch, so finishing requires several cron ticks. If
 		// any of that machinery breaks we'd silently lose resumability
 		// — assert directly that the import didn't fit in one tick.
-		$body  = $this->curl_get( $this->base_url . '/wp-json/wp-origin/v1/seed-status' );
+		$body  = $this->curl_get( $this->base_url . '/wp-json/push-md/v1/seed-status' );
 		$state = json_decode( $body, true );
 		$this->assertIsArray( $state, "Unexpected seed-status response: $body" );
 		$this->assertGreaterThanOrEqual( 30, $state['total'], "Expected the bulk seed to leave >=30 posts to import: $body" );
@@ -191,8 +191,8 @@ class WP_Origin_End_To_End_Test extends TestCase {
 		$this->assertNotEmpty( glob( $clone_dir . '/wp_template_part/*/*.html' ), 'Expected active theme base template parts to be exported.' );
 		$this->assertNotEmpty( glob( $clone_dir . '/wp_theme/*/theme.json' ), 'Expected active theme theme.json to be exported.' );
 		$this->assertNotEmpty( glob( $clone_dir . '/wp_global_styles/*.json' ), 'Expected active theme Global Styles overlay to be exported.' );
-		$this->assertFileExists( $clone_dir . '/wp_guideline/skills/wp-origin/SKILL.md' );
-		$this->assertFileExists( $clone_dir . '/wp_guideline/skills/wp-origin-template-editor/SKILL.md' );
+		$this->assertFileExists( $clone_dir . '/wp_guideline/skills/push-md/SKILL.md' );
+		$this->assertFileExists( $clone_dir . '/wp_guideline/skills/push-md-template-editor/SKILL.md' );
 		$this->assertStringContainsString(
 			'Hello from WordPress',
 			file_get_contents( $clone_dir . '/post/hello-world.md' )
@@ -201,23 +201,23 @@ class WP_Origin_End_To_End_Test extends TestCase {
 			'Template from WordPress',
 			file_get_contents( $clone_dir . '/wp_template/blog-home.html' )
 		);
-		$wp_origin_skill          = file_get_contents( $clone_dir . '/wp_guideline/skills/wp-origin/SKILL.md' );
-		$template_editor_skill    = file_get_contents( $clone_dir . '/wp_guideline/skills/wp-origin-template-editor/SKILL.md' );
+		$pmd_skill              = file_get_contents( $clone_dir . '/wp_guideline/skills/push-md/SKILL.md' );
+		$template_editor_skill  = file_get_contents( $clone_dir . '/wp_guideline/skills/push-md-template-editor/SKILL.md' );
 		$this->assertStringContainsString(
-			'Use the `wp-origin-template-editor` skill before editing',
-			$wp_origin_skill
+			'Use the `push-md-template-editor` skill before editing',
+			$pmd_skill
 		);
 		$this->assertStringContainsString(
 			'`wp_global_styles/{theme}.json` contains the editable Global Styles overlay',
-			$wp_origin_skill
+			$pmd_skill
 		);
 		$this->assertStringContainsString(
 			'do not create flattened files such as `wp_template_part/twentytwentyfive-footer.html`',
-			$wp_origin_skill
+			$pmd_skill
 		);
 		$this->assertStringContainsString(
 			'The customized database post keeps the slug `footer` and stores `twentytwentyfive` in the `wp_theme` taxonomy.',
-			$wp_origin_skill
+			$pmd_skill
 		);
 		$this->assertStringContainsString(
 			'maps to the template-part ID `twentytwentyfive//footer`',
@@ -294,7 +294,7 @@ class WP_Origin_End_To_End_Test extends TestCase {
 		$this->run_cmd( array( 'git', '-C', $clone_dir, 'reset', '--hard', 'HEAD~1' ) );
 
 		// Theme source JSON is exported for context, not edited through
-		// WP Origin.
+		// Push MD.
 		$theme_json_files = glob( $clone_dir . '/wp_theme/*/theme.json' );
 		file_put_contents( $theme_json_files[0], "\n", FILE_APPEND );
 		$this->run_cmd( array( 'git', '-C', $clone_dir, 'add', $theme_json_files[0] ) );
@@ -304,7 +304,7 @@ class WP_Origin_End_To_End_Test extends TestCase {
 			true
 		);
 		$this->assertNotSame( 0, $push_result['code'], 'Theme base JSON edits should have been rejected.' );
-		$this->assertStringContainsString( 'Push rejected because theme base files are read-only in WP Origin.', $push_result['output'] );
+		$this->assertStringContainsString( 'Push rejected because theme base files are read-only in Push MD.', $push_result['output'] );
 		$this->run_cmd( array( 'git', '-C', $clone_dir, 'reset', '--hard', 'HEAD~1' ) );
 
 		$global_styles_files = glob( $clone_dir . '/wp_global_styles/*.json' );
@@ -587,7 +587,7 @@ class WP_Origin_End_To_End_Test extends TestCase {
 				true
 			);
 			$this->assertNotSame( 0, $push_result['code'], 'Arbitrary symlinks should have been rejected.' );
-			$this->assertStringContainsString( 'Push rejected because symlink files are generated by WP Origin and cannot be created or modified.', $push_result['output'] );
+			$this->assertStringContainsString( 'Push rejected because symlink files are generated by Push MD and cannot be created or modified.', $push_result['output'] );
 			$this->run_cmd( array( 'git', '-C', $clone_dir, 'reset', '--hard', 'HEAD~1' ) );
 		}
 
@@ -599,7 +599,7 @@ class WP_Origin_End_To_End_Test extends TestCase {
 				true
 			);
 			$this->assertNotSame( 0, $push_result['code'], 'Generated symlink deletion should have been rejected.' );
-			$this->assertStringContainsString( 'Push rejected because symlink files are generated by WP Origin and cannot be deleted or modified.', $push_result['output'] );
+			$this->assertStringContainsString( 'Push rejected because symlink files are generated by Push MD and cannot be deleted or modified.', $push_result['output'] );
 			$this->run_cmd( array( 'git', '-C', $clone_dir, 'reset', '--hard', 'HEAD~1' ) );
 		}
 
@@ -615,7 +615,7 @@ class WP_Origin_End_To_End_Test extends TestCase {
 			true
 		);
 		$this->assertNotSame( 0, $push_result['code'], 'Executable content files should have been rejected.' );
-		$this->assertStringContainsString( 'Push rejected because executable file modes are not supported by WP Origin content exports.', $push_result['output'] );
+		$this->assertStringContainsString( 'Push rejected because executable file modes are not supported by Push MD content exports.', $push_result['output'] );
 		$this->run_cmd( array( 'git', '-C', $clone_dir, 'reset', '--hard', 'HEAD~1' ) );
 
 		file_put_contents(
@@ -629,7 +629,7 @@ class WP_Origin_End_To_End_Test extends TestCase {
 			true
 		);
 		$this->assertNotSame( 0, $push_result['code'], 'Multi-ref pushes should have been rejected.' );
-		$this->assertStringContainsString( 'Push rejected because WP Origin only accepts one ref update at a time.', $push_result['output'] );
+		$this->assertStringContainsString( 'Push rejected because Push MD only accepts one ref update at a time.', $push_result['output'] );
 		$this->assert_slug_absent( 'rejected-multi-ref', 'posts' );
 		$this->run_cmd( array( 'git', '-C', $clone_dir, 'reset', '--hard', 'HEAD~1' ) );
 
@@ -910,7 +910,7 @@ class WP_Origin_End_To_End_Test extends TestCase {
 		// 11) The CPT-based persistence model is gone.
 		$this->assertNotSame(
 			200,
-			$this->http_status( $this->base_url . '/wp-json/wp/v2/types/wp_origin_commit' )
+			$this->http_status( $this->base_url . '/wp-json/wp/v2/types/pmd_commit' )
 		);
 	}
 
@@ -934,8 +934,8 @@ class WP_Origin_End_To_End_Test extends TestCase {
 	}
 
 	private function configure_git( $dir ) {
-		$this->run_cmd( array( 'git', '-C', $dir, 'config', 'user.name', 'WP Origin E2E' ) );
-		$this->run_cmd( array( 'git', '-C', $dir, 'config', 'user.email', 'wp-origin-e2e@example.com' ) );
+		$this->run_cmd( array( 'git', '-C', $dir, 'config', 'user.name', 'Push MD E2E' ) );
+		$this->run_cmd( array( 'git', '-C', $dir, 'config', 'user.email', 'push-md-e2e@example.com' ) );
 	}
 
 	private function edit_file( $path, $needle, $replacement ) {
@@ -999,7 +999,7 @@ class WP_Origin_End_To_End_Test extends TestCase {
 				CURLOPT_RETURNTRANSFER => true,
 				CURLOPT_CUSTOMREQUEST  => 'POST',
 				CURLOPT_HTTPHEADER     => array( $this->auth_header, 'Content-Type: application/json' ),
-				CURLOPT_POSTFIELDS     => wp_origin_e2e_json_encode( $payload ),
+				CURLOPT_POSTFIELDS     => pmd_e2e_json_encode( $payload ),
 			)
 		);
 		$response = curl_exec( $ch );
@@ -1022,7 +1022,7 @@ class WP_Origin_End_To_End_Test extends TestCase {
 				CURLOPT_RETURNTRANSFER => true,
 				CURLOPT_CUSTOMREQUEST  => 'POST',
 				CURLOPT_HTTPHEADER     => array( $this->auth_header, 'Content-Type: application/json' ),
-				CURLOPT_POSTFIELDS     => wp_origin_e2e_json_encode( $payload ),
+				CURLOPT_POSTFIELDS     => pmd_e2e_json_encode( $payload ),
 			)
 		);
 		$response = curl_exec( $ch );
@@ -1055,7 +1055,7 @@ class WP_Origin_End_To_End_Test extends TestCase {
 				CURLOPT_RETURNTRANSFER => true,
 				CURLOPT_CUSTOMREQUEST  => 'POST',
 				CURLOPT_HTTPHEADER     => array( $this->auth_header, 'Content-Type: application/json' ),
-				CURLOPT_POSTFIELDS     => wp_origin_e2e_json_encode( $payload ),
+				CURLOPT_POSTFIELDS     => pmd_e2e_json_encode( $payload ),
 			)
 		);
 		$response = curl_exec( $ch );
@@ -1114,6 +1114,6 @@ class WP_Origin_End_To_End_Test extends TestCase {
 	}
 }
 
-function wp_origin_e2e_json_encode( $value ) {
+function pmd_e2e_json_encode( $value ) {
 	return json_encode( $value );
 }
