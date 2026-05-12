@@ -1,0 +1,473 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>Push MD</title>
+	<meta name="description" content="Placeholder landing page for Push MD, a WordPress plugin that exposes supported content as a Git remote.">
+	<style>
+		:root {
+			--ink: #18211d;
+			--muted: #53615b;
+			--paper: #f8faf7;
+			--panel: #ffffff;
+			--line: #dce5df;
+			--green: #177245;
+			--blue: #2c62d6;
+			--amber: #b45f06;
+			--soft-green: #e8f4ed;
+			--soft-blue: #eaf0ff;
+			--shadow: 0 24px 70px rgba( 24, 33, 29, 0.16 );
+		}
+
+		* {
+			box-sizing: border-box;
+		}
+
+		body {
+			margin: 0;
+			background: var( --paper );
+			color: var( --ink );
+			font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+			line-height: 1.5;
+		}
+
+		a {
+			color: inherit;
+		}
+
+		.site-header {
+			position: fixed;
+			top: 0;
+			left: 0;
+			z-index: 10;
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+			width: 100%;
+			padding: 18px clamp( 20px, 5vw, 72px );
+			background: rgba( 248, 250, 247, 0.84 );
+			border-bottom: 1px solid rgba( 220, 229, 223, 0.72 );
+			backdrop-filter: blur( 16px );
+		}
+
+		.brand {
+			display: flex;
+			align-items: center;
+			gap: 10px;
+			font-size: 0.96rem;
+			font-weight: 700;
+		}
+
+		.brand-mark {
+			display: grid;
+			width: 32px;
+			height: 32px;
+			place-items: center;
+			color: #ffffff;
+			background: var( --green );
+			border-radius: 8px;
+			font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+			font-size: 0.95rem;
+		}
+
+		.header-link {
+			color: var( --muted );
+			font-size: 0.92rem;
+			font-weight: 650;
+			text-decoration: none;
+		}
+
+		.hero {
+			position: relative;
+			display: flex;
+			align-items: center;
+			min-height: 84svh;
+			overflow: hidden;
+			padding: 118px clamp( 20px, 5vw, 72px ) 72px;
+			background: var( --paper );
+		}
+
+		.hero-scene {
+			position: absolute;
+			right: clamp( -260px, -10vw, -80px );
+			bottom: clamp( -110px, -6vw, -40px );
+			width: min( 820px, 74vw );
+			min-width: 560px;
+			transform: rotate( -3deg );
+			pointer-events: none;
+		}
+
+		.window {
+			overflow: hidden;
+			background: rgba( 255, 255, 255, 0.94 );
+			border: 1px solid rgba( 220, 229, 223, 0.96 );
+			border-radius: 8px;
+			box-shadow: var( --shadow );
+		}
+
+		.window-bar {
+			display: flex;
+			align-items: center;
+			gap: 7px;
+			height: 38px;
+			padding: 0 14px;
+			background: #eef4ef;
+			border-bottom: 1px solid var( --line );
+		}
+
+		.dot {
+			width: 10px;
+			height: 10px;
+			border-radius: 999px;
+			background: #d54b4b;
+		}
+
+		.dot:nth-child( 2 ) {
+			background: #d9a441;
+		}
+
+		.dot:nth-child( 3 ) {
+			background: #38a169;
+		}
+
+		.editor {
+			display: grid;
+			grid-template-columns: 180px 1fr;
+			min-height: 430px;
+		}
+
+		.file-tree {
+			padding: 22px 18px;
+			background: #f4f7f5;
+			border-right: 1px solid var( --line );
+			color: var( --muted );
+			font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+			font-size: 0.82rem;
+		}
+
+		.file-tree div {
+			margin: 0 0 13px;
+		}
+
+		.file-tree .active {
+			color: var( --green );
+			font-weight: 700;
+		}
+
+		.markdown-preview {
+			padding: 24px 28px;
+			background: #ffffff;
+			font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+			font-size: 0.86rem;
+			color: #23302a;
+		}
+
+		.markdown-preview .comment {
+			color: var( --muted );
+		}
+
+		.markdown-preview .key {
+			color: var( --amber );
+		}
+
+		.markdown-preview .command {
+			color: var( --blue );
+		}
+
+		.markdown-preview pre {
+			margin: 0;
+			white-space: pre-wrap;
+		}
+
+		.hero-copy {
+			position: relative;
+			z-index: 1;
+			width: min( 690px, 100% );
+		}
+
+		.status {
+			display: inline-flex;
+			align-items: center;
+			gap: 8px;
+			margin: 0 0 22px;
+			padding: 7px 10px;
+			color: #155d3a;
+			background: rgba( 232, 244, 237, 0.9 );
+			border: 1px solid rgba( 23, 114, 69, 0.2 );
+			border-radius: 8px;
+			font-size: 0.84rem;
+			font-weight: 700;
+		}
+
+		.status::before {
+			width: 8px;
+			height: 8px;
+			content: "";
+			background: var( --green );
+			border-radius: 999px;
+		}
+
+		h1 {
+			max-width: 11ch;
+			margin: 0;
+			font-size: 8.5rem;
+			font-weight: 800;
+			line-height: 0.88;
+		}
+
+		.lede {
+			max-width: 620px;
+			margin: 28px 0 0;
+			color: #314139;
+			font-size: 1.35rem;
+		}
+
+		.actions {
+			display: flex;
+			flex-wrap: wrap;
+			gap: 12px;
+			margin-top: 32px;
+		}
+
+		.button {
+			display: inline-flex;
+			align-items: center;
+			justify-content: center;
+			min-height: 44px;
+			padding: 0 18px;
+			border: 1px solid var( --ink );
+			border-radius: 8px;
+			font-weight: 750;
+			text-decoration: none;
+		}
+
+		.button.primary {
+			color: #ffffff;
+			background: var( --ink );
+		}
+
+		.button.secondary {
+			background: rgba( 255, 255, 255, 0.68 );
+		}
+
+		.content {
+			padding: 54px clamp( 20px, 5vw, 72px ) 70px;
+		}
+
+		.section-intro {
+			display: grid;
+			grid-template-columns: minmax( 0, 0.75fr ) minmax( 280px, 1fr );
+			gap: clamp( 28px, 6vw, 72px );
+			align-items: start;
+			max-width: 1180px;
+			margin: 0 auto;
+		}
+
+		h2 {
+			margin: 0;
+			font-size: 3.35rem;
+			line-height: 1;
+		}
+
+		.placeholder-note {
+			margin: 6px 0 0;
+			color: var( --muted );
+			font-size: 1.05rem;
+		}
+
+		.feature-grid {
+			display: grid;
+			grid-template-columns: repeat( 3, minmax( 0, 1fr ) );
+			gap: 14px;
+			max-width: 1180px;
+			margin: 46px auto 0;
+		}
+
+		.feature {
+			min-height: 190px;
+			padding: 24px;
+			background: var( --panel );
+			border: 1px solid var( --line );
+			border-radius: 8px;
+		}
+
+		.feature-icon {
+			display: grid;
+			width: 42px;
+			height: 42px;
+			margin-bottom: 22px;
+			place-items: center;
+			border-radius: 8px;
+			font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+			font-weight: 800;
+		}
+
+		.feature:nth-child( 1 ) .feature-icon {
+			color: var( --green );
+			background: var( --soft-green );
+		}
+
+		.feature:nth-child( 2 ) .feature-icon {
+			color: var( --blue );
+			background: var( --soft-blue );
+		}
+
+		.feature:nth-child( 3 ) .feature-icon {
+			color: var( --amber );
+			background: #fff2dc;
+		}
+
+		.feature h3 {
+			margin: 0 0 10px;
+			font-size: 1.12rem;
+		}
+
+		.feature p {
+			margin: 0;
+			color: var( --muted );
+		}
+
+		@media ( max-width: 860px ) {
+			.site-header {
+				position: absolute;
+			}
+
+			.hero {
+				align-items: flex-start;
+				min-height: 86svh;
+				padding-top: 112px;
+			}
+
+			.hero-scene {
+				right: -330px;
+				bottom: -130px;
+				opacity: 0.62;
+			}
+
+			.section-intro,
+			.feature-grid {
+				grid-template-columns: 1fr;
+			}
+
+			h1 {
+				font-size: 5.4rem;
+			}
+
+			h2 {
+				font-size: 2.5rem;
+			}
+		}
+
+		@media ( max-width: 560px ) {
+			.header-link {
+				display: none;
+			}
+
+			.hero {
+				min-height: 88svh;
+				padding-bottom: 46px;
+			}
+
+			.hero-scene {
+				right: -430px;
+				bottom: -150px;
+				opacity: 0.46;
+			}
+
+			h1 {
+				max-width: 8ch;
+				font-size: 3.6rem;
+			}
+
+			.lede {
+				font-size: 1.05rem;
+			}
+
+			.actions {
+				flex-direction: column;
+				align-items: stretch;
+			}
+		}
+	</style>
+</head>
+<body>
+	<header class="site-header" aria-label="Site header">
+		<div class="brand">
+			<span class="brand-mark">MD</span>
+			<span>Push MD</span>
+		</div>
+		<a class="header-link" href="../prd.md">Read the PRD</a>
+	</header>
+
+	<main>
+		<section class="hero" aria-labelledby="hero-title">
+			<div class="hero-scene" aria-hidden="true">
+				<div class="window">
+					<div class="window-bar">
+						<span class="dot"></span>
+						<span class="dot"></span>
+						<span class="dot"></span>
+					</div>
+					<div class="editor">
+						<div class="file-tree">
+							<div class="active">post/hello-world.md</div>
+							<div>page/about.md</div>
+							<div>wp_template/home.html</div>
+							<div>wp_global_styles/theme.json</div>
+							<div>AGENTS.md</div>
+						</div>
+						<div class="markdown-preview">
+<pre><span class="comment"># Git remote for WordPress content</span>
+<span class="key">title:</span> Hello from Markdown
+<span class="key">status:</span> published
+
+Write in your editor.
+Review with Git.
+Push safely back to WordPress.
+
+<span class="command">$ git clone https://example.com/wp-json/git/v1/md.git</span>
+<span class="command">$ git push origin trunk</span></pre>
+						</div>
+					</div>
+				</div>
+			</div>
+
+			<div class="hero-copy">
+				<p class="status">Placeholder landing page</p>
+				<h1 id="hero-title">Push MD</h1>
+				<p class="lede">A WordPress plugin concept for editing supported posts, pages, block templates, and site styles through a normal Git remote.</p>
+				<div class="actions" aria-label="Primary links">
+					<a class="button primary" href="../prd.md">Read the PRD</a>
+					<a class="button secondary" href="../README.md">Developer notes</a>
+				</div>
+			</div>
+		</section>
+
+		<section class="content" aria-labelledby="placeholder-title">
+			<div class="section-intro">
+				<h2 id="placeholder-title">Built from the product brief.</h2>
+				<p class="placeholder-note">This is temporary marketing copy and layout scaffolding for the docs site. The page summarizes the core promise from the PRD without locking in final brand, launch copy, or production assets.</p>
+			</div>
+
+			<div class="feature-grid" aria-label="Product pillars">
+				<article class="feature">
+					<div class="feature-icon">git</div>
+					<h3>Clone WordPress content</h3>
+					<p>Expose supported site content through a Git Smart HTTP endpoint on the site's own REST API.</p>
+				</article>
+				<article class="feature">
+					<div class="feature-icon">md</div>
+					<h3>Edit readable files</h3>
+					<p>Represent posts and pages as Markdown, while keeping block theme structures in their native formats.</p>
+				</article>
+				<article class="feature">
+					<div class="feature-icon">ok</div>
+					<h3>Fail closed on unsafe pushes</h3>
+					<p>Reject stale, unsupported, or ambiguous changes before WordPress content is modified.</p>
+				</article>
+			</div>
+		</section>
+	</main>
+</body>
+</html>
