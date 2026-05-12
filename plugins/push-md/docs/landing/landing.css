@@ -464,8 +464,8 @@ pre {
 }
 
 .task-list li {
-	display: grid;
-	grid-template-columns: auto minmax(0, 1fr);
+	display: flex;
+	flex-wrap: wrap;
 	gap: 10px;
 	align-items: start;
 }
