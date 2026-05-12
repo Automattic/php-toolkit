@@ -226,32 +226,43 @@ copy_pmd_php_toolkit_bundle() {
 	generate_pmd_toolkit_autoload "$target_dir"
 }
 
-cp -r $PROJECT_DIR/plugins/data-liberation $DIST_DIR
-cp $PROJECT_DIR/dist/php-toolkit.phar $DIST_DIR/data-liberation/php-toolkit.phar
-cd $DIST_DIR
-zip -r data-liberation.zip data-liberation/
-cd $PROJECT_DIR
-rm -rf $DIST_DIR/data-liberation
-
-cd $PROJECT_DIR/plugins/static-files-editor/
-npm run build
-cd $PROJECT_DIR
-mkdir -p $DIST_DIR/static-files-editor
-cp -r $PROJECT_DIR/plugins/static-files-editor/!(node_modules|src|webpack.config.js|package.json|package-lock.json) $DIST_DIR/static-files-editor
-cd $DIST_DIR
-zip -r static-files-editor.zip static-files-editor/
-cd $PROJECT_DIR
-rm -rf $DIST_DIR/static-files-editor
-
-mkdir -p $DIST_DIR/url-updater
-cp -r $PROJECT_DIR/plugins/url-updater/!(node_modules|src|webpack.config.js|package.json|package-lock.json) $DIST_DIR/url-updater
-cd $DIST_DIR
-zip -r url-updater.zip url-updater/
-cd $PROJECT_DIR
-rm -rf $DIST_DIR/url-updater
+# Temporarily disabled while the release workflow only publishes Push MD.
+# Restore these blocks when the older plugin zips should be built again.
+#
+# cp -r $PROJECT_DIR/plugins/data-liberation $DIST_DIR
+# cp $PROJECT_DIR/dist/php-toolkit.phar $DIST_DIR/data-liberation/php-toolkit.phar
+# cd $DIST_DIR
+# zip -r data-liberation.zip data-liberation/
+# cd $PROJECT_DIR
+# rm -rf $DIST_DIR/data-liberation
+#
+# cd $PROJECT_DIR/plugins/static-files-editor/
+# npm run build
+# cd $PROJECT_DIR
+# mkdir -p $DIST_DIR/static-files-editor
+# cp -r $PROJECT_DIR/plugins/static-files-editor/!(node_modules|src|webpack.config.js|package.json|package-lock.json) $DIST_DIR/static-files-editor
+# cd $DIST_DIR
+# zip -r static-files-editor.zip static-files-editor/
+# cd $PROJECT_DIR
+# rm -rf $DIST_DIR/static-files-editor
+#
+# mkdir -p $DIST_DIR/url-updater
+# cp -r $PROJECT_DIR/plugins/url-updater/!(node_modules|src|webpack.config.js|package.json|package-lock.json) $DIST_DIR/url-updater
+# cd $DIST_DIR
+# zip -r url-updater.zip url-updater/
+# cd $PROJECT_DIR
+# rm -rf $DIST_DIR/url-updater
 
 mkdir -p $DIST_DIR/push-md
-cp -r $PROJECT_DIR/plugins/push-md/!(Tests|docker-demo|docs|blueprint-e2e.json|push-md-dev-bootstrap.php|push-md-phar-bootstrap.php) $DIST_DIR/push-md
+rsync -a \
+	--exclude='Tests/' \
+	--exclude='docker-demo/' \
+	--exclude='docs/' \
+	--exclude='blueprint-e2e.json' \
+	--exclude='push-md-dev-bootstrap.php' \
+	--exclude='push-md-phar-bootstrap.php' \
+	"$PROJECT_DIR/plugins/push-md/" \
+	"$DIST_DIR/push-md/"
 copy_pmd_php_toolkit_bundle "$DIST_DIR/push-md/php-toolkit"
 cd $DIST_DIR
 zip -r push-md.zip push-md/
