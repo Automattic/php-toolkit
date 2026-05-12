@@ -19,6 +19,7 @@
 			<a href="#how-it-works">Use cases</a>
 			<a href="#permissions">Permissions</a>
 			<a href="#agent-skills">Agent skills</a>
+			<a href="#faq">FAQ</a>
 			<a href="../README.md">Docs</a>
 		</nav>
 		<a class="button button-primary" href="#install">Install plugin</a>
@@ -156,6 +157,66 @@
 							<span>Global Styles overlays</span>
 						</div>
 					</div>
+				</article>
+			</div>
+		</section>
+
+		<section class="doc-section faq-section" id="faq" aria-labelledby="faq-title">
+			<div class="section-copy">
+				<h2 id="faq-title"><span class="md-token">##</span> FAQ</h2>
+				<p>
+					Short answers for the places where Git workflows usually get tangled with
+					WordPress publishing, permissions, and revision history.
+				</p>
+			</div>
+
+			<div class="faq-list">
+				<article class="faq-item">
+					<h3><span class="md-token">###</span> Is WordPress still the source of truth?</h3>
+					<p>
+						Yes. Your WordPress database stays authoritative. Git clients read and write
+						through Push MD, so there is no separate repository to reconcile.
+					</p>
+				</article>
+
+				<article class="faq-item">
+					<h3><span class="md-token">###</span> Does this work with any Git client?</h3>
+					<p>
+						Yes. Agents, terminals, desktop apps, and editors can use normal Git over HTTPS
+						against the WordPress remote.
+					</p>
+				</article>
+
+				<article class="faq-item">
+					<h3><span class="md-token">###</span> What happens when someone edits in WP-Admin?</h3>
+					<p>
+						WP-Admin edits become Git-visible on pull. If a local checkout is stale, Push MD
+						rejects the push before writing over newer WordPress content.
+					</p>
+				</article>
+
+				<article class="faq-item">
+					<h3><span class="md-token">###</span> How do permissions work?</h3>
+					<p>
+						Push MD uses WordPress authentication and Application Passwords, then respects the
+						current user's capabilities before accepting a write.
+					</p>
+				</article>
+
+				<article class="faq-item">
+					<h3><span class="md-token">###</span> Do pushes create revisions?</h3>
+					<p>
+						Accepted Markdown content pushes go through WordPress APIs and create WordPress
+						revisions, so changes remain reviewable in the usual WordPress history.
+					</p>
+				</article>
+
+				<article class="faq-item">
+					<h3><span class="md-token">###</span> Is this a static site generator?</h3>
+					<p>
+						No. It gives you the local-file workflow people like in static site generators,
+						while WordPress still handles previews, rendering, publishing, roles, and revisions.
+					</p>
 				</article>
 			</div>
 		</section>

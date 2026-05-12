@@ -238,6 +238,7 @@ pre {
 .terminal-card,
 .authority-strip article,
 .use-case-card,
+.faq-list,
 .install-panel {
 	border: 1px solid var(--line);
 	border-radius: 8px;
@@ -504,6 +505,44 @@ pre {
 	overflow-wrap: anywhere;
 }
 
+.faq-list {
+	display: grid;
+	overflow: hidden;
+	background: rgba(255, 253, 247, 0.76);
+	box-shadow: none;
+}
+
+.faq-item {
+	padding: clamp(20px, 3vw, 28px);
+	border-top: 1px solid var(--line);
+}
+
+.faq-item:first-child {
+	border-top: 0;
+}
+
+.faq-item h3 {
+	margin: 0;
+	font-family: var(--serif);
+	font-size: clamp(24px, 2.7vw, 36px);
+	line-height: 1.16;
+	letter-spacing: 0;
+}
+
+.faq-item h3 .md-token {
+	margin-right: 8px;
+	font-size: 0.76em;
+	vertical-align: 0.04em;
+}
+
+.faq-item p {
+	max-width: 980px;
+	margin: 10px 0 0;
+	color: var(--muted);
+	font-size: 16px;
+	line-height: 1.58;
+}
+
 .install-panel {
 	display: grid;
 	gap: 22px;
@@ -691,6 +730,10 @@ pre {
 	.file-map div,
 	.code-block {
 		grid-template-columns: 1fr;
+	}
+
+	.faq-item h3 {
+		font-size: 25px;
 	}
 
 	.site-footer {
