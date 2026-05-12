@@ -28,11 +28,11 @@
 		<section class="hero" id="top" aria-labelledby="hero-title">
 			<div class="hero-copy">
 				<p class="file-label">page/push-md.md</p>
-				<h1 id="hero-title"><span class="md-token">#</span> Let coding agents work in Git. Keep WordPress in charge.</h1>
+				<h1 id="hero-title"><span class="md-token">#</span> Write Markdown with agents. Keep WordPress in charge.</h1>
 				<p class="hero-subhead">
-					Push MD turns WordPress into a Git remote for supported content, so agents and
-					Markdown-first teams can clone, diff, commit, and push while WordPress remains
-					the source of truth.
+					Push MD makes WordPress the Git remote for Markdown-first content work:
+					agents edit <code>.md</code> files, WordPress enforces roles, creates
+					revisions, and renders the final site.
 				</p>
 				<div class="hero-actions" aria-label="Primary actions">
 					<a class="button button-primary" href="#install">Install plugin</a>
@@ -46,14 +46,19 @@
 						<span>page/home.md</span>
 						<span>trunk</span>
 					</div>
-					<pre class="markdown-source" aria-label="Markdown source"><code><span class="md-line md-heading"># Let coding agents work in Git</span>
-<span class="md-line">WordPress stays authoritative while agents edit files.</span>
+					<pre class="markdown-source" aria-label="Markdown source"><code><span class="md-line md-muted">---</span>
+<span class="md-line md-key">title: Markdown for WordPress agents</span>
+<span class="md-line md-key">status: draft</span>
+<span class="md-line md-muted">---</span>
 <span class="md-line"></span>
-<span class="md-line md-heading">## Why this works</span>
-<span class="md-line">- WordPress is the Git remote.</span>
-<span class="md-line">- Existing roles decide who can read or push.</span>
+<span class="md-line md-heading"># Markdown in Git</span>
+<span class="md-line">Agents edit ordinary Markdown files in a checkout.</span>
+<span class="md-line"></span>
+<span class="md-line md-heading">## WordPress stays in charge</span>
+<span class="md-line">- WordPress is the Git remote and source of truth.</span>
+<span class="md-line">- Roles decide who can read or push.</span>
 <span class="md-line">- Accepted pushes create WordPress revisions.</span>
-<span class="md-line">- WP-Admin edits become visible on pull.</span>
+<span class="md-line">- WordPress renders the published page.</span>
 <span class="md-line"></span>
 <span class="md-line md-heading">## Agent run</span>
 <span class="md-line md-code">git clone https://example.com/wp-json/git/v1/md.git my-site</span>
@@ -61,15 +66,21 @@
 <span class="md-line md-code">git push origin trunk</span></code></pre>
 				</div>
 
+				<div class="format-bridge" aria-hidden="true">
+					<span>Markdown</span>
+					<strong>-&gt;</strong>
+					<span>WordPress</span>
+				</div>
+
 				<article class="preview-card">
 					<p class="preview-kicker">Rendered by WordPress</p>
-					<h2>Let coding agents work in Git</h2>
-					<p>WordPress stays authoritative while agents edit files.</p>
-					<h3>Why this works</h3>
+					<h2>Markdown for WordPress agents</h2>
+					<p>Agents edit Markdown. WordPress publishes the page, enforces access, and keeps the revision trail.</p>
+					<h3>WordPress guarantees</h3>
 					<ul>
-						<li>WordPress is the Git remote.</li>
-						<li>Roles decide who can read or push.</li>
+						<li>Role-aware clone and push access.</li>
 						<li>Accepted pushes create revisions.</li>
+						<li>WP-Admin edits are visible on pull.</li>
 					</ul>
 					<div class="remote-output">
 						<span>remote: checked WordPress permissions</span>
@@ -82,24 +93,24 @@
 
 		<section class="authority-strip" id="permissions" aria-label="Why WordPress stays authoritative">
 			<article>
-				<p class="section-path">## no-sync-layer</p>
-				<h2>WordPress is the remote.</h2>
-				<p>Agents and editors clone directly from <code>/wp-json/git/v1/md.git</code> instead of pushing through another canonical repository.</p>
+				<p class="section-path">## markdown-files</p>
+				<h2>Edit Markdown.</h2>
+				<p>Posts and pages appear as readable <code>.md</code> files, so agents and local editors can use familiar diffs and commits.</p>
 			</article>
 			<article>
-				<p class="section-path">## no-new-users</p>
-				<h2>Use WordPress roles.</h2>
+				<p class="section-path">## wordpress-remote</p>
+				<h2>Publish WordPress.</h2>
+				<p>Git clients clone directly from <code>/wp-json/git/v1/md.git</code>; WordPress remains the remote and source of truth.</p>
+			</article>
+			<article>
+				<p class="section-path">## wordpress-roles</p>
+				<h2>Respect roles.</h2>
 				<p>Git over HTTPS uses WordPress authentication, including Application Passwords, and respects existing capabilities.</p>
 			</article>
 			<article>
-				<p class="section-path">## revision-backed</p>
-				<h2>Pushes create revisions.</h2>
-				<p>Accepted content changes go through WordPress APIs, so publishing behavior, permissions, and revisions remain intact.</p>
-			</article>
-			<article>
-				<p class="section-path">## admin-safe</p>
-				<h2>Pull admin edits first.</h2>
-				<p>WP-Admin edits become Git-visible on pull, and stale pushes are rejected before WordPress content is changed.</p>
+				<p class="section-path">## wordpress-revisions</p>
+				<h2>Keep revisions.</h2>
+				<p>Accepted Markdown changes go through WordPress APIs, create revisions, and preserve publishing behavior.</p>
 			</article>
 		</section>
 
@@ -146,7 +157,7 @@ WP-Admin    -- revisions --&gt; WordPress</code></pre>
 		<section class="doc-section markdown-section" aria-labelledby="markdown-title">
 			<div class="section-copy">
 				<p class="section-path"># markdown-and-ssg-workflows</p>
-				<h2 id="markdown-title">Use local-file workflows without replacing WordPress.</h2>
+				<h2 id="markdown-title">Markdown is the editing format. WordPress is the publishing system.</h2>
 				<p>
 					If you like Astro, Jekyll, or a Markdown vault, Push MD gives you a familiar
 					file tree while WordPress keeps handling previews, publishing, permissions,
@@ -156,23 +167,23 @@ WP-Admin    -- revisions --&gt; WordPress</code></pre>
 			<div class="markdown-table" aria-label="Supported checkout file types">
 				<div class="table-row table-head">
 					<span>Path</span>
-					<span>What it edits</span>
+					<span>What WordPress does with it</span>
 				</div>
 				<div class="table-row">
 					<code>post/*.md</code>
-					<span>Posts as Markdown</span>
+					<span>Turns Markdown into WordPress posts and revisions</span>
 				</div>
 				<div class="table-row">
 					<code>page/**/*.md</code>
-					<span>Pages and hierarchy</span>
+					<span>Preserves page hierarchy and WordPress identity</span>
 				</div>
 				<div class="table-row">
 					<code>wp_template_part/**/*.html</code>
-					<span>Raw Gutenberg block files</span>
+					<span>Keeps block markup compatible with the Site Editor</span>
 				</div>
 				<div class="table-row">
 					<code>wp_global_styles/*.json</code>
-					<span>Editable Global Styles overlays</span>
+					<span>Applies editable Global Styles overlays</span>
 				</div>
 			</div>
 		</section>
