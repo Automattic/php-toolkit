@@ -20,9 +20,9 @@
 			<a href="#permissions">Permissions</a>
 			<a href="#agent-skills">Agent skills</a>
 			<a href="#faq">FAQ</a>
-			<a href="../README.md">Docs</a>
+			<a href="https://github.com/Automattic/php-toolkit/tree/trunk/plugins/push-md/docs">Docs</a>
 		</nav>
-		<a class="button button-primary" href="#install">Install plugin</a>
+		<a class="button button-primary" href="#install">Download plugin</a>
 	</header>
 
 	<main id="main" class="markdown-document">
@@ -35,48 +35,49 @@
 					revisions, rejects stale pushes, and lets WordPress render the site.
 				</p>
 				<div class="hero-actions" aria-label="Primary actions">
-					<a class="button button-primary" href="#install">Install plugin</a>
-					<a class="button button-secondary" href="../README.md">Read docs</a>
+					<a class="button button-primary" href="#install">Download plugin</a>
+					<a class="button button-secondary" href="https://github.com/Automattic/php-toolkit/tree/trunk/plugins/push-md/docs">Read docs</a>
 				</div>
 			</div>
 
-			<div class="terminal-card" aria-label="Push MD terminal workflow">
+			<div class="terminal-card" role="application" aria-label="Push MD command emulator">
 				<div class="terminal-topline">
 					<span class="terminal-dots" aria-hidden="true">
 						<span></span>
 						<span></span>
 						<span></span>
 					</span>
-					<span>push-md / trunk</span>
-					<span>WordPress remote</span>
+					<span id="landing-terminal-title">emulator:~/site</span>
+					<span class="terminal-status">trunk / WordPress remote</span>
 				</div>
-				<pre class="terminal-source" aria-label="Terminal transcript"><code><span class="terminal-line"><span class="terminal-prompt">$</span> git clone https://example.com/wp-json/git/v1/md.git site</span>
-<span class="terminal-line terminal-muted">remote: exported posts and pages as Markdown</span>
-<span class="terminal-line"><span class="terminal-prompt">$</span> cd site</span>
-<span class="terminal-line"><span class="terminal-prompt">$</span> codex "Update page/home.md"</span>
-<span class="terminal-line terminal-comment">edit: page/home.md</span>
-<span class="terminal-line"><span class="terminal-prompt">$</span> git diff -- page/home.md</span>
-<span class="terminal-line terminal-muted">@@</span>
-<span class="terminal-line terminal-diff-remove">- Old CTA copy</span>
-<span class="terminal-line terminal-diff-add">+ Keep WordPress in charge</span>
-<span class="terminal-line"><span class="terminal-prompt">$</span> git push origin trunk</span>
-<span class="terminal-line terminal-success">remote: checked WordPress permissions</span>
-<span class="terminal-line terminal-success">remote: stale state check passed</span>
-<span class="terminal-line terminal-success">remote: created WordPress revision #184</span>
-<span class="terminal-line terminal-success">remote: applied 1 Markdown change</span></code></pre>
-				<div class="terminal-summary">
-					<span>
+				<div class="terminal-summary" aria-label="Terminal tabs">
+					<span class="is-active">
 						<strong>.md</strong>
-						Markdown in Git
+						Markdown
 					</span>
 					<span>
 						<strong>WP</strong>
-						Roles and revisions
+						Roles
 					</span>
 					<span>
 						<strong>pull</strong>
-						Admin edits show up
+						Admin edits
 					</span>
+				</div>
+				<div class="terminal-body">
+					<div class="terminal-output" id="landing-terminal-output" aria-live="polite"></div>
+					<label class="terminal-input-row" for="landing-terminal-input">
+						<span class="terminal-prompt-chip">
+							<span class="terminal-prompt-user">push-md</span>
+							<span class="terminal-prompt-mark">:</span>
+							<span class="terminal-prompt-path" id="landing-terminal-cwd">~/site</span>
+							<span class="terminal-prompt-mark">$</span>
+						</span>
+						<span class="terminal-entry">
+							<input class="terminal-input" id="landing-terminal-input" type="text" autocomplete="off" spellcheck="false" placeholder="Type an emulated command" aria-label="Type an emulated command">
+							<span class="terminal-input-ghost" id="landing-terminal-input-ghost" aria-hidden="true"></span>
+						</span>
+					</label>
 				</div>
 			</div>
 		</section>
@@ -247,7 +248,7 @@
 	<footer class="site-footer">
 		<p>Push MD is part of the WordPress PHP Toolkit.</p>
 		<div>
-			<a href="../README.md">Developer docs</a>
+			<a href="https://github.com/Automattic/php-toolkit/tree/trunk/plugins/push-md/docs">Developer docs</a>
 			<a href="../prd.md">PRD</a>
 			<a href="https://github.com/WordPress/php-toolkit/tree/trunk/plugins/push-md">GitHub</a>
 		</div>
