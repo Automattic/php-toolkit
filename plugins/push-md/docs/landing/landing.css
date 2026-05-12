@@ -187,7 +187,7 @@ pre {
 	font-family: var(--serif);
 	font-size: clamp(44px, 4.9vw, 68px);
 	font-weight: 700;
-	line-height: 1.08;
+	line-height: 1.16;
 	text-wrap: balance;
 }
 
@@ -649,7 +649,7 @@ pre {
 
 	.hero h1 {
 		font-size: 40px;
-		line-height: 1.1;
+		line-height: 1.18;
 	}
 
 	.hero-subhead,
