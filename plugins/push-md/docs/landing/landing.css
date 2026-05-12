@@ -409,16 +409,19 @@ pre {
 	width: 100%;
 }
 
+.section-copy {
+	width: 100%;
+}
+
 .section-copy h2 {
-	max-width: 920px;
+	max-width: none;
 	font-family: var(--serif);
 	font-size: clamp(34px, 4.2vw, 58px);
 	line-height: 1.08;
-	text-wrap: balance;
 }
 
 .section-copy p {
-	max-width: 720px;
+	max-width: none;
 	margin: 18px 0 0;
 	font-size: 17px;
 }
