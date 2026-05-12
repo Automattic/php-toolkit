@@ -6,6 +6,18 @@ copy lives in `plugins/push-md/readme.txt`; this README explains
 implementation choices, release packaging, lifecycle behavior, and
 review-sensitive details.
 
+## Public Landing Page Draft
+
+A standalone public landing page draft lives in:
+
+```text
+plugins/push-md/docs/landing/index.html
+```
+
+It is intentionally static so it can be opened directly in a browser while the
+public site target is still undecided. The page positions Push MD as
+WordPress-as-source-of-truth for Git, agents, and Markdown workflows.
+
 ## What Push MD Does
 
 Push MD exposes supported WordPress content as a Git Smart HTTP remote at:

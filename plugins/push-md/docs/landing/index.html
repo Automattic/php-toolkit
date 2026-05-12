@@ -3,471 +3,257 @@
 <head>
 	<meta charset="utf-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1">
-	<title>Push MD</title>
-	<meta name="description" content="Placeholder landing page for Push MD, a WordPress plugin that exposes supported content as a Git remote.">
-	<style>
-		:root {
-			--ink: #18211d;
-			--muted: #53615b;
-			--paper: #f8faf7;
-			--panel: #ffffff;
-			--line: #dce5df;
-			--green: #177245;
-			--blue: #2c62d6;
-			--amber: #b45f06;
-			--soft-green: #e8f4ed;
-			--soft-blue: #eaf0ff;
-			--shadow: 0 24px 70px rgba( 24, 33, 29, 0.16 );
-		}
-
-		* {
-			box-sizing: border-box;
-		}
-
-		body {
-			margin: 0;
-			background: var( --paper );
-			color: var( --ink );
-			font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-			line-height: 1.5;
-		}
-
-		a {
-			color: inherit;
-		}
-
-		.site-header {
-			position: fixed;
-			top: 0;
-			left: 0;
-			z-index: 10;
-			display: flex;
-			align-items: center;
-			justify-content: space-between;
-			width: 100%;
-			padding: 18px clamp( 20px, 5vw, 72px );
-			background: rgba( 248, 250, 247, 0.84 );
-			border-bottom: 1px solid rgba( 220, 229, 223, 0.72 );
-			backdrop-filter: blur( 16px );
-		}
-
-		.brand {
-			display: flex;
-			align-items: center;
-			gap: 10px;
-			font-size: 0.96rem;
-			font-weight: 700;
-		}
-
-		.brand-mark {
-			display: grid;
-			width: 32px;
-			height: 32px;
-			place-items: center;
-			color: #ffffff;
-			background: var( --green );
-			border-radius: 8px;
-			font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-			font-size: 0.95rem;
-		}
-
-		.header-link {
-			color: var( --muted );
-			font-size: 0.92rem;
-			font-weight: 650;
-			text-decoration: none;
-		}
-
-		.hero {
-			position: relative;
-			display: flex;
-			align-items: center;
-			min-height: 84svh;
-			overflow: hidden;
-			padding: 118px clamp( 20px, 5vw, 72px ) 72px;
-			background: var( --paper );
-		}
-
-		.hero-scene {
-			position: absolute;
-			right: clamp( -260px, -10vw, -80px );
-			bottom: clamp( -110px, -6vw, -40px );
-			width: min( 820px, 74vw );
-			min-width: 560px;
-			transform: rotate( -3deg );
-			pointer-events: none;
-		}
-
-		.window {
-			overflow: hidden;
-			background: rgba( 255, 255, 255, 0.94 );
-			border: 1px solid rgba( 220, 229, 223, 0.96 );
-			border-radius: 8px;
-			box-shadow: var( --shadow );
-		}
-
-		.window-bar {
-			display: flex;
-			align-items: center;
-			gap: 7px;
-			height: 38px;
-			padding: 0 14px;
-			background: #eef4ef;
-			border-bottom: 1px solid var( --line );
-		}
-
-		.dot {
-			width: 10px;
-			height: 10px;
-			border-radius: 999px;
-			background: #d54b4b;
-		}
-
-		.dot:nth-child( 2 ) {
-			background: #d9a441;
-		}
-
-		.dot:nth-child( 3 ) {
-			background: #38a169;
-		}
-
-		.editor {
-			display: grid;
-			grid-template-columns: 180px 1fr;
-			min-height: 430px;
-		}
-
-		.file-tree {
-			padding: 22px 18px;
-			background: #f4f7f5;
-			border-right: 1px solid var( --line );
-			color: var( --muted );
-			font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-			font-size: 0.82rem;
-		}
-
-		.file-tree div {
-			margin: 0 0 13px;
-		}
-
-		.file-tree .active {
-			color: var( --green );
-			font-weight: 700;
-		}
-
-		.markdown-preview {
-			padding: 24px 28px;
-			background: #ffffff;
-			font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-			font-size: 0.86rem;
-			color: #23302a;
-		}
-
-		.markdown-preview .comment {
-			color: var( --muted );
-		}
-
-		.markdown-preview .key {
-			color: var( --amber );
-		}
-
-		.markdown-preview .command {
-			color: var( --blue );
-		}
-
-		.markdown-preview pre {
-			margin: 0;
-			white-space: pre-wrap;
-		}
-
-		.hero-copy {
-			position: relative;
-			z-index: 1;
-			width: min( 690px, 100% );
-		}
-
-		.status {
-			display: inline-flex;
-			align-items: center;
-			gap: 8px;
-			margin: 0 0 22px;
-			padding: 7px 10px;
-			color: #155d3a;
-			background: rgba( 232, 244, 237, 0.9 );
-			border: 1px solid rgba( 23, 114, 69, 0.2 );
-			border-radius: 8px;
-			font-size: 0.84rem;
-			font-weight: 700;
-		}
-
-		.status::before {
-			width: 8px;
-			height: 8px;
-			content: "";
-			background: var( --green );
-			border-radius: 999px;
-		}
-
-		h1 {
-			max-width: 11ch;
-			margin: 0;
-			font-size: 8.5rem;
-			font-weight: 800;
-			line-height: 0.88;
-		}
-
-		.lede {
-			max-width: 620px;
-			margin: 28px 0 0;
-			color: #314139;
-			font-size: 1.35rem;
-		}
-
-		.actions {
-			display: flex;
-			flex-wrap: wrap;
-			gap: 12px;
-			margin-top: 32px;
-		}
-
-		.button {
-			display: inline-flex;
-			align-items: center;
-			justify-content: center;
-			min-height: 44px;
-			padding: 0 18px;
-			border: 1px solid var( --ink );
-			border-radius: 8px;
-			font-weight: 750;
-			text-decoration: none;
-		}
-
-		.button.primary {
-			color: #ffffff;
-			background: var( --ink );
-		}
-
-		.button.secondary {
-			background: rgba( 255, 255, 255, 0.68 );
-		}
-
-		.content {
-			padding: 54px clamp( 20px, 5vw, 72px ) 70px;
-		}
-
-		.section-intro {
-			display: grid;
-			grid-template-columns: minmax( 0, 0.75fr ) minmax( 280px, 1fr );
-			gap: clamp( 28px, 6vw, 72px );
-			align-items: start;
-			max-width: 1180px;
-			margin: 0 auto;
-		}
-
-		h2 {
-			margin: 0;
-			font-size: 3.35rem;
-			line-height: 1;
-		}
-
-		.placeholder-note {
-			margin: 6px 0 0;
-			color: var( --muted );
-			font-size: 1.05rem;
-		}
-
-		.feature-grid {
-			display: grid;
-			grid-template-columns: repeat( 3, minmax( 0, 1fr ) );
-			gap: 14px;
-			max-width: 1180px;
-			margin: 46px auto 0;
-		}
-
-		.feature {
-			min-height: 190px;
-			padding: 24px;
-			background: var( --panel );
-			border: 1px solid var( --line );
-			border-radius: 8px;
-		}
-
-		.feature-icon {
-			display: grid;
-			width: 42px;
-			height: 42px;
-			margin-bottom: 22px;
-			place-items: center;
-			border-radius: 8px;
-			font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-			font-weight: 800;
-		}
-
-		.feature:nth-child( 1 ) .feature-icon {
-			color: var( --green );
-			background: var( --soft-green );
-		}
-
-		.feature:nth-child( 2 ) .feature-icon {
-			color: var( --blue );
-			background: var( --soft-blue );
-		}
-
-		.feature:nth-child( 3 ) .feature-icon {
-			color: var( --amber );
-			background: #fff2dc;
-		}
-
-		.feature h3 {
-			margin: 0 0 10px;
-			font-size: 1.12rem;
-		}
-
-		.feature p {
-			margin: 0;
-			color: var( --muted );
-		}
-
-		@media ( max-width: 860px ) {
-			.site-header {
-				position: absolute;
-			}
-
-			.hero {
-				align-items: flex-start;
-				min-height: 86svh;
-				padding-top: 112px;
-			}
-
-			.hero-scene {
-				right: -330px;
-				bottom: -130px;
-				opacity: 0.62;
-			}
-
-			.section-intro,
-			.feature-grid {
-				grid-template-columns: 1fr;
-			}
-
-			h1 {
-				font-size: 5.4rem;
-			}
-
-			h2 {
-				font-size: 2.5rem;
-			}
-		}
-
-		@media ( max-width: 560px ) {
-			.header-link {
-				display: none;
-			}
-
-			.hero {
-				min-height: 88svh;
-				padding-bottom: 46px;
-			}
-
-			.hero-scene {
-				right: -430px;
-				bottom: -150px;
-				opacity: 0.46;
-			}
-
-			h1 {
-				max-width: 8ch;
-				font-size: 3.6rem;
-			}
-
-			.lede {
-				font-size: 1.05rem;
-			}
-
-			.actions {
-				flex-direction: column;
-				align-items: stretch;
-			}
-		}
-	</style>
+	<title>Push MD - WordPress as the Git remote for agents</title>
+	<meta name="description" content="Push MD lets coding agents and Markdown-first teams work with WordPress content through Git while WordPress remains the source of truth.">
+	<link rel="stylesheet" href="landing.css">
 </head>
 <body>
-	<header class="site-header" aria-label="Site header">
-		<div class="brand">
-			<span class="brand-mark">MD</span>
+	<a class="skip-link" href="#main">Skip to content</a>
+
+	<header class="site-header">
+		<a class="brand" href="#top" aria-label="Push MD home">
+			<span class="brand-mark" aria-hidden="true">PMD</span>
 			<span>Push MD</span>
-		</div>
-		<a class="header-link" href="../prd.md">Read the PRD</a>
+		</a>
+		<nav class="site-nav" aria-label="Main navigation">
+			<a href="#how-it-works">Use cases</a>
+			<a href="#permissions">Permissions</a>
+			<a href="#agent-skills">Agent skills</a>
+			<a href="#faq">FAQ</a>
+			<a href="https://github.com/Automattic/php-toolkit/tree/trunk/plugins/push-md/docs">Docs</a>
+		</nav>
+		<a class="button button-primary" href="#install">Download plugin</a>
 	</header>
 
-	<main>
-		<section class="hero" aria-labelledby="hero-title">
-			<div class="hero-scene" aria-hidden="true">
-				<div class="window">
-					<div class="window-bar">
-						<span class="dot"></span>
-						<span class="dot"></span>
-						<span class="dot"></span>
-					</div>
-					<div class="editor">
-						<div class="file-tree">
-							<div class="active">post/hello-world.md</div>
-							<div>page/about.md</div>
-							<div>wp_template/home.html</div>
-							<div>wp_global_styles/theme.json</div>
-							<div>AGENTS.md</div>
-						</div>
-						<div class="markdown-preview">
-<pre><span class="comment"># Git remote for WordPress content</span>
-<span class="key">title:</span> Hello from Markdown
-<span class="key">status:</span> published
-
-Write in your editor.
-Review with Git.
-Push safely back to WordPress.
-
-<span class="command">$ git clone https://example.com/wp-json/git/v1/md.git</span>
-<span class="command">$ git push origin trunk</span></pre>
-						</div>
-					</div>
+	<main id="main" class="markdown-document">
+		<section class="hero" id="top" aria-labelledby="hero-title">
+			<div class="hero-copy">
+				<h1 id="hero-title"><span class="md-token">#</span> Markdown in Git. WordPress in charge.</h1>
+				<p class="hero-subhead">
+					Agents and any Git client work on ordinary <code>.md</code> files while your
+					WordPress database remains the source of truth. Push MD checks roles, creates
+					revisions, rejects stale pushes, and lets WordPress render the site.
+				</p>
+				<div class="hero-actions" aria-label="Primary actions">
+					<a class="button button-primary" href="#install">Download plugin</a>
+					<a class="button button-secondary" href="https://github.com/Automattic/php-toolkit/tree/trunk/plugins/push-md/docs">Read docs</a>
 				</div>
 			</div>
 
-			<div class="hero-copy">
-				<p class="status">Placeholder landing page</p>
-				<h1 id="hero-title">Push MD</h1>
-				<p class="lede">A WordPress plugin concept for editing supported posts, pages, block templates, and site styles through a normal Git remote.</p>
-				<div class="actions" aria-label="Primary links">
-					<a class="button primary" href="../prd.md">Read the PRD</a>
-					<a class="button secondary" href="../README.md">Developer notes</a>
+			<div class="terminal-card" role="application" aria-label="Push MD command emulator">
+				<div class="terminal-topline">
+					<span class="terminal-dots" aria-hidden="true">
+						<span></span>
+						<span></span>
+						<span></span>
+					</span>
+					<span id="landing-terminal-title">emulator:~/site</span>
+					<span class="terminal-status">trunk / WordPress remote</span>
+				</div>
+				<div class="terminal-summary" aria-label="Terminal tabs">
+					<span class="is-active">
+						<strong>.md</strong>
+						Markdown
+					</span>
+					<span>
+						<strong>WP</strong>
+						Roles
+					</span>
+					<span>
+						<strong>pull</strong>
+						Admin edits
+					</span>
+				</div>
+				<div class="terminal-body">
+					<div class="terminal-output" id="landing-terminal-output" aria-live="polite"></div>
+					<label class="terminal-input-row" for="landing-terminal-input">
+						<span class="terminal-prompt-chip">
+							<span class="terminal-prompt-user">push-md</span>
+							<span class="terminal-prompt-mark">:</span>
+							<span class="terminal-prompt-path" id="landing-terminal-cwd">~/site</span>
+							<span class="terminal-prompt-mark">$</span>
+						</span>
+						<span class="terminal-entry">
+							<input class="terminal-input" id="landing-terminal-input" type="text" autocomplete="off" spellcheck="false" placeholder="Type an emulated command" aria-label="Type an emulated command">
+							<span class="terminal-input-ghost" id="landing-terminal-input-ghost" aria-hidden="true"></span>
+						</span>
+					</label>
 				</div>
 			</div>
 		</section>
 
-		<section class="content" aria-labelledby="placeholder-title">
-			<div class="section-intro">
-				<h2 id="placeholder-title">Built from the product brief.</h2>
-				<p class="placeholder-note">This is temporary marketing copy and layout scaffolding for the docs site. The page summarizes the core promise from the PRD without locking in final brand, launch copy, or production assets.</p>
+		<section class="authority-strip" id="permissions" aria-label="Why WordPress stays authoritative">
+			<article>
+				<h2><span class="md-token">##</span> Markdown files</h2>
+				<p>Posts and pages appear as readable <code>.md</code> files for agents, diffs, and local editors.</p>
+			</article>
+			<article>
+				<h2><span class="md-token">##</span> WordPress remote</h2>
+				<p>Git clients clone directly from <code>/wp-json/git/v1/md.git</code>. There is no second repository to reconcile.</p>
+			</article>
+			<article>
+				<h2><span class="md-token">##</span> Existing roles</h2>
+				<p>Git over HTTPS uses WordPress authentication and respects current capabilities.</p>
+			</article>
+			<article>
+				<h2><span class="md-token">##</span> Revisions</h2>
+				<p>Accepted Markdown pushes go through WordPress APIs and create WordPress revisions.</p>
+			</article>
+		</section>
+
+		<section class="doc-section use-cases-section" id="how-it-works" aria-labelledby="use-cases-title">
+			<div class="section-copy">
+				<h2 id="use-cases-title"><span class="md-token">##</span> Use cases</h2>
+				<p>
+					Push MD is for teams that want Git-shaped work without moving the source of
+					truth out of WordPress. Use any Git client for agent runs, local Markdown edits,
+					and static-site-style publishing flows that still need WordPress roles and revisions.
+				</p>
 			</div>
 
-			<div class="feature-grid" aria-label="Product pillars">
-				<article class="feature">
-					<div class="feature-icon">git</div>
-					<h3>Clone WordPress content</h3>
-					<p>Expose supported site content through a Git Smart HTTP endpoint on the site's own REST API.</p>
+			<div class="use-case-list">
+				<article class="use-case-card" id="agent-skills">
+					<p class="callout-label">### coding agents</p>
+					<h3>Agents complete WordPress work through Git.</h3>
+					<p>
+						Give agents a normal checkout instead of a separate sync repo. WordPress
+						coordinates each run through authentication, stale-state checks, and revisions.
+					</p>
+					<ul class="task-list">
+						<li><code>[x]</code> Clone supported content from WordPress with any Git client.</li>
+						<li><code>[x]</code> Edit Markdown, block templates, and styles locally.</li>
+						<li><code>[x]</code> Carry site guidance in <code>AGENTS.md</code> and <code>SKILL.md</code>.</li>
+						<li><code>[x]</code> Push only after WordPress accepts the change.</li>
+					</ul>
 				</article>
-				<article class="feature">
-					<div class="feature-icon">md</div>
-					<h3>Edit readable files</h3>
-					<p>Represent posts and pages as Markdown, while keeping block theme structures in their native formats.</p>
+
+				<article class="use-case-card">
+					<p class="callout-label">### static site generators</p>
+					<h3>Static Site Generator or WordPress? Why not both?</h3>
+					<p>
+						If you like Astro, Jekyll, or a Markdown vault, use a local file tree while
+						WordPress keeps handling previews, roles, rendering, publishing, and revisions.
+					</p>
+					<ul class="task-list">
+						<li><code>[x]</code> Write posts and pages as Markdown.</li>
+						<li><code>[x]</code> Keep template parts as block HTML.</li>
+						<li><code>[x]</code> Version Global Styles as JSON.</li>
+						<li><code>[x]</code> Pull WP-Admin edits before the next local run.</li>
+					</ul>
+					<div class="file-map" aria-label="Static-site style file map">
+						<div>
+							<code>post/*.md</code>
+							<span>posts and revisions</span>
+						</div>
+						<div>
+							<code>page/**/*.md</code>
+							<span>pages and hierarchy</span>
+						</div>
+						<div>
+							<code>wp_template_part/**/*.html</code>
+							<span>Site Editor block markup</span>
+						</div>
+						<div>
+							<code>wp_global_styles/*.json</code>
+							<span>Global Styles overlays</span>
+						</div>
+					</div>
 				</article>
-				<article class="feature">
-					<div class="feature-icon">ok</div>
-					<h3>Fail closed on unsafe pushes</h3>
-					<p>Reject stale, unsupported, or ambiguous changes before WordPress content is modified.</p>
+			</div>
+		</section>
+
+		<section class="doc-section faq-section" id="faq" aria-labelledby="faq-title">
+			<div class="section-copy">
+				<h2 id="faq-title"><span class="md-token">##</span> FAQ</h2>
+				<p>
+					Short answers for the places where Git workflows usually get tangled with
+					WordPress publishing, permissions, and revision history.
+				</p>
+			</div>
+
+			<div class="faq-list">
+				<article class="faq-item">
+					<h3><span class="md-token">###</span> Is WordPress still the source of truth?</h3>
+					<p>
+						Yes. Your WordPress database stays authoritative. Git clients read and write
+						through Push MD, so there is no separate repository to reconcile.
+					</p>
 				</article>
+
+				<article class="faq-item">
+					<h3><span class="md-token">###</span> Does this work with any Git client?</h3>
+					<p>
+						Yes. Agents, terminals, desktop apps, and editors can use normal Git over HTTPS
+						against the WordPress remote.
+					</p>
+				</article>
+
+				<article class="faq-item">
+					<h3><span class="md-token">###</span> What happens when someone edits in WP-Admin?</h3>
+					<p>
+						WP-Admin edits become Git-visible on pull. If a local checkout is stale, Push MD
+						rejects the push before writing over newer WordPress content.
+					</p>
+				</article>
+
+				<article class="faq-item">
+					<h3><span class="md-token">###</span> How do permissions work?</h3>
+					<p>
+						Push MD uses WordPress authentication and Application Passwords, then respects the
+						current user's capabilities before accepting a write.
+					</p>
+				</article>
+
+				<article class="faq-item">
+					<h3><span class="md-token">###</span> Do pushes create revisions?</h3>
+					<p>
+						Accepted Markdown content pushes go through WordPress APIs and create WordPress
+						revisions, so changes remain reviewable in the usual WordPress history.
+					</p>
+				</article>
+
+				<article class="faq-item">
+					<h3><span class="md-token">###</span> Is this a static site generator?</h3>
+					<p>
+						No. It gives you the local-file workflow people like in static site generators,
+						while WordPress still handles previews, rendering, publishing, roles, and revisions.
+					</p>
+				</article>
+			</div>
+		</section>
+
+		<section class="doc-section install-section" id="install" aria-labelledby="install-title">
+			<div class="section-copy">
+				<h2 id="install-title"><span class="md-token">##</span> Clone WordPress like a Git remote.</h2>
+				<p>
+					Install Push MD, authenticate with a WordPress Application Password, then clone
+					the <code>trunk</code> branch from your site. Any Git client can talk to WordPress directly.
+				</p>
+			</div>
+			<div class="install-panel">
+				<ol class="install-steps">
+					<li>Install and activate the Push MD plugin.</li>
+					<li>Create or use a WordPress Application Password.</li>
+					<li>Clone the WordPress Git remote and work on <code>trunk</code>.</li>
+				</ol>
+				<div class="code-block">
+					<code id="clone-command">git clone https://example.com/wp-json/git/v1/md.git my-site</code>
+					<button class="copy-button" type="button" data-copy-target="clone-command">Copy</button>
+				</div>
+				<p class="install-note">Pushes to other branches are rejected. WordPress remains the source of truth.</p>
 			</div>
 		</section>
 	</main>
+
+	<footer class="site-footer">
+		<p>Push MD is part of the WordPress PHP Toolkit.</p>
+		<div>
+			<a href="https://github.com/Automattic/php-toolkit/tree/trunk/plugins/push-md/docs">Developer docs</a>
+			<a href="../prd.md">PRD</a>
+			<a href="https://github.com/WordPress/php-toolkit/tree/trunk/plugins/push-md">GitHub</a>
+		</div>
+	</footer>
+
+	<script src="landing.js"></script>
 </body>
 </html>
