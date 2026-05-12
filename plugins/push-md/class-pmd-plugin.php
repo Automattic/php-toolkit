@@ -14,11 +14,11 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
- * WP Origin – exposes WordPress as a Git remote.
+ * Push MD – exposes WordPress as a Git remote.
  *
  * Persistence model: the GitRepository is backed directly by a
  * WpdbFilesystem instance, so every Git object, ref, and config entry the
- * server creates lives in two `{$wpdb->prefix}wp_origin_*` tables. There
+ * server creates lives in two `{$wpdb->prefix}pmd_*` tables. There
  * is no parallel CPT/manifest layer — Git's own object store is the
  * source of truth for repository history. WordPress posts remain the
  * source of truth for content.
@@ -32,19 +32,19 @@ if ( ! defined( 'ABSPATH' ) ) {
  *   4. for pushes, walks the new commits and applies their Markdown
  *      changes back to WordPress.
  */
-class WP_Origin_Plugin {
+class PMD_Plugin {
 	const DEFAULT_BRANCH               = 'trunk';
 	const ROUTE_NAMESPACE              = 'git/v1';
 	const ROUTE_PATTERN                = '/md\.git(?P<path>/.*)?';
 	const EPOCH_TIMESTAMP              = 946684800;
-	const TABLE_PREFIX                 = 'wp_origin_';
-	const AGENT_SKILL_SOURCE           = 'wp-origin';
-	const AGENT_SKILL_SLUG             = 'wp-origin';
-	const AGENT_SKILL_TITLE            = 'WP Origin AGENTS.md';
-	const TEMPLATE_EDITOR_SKILL_SOURCE = 'wp-origin-template-editor';
-	const TEMPLATE_EDITOR_SKILL_SLUG   = 'wp-origin-template-editor';
-	const TEMPLATE_EDITOR_SKILL_TITLE  = 'WP Origin Template Editor';
-	const THEME_BASE_REF               = 'refs/remotes/wp-origin/theme-base';
+	const TABLE_PREFIX                 = 'pmd_';
+	const AGENT_SKILL_SOURCE           = 'push-md';
+	const AGENT_SKILL_SLUG             = 'push-md';
+	const AGENT_SKILL_TITLE            = 'Push MD AGENTS.md';
+	const TEMPLATE_EDITOR_SKILL_SOURCE = 'push-md-template-editor';
+	const TEMPLATE_EDITOR_SKILL_SLUG   = 'push-md-template-editor';
+	const TEMPLATE_EDITOR_SKILL_TITLE  = 'Push MD Template Editor';
+	const THEME_BASE_REF               = 'refs/remotes/push-md/theme-base';
 	const THEME_BASE_COMMIT_MESSAGE    = 'Initial theme base from WordPress';
 	const THEME_BASE_SYNC_MESSAGE      = 'Sync theme base from WordPress';
 	const WORDPRESS_SYNC_MESSAGE       = 'Sync from WordPress';
@@ -73,13 +73,13 @@ class WP_Origin_Plugin {
 		add_filter( 'rest_post_dispatch', array( __CLASS__, 'add_authentication_challenge' ), 10, 3 );
 		add_filter( 'rest_pre_serve_request', array( __CLASS__, 'serve_git_response' ), 10, 4 );
 
-		WP_Origin_Seeder::bootstrap();
-		WP_Origin_Admin::bootstrap();
+		PMD_Seeder::bootstrap();
+		PMD_Admin::bootstrap();
 	}
 
 	public static function on_activation() {
 		self::install_default_agent_skill();
-		WP_Origin_Seeder::on_activation();
+		PMD_Seeder::on_activation();
 	}
 
 	public static function install_default_agent_skill() {
@@ -90,7 +90,7 @@ class WP_Origin_Plugin {
 		wp_install_skill(
 			self::AGENT_SKILL_SOURCE,
 			self::AGENT_SKILL_TITLE,
-			'Guide for coding agents working in a WP Origin checkout of a WordPress site.',
+			'Guide for coding agents working in a Push MD checkout of a WordPress site.',
 			self::get_default_agent_skill_content(),
 			array(
 				'post_name' => self::AGENT_SKILL_SLUG,
@@ -100,7 +100,7 @@ class WP_Origin_Plugin {
 		wp_install_skill(
 			self::TEMPLATE_EDITOR_SKILL_SOURCE,
 			self::TEMPLATE_EDITOR_SKILL_TITLE,
-			'Edit WP Origin block theme templates and template parts as raw Gutenberg HTML while preserving Site Editor compatibility.',
+			'Edit Push MD block theme templates and template parts as raw Gutenberg HTML while preserving Site Editor compatibility.',
 			self::get_default_template_editor_skill_content(),
 			array(
 				'post_name' => self::TEMPLATE_EDITOR_SKILL_SLUG,
@@ -137,11 +137,11 @@ class WP_Origin_Plugin {
 
 	private static function get_default_agent_skill_content() {
 		return <<<'SKILL'
-# WP Origin AGENTS.md
+# Push MD AGENTS.md
 
 ## What This Repository Is
 
-This repository is a Git checkout of a WordPress site exposed by WP Origin. WordPress remains the source of truth. The Git history in this clone is a working view for review, editing, and agent workflows.
+This repository is a Git checkout of a WordPress site exposed by Push MD. WordPress remains the source of truth. The Git history in this clone is a working view for review, editing, and agent workflows.
 
 ## Repository Layout
 
@@ -173,7 +173,7 @@ This repository is a Git checkout of a WordPress site exposed by WP Origin. Word
 - Global Styles JSON files may be created or updated, but deletes and renames are rejected. `wp_global_styles/{theme}.json` is the database overlay for `wp_theme/{theme}/theme.json`.
 - Keep theme-scoped templates in their nested paths. For example, edit `wp_template_part/twentytwentyfive/footer.html`; do not create flattened files such as `wp_template_part/twentytwentyfive-footer.html`.
 - A path such as `wp_template_part/twentytwentyfive/footer.html` maps to the WordPress template-part ID `twentytwentyfive//footer`. The customized database post keeps the slug `footer` and stores `twentytwentyfive` in the `wp_theme` taxonomy.
-- Use the `wp-origin-template-editor` skill before editing `wp_template/*.html`, `wp_template_part/*.html`, or `wp_navigation/*.html`.
+- Use the `push-md-template-editor` skill before editing `wp_template/*.html`, `wp_template_part/*.html`, or `wp_navigation/*.html`.
 - Preserve unsupported block markup, fenced `gutenberg` blocks, custom blocks, and raw HTML unless the user asks for a conversion.
 - After template or Global Styles edits, run `git status --short` and confirm there are no unintended deleted files, renamed files, `wp_theme` changes, or flattened theme paths.
 - Use forward slashes in paths.
@@ -183,9 +183,9 @@ SKILL;
 
 	private static function get_default_template_editor_skill_content() {
 		return <<<'SKILL'
-# WP Origin Template Editor
+# Push MD Template Editor
 
-Use this skill when editing `wp_template/*.html`, `wp_template_part/*.html`, or `wp_navigation/*.html` in a WP Origin checkout.
+Use this skill when editing `wp_template/*.html`, `wp_template_part/*.html`, or `wp_navigation/*.html` in a Push MD checkout.
 
 ## What These Files Are
 
@@ -205,7 +205,7 @@ Theme-scoped paths are a filesystem view of WordPress template IDs. For example,
 - Do not edit `wp_theme/{theme}/theme.json`; use it to understand theme colors, spacing, typography, and layout settings. Edit `wp_global_styles/{theme}.json` when the user asks for site-wide theme.json-style changes.
 - Preserve unknown blocks, custom blocks, and existing block attributes unless the user explicitly asks to change them.
 - Preserve Gutenberg block comments. They are the block schema, not decorative comments.
-- Do not create theme, plugin, upload, or database files. WP Origin exposes content entities only.
+- Do not create theme, plugin, upload, or database files. Push MD exposes content entities only.
 - Use forward slashes in paths.
 
 ## Block Theme Markup Rules
@@ -262,7 +262,7 @@ SKILL;
 	public static function check_permissions( WP_REST_Request $request ) {
 		if ( ! is_user_logged_in() ) {
 			return new WP_Error(
-				'wp_origin_auth_required',
+				'pmd_auth_required',
 				'Authentication required.',
 				array( 'status' => 401 )
 			);
@@ -270,8 +270,8 @@ SKILL;
 
 		if ( ! self::current_user_can_read_exported_content() ) {
 			return new WP_Error(
-				'wp_origin_forbidden',
-				'You do not have permission to read all WP Origin content.',
+				'pmd_forbidden',
+				'You do not have permission to read all Push MD content.',
 				array( 'status' => 403 )
 			);
 		}
@@ -309,17 +309,17 @@ SKILL;
 		$previous_error_handler = set_error_handler( array( __CLASS__, 'throw_on_php_warning' ) ); // phpcs:ignore
 
 		try {
-			if ( ! WP_Origin_Seeder::is_ready() ) {
-				WP_Origin_Seeder::drive( 5 );
+			if ( ! PMD_Seeder::is_ready() ) {
+				PMD_Seeder::drive( 5 );
 			}
 
-			if ( ! WP_Origin_Seeder::is_ready() ) {
-				$response = new WP_Origin_Buffering_Response();
+			if ( ! PMD_Seeder::is_ready() ) {
+				$response = new PMD_Buffering_Response();
 				$response->send_http_code( 503 );
 				$response->send_header( 'Content-Type', 'text/plain; charset=utf-8' );
 				$response->send_header( 'Cache-Control', 'no-cache' );
 				$response->send_header( 'Retry-After', '15' );
-				$response->append_bytes( WP_Origin_Seeder::not_ready_message() . "\n" );
+				$response->append_bytes( PMD_Seeder::not_ready_message() . "\n" );
 
 				return $response->to_rest_response();
 			}
@@ -371,7 +371,7 @@ SKILL;
 				}
 			}
 
-			$response = new WP_Origin_Buffering_Response();
+			$response = new PMD_Buffering_Response();
 			$endpoint = new GitEndpoint( $repository );
 			$endpoint->handle_request( $git_path, $request_body, $response );
 
@@ -396,7 +396,7 @@ SKILL;
 			return $response->to_rest_response();
 		} catch ( Throwable $exception ) {
 			return new WP_Error(
-				'wp_origin_error',
+				'pmd_error',
 				self::get_throwable_message( $exception ),
 				array( 'status' => 500 )
 			);
@@ -413,14 +413,14 @@ SKILL;
 		}
 
 		$headers = $result->get_headers();
-		if ( empty( $headers[ WP_Origin_Buffering_Response::MARKER_HEADER ] ) ) {
+		if ( empty( $headers[ PMD_Buffering_Response::MARKER_HEADER ] ) ) {
 			return $served;
 		}
 
 		if ( ! headers_sent() ) {
 			status_header( $result->get_status() );
 			foreach ( $headers as $name => $value ) {
-				if ( WP_Origin_Buffering_Response::MARKER_HEADER === $name ) {
+				if ( PMD_Buffering_Response::MARKER_HEADER === $name ) {
 					continue;
 				}
 				header( $name . ': ' . $value );
@@ -445,13 +445,13 @@ SKILL;
 			return $response;
 		}
 
-		$response->header( 'WWW-Authenticate', 'Basic realm="WP Origin"' );
+		$response->header( 'WWW-Authenticate', 'Basic realm="Push MD"' );
 
 		return $response;
 	}
 
 	private static function build_protocol_error_response( $service, $message ) {
-		$response = new WP_Origin_Buffering_Response();
+		$response = new PMD_Buffering_Response();
 		$response->send_header( 'Content-Type', 'application/x-' . $service . '-result' );
 		$response->send_header( 'Cache-Control', 'no-cache' );
 		$response->send_header( 'Git-Protocol', 'version=2' );
@@ -476,7 +476,7 @@ SKILL;
 			$service = self::normalize_git_service( $query_params['service'] );
 			if ( '' === $service ) {
 				return new WP_Error(
-					'wp_origin_invalid_git_service',
+					'pmd_invalid_git_service',
 					'Unsupported Git service requested.',
 					array( 'status' => 400 )
 				);
@@ -529,10 +529,10 @@ SKILL;
 		);
 
 		if ( ! $repository->get_config_value( 'user.name' ) ) {
-			$repository->set_config_value( 'user.name', get_option( 'blogname', 'WP Origin' ) );
+			$repository->set_config_value( 'user.name', get_option( 'blogname', 'Push MD' ) );
 		}
 		if ( ! $repository->get_config_value( 'user.email' ) ) {
-			$repository->set_config_value( 'user.email', get_option( 'admin_email', 'wp-origin@example.com' ) );
+			$repository->set_config_value( 'user.email', get_option( 'admin_email', 'push-md@example.com' ) );
 		}
 
 		return $repository;
@@ -719,12 +719,12 @@ SKILL;
 		$can_read_all_exports   = current_user_can( 'edit_others_posts' );
 		foreach ( $posts as $post ) {
 			if ( ! $can_read_all_exports && ! current_user_can( 'read_post', intval( $post->ID ) ) ) {
-				throw new Exception( 'Git export rejected because you do not have permission to read all WP Origin content.' );
+				throw new Exception( 'Git export rejected because you do not have permission to read all Push MD content.' );
 			}
 
 			$path = self::build_markdown_path( $post );
 			if ( isset( $files[ $path ] ) ) {
-				throw new Exception( 'Git export rejected because multiple WordPress entities map to the same WP Origin path: ' . esc_html( $path ) );
+				throw new Exception( 'Git export rejected because multiple WordPress entities map to the same Push MD path: ' . esc_html( $path ) );
 			}
 
 			$content = self::export_post_to_markdown( $post );
@@ -778,11 +778,11 @@ SKILL;
 
 		$default_skills = array(
 			self::AGENT_SKILL_SLUG => array(
-				'description' => 'Guide for coding agents working in a WP Origin checkout of a WordPress site.',
+				'description' => 'Guide for coding agents working in a Push MD checkout of a WordPress site.',
 				'content'     => self::get_default_agent_skill_content(),
 			),
 			self::TEMPLATE_EDITOR_SKILL_SLUG => array(
-				'description' => 'Edit WP Origin block theme templates and template parts as raw Gutenberg HTML while preserving Site Editor compatibility.',
+				'description' => 'Edit Push MD block theme templates and template parts as raw Gutenberg HTML while preserving Site Editor compatibility.',
 				'content'     => self::get_default_template_editor_skill_content(),
 			),
 		);
@@ -1287,11 +1287,11 @@ SKILL;
 		$files          = array();
 		$default_skills = array(
 			self::AGENT_SKILL_SLUG => array(
-				'description' => 'Guide for coding agents working in a WP Origin checkout of a WordPress site.',
+				'description' => 'Guide for coding agents working in a Push MD checkout of a WordPress site.',
 				'content'     => self::get_default_agent_skill_content(),
 			),
 			self::TEMPLATE_EDITOR_SKILL_SLUG => array(
-				'description' => 'Edit WP Origin block theme templates and template parts as raw Gutenberg HTML while preserving Site Editor compatibility.',
+				'description' => 'Edit Push MD block theme templates and template parts as raw Gutenberg HTML while preserving Site Editor compatibility.',
 				'content'     => self::get_default_template_editor_skill_content(),
 			),
 		);
@@ -1378,7 +1378,7 @@ SKILL;
 				continue;
 			}
 			if ( self::is_theme_base_path( $path ) ) {
-				throw new Exception( 'Push rejected because theme base files are read-only in WP Origin. Edit template HTML files to create WordPress customizations instead.' );
+				throw new Exception( 'Push rejected because theme base files are read-only in Push MD. Edit template HTML files to create WordPress customizations instead.' );
 			}
 			if ( self::is_raw_block_path( $path ) ) {
 				self::assert_raw_block_html_has_no_front_matter( $entry['content'] );
@@ -1554,7 +1554,7 @@ SKILL;
 				continue;
 			}
 			if ( self::is_theme_base_path( $path ) ) {
-				throw new Exception( 'Push rejected because theme base files are read-only in WP Origin. Edit template HTML files to create WordPress customizations instead.' );
+				throw new Exception( 'Push rejected because theme base files are read-only in Push MD. Edit template HTML files to create WordPress customizations instead.' );
 			}
 		}
 	}
@@ -1618,7 +1618,7 @@ SKILL;
 				continue;
 			}
 			if ( ! isset( $old_files[ $path ] ) || ! self::repository_entries_match( $old_files[ $path ], $entry ) ) {
-				throw new Exception( 'Push rejected because symlink files are generated by WP Origin and cannot be created or modified.' );
+				throw new Exception( 'Push rejected because symlink files are generated by Push MD and cannot be created or modified.' );
 			}
 		}
 
@@ -1627,7 +1627,7 @@ SKILL;
 				continue;
 			}
 			if ( ! isset( $new_files[ $path ] ) || ! self::repository_entries_match( $entry, $new_files[ $path ] ) ) {
-				throw new Exception( 'Push rejected because symlink files are generated by WP Origin and cannot be deleted or modified.' );
+				throw new Exception( 'Push rejected because symlink files are generated by Push MD and cannot be deleted or modified.' );
 			}
 		}
 	}
@@ -1638,7 +1638,7 @@ SKILL;
 				continue;
 			}
 			if ( ! isset( $old_files[ $path ] ) || ! self::repository_entries_match( $old_files[ $path ], $entry ) ) {
-				throw new Exception( 'Push rejected because executable file modes are not supported by WP Origin content exports.' );
+				throw new Exception( 'Push rejected because executable file modes are not supported by Push MD content exports.' );
 			}
 		}
 	}
@@ -2145,7 +2145,7 @@ SKILL;
 
 		$messages   = array();
 		$messages[] = sprintf(
-			'WP Origin applied %d content %s:',
+			'Push MD applied %d content %s:',
 			count( $push_summary ),
 			1 === count( $push_summary ) ? 'change' : 'changes'
 		);
@@ -2963,14 +2963,14 @@ SKILL;
 		}
 		if ( 1 !== count( $commands ) ) {
 			return array(
-				'error' => 'Push rejected because WP Origin only accepts one ref update at a time.',
+				'error' => 'Push rejected because Push MD only accepts one ref update at a time.',
 			);
 		}
 
 		$command = $commands[0];
 		if ( 'refs/heads/' . self::DEFAULT_BRANCH !== $command['ref'] ) {
 			return array(
-				'error' => 'Push rejected because WP Origin only accepts pushes to trunk.',
+				'error' => 'Push rejected because Push MD only accepts pushes to trunk.',
 			);
 		}
 		if ( Commit::is_null_hash( $command['new_oid'] ) ) {

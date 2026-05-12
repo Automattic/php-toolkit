@@ -58,17 +58,17 @@ class GitProtocolEncoderPipeTest extends TestCase {
 		$encoded = GitProtocolEncoderPipe::encode_tree_bytes(
 			new Tree(
 				array(
-					'wp-origin'                 => new TreeEntry(
+					'push-md'                 => new TreeEntry(
 						array(
 							'mode' => TreeEntry::FILE_MODE_DIRECTORY,
-							'name' => 'wp-origin',
+							'name' => 'push-md',
 							'hash' => str_repeat( '0', 40 ),
 						)
 					),
-					'wp-origin-template-editor' => new TreeEntry(
+					'push-md-template-editor' => new TreeEntry(
 						array(
 							'mode' => TreeEntry::FILE_MODE_DIRECTORY,
-							'name' => 'wp-origin-template-editor',
+							'name' => 'push-md-template-editor',
 							'hash' => str_repeat( '1', 40 ),
 						)
 					),
@@ -77,8 +77,8 @@ class GitProtocolEncoderPipeTest extends TestCase {
 		);
 
 		$this->assertLessThan(
-			strpos( $encoded, "40000 wp-origin\0" ),
-			strpos( $encoded, "40000 wp-origin-template-editor\0" )
+			strpos( $encoded, "40000 push-md\0" ),
+			strpos( $encoded, "40000 push-md-template-editor\0" )
 		);
 	}
 }

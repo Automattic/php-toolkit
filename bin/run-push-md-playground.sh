@@ -2,11 +2,11 @@
 set -eu
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-PORT="${WP_ORIGIN_PLAYGROUND_PORT:-${1:-9400}}"
+PORT="${PUSH_MD_PLAYGROUND_PORT:-${1:-9400}}"
 CONTEXT_DIR="$ROOT_DIR/.context"
-BLUEPRINT_TEMPLATE="$ROOT_DIR/plugins/wp-origin/blueprint-e2e.json"
-BLUEPRINT_FILE="$CONTEXT_DIR/wp-origin-playground-$PORT.json"
-CREDENTIALS_FILE="$CONTEXT_DIR/wp-origin-e2e-$PORT.json"
+BLUEPRINT_TEMPLATE="$ROOT_DIR/plugins/push-md/blueprint-e2e.json"
+BLUEPRINT_FILE="$CONTEXT_DIR/push-md-playground-$PORT.json"
+CREDENTIALS_FILE="$CONTEXT_DIR/push-md-e2e-$PORT.json"
 
 if command -v wp-playground >/dev/null 2>&1; then
 	PLAYGROUND_CMD=(wp-playground)
@@ -33,7 +33,7 @@ if ( false === $template ) {
 	fwrite( STDERR, "Unable to read blueprint template.\n" );
 	exit( 1 );
 }
-$blueprint = str_replace( "__WP_ORIGIN_CREDENTIALS_FILE__", $argv[2], $template );
+$blueprint = str_replace( "__PUSH_MD_CREDENTIALS_FILE__", $argv[2], $template );
 if ( false === file_put_contents( $argv[3], $blueprint ) ) {
 	fwrite( STDERR, "Unable to write playground blueprint.\n" );
 	exit( 1 );
@@ -54,7 +54,7 @@ PLAYGROUND_WP_VERSION="$(php -r '$config = json_decode(file_get_contents($argv[1
 	--mount="$ROOT_DIR:/workspace" \
 	--mount="$ROOT_DIR/vendor:/wordpress/wp-content/vendor" \
 	--mount="$ROOT_DIR/components:/wordpress/wp-content/components" \
-	--mount="$ROOT_DIR/plugins/wp-origin:/wordpress/wp-content/plugins/wp-origin" &
+	--mount="$ROOT_DIR/plugins/push-md:/wordpress/wp-content/plugins/push-md" &
 PLAYGROUND_PID=$!
 
 for _ in $(seq 1 120); do
@@ -69,7 +69,7 @@ for _ in $(seq 1 120); do
 done
 
 if [ ! -f "$CREDENTIALS_FILE" ]; then
-	echo "WP Origin Playground did not produce credentials at $CREDENTIALS_FILE." >&2
+	echo "Push MD Playground did not produce credentials at $CREDENTIALS_FILE." >&2
 	exit 1
 fi
 
@@ -77,7 +77,7 @@ USERNAME="$(php -r 'echo json_decode(file_get_contents($argv[1]), true)["usernam
 PASSWORD="$(php -r 'echo json_decode(file_get_contents($argv[1]), true)["password"];' "$CREDENTIALS_FILE")"
 
 cat <<EOF
-WP Origin Playground is ready.
+Push MD Playground is ready.
 
 Site URL: http://127.0.0.1:$PORT
 Credentials file: $CREDENTIALS_FILE

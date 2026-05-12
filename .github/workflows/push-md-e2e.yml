@@ -1,4 +1,4 @@
-name: WP Origin E2E
+name: Push MD E2E
 
 on:
   pull_request:
@@ -7,7 +7,7 @@ on:
 
 jobs:
   e2e:
-    name: WP Origin E2E
+    name: Push MD E2E
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
@@ -79,7 +79,7 @@ jobs:
           PHP
           wp --path="$WP_DIR" core install \
             --url="$WP_URL" \
-            --title="WP Origin E2E" \
+            --title="Push MD E2E" \
             --admin_user="$WP_ADMIN_USER" \
             --admin_email="admin@example.com" \
             --admin_password="$WP_ADMIN_PASS" \
@@ -121,38 +121,38 @@ jobs:
       - name: Install CI seeder helper as a mu-plugin
         run: |
           mkdir -p "$WP_DIR/wp-content/mu-plugins"
-          cp "$GITHUB_WORKSPACE/plugins/wp-origin/Tests/ci-mu-test-helper.php" \
-            "$WP_DIR/wp-content/mu-plugins/wp-origin-ci-test-helper.php"
+          cp "$GITHUB_WORKSPACE/plugins/push-md/Tests/ci-mu-test-helper.php" \
+            "$WP_DIR/wp-content/mu-plugins/push-md-ci-test-helper.php"
 
       - name: Mount toolkit components and activate plugin
         run: |
-          rm -rf "$WP_DIR/wp-content/plugins/wp-origin"
-          ln -s "$GITHUB_WORKSPACE/plugins/wp-origin" "$WP_DIR/wp-content/plugins/wp-origin"
+          rm -rf "$WP_DIR/wp-content/plugins/push-md"
+          ln -s "$GITHUB_WORKSPACE/plugins/push-md" "$WP_DIR/wp-content/plugins/push-md"
           ln -s "$GITHUB_WORKSPACE/components" "$WP_DIR/wp-content/components"
           ln -s "$GITHUB_WORKSPACE/vendor" "$WP_DIR/wp-content/vendor"
-          wp --path="$WP_DIR" plugin activate wp-origin
+          wp --path="$WP_DIR" plugin activate push-md
 
       - name: Drive seeder cron until done
         run: |
           for i in $(seq 1 30); do
             wp --path="$WP_DIR" cron event run --due-now > /dev/null 2>&1 || true
-            STATE=$(wp --path="$WP_DIR" option get wp_origin_seed_state 2>/dev/null || echo "pending")
+            STATE=$(wp --path="$WP_DIR" option get pmd_seed_state 2>/dev/null || echo "pending")
             echo "tick $i: state=$STATE"
             if [ "$STATE" = "done" ]; then exit 0; fi
             if [ "$STATE" = "failed" ]; then
-              wp --path="$WP_DIR" option get wp_origin_seed_progress
+              wp --path="$WP_DIR" option get pmd_seed_progress
               exit 1
             fi
             sleep 1
           done
           echo "Seeder never reached 'done' state." >&2
-          wp --path="$WP_DIR" option get wp_origin_seed_progress
+          wp --path="$WP_DIR" option get pmd_seed_progress
           exit 1
 
       - name: Create Application Password
         id: app_password
         run: |
-          PASSWORD=$(wp --path="$WP_DIR" user application-password create "$WP_ADMIN_USER" "WP Origin E2E" --porcelain)
+          PASSWORD=$(wp --path="$WP_DIR" user application-password create "$WP_ADMIN_USER" "Push MD E2E" --porcelain)
           PASSWORD=${PASSWORD// /}
           echo "::add-mask::$PASSWORD"
           echo "password=$PASSWORD" >> "$GITHUB_OUTPUT"
@@ -160,7 +160,7 @@ jobs:
       - name: Start PHP built-in server
         run: |
           cd "$WP_DIR"
-          nohup php -S 127.0.0.1:8080 -t . "$GITHUB_WORKSPACE/plugins/wp-origin/Tests/php-server-router.php" > /tmp/php-server.log 2>&1 &
+          nohup php -S 127.0.0.1:8080 -t . "$GITHUB_WORKSPACE/plugins/push-md/Tests/php-server-router.php" > /tmp/php-server.log 2>&1 &
           echo $! > /tmp/server.pid
           for _ in $(seq 1 30); do
             if curl -fsS "$WP_URL/wp-json/" > /dev/null 2>&1; then exit 0; fi
@@ -172,10 +172,10 @@ jobs:
 
       - name: Run E2E tests
         env:
-          WP_ORIGIN_E2E_BASE_URL: ${{ env.WP_URL }}
-          WP_ORIGIN_E2E_USERNAME: ${{ env.WP_ADMIN_USER }}
-          WP_ORIGIN_E2E_PASSWORD: ${{ steps.app_password.outputs.password }}
-        run: vendor/bin/phpunit --testsuite "WP Origin E2E"
+          PUSH_MD_E2E_BASE_URL: ${{ env.WP_URL }}
+          PUSH_MD_E2E_USERNAME: ${{ env.WP_ADMIN_USER }}
+          PUSH_MD_E2E_PASSWORD: ${{ steps.app_password.outputs.password }}
+        run: vendor/bin/phpunit --testsuite "Push MD E2E"
 
       - name: Print PHP server log on failure
         if: failure()

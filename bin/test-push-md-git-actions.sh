@@ -3,9 +3,9 @@ set -eu
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 WORK_DIR="$(mktemp -d)"
-DEFAULT_PORT="${WP_ORIGIN_E2E_PORT:-}"
-PLAYGROUND_LOG="$ROOT_DIR/.context/wp-origin-playground.log"
-BLUEPRINT_TEMPLATE="$ROOT_DIR/plugins/wp-origin/blueprint-e2e.json"
+DEFAULT_PORT="${PUSH_MD_E2E_PORT:-}"
+PLAYGROUND_LOG="$ROOT_DIR/.context/push-md-playground.log"
+BLUEPRINT_TEMPLATE="$ROOT_DIR/plugins/push-md/blueprint-e2e.json"
 
 find_free_port() {
 	php -r '$server = stream_socket_server("tcp://127.0.0.1:0", $errno, $errstr); if (false === $server) { fwrite(STDERR, $errstr . PHP_EOL); exit(1); } $name = stream_socket_get_name($server, false); fclose($server); echo substr(strrchr($name, ":"), 1);'
@@ -17,7 +17,7 @@ else
 	PORT="$(find_free_port)"
 fi
 
-CREDENTIALS_FILE="$ROOT_DIR/.context/wp-origin-e2e-$PORT.json"
+CREDENTIALS_FILE="$ROOT_DIR/.context/push-md-e2e-$PORT.json"
 BLUEPRINT_FILE="$WORK_DIR/blueprint-e2e.json"
 MU_PLUGINS_DIR="$WORK_DIR/mu-plugins"
 
@@ -42,14 +42,14 @@ trap cleanup EXIT INT TERM
 mkdir -p "$ROOT_DIR/.context"
 mkdir -p "$MU_PLUGINS_DIR"
 rm -f "$PLAYGROUND_LOG" "$CREDENTIALS_FILE"
-cp "$ROOT_DIR/plugins/wp-origin/Tests/ci-mu-test-helper.php" "$MU_PLUGINS_DIR/wp-origin-ci-test-helper.php"
-cat > "$MU_PLUGINS_DIR/wp-origin-e2e-auth.php" <<'PHP'
+cp "$ROOT_DIR/plugins/push-md/Tests/ci-mu-test-helper.php" "$MU_PLUGINS_DIR/push-md-ci-test-helper.php"
+cat > "$MU_PLUGINS_DIR/push-md-e2e-auth.php" <<'PHP'
 <?php
 add_filter( 'wp_is_application_passwords_available', '__return_true' );
 PHP
 
 cd "$ROOT_DIR"
-sed "s|__WP_ORIGIN_CREDENTIALS_FILE__|/workspace/.context/$(basename "$CREDENTIALS_FILE")|g" "$BLUEPRINT_TEMPLATE" > "$BLUEPRINT_FILE"
+sed "s|__PUSH_MD_CREDENTIALS_FILE__|/workspace/.context/$(basename "$CREDENTIALS_FILE")|g" "$BLUEPRINT_TEMPLATE" > "$BLUEPRINT_FILE"
 PLAYGROUND_PHP_VERSION="$(php -r '$config = json_decode(file_get_contents($argv[1]), true); echo $config["preferredVersions"]["php"];' "$BLUEPRINT_FILE")"
 PLAYGROUND_WP_VERSION="$(php -r '$config = json_decode(file_get_contents($argv[1]), true); echo $config["preferredVersions"]["wp"];' "$BLUEPRINT_FILE")"
 
@@ -62,7 +62,7 @@ $PLAYGROUND_CMD server \
 	--mount="$ROOT_DIR:/workspace" \
 	--mount="$ROOT_DIR/vendor:/wordpress/wp-content/vendor" \
 	--mount="$ROOT_DIR/components:/wordpress/wp-content/components" \
-	--mount="$ROOT_DIR/plugins/wp-origin:/wordpress/wp-content/plugins/wp-origin" \
+	--mount="$ROOT_DIR/plugins/push-md:/wordpress/wp-content/plugins/push-md" \
 	--mount="$MU_PLUGINS_DIR:/wordpress/wp-content/mu-plugins" \
 	>"$PLAYGROUND_LOG" 2>&1 &
 PLAYGROUND_PID=$!
@@ -76,7 +76,7 @@ done
 
 if [ ! -f "$CREDENTIALS_FILE" ]; then
 	cat "$PLAYGROUND_LOG"
-	echo "WP Origin e2e setup did not produce credentials." >&2
+	echo "Push MD e2e setup did not produce credentials." >&2
 	exit 1
 fi
 
@@ -100,7 +100,7 @@ assert_push_summary_contains() {
 
 wait_for_seed_done() {
 	for _ in $(seq 1 120); do
-		STATUS_JSON="$(curl -sS -f -H "Authorization: Basic $AUTH_HEADER" "$BASE_URL/wp-json/wp-origin/v1/seed-status" || true)"
+		STATUS_JSON="$(curl -sS -f -H "Authorization: Basic $AUTH_HEADER" "$BASE_URL/wp-json/push-md/v1/seed-status" || true)"
 		STATE="$(printf '%s' "$STATUS_JSON" | php -r '$state = json_decode(stream_get_contents(STDIN), true); echo is_array($state) && isset($state["state"]) ? $state["state"] : "";')"
 		if [ "$STATE" = "done" ]; then
 			return
@@ -109,7 +109,7 @@ wait_for_seed_done() {
 	done
 
 	cat "$PLAYGROUND_LOG"
-	echo "WP Origin seeder did not finish." >&2
+	echo "Push MD seeder did not finish." >&2
 	exit 1
 }
 
@@ -193,8 +193,8 @@ find "$CLONE_DIR/wp_template" -mindepth 2 -name '*.html' | grep -q .
 find "$CLONE_DIR/wp_template_part" -mindepth 2 -name '*.html' | grep -q .
 find "$CLONE_DIR/wp_theme" -mindepth 2 -maxdepth 2 -name theme.json | grep -q .
 find "$CLONE_DIR/wp_global_styles" -maxdepth 1 -name '*.json' | grep -q .
-test -f "$CLONE_DIR/wp_guideline/skills/wp-origin/SKILL.md"
-test -f "$CLONE_DIR/wp_guideline/skills/wp-origin-template-editor/SKILL.md"
+test -f "$CLONE_DIR/wp_guideline/skills/push-md/SKILL.md"
+test -f "$CLONE_DIR/wp_guideline/skills/push-md-template-editor/SKILL.md"
 test -L "$CLONE_DIR/.agents/skills"
 test -L "$CLONE_DIR/.claude/skills"
 test -L "$CLONE_DIR/AGENTS.md"
@@ -209,33 +209,33 @@ grep -Fq 'description: "Hand-authored summary."' "$CLONE_DIR/post/hello-world.md
 grep -Eq '^date: "[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z"$' "$CLONE_DIR/post/hello-world.md"
 grep -Eq '^id: "[1-9][0-9]*"$' "$CLONE_DIR/post/hello-world.md"
 ! grep -Eq '^(type|slug|date_gmt|modified_gmt):' "$CLONE_DIR/post/hello-world.md"
-head -n 1 "$CLONE_DIR/wp_guideline/skills/wp-origin/SKILL.md" | grep -Fxq -- '---'
-grep -Fq 'name: "wp-origin"' "$CLONE_DIR/wp_guideline/skills/wp-origin/SKILL.md"
-grep -Fq 'description: "Guide for coding agents working in a WP Origin checkout of a WordPress site."' "$CLONE_DIR/wp_guideline/skills/wp-origin/SKILL.md"
-grep -Fq '# WP Origin AGENTS.md' "$CLONE_DIR/wp_guideline/skills/wp-origin/SKILL.md"
-grep -Fq 'This repository is a Git checkout of a WordPress site' "$CLONE_DIR/wp_guideline/skills/wp-origin/SKILL.md"
-grep -Fq '`wp_global_styles/{theme}.json` contains the editable Global Styles overlay' "$CLONE_DIR/wp_guideline/skills/wp-origin/SKILL.md"
-grep -Fq 'do not create flattened files such as `wp_template_part/twentytwentyfive-footer.html`' "$CLONE_DIR/wp_guideline/skills/wp-origin/SKILL.md"
-grep -Fq 'The customized database post keeps the slug `footer` and stores `twentytwentyfive` in the `wp_theme` taxonomy.' "$CLONE_DIR/wp_guideline/skills/wp-origin/SKILL.md"
-head -n 1 "$CLONE_DIR/wp_guideline/skills/wp-origin-template-editor/SKILL.md" | grep -Fxq -- '---'
-grep -Fq 'name: "wp-origin-template-editor"' "$CLONE_DIR/wp_guideline/skills/wp-origin-template-editor/SKILL.md"
-grep -Fq 'description: "Edit WP Origin block theme templates and template parts as raw Gutenberg HTML while preserving Site Editor compatibility."' "$CLONE_DIR/wp_guideline/skills/wp-origin-template-editor/SKILL.md"
-grep -Fq '# WP Origin Template Editor' "$CLONE_DIR/wp_guideline/skills/wp-origin-template-editor/SKILL.md"
-grep -Fq 'maps to the template-part ID `twentytwentyfive//footer`' "$CLONE_DIR/wp_guideline/skills/wp-origin-template-editor/SKILL.md"
-grep -Fq 'Do not flatten theme-scoped paths into files such as `wp_template_part/twentytwentyfive-footer.html`' "$CLONE_DIR/wp_guideline/skills/wp-origin-template-editor/SKILL.md"
-grep -Fq 'Edit `wp_global_styles/{theme}.json` when the user asks for site-wide theme.json-style changes.' "$CLONE_DIR/wp_guideline/skills/wp-origin-template-editor/SKILL.md"
-grep -Fq 'Prefer editable core blocks' "$CLONE_DIR/wp_guideline/skills/wp-origin-template-editor/SKILL.md"
-grep -Fq 'Run `git status --short` before committing or pushing' "$CLONE_DIR/wp_guideline/skills/wp-origin-template-editor/SKILL.md"
-grep -Fq 'This repository is a Git checkout of a WordPress site' "$CLONE_DIR/.agents/skills/wp-origin/SKILL.md"
-grep -Fq '# WP Origin Template Editor' "$CLONE_DIR/.agents/skills/wp-origin-template-editor/SKILL.md"
-grep -Fq 'This repository is a Git checkout of a WordPress site' "$CLONE_DIR/.claude/skills/wp-origin/SKILL.md"
-grep -Fq '# WP Origin Template Editor' "$CLONE_DIR/.claude/skills/wp-origin-template-editor/SKILL.md"
+head -n 1 "$CLONE_DIR/wp_guideline/skills/push-md/SKILL.md" | grep -Fxq -- '---'
+grep -Fq 'name: "push-md"' "$CLONE_DIR/wp_guideline/skills/push-md/SKILL.md"
+grep -Fq 'description: "Guide for coding agents working in a Push MD checkout of a WordPress site."' "$CLONE_DIR/wp_guideline/skills/push-md/SKILL.md"
+grep -Fq '# Push MD AGENTS.md' "$CLONE_DIR/wp_guideline/skills/push-md/SKILL.md"
+grep -Fq 'This repository is a Git checkout of a WordPress site' "$CLONE_DIR/wp_guideline/skills/push-md/SKILL.md"
+grep -Fq '`wp_global_styles/{theme}.json` contains the editable Global Styles overlay' "$CLONE_DIR/wp_guideline/skills/push-md/SKILL.md"
+grep -Fq 'do not create flattened files such as `wp_template_part/twentytwentyfive-footer.html`' "$CLONE_DIR/wp_guideline/skills/push-md/SKILL.md"
+grep -Fq 'The customized database post keeps the slug `footer` and stores `twentytwentyfive` in the `wp_theme` taxonomy.' "$CLONE_DIR/wp_guideline/skills/push-md/SKILL.md"
+head -n 1 "$CLONE_DIR/wp_guideline/skills/push-md-template-editor/SKILL.md" | grep -Fxq -- '---'
+grep -Fq 'name: "push-md-template-editor"' "$CLONE_DIR/wp_guideline/skills/push-md-template-editor/SKILL.md"
+grep -Fq 'description: "Edit Push MD block theme templates and template parts as raw Gutenberg HTML while preserving Site Editor compatibility."' "$CLONE_DIR/wp_guideline/skills/push-md-template-editor/SKILL.md"
+grep -Fq '# Push MD Template Editor' "$CLONE_DIR/wp_guideline/skills/push-md-template-editor/SKILL.md"
+grep -Fq 'maps to the template-part ID `twentytwentyfive//footer`' "$CLONE_DIR/wp_guideline/skills/push-md-template-editor/SKILL.md"
+grep -Fq 'Do not flatten theme-scoped paths into files such as `wp_template_part/twentytwentyfive-footer.html`' "$CLONE_DIR/wp_guideline/skills/push-md-template-editor/SKILL.md"
+grep -Fq 'Edit `wp_global_styles/{theme}.json` when the user asks for site-wide theme.json-style changes.' "$CLONE_DIR/wp_guideline/skills/push-md-template-editor/SKILL.md"
+grep -Fq 'Prefer editable core blocks' "$CLONE_DIR/wp_guideline/skills/push-md-template-editor/SKILL.md"
+grep -Fq 'Run `git status --short` before committing or pushing' "$CLONE_DIR/wp_guideline/skills/push-md-template-editor/SKILL.md"
+grep -Fq 'This repository is a Git checkout of a WordPress site' "$CLONE_DIR/.agents/skills/push-md/SKILL.md"
+grep -Fq '# Push MD Template Editor' "$CLONE_DIR/.agents/skills/push-md-template-editor/SKILL.md"
+grep -Fq 'This repository is a Git checkout of a WordPress site' "$CLONE_DIR/.claude/skills/push-md/SKILL.md"
+grep -Fq '# Push MD Template Editor' "$CLONE_DIR/.claude/skills/push-md-template-editor/SKILL.md"
 grep -Fq 'This repository is a Git checkout of a WordPress site' "$CLONE_DIR/AGENTS.md"
 grep -Fq 'This repository is a Git checkout of a WordPress site' "$CLONE_DIR/CLAUDE.md"
 [ "$(readlink "$CLONE_DIR/.agents/skills")" = "../wp_guideline/skills" ]
 [ "$(readlink "$CLONE_DIR/.claude/skills")" = "../wp_guideline/skills" ]
-[ "$(readlink "$CLONE_DIR/AGENTS.md")" = "wp_guideline/skills/wp-origin/SKILL.md" ]
-[ "$(readlink "$CLONE_DIR/CLAUDE.md")" = "wp_guideline/skills/wp-origin/SKILL.md" ]
+[ "$(readlink "$CLONE_DIR/AGENTS.md")" = "wp_guideline/skills/push-md/SKILL.md" ]
+[ "$(readlink "$CLONE_DIR/CLAUDE.md")" = "wp_guideline/skills/push-md/SKILL.md" ]
 
 POST_ID="$(curl -sS -f -H "Authorization: Basic $AUTH_HEADER" "$BASE_URL/wp-json/wp/v2/posts?slug=hello-world&context=edit" | php -r '
 $posts = json_decode(stream_get_contents(STDIN), true);
@@ -251,8 +251,8 @@ echo count($revisions);
 ')"
 
 cd "$CLONE_DIR"
-git config user.name "WP Origin E2E"
-git config user.email "wp-origin-e2e@example.com"
+git config user.name "Push MD E2E"
+git config user.email "push-md-e2e@example.com"
 
 grep -Fq "id: \"$PAGE_ID\"" "$CLONE_DIR/page/sample-page.md"
 git mv page/sample-page.md page/renamed-sample-page.md
@@ -265,7 +265,7 @@ file_put_contents($path, $contents);
 git add -A
 git commit -m "Rename page from Git"
 PUSH_OUTPUT="$(git push origin trunk 2>&1)"
-assert_push_summary_contains "$PUSH_OUTPUT" 'WP Origin applied 1 content change:'
+assert_push_summary_contains "$PUSH_OUTPUT" 'Push MD applied 1 content change:'
 assert_push_summary_contains "$PUSH_OUTPUT" '/renamed-sample-page/'
 curl -sS -f -H "Authorization: Basic $AUTH_HEADER" "$BASE_URL/wp-json/wp/v2/pages?slug=renamed-sample-page&context=edit" | php -r '
 $pages = json_decode(stream_get_contents(STDIN), true);
@@ -299,7 +299,7 @@ MARKDOWN
 git add "page/$PARENT_A_SLUG/$GIT_CHILD_SLUG.md"
 git commit -m "Create nested child page from Git"
 PUSH_OUTPUT="$(git push origin trunk 2>&1)"
-assert_push_summary_contains "$PUSH_OUTPUT" 'WP Origin applied 1 content change:'
+assert_push_summary_contains "$PUSH_OUTPUT" 'Push MD applied 1 content change:'
 assert_push_summary_contains "$PUSH_OUTPUT" "$GIT_CHILD_SLUG"
 curl -sS -f -H "Authorization: Basic $AUTH_HEADER" "$BASE_URL/wp-json/wp/v2/pages?slug=$GIT_CHILD_SLUG&context=edit" | php -r '
 $pages = json_decode(stream_get_contents(STDIN), true);
@@ -333,7 +333,7 @@ if PUSH_OUTPUT="$(git push origin trunk 2>&1)"; then
 	echo "Expected theme base JSON push to fail." >&2
 	exit 1
 fi
-assert_push_summary_contains "$PUSH_OUTPUT" 'Push rejected because theme base files are read-only in WP Origin.'
+assert_push_summary_contains "$PUSH_OUTPUT" 'Push rejected because theme base files are read-only in Push MD.'
 git reset --hard HEAD~1 >/dev/null
 
 GLOBAL_STYLES_PATH="$(find "$CLONE_DIR/wp_global_styles" -maxdepth 1 -name '*.json' | head -n 1)"
@@ -352,7 +352,7 @@ JSON
 git add "$GLOBAL_STYLES_RELATIVE"
 git commit -m "Customize global styles from Git"
 PUSH_OUTPUT="$(git push origin trunk 2>&1)"
-assert_push_summary_contains "$PUSH_OUTPUT" 'WP Origin applied 1 content change:'
+assert_push_summary_contains "$PUSH_OUTPUT" 'Push MD applied 1 content change:'
 assert_push_summary_contains "$PUSH_OUTPUT" 'wp_global_styles'
 curl -sS -f "$BASE_URL/" | grep -Fq '#123456'
 git pull --rebase origin trunk
@@ -374,7 +374,7 @@ HTML
 git add "$BASE_FOOTER_RELATIVE"
 git commit -m "Customize theme footer from Git"
 PUSH_OUTPUT="$(git push origin trunk 2>&1)"
-assert_push_summary_contains "$PUSH_OUTPUT" 'WP Origin applied 1 content change:'
+assert_push_summary_contains "$PUSH_OUTPUT" 'Push MD applied 1 content change:'
 assert_push_summary_contains "$PUSH_OUTPUT" 'wp_template_part'
 
 curl -sS -f -H "Authorization: Basic $AUTH_HEADER" "$BASE_URL/wp-json/wp/v2/template-parts/$BASE_FOOTER_THEME//footer?context=edit" | php -r '
@@ -400,7 +400,7 @@ file_put_contents($path, $contents);
 git add post/hello-world.md
 git commit -m "Update hello world from Git"
 PUSH_OUTPUT="$(git push origin trunk 2>&1)"
-assert_push_summary_contains "$PUSH_OUTPUT" 'WP Origin applied 1 content change:'
+assert_push_summary_contains "$PUSH_OUTPUT" 'Push MD applied 1 content change:'
 assert_push_summary_contains "$PUSH_OUTPUT" '/hello-world/'
 
 UPDATED_CONTENT="$(curl -sS -f -H "Authorization: Basic $AUTH_HEADER" "$BASE_URL/wp-json/wp/v2/posts/$POST_ID?context=edit" | php -r '
@@ -439,7 +439,7 @@ printf '%s' '<!-- wp:paragraph --><p>Created template from Git.</p><!-- /wp:para
 git add wp_template/blog-home.html wp_template/custom-blog-card.html
 git commit -m "Update template HTML from Git"
 PUSH_OUTPUT="$(git push origin trunk 2>&1)"
-assert_push_summary_contains "$PUSH_OUTPUT" 'WP Origin applied 2 content changes:'
+assert_push_summary_contains "$PUSH_OUTPUT" 'Push MD applied 2 content changes:'
 assert_push_summary_contains "$PUSH_OUTPUT" 'wp_template'
 
 rm "$CLONE_DIR/wp_template/custom-blog-card.html"
@@ -464,15 +464,15 @@ git reset --hard HEAD~1 >/dev/null
 php -r '
 $path = $argv[1];
 $contents = file_get_contents($path);
-$contents .= "\nEscaped path literal: C:\\\\Temp\\\\wp-origin\nQuoted JSON literal: {\"windows\":\"C:\\\\\\\\Temp\\\\\\\\wp-origin\"}\n";
+$contents .= "\nEscaped path literal: C:\\\\Temp\\\\push-md\nQuoted JSON literal: {\"windows\":\"C:\\\\\\\\Temp\\\\\\\\push-md\"}\n";
 file_put_contents($path, $contents);
 ' "$CLONE_DIR/post/hello-world.md"
 
-EXACT_COMMIT_MESSAGE='Preserve C:\\Temp\\wp-origin in commit metadata'
+EXACT_COMMIT_MESSAGE='Preserve C:\\Temp\\push-md in commit metadata'
 git add post/hello-world.md
 git commit -m "$EXACT_COMMIT_MESSAGE"
 PUSH_OUTPUT="$(git push origin trunk 2>&1)"
-assert_push_summary_contains "$PUSH_OUTPUT" 'WP Origin applied 1 content change:'
+assert_push_summary_contains "$PUSH_OUTPUT" 'Push MD applied 1 content change:'
 assert_push_summary_contains "$PUSH_OUTPUT" '/hello-world/'
 
 EXACT_CLONE_DIR="$WORK_DIR/exact-clone"
@@ -480,8 +480,8 @@ git -c protocol.version=2 clone "$REMOTE_AUTH_URL" "$EXACT_CLONE_DIR"
 EXACT_COMMIT_HASH="$(git -C "$EXACT_CLONE_DIR" log --grep='Preserve' --format=%H -n 1)"
 [ -n "$EXACT_COMMIT_HASH" ]
 git -C "$EXACT_CLONE_DIR" show "$EXACT_COMMIT_HASH:post/hello-world.md" > "$WORK_DIR/exact-blob.md"
-grep -Fq 'Escaped path literal: C:\\Temp\\wp-origin' "$WORK_DIR/exact-blob.md"
-grep -Fq 'Quoted JSON literal: {"windows":"C:\\\\Temp\\\\wp-origin"}' "$WORK_DIR/exact-blob.md"
+grep -Fq 'Escaped path literal: C:\\Temp\\push-md' "$WORK_DIR/exact-blob.md"
+grep -Fq 'Quoted JSON literal: {"windows":"C:\\\\Temp\\\\push-md"}' "$WORK_DIR/exact-blob.md"
 ACTUAL_COMMIT_MESSAGE="$(git -C "$EXACT_CLONE_DIR" show -s --format=%B "$EXACT_COMMIT_HASH" | php -r 'echo rtrim(stream_get_contents(STDIN), "\r\n");')"
 [ "$ACTUAL_COMMIT_MESSAGE" = "$EXACT_COMMIT_MESSAGE" ]
 git pull --rebase origin trunk
@@ -512,7 +512,7 @@ rm "$CLONE_DIR/page/renamed-sample-page.md"
 git add post/created-from-git.md page/page-from-git.md page/renamed-sample-page.md
 git commit -m "Create and delete content from Git"
 PUSH_OUTPUT="$(git push origin trunk 2>&1)"
-assert_push_summary_contains "$PUSH_OUTPUT" 'WP Origin applied 3 content changes:'
+assert_push_summary_contains "$PUSH_OUTPUT" 'Push MD applied 3 content changes:'
 assert_push_summary_contains "$PUSH_OUTPUT" '/created-from-git/'
 assert_push_summary_contains "$PUSH_OUTPUT" '/page-from-git/'
 assert_push_summary_contains "$PUSH_OUTPUT" '/renamed-sample-page/'
@@ -690,7 +690,7 @@ if PUSH_OUTPUT="$(git push origin trunk 2>&1)"; then
 	echo "Expected arbitrary symlink push to fail." >&2
 	exit 1
 fi
-assert_push_summary_contains "$PUSH_OUTPUT" 'Push rejected because symlink files are generated by WP Origin and cannot be created or modified.'
+assert_push_summary_contains "$PUSH_OUTPUT" 'Push rejected because symlink files are generated by Push MD and cannot be created or modified.'
 git reset --hard HEAD~1 >/dev/null
 
 if [ -L "$CLONE_DIR/AGENTS.md" ]; then
@@ -700,7 +700,7 @@ if [ -L "$CLONE_DIR/AGENTS.md" ]; then
 		echo "Expected generated symlink deletion push to fail." >&2
 		exit 1
 	fi
-	assert_push_summary_contains "$PUSH_OUTPUT" 'Push rejected because symlink files are generated by WP Origin and cannot be deleted or modified.'
+	assert_push_summary_contains "$PUSH_OUTPUT" 'Push rejected because symlink files are generated by Push MD and cannot be deleted or modified.'
 	git reset --hard HEAD~1 >/dev/null
 fi
 
@@ -717,7 +717,7 @@ if PUSH_OUTPUT="$(git push origin trunk 2>&1)"; then
 	echo "Expected executable content file push to fail." >&2
 	exit 1
 fi
-assert_push_summary_contains "$PUSH_OUTPUT" 'Push rejected because executable file modes are not supported by WP Origin content exports.'
+assert_push_summary_contains "$PUSH_OUTPUT" 'Push rejected because executable file modes are not supported by Push MD content exports.'
 git reset --hard HEAD~1 >/dev/null
 
 php -r '
@@ -732,7 +732,7 @@ if PUSH_OUTPUT="$(git push origin HEAD:trunk HEAD:refs/heads/rejected-multi-ref 
 	echo "Expected multi-ref push to fail." >&2
 	exit 1
 fi
-assert_push_summary_contains "$PUSH_OUTPUT" 'Push rejected because WP Origin only accepts one ref update at a time.'
+assert_push_summary_contains "$PUSH_OUTPUT" 'Push rejected because Push MD only accepts one ref update at a time.'
 curl -sS -f -H "Authorization: Basic $AUTH_HEADER" "$BASE_URL/wp-json/wp/v2/posts?slug=rejected-multi-ref&context=edit" | php -r '
 $posts = json_decode(stream_get_contents(STDIN), true);
 if (array() !== $posts) {

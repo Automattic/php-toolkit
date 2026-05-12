@@ -1,0 +1,43 @@
+{
+	"$schema": "https://playground.wordpress.net/blueprint-schema.json",
+	"meta": {
+		"title": "Push MD E2E",
+		"description": "Boot a WordPress site with Push MD, Gutenberg Guidelines, and seeded content active.",
+		"author": "adamziel"
+	},
+	"preferredVersions": {
+		"php": "8.1",
+		"wp": "6.9.4"
+	},
+	"steps": [
+		{
+			"step": "setSiteOptions",
+			"options": {
+				"gutenberg-experiments": {
+					"gutenberg-guidelines": true
+				}
+			}
+		},
+		{
+			"step": "installPlugin",
+			"pluginData": {
+				"resource": "wordpress.org/plugins",
+				"slug": "gutenberg"
+			},
+			"options": {
+				"activate": true
+			}
+		},
+		{
+			"step": "activatePlugin",
+			"pluginPath": "/wordpress/wp-content/plugins/push-md"
+		},
+		{
+			"step": "runPHP",
+			"code": {
+				"filename": "seed-push-md-e2e.php",
+				"content": "<?php\nrequire '/wordpress/wp-load.php';\n$admins = get_users( array( 'role' => 'Administrator', 'number' => 1 ) );\n$admin = $admins[0];\n$experiments = get_option( 'gutenberg-experiments' );\nif ( ! is_array( $experiments ) ) {\n\t$experiments = array();\n}\n$experiments['gutenberg-guidelines'] = true;\nupdate_option( 'gutenberg-experiments', $experiments );\nif ( class_exists( 'PMD_Plugin' ) ) {\n\tPMD_Plugin::install_default_agent_skill();\n}\nupdate_option( 'permalink_structure', '/%postname%/' );\nflush_rewrite_rules();\n$hello = get_page_by_path( 'hello-world', OBJECT, 'post' );\nif ( $hello ) {\n\twp_update_post( array(\n\t\t'ID' => $hello->ID,\n\t\t'post_title' => 'Hello World',\n\t\t'post_content' => '<!-- wp:paragraph --><p>Hello from WordPress</p><!-- /wp:paragraph -->',\n\t\t'post_excerpt' => 'Hand-authored summary.',\n\t\t'post_status' => 'publish',\n\t) );\n}\n$page = get_page_by_path( 'sample-page', OBJECT, 'page' );\nif ( $page ) {\n\twp_update_post( array(\n\t\t'ID' => $page->ID,\n\t\t'post_title' => 'Sample Page',\n\t\t'post_content' => '<!-- wp:paragraph --><p>Page from WordPress</p><!-- /wp:paragraph -->',\n\t\t'post_status' => 'publish',\n\t) );\n}\n$template = get_page_by_path( 'blog-home', OBJECT, 'wp_template' );\n$template_args = array(\n\t'post_type' => 'wp_template',\n\t'post_name' => 'blog-home',\n\t'post_title' => 'Blog Home',\n\t'post_content' => '<!-- wp:group --><div class=\"wp-block-group\"><!-- wp:paragraph --><p>Template from WordPress</p><!-- /wp:paragraph --></div><!-- /wp:group -->',\n\t'post_status' => 'publish',\n);\nif ( $template ) {\n\t$template_args['ID'] = $template->ID;\n\twp_update_post( $template_args );\n} else {\n\twp_insert_post( $template_args );\n}\nlist( $raw_password ) = WP_Application_Passwords::create_new_application_password( $admin->ID, array( 'name' => 'Push MD E2E' ) );\n$password = preg_replace( '/\\s+/', '', $raw_password );\nfile_put_contents(\n\t'__PUSH_MD_CREDENTIALS_FILE__',\n\twp_json_encode(\n\t\tarray(\n\t\t\t'username' => $admin->user_login,\n\t\t\t'password' => $password,\n\t\t\t'post_slug' => 'hello-world',\n\t\t\t'page_slug' => 'sample-page',\n\t\t\t'guideline_skill_slug' => 'push-md',\n\t\t)\n\t)\n);\n"
+			}
+		}
+	]
+}

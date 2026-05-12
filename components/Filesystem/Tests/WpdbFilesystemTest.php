@@ -16,7 +16,7 @@ class WpdbFilesystemTest extends FilesystemTestCase {
 	protected function create_fs(): Filesystem {
 		$this->wpdb = new FakeWpdb();
 
-		return WpdbFilesystem::create( $this->wpdb, 'wp_origin_' );
+		return WpdbFilesystem::create( $this->wpdb, 'pmd_' );
 	}
 
 	public function testRoundTripsBinaryContents() {
@@ -69,7 +69,7 @@ class WpdbFilesystemTest extends FilesystemTestCase {
 		// A second WpdbFilesystem pointed at the same wpdb tables must
 		// see what the first one wrote — this is the property the plugin
 		// relies on across requests.
-		$reopened = WpdbFilesystem::create( $this->wpdb, 'wp_origin_' );
+		$reopened = WpdbFilesystem::create( $this->wpdb, 'pmd_' );
 
 		$this->assertTrue( $reopened->is_file( '/HEAD' ) );
 		$this->assertSame( 'ref: refs/heads/trunk', $reopened->get_contents( '/HEAD' ) );
@@ -78,7 +78,7 @@ class WpdbFilesystemTest extends FilesystemTestCase {
 	public function testGetMetaExposesTableNames() {
 		$meta = $this->fs->get_meta();
 
-		$this->assertSame( 'wp_origin_files', $meta['files_table'] );
-		$this->assertSame( 'wp_origin_directory_entries', $meta['entries_table'] );
+		$this->assertSame( 'pmd_files', $meta['files_table'] );
+		$this->assertSame( 'pmd_directory_entries', $meta['entries_table'] );
 	}
 }

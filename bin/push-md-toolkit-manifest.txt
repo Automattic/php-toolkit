@@ -1,6 +1,6 @@
-# WP Origin ships a purpose-built toolkit bundle, not the entire monorepo.
+# Push MD ships a purpose-built toolkit bundle, not the entire monorepo.
 # Keep Markdown vendored code intact for now; the rest of this list is the
-# runtime surface WP Origin uses for Git storage, Git Smart HTTP, and block
+# runtime surface Push MD uses for Git storage, Git Smart HTTP, and block
 # markup conversion.
 
 components/Markdown/

@@ -46,7 +46,7 @@ class WpdbFilesystem implements Filesystem {
 	 *
 	 * @param object $wpdb         The wpdb instance to use.
 	 * @param string $table_prefix Prefix for the two backing tables, e.g.
-	 *                             "{$wpdb->prefix}wp_origin_". Two tables are
+	 *                             "{$wpdb->prefix}pmd_". Two tables are
 	 *                             created: "{$prefix}files" and
 	 *                             "{$prefix}directory_entries".
 	 */

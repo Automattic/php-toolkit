@@ -1,16 +1,16 @@
-# PRD: WP Origin
+# PRD: Push MD
 
 ## 1. Product Overview
 
 ### 1.1 Document Title And Version
 
-- PRD: WP Origin
+- PRD: Push MD
 - Version: 0.1 implementation refresh
 - Status: Pre-release
 
 ### 1.2 Product Summary
 
-WP Origin makes supported WordPress content available as a Git remote. Users and
+Push MD makes supported WordPress content available as a Git remote. Users and
 coding agents can run normal Git commands such as `clone`, `pull`, and `push`
 against `/wp-json/git/v1/md.git`, edit content locally, and push those changes
 back into WordPress.
@@ -19,7 +19,7 @@ WordPress remains the source of truth. The plugin stores the Git object data it
 needs in WordPress database tables, exports the current WordPress state into a
 repository tree, and imports pushed changes through WordPress post APIs.
 
-The main product rule is content safety. WP Origin should reject unsafe pushes
+The main product rule is content safety. Push MD should reject unsafe pushes
 before any WordPress content is changed. It should prefer a clear Git error over
 partial writes, lossy conversion, ambiguous identity, or silent normalization.
 
@@ -68,7 +68,7 @@ partial writes, lossy conversion, ambiguous identity, or silent normalization.
 
 ### 3.1 User Types
 
-- **Site owner**: Installs WP Origin and wants safer backups, review, and
+- **Site owner**: Installs Push MD and wants safer backups, review, and
   agent-assisted edits.
 - **Content editor**: Writes or reviews posts and pages in local tools.
 - **Site builder**: Edits templates, template parts, navigation posts, and Global
@@ -115,16 +115,16 @@ Current exported paths:
 - `wp_navigation/{slug}.html` for navigation posts.
 - `wp_theme/{theme}/theme.json` for read-only theme JSON context.
 - `wp_global_styles/{theme}.json` for editable Global Styles overlays.
-- `wp_guideline/skills/{slug}/SKILL.md` for Gutenberg Guidelines skills and WP
-  Origin's built-in agent skills.
+- `wp_guideline/skills/{slug}/SKILL.md` for Gutenberg Guidelines skills and
+  Push MD's built-in agent skills.
 - `AGENTS.md`, `CLAUDE.md`, `.agents/skills`, and `.claude/skills` as generated
   or symlinked agent guidance when available.
 
-Paths are part of the content identity. WP Origin should reject unsupported
+Paths are part of the content identity. Push MD should reject unsupported
 directories, unexpected extensions, path traversal, non-canonical slugs, and
 ambiguous mappings.
 
-WP Origin's built-in agent skills are generated only when Gutenberg Guidelines
+Push MD's built-in agent skills are generated only when Gutenberg Guidelines
 are enabled and no matching Guideline exists. Editing the canonical
 `wp_guideline/skills/{slug}/SKILL.md` file can create or update the matching
 Guideline, while generated aliases such as `AGENTS.md` and `.agents/skills`
@@ -209,7 +209,7 @@ Push behavior:
 - Deletes and renames are rejected for template, template part, navigation, and
   Global Styles files until reset semantics are explicit.
 - `wp_theme/{theme}/theme.json` is read-only context and cannot be edited.
-- `wp_global_styles/{theme}.json` is editable JSON. WP Origin strips WordPress's
+- `wp_global_styles/{theme}.json` is editable JSON. Push MD strips WordPress's
   internal Global Styles safety flag on export and restores it on import.
   Global Styles files must contain a JSON object.
 
@@ -219,7 +219,7 @@ that would normalize into surprising block structure are rejected.
 
 ## 8. Import Safety
 
-WP Origin validates and plans the full pushed range before mutating WordPress.
+Push MD validates and plans the full pushed range before mutating WordPress.
 This is required for single-commit and multi-commit pushes: if any changed file
 or later commit is invalid, no earlier WordPress writes may remain.
 
@@ -249,7 +249,7 @@ unsupported operation.
 
 ## 9. Conflict Model
 
-Before accepting a push, WP Origin refreshes the remote view from WordPress. If
+Before accepting a push, Push MD refreshes the remote view from WordPress. If
 WordPress changed since the client's base commit, the push is rejected. The user
 or agent must pull, rebase or merge locally, resolve conflicts, and push again.
 
@@ -270,14 +270,14 @@ edits with stale local content.
 1. The user edits `post/{slug}.md`, `page/{slug}.md`, or a nested page path.
 2. The user commits locally.
 3. The user pushes to `trunk`.
-4. WP Origin validates the whole push, checks permissions, updates WordPress,
+4. Push MD validates the whole push, checks permissions, updates WordPress,
    and lets WordPress create revisions.
 
 ### 10.3 Create Content
 
 1. The user adds a new `post/{slug}.md` or page file.
 2. Front matter is optional except where WordPress behavior requires a value.
-3. WP Origin creates the matching post or page using safe WordPress defaults.
+3. Push MD creates the matching post or page using safe WordPress defaults.
 4. Nested pages require an existing exported parent path.
 
 ### 10.4 Delete And Restore Content
@@ -290,7 +290,7 @@ edits with stale local content.
 
 1. The user edits a supported `.html` block entity file or
    `wp_global_styles/{theme}.json`.
-2. WP Origin validates raw block markup or JSON before writing.
+2. Push MD validates raw block markup or JSON before writing.
 3. Theme source files remain read-only.
 4. Deletes and renames are rejected.
 
@@ -298,7 +298,7 @@ edits with stale local content.
 
 1. A user edits content in WP-Admin after another user cloned.
 2. The stale local clone attempts to push.
-3. WP Origin rejects the push before writing WordPress content.
+3. Push MD rejects the push before writing WordPress content.
 4. The local user pulls, rebases or merges, resolves conflicts, and pushes the
    resolved tree.
 

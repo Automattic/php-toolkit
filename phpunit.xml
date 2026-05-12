@@ -15,14 +15,14 @@
             <directory>components/Blueprints/Tests</directory>
         </testsuite>
         <!--
-            WP Origin E2E suite — drives a real WordPress instance over
+            Push MD E2E suite — drives a real WordPress instance over
             HTTP with the real `git` CLI. Skipped unless the
-            WP_ORIGIN_E2E_* env vars are set, so it is opt-in for local
+            PUSH_MD_E2E_* env vars are set, so it is opt-in for local
             runs and only the CI workflow at
-            .github/workflows/wp-origin-e2e.yml exercises it.
+            .github/workflows/push-md-e2e.yml exercises it.
         -->
-        <testsuite name="WP Origin E2E">
-            <directory>plugins/wp-origin/Tests</directory>
+        <testsuite name="Push MD E2E">
+            <directory>plugins/push-md/Tests</directory>
         </testsuite>
     </testsuites>
 </phpunit>
