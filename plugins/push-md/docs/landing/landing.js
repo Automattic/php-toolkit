@@ -32,8 +32,9 @@
 		var inputRowEl     = inputEl ? inputEl.closest( '.terminal-input-row' ) : null;
 		var cwdEl          = document.getElementById( 'landing-terminal-cwd' );
 		var titleEl        = document.getElementById( 'landing-terminal-title' );
-		var checkoutDir    = 'site';
-		var remoteUrl      = 'https://example.com/wp-json/git/v1/md.git';
+		var tabButtons     = document.querySelectorAll( '[data-terminal-demo]' );
+		var checkoutDir    = 'my-site';
+		var remoteUrl      = 'https://pushmd.blog/wp-json/git/v1/md.git';
 		var cwd            = '~';
 		var history        = [];
 		var historyIndex   = 0;
@@ -42,17 +43,31 @@
 		var revisionNumber = 184;
 		var diffRemoveLine = 'Old CTA copy';
 		var diffAddLine    = 'Keep WordPress in charge';
-		var files          = {
+		var initialFiles   = {
 			'AGENTS.md': '# WordPress content guidelines\n\n- Keep block markup valid.\n- Pull before editing stale content.\n- Let WordPress roles decide who can publish.\n',
+			'README.md': '# Push MD demo remote\n\nThis read-only repository is exported from pushmd.blog so you can clone WordPress-shaped Markdown immediately.\n',
 			'page/home.md': '# Home\n\nOld CTA copy\n',
 			'post/hello-world.md': '# Hello World\n\nHello from WordPress.\n',
 			'wp_template_part/header.html': '<!-- wp:site-title /-->\n<!-- wp:navigation /-->\n',
 			'wp_global_styles/theme.json': '{\n  "version": 3,\n  "styles": {\n    "color": {\n      "background": "#faf8f1"\n    }\n  }\n}\n'
 		};
+		var files          = cloneInitialFiles();
 		var pendingFiles   = {};
 
 		if ( ! outputEl || ! inputEl || ! inputGhostEl || ! inputRowEl || ! cwdEl || ! titleEl ) {
 			return;
+		}
+
+		function cloneInitialFiles() {
+			var clone = {};
+			var filePath;
+
+			for ( filePath in initialFiles ) {
+				if ( Object.prototype.hasOwnProperty.call( initialFiles, filePath ) ) {
+					clone[filePath] = initialFiles[filePath];
+				}
+			}
+			return clone;
 		}
 
 		function appendLine( text, className ) {
@@ -105,19 +120,58 @@
 			}
 		}
 
-		function bootTranscript() {
+		function resetDemoState() {
+			cwd            = '~';
+			history        = [];
+			historyIndex   = 0;
+			dirtyPath      = '';
+			aheadMessage   = '';
+			revisionNumber = 184;
+			diffRemoveLine = 'Old CTA copy';
+			diffAddLine    = 'Keep WordPress in charge';
+			files          = cloneInitialFiles();
+			pendingFiles   = {};
+			updatePrompt();
+			updateInputGhost();
+		}
+
+		function bootTranscript( demo ) {
 			outputEl.textContent = '';
 			appendLine( 'Push MD command emulator', 'terminal-success' );
-			appendLine( 'This public demo mirrors commands you can run with any Git client.', 'terminal-muted' );
+			appendLine( 'The public remote is pullable now. Pushes need your own authenticated WordPress site.', 'terminal-muted' );
 			appendLine( '' );
-			runCommand( 'git clone ' + remoteUrl + ' ' + checkoutDir, { silentHistory: true } );
-			runCommand( 'cd ' + checkoutDir, { silentHistory: true } );
-			runCommand( 'codex "Update page/home.md"', { silentHistory: true } );
-			runCommand( 'git diff -- page/home.md', { silentHistory: true } );
-			runCommand( 'git commit -am "Update home page"', { silentHistory: true } );
-			runCommand( 'git push origin trunk', { silentHistory: true } );
+
+			if ( demo === 'roles' ) {
+				runCommand( 'git clone ' + remoteUrl + ' ' + checkoutDir, { silentHistory: true } );
+				runCommand( 'cd ' + checkoutDir, { silentHistory: true } );
+				runCommand( 'codex "Update page/home.md"', { silentHistory: true } );
+				runCommand( 'git commit -am "Update home page"', { silentHistory: true } );
+				runCommand( 'git push origin trunk', { silentHistory: true } );
+			} else if ( demo === 'pull' ) {
+				runCommand( 'git clone ' + remoteUrl + ' ' + checkoutDir, { silentHistory: true } );
+				runCommand( 'cd ' + checkoutDir, { silentHistory: true } );
+				runCommand( 'git pull', { silentHistory: true } );
+				runCommand( 'git status', { silentHistory: true } );
+			} else {
+				runCommand( 'git clone ' + remoteUrl + ' ' + checkoutDir, { silentHistory: true } );
+				runCommand( 'cd ' + checkoutDir, { silentHistory: true } );
+				runCommand( 'tree', { silentHistory: true } );
+				runCommand( 'cat AGENTS.md', { silentHistory: true } );
+			}
 			appendLine( '' );
-			appendLine( 'Try: git status, git pull, ls, cat AGENTS.md, codex "Update page/home.md", help', 'terminal-muted' );
+			appendLine( 'Try: git status, git pull, ls, cat README.md, codex "Update page/home.md", help', 'terminal-muted' );
+		}
+
+		function activateDemo( demo ) {
+			tabButtons.forEach(
+				function ( button ) {
+					var isActive = button.getAttribute( 'data-terminal-demo' ) === demo;
+					button.classList.toggle( 'is-active', isActive );
+					button.setAttribute( 'aria-pressed', isActive ? 'true' : 'false' );
+				}
+			);
+			resetDemoState();
+			bootTranscript( demo );
 		}
 
 		function runCommand( command, options ) {
@@ -269,6 +323,12 @@
 				appendLine( 'Everything up-to-date', 'terminal-muted' );
 				return;
 			}
+			if ( remoteUrl.indexOf( 'pushmd.blog' ) !== -1 ) {
+				appendLine( 'remote: public Push MD demo is read-only', 'terminal-error' );
+				appendLine( 'remote: install Push MD on your WordPress site to accept authenticated pushes', 'terminal-muted' );
+				appendLine( 'error: failed to push some refs to origin', 'terminal-error' );
+				return;
+			}
 
 			revisionNumber++;
 			appendLine( 'Enumerating objects: 5, done.' );
@@ -327,6 +387,7 @@
 		function printTree() {
 			appendLine( '.' );
 			appendLine( '|-- AGENTS.md' );
+			appendLine( '|-- README.md' );
 			appendLine( '|-- page/' );
 			appendLine( '|   `-- home.md' );
 			appendLine( '|-- post/' );
@@ -491,10 +552,18 @@
 				updateInputGhost();
 			}
 		);
+		tabButtons.forEach(
+			function ( button ) {
+				button.addEventListener(
+					'click',
+					function () {
+						activateDemo( button.getAttribute( 'data-terminal-demo' ) || 'markdown' );
+					}
+				);
+			}
+		);
 
-		updatePrompt();
-		updateInputGhost();
-		bootTranscript();
+		activateDemo( 'markdown' );
 	}
 
 	function markCopied( button ) {
