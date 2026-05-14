@@ -5,6 +5,7 @@
 	<meta name="viewport" content="width=device-width, initial-scale=1">
 	<title>Push MD - WordPress as the Git remote for agents</title>
 	<meta name="description" content="Push MD lets coding agents and Markdown-first teams work with WordPress content through Git while WordPress remains the source of truth.">
+	<meta name="theme-color" content="#101614">
 	<meta property="og:type" content="website">
 	<meta property="og:site_name" content="Push MD">
 	<meta property="og:title" content="Push MD - WordPress as the Git remote for agents">
@@ -30,6 +31,7 @@
 		</a>
 		<nav class="site-nav" aria-label="Main navigation">
 			<a href="#how-it-works">Use cases</a>
+			<a href="#install">Clone demo</a>
 			<a href="#permissions">Permissions</a>
 			<a href="#agent-skills">Agent skills</a>
 			<a href="#faq">FAQ</a>
@@ -76,18 +78,18 @@
 					<span class="terminal-status">trunk / WordPress remote</span>
 				</div>
 				<div class="terminal-summary" aria-label="Terminal tabs">
-					<span class="is-active">
+					<button class="is-active" type="button" data-terminal-demo="markdown" aria-pressed="true">
 						<strong>.md</strong>
 						Markdown
-					</span>
-					<span>
+					</button>
+					<button type="button" data-terminal-demo="roles" aria-pressed="false">
 						<strong>WP</strong>
 						Roles
-					</span>
-					<span>
+					</button>
+					<button type="button" data-terminal-demo="pull" aria-pressed="false">
 						<strong>pull</strong>
 						Admin edits
-					</span>
+					</button>
 				</div>
 				<div class="terminal-body">
 					<div class="terminal-output" id="landing-terminal-output" aria-live="polite"></div>
@@ -274,21 +276,22 @@
 			<div class="section-copy">
 				<h2 id="install-title"><span class="md-token">##</span> Clone WordPress like a Git remote.</h2>
 				<p>
-					Install Push MD, authenticate with a WordPress Application Password, then clone
-					the <code>trunk</code> branch from your site. Any Git client can talk to WordPress directly.
+					Clone the public read-only remote for a first look. When you are ready to push
+					back, install Push MD on your own WordPress site and authenticate with an
+					Application Password.
 				</p>
 			</div>
 			<div class="install-panel">
 				<ol class="install-steps">
-					<li>Install and activate the Push MD plugin.</li>
-					<li>Create or use a WordPress Application Password.</li>
-					<li>Clone the WordPress Git remote and work on <code>trunk</code>.</li>
+					<li>Try the read-only public remote from this site.</li>
+					<li>Open the Markdown files with an editor or agent.</li>
+					<li>Install the plugin on your WordPress site when you are ready to accept pushes.</li>
 				</ol>
 				<div class="code-block">
-					<code id="clone-command">git clone https://example.com/wp-json/git/v1/md.git my-site</code>
+					<code id="clone-command">git clone https://pushmd.blog/wp-json/git/v1/md.git my-site</code>
 					<button class="copy-button" type="button" data-copy-target="clone-command">Copy</button>
 				</div>
-				<p class="install-note">Pushes to other branches are rejected. WordPress remains the source of truth.</p>
+				<p class="install-note">The public remote is pullable for a first look. Pushes need the plugin on your own authenticated WordPress site.</p>
 			</div>
 		</section>
 	</main>
@@ -296,7 +299,7 @@
 	<footer class="site-footer">
 		<p>An Automattic experiment by <a href="https://adamadam.blog/">zieladam</a> and <a href="https://piszek.com">artpi</a></p>
 		<div>
-			<a href="https://github.com/WordPress/php-toolkit/tree/trunk/plugins/push-md">GitHub</a>
+			<a href="https://github.com/Automattic/php-toolkit/tree/trunk/plugins/push-md">GitHub</a>
 		</div>
 	</footer>
 
