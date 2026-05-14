@@ -18,6 +18,37 @@ It is intentionally static so it can be opened directly in a browser while the
 public site target is still undecided. The page positions Push MD as
 WordPress-as-source-of-truth for Git, agents, and Markdown workflows.
 
+The social share card source lives next to the landing page:
+
+```text
+plugins/push-md/docs/landing/social-card.html
+```
+
+To regenerate the Twitter/X and Open Graph card image, start a local static
+server from the repository root:
+
+```bash
+php -S 127.0.0.1:8876 -t plugins/push-md/docs/landing
+```
+
+Then capture the card at the expected social-preview size:
+
+```bash
+'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' \
+	--headless \
+	--disable-gpu \
+	--hide-scrollbars \
+	--force-device-scale-factor=1 \
+	--window-size=1200,630 \
+	--screenshot=plugins/push-md/docs/landing/assets/push-md-social-card.png \
+	http://127.0.0.1:8876/social-card.html
+```
+
+If Chrome is installed elsewhere, replace the binary path with the local
+Chrome or Chromium executable. The generated
+`plugins/push-md/docs/landing/assets/push-md-social-card.png` file is the image
+referenced by the landing page's `og:image` and `twitter:image` tags.
+
 ## What Push MD Does
 
 Push MD exposes supported WordPress content as a Git Smart HTTP remote at:

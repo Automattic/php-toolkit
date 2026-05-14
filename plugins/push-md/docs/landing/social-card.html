@@ -1,0 +1,359 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>Push MD social share card</title>
+	<style>
+		:root {
+			--page: #faf8f1;
+			--ink: #1f1d19;
+			--muted: #706a5f;
+			--line: #ded6c7;
+			--hash: #b05d33;
+			--yellow: #f4d06f;
+			--terminal: #151515;
+			--terminal-line: rgba(255, 253, 247, 0.1);
+			--shadow: 0 28px 86px rgba(58, 47, 31, 0.22);
+			--mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+			--sans: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+			--serif: Georgia, "Times New Roman", serif;
+		}
+
+		* {
+			box-sizing: border-box;
+		}
+
+		html,
+		body {
+			margin: 0;
+			min-width: 1200px;
+			min-height: 630px;
+			background: var(--page);
+		}
+
+		body {
+			display: grid;
+			place-items: center;
+			color: var(--ink);
+			font-family: var(--sans);
+		}
+
+		.share-card {
+			position: relative;
+			overflow: hidden;
+			width: 1200px;
+			height: 630px;
+			background:
+				linear-gradient(rgba(112, 106, 95, 0.07) 1px, transparent 1px),
+				linear-gradient(90deg, rgba(222, 214, 199, 0.24) 1px, transparent 1px),
+				var(--page);
+			background-size: 100% 34px, 96px 100%, auto;
+		}
+
+		.share-card::before,
+		.share-card::after {
+			position: absolute;
+			color: rgba(176, 93, 51, 0.12);
+			font-family: var(--mono);
+			font-size: 180px;
+			font-weight: 800;
+			line-height: 1;
+			content: "#";
+		}
+
+		.share-card::before {
+			left: 54px;
+			top: 44px;
+		}
+
+		.share-card::after {
+			right: 54px;
+			bottom: 26px;
+			color: rgba(30, 107, 131, 0.1);
+			content: "$";
+		}
+
+		.terminal-card {
+			position: absolute;
+			inset: 58px 78px 58px;
+			z-index: 1;
+			overflow: hidden;
+			border: 1px solid var(--line);
+			border-radius: 8px;
+			background: var(--terminal);
+			box-shadow: var(--shadow);
+			font-family: var(--mono);
+			font-variant-ligatures: none;
+		}
+
+		.terminal-topline {
+			display: grid;
+			grid-template-columns: auto minmax(0, 1fr) auto;
+			align-items: center;
+			gap: 14px;
+			height: 40px;
+			padding: 0 14px;
+			border-bottom: 1px solid var(--terminal-line);
+			background: linear-gradient(180deg, #34302b, #23211e);
+			color: #cfc4ae;
+			font-size: 13px;
+		}
+
+		.terminal-dots {
+			display: inline-flex;
+			gap: 7px;
+		}
+
+		.terminal-dots span {
+			width: 12px;
+			height: 12px;
+			border-radius: 50%;
+			background: #f4d06f;
+		}
+
+		.terminal-dots span:first-child {
+			background: #d66a4b;
+		}
+
+		.terminal-dots span:last-child {
+			background: #68a77d;
+		}
+
+		.terminal-title,
+		.terminal-status {
+			overflow: hidden;
+			text-overflow: ellipsis;
+			white-space: nowrap;
+		}
+
+		.terminal-status {
+			color: #b7ad9e;
+			text-align: right;
+		}
+
+		.terminal-body {
+			display: grid;
+			grid-template-columns: 570px minmax(0, 1fr);
+			gap: 26px;
+			height: 474px;
+			padding: 38px 38px 32px;
+			color: #d7dee6;
+		}
+
+		.brand-panel {
+			display: flex;
+			flex-direction: column;
+			min-width: 0;
+			padding: 4px 0 0;
+		}
+
+		.brand-row {
+			display: flex;
+			align-items: center;
+			gap: 16px;
+		}
+
+		.logo-mark {
+			display: block;
+			flex: 0 0 auto;
+			width: 92px;
+			height: 92px;
+			padding: 9px;
+			border: 1px solid rgba(239, 232, 216, 0.72);
+			border-radius: 50%;
+			background: #faf8f1;
+			object-fit: contain;
+			box-shadow:
+				0 0 0 4px rgba(17, 17, 17, 0.68),
+				0 14px 30px rgba(0, 0, 0, 0.34);
+		}
+
+		.product-name {
+			margin: 0;
+			color: #ffffff;
+			font-family: var(--sans);
+			font-size: 32px;
+			font-weight: 820;
+			line-height: 1.1;
+		}
+
+		.product-tag {
+			margin: 3px 0 0;
+			color: #b7ad9e;
+			font-size: 15px;
+		}
+
+		h1 {
+			margin: 28px 0 0;
+			color: #efe8d8;
+			font-family: var(--serif);
+			font-size: 45px;
+			font-weight: 700;
+			line-height: 1.05;
+			letter-spacing: 0;
+		}
+
+		.md-token {
+			color: var(--hash);
+			font-family: var(--mono);
+			font-size: 0.9em;
+			font-weight: 800;
+			vertical-align: 0.02em;
+		}
+
+		.subhead {
+			margin: 34px 0 0;
+			color: #c7beae;
+			font-family: var(--sans);
+			font-size: 20px;
+			font-weight: 560;
+			line-height: 1.34;
+		}
+
+		.emulator-output {
+			display: flex;
+			flex-direction: column;
+			min-width: 0;
+			overflow: hidden;
+			padding: 24px 24px 20px;
+			border: 1px solid rgba(145, 214, 238, 0.12);
+			border-radius: 8px;
+			background: #111111;
+			box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+			font-size: 16px;
+			line-height: 1.45;
+		}
+
+		.terminal-line {
+			display: block;
+			min-height: 25px;
+			overflow-wrap: anywhere;
+		}
+
+		.terminal-muted {
+			color: #9b917f;
+		}
+
+		.terminal-accent {
+			color: #91d6ee;
+		}
+
+		.terminal-success {
+			color: #aee0b5;
+		}
+
+		.terminal-warning {
+			color: var(--yellow);
+		}
+
+		.terminal-command {
+			color: #ffffff;
+		}
+
+		.terminal-diff-remove {
+			color: #e7a191;
+		}
+
+		.terminal-diff-add {
+			color: #aee0b5;
+		}
+
+		.input-row {
+			display: flex;
+			align-items: center;
+			gap: 5px;
+			min-height: 42px;
+			margin-top: auto;
+			padding: 7px 8px;
+			border: 1px solid rgba(145, 214, 238, 0.16);
+			border-radius: 6px;
+			background: #0e0f0f;
+			color: #ffffff;
+			font-size: 14px;
+			white-space: nowrap;
+		}
+
+		.input-user {
+			color: #aee0b5;
+			font-weight: 800;
+			white-space: nowrap;
+		}
+
+		.input-mark {
+			color: var(--yellow);
+		}
+
+		.input-path {
+			flex: 0 0 auto;
+		}
+
+		.input-text {
+			flex: 0 0 auto;
+			color: #efe8d8;
+		}
+
+		.cursor {
+			display: inline-block;
+			flex: 0 0 auto;
+			width: 8px;
+			height: 20px;
+			background: rgba(239, 232, 216, 0.75);
+			vertical-align: -3px;
+		}
+
+		@media (max-width: 1199px) {
+			body {
+				place-items: start;
+			}
+		}
+	</style>
+</head>
+<body>
+	<main class="share-card" aria-label="Push MD social share card">
+		<section class="terminal-card" aria-label="Push MD terminal card">
+			<div class="terminal-topline">
+				<span class="terminal-dots" aria-hidden="true">
+					<span></span>
+					<span></span>
+					<span></span>
+				</span>
+				<span class="terminal-title">my-wordpress-website</span>
+				<span class="terminal-status">trunk / WordPress remote</span>
+			</div>
+			<div class="terminal-body">
+				<section class="brand-panel" aria-label="Push MD summary">
+					<div class="brand-row">
+						<img class="logo-mark" src="assets/push-md-logo.png" alt="Push MD logo" width="512" height="512">
+						<div>
+							<p class="product-name">Push MD</p>
+							<p class="product-tag">Git-shaped WordPress publishing</p>
+						</div>
+					</div>
+					<h1><span class="md-token">#</span> WordPress as the Git remote for agents</h1>
+					<p class="subhead">Clone posts as Markdown, pull WP-Admin edits, and push your changes with any git client.</p>
+				</section>
+				<section class="emulator-output" aria-label="Example terminal output">
+					<span class="terminal-line terminal-accent">edit: page/home.md</span>
+					<span class="terminal-line terminal-muted">Agent updated Markdown locally.</span>
+					<span class="terminal-line terminal-command">$ git diff -- page/home.md</span>
+					<span class="terminal-line terminal-muted">@@</span>
+					<span class="terminal-line terminal-diff-remove">- Old CTA copy</span>
+					<span class="terminal-line terminal-diff-add">+ Keep WordPress in charge</span>
+					<span class="terminal-line terminal-command">$ git push origin trunk</span>
+					<span class="terminal-line terminal-success">remote: checked WordPress permissions</span>
+					<span class="terminal-line terminal-success">remote: created WordPress revision #185</span>
+					<div class="input-row" aria-hidden="true">
+						<span class="input-user">push-md</span>
+						<span class="input-mark">:</span>
+						<span class="terminal-accent input-path">~/wp</span>
+						<span class="input-mark">$</span>
+						<span class="input-text">git push origin trunk</span>
+						<span class="cursor"></span>
+					</div>
+				</section>
+			</div>
+		</section>
+	</main>
+</body>
+</html>

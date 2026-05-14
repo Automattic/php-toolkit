@@ -5,6 +5,19 @@
 	<meta name="viewport" content="width=device-width, initial-scale=1">
 	<title>Push MD - WordPress as the Git remote for agents</title>
 	<meta name="description" content="Push MD lets coding agents and Markdown-first teams work with WordPress content through Git while WordPress remains the source of truth.">
+	<meta property="og:type" content="website">
+	<meta property="og:site_name" content="Push MD">
+	<meta property="og:title" content="Push MD - WordPress as the Git remote for agents">
+	<meta property="og:description" content="Clone posts as Markdown, pull WP-Admin edits, and push your changes with any git client.">
+	<meta property="og:image" content="assets/push-md-social-card.png">
+	<meta property="og:image:width" content="1200">
+	<meta property="og:image:height" content="630">
+	<meta property="og:image:alt" content="Push MD social card showing a terminal workflow for WordPress content in Git.">
+	<meta name="twitter:card" content="summary_large_image">
+	<meta name="twitter:title" content="Push MD - WordPress as the Git remote for agents">
+	<meta name="twitter:description" content="Clone posts as Markdown, pull WP-Admin edits, and push your changes with any git client.">
+	<meta name="twitter:image" content="assets/push-md-social-card.png">
+	<meta name="twitter:image:alt" content="Push MD social card showing a terminal workflow for WordPress content in Git.">
 	<link rel="stylesheet" href="landing.css">
 </head>
 <body>
@@ -12,7 +25,7 @@
 
 	<header class="site-header">
 		<a class="brand" href="#top" aria-label="Push MD home">
-			<span class="brand-mark" aria-hidden="true">PMD</span>
+			<img class="brand-logo" src="assets/push-md-logo.png" alt="" width="512" height="512" aria-hidden="true">
 			<span>Push MD</span>
 		</a>
 		<nav class="site-nav" aria-label="Main navigation">
@@ -22,7 +35,13 @@
 			<a href="#faq">FAQ</a>
 			<a href="https://github.com/Automattic/php-toolkit/tree/trunk/plugins/push-md/docs">Docs</a>
 		</nav>
-		<a class="button button-primary" href="https://github.com/Automattic/php-toolkit/releases/latest/download/push-md.zip">Download plugin</a>
+		<a class="button button-primary" href="https://github.com/Automattic/php-toolkit/releases/latest/download/push-md.zip">
+			<svg class="button-icon octicon octicon-download" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+				<path d="M2.75 14A1.75 1.75 0 0 1 1 12.25v-2.5a.75.75 0 0 1 1.5 0v2.5c0 .138.112.25.25.25h10.5a.25.25 0 0 0 .25-.25v-2.5a.75.75 0 0 1 1.5 0v2.5A1.75 1.75 0 0 1 13.25 14Z"></path>
+				<path d="M7.25 7.689V2a.75.75 0 0 1 1.5 0v5.689l1.97-1.969a.749.749 0 1 1 1.06 1.06l-3.25 3.25a.749.749 0 0 1-1.06 0L4.22 6.78a.749.749 0 1 1 1.06-1.06l1.97 1.969Z"></path>
+			</svg>
+			<span>Download plugin</span>
+		</a>
 	</header>
 
 	<main id="main" class="markdown-document">
@@ -35,7 +54,13 @@
 					revisions, rejects stale pushes, and lets WordPress render the site.
 				</p>
 				<div class="hero-actions" aria-label="Primary actions">
-					<a class="button button-primary" href="https://github.com/Automattic/php-toolkit/releases/latest/download/push-md.zip">Download plugin</a>
+					<a class="button button-primary" href="https://github.com/Automattic/php-toolkit/releases/latest/download/push-md.zip">
+						<svg class="button-icon octicon octicon-download" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+							<path d="M2.75 14A1.75 1.75 0 0 1 1 12.25v-2.5a.75.75 0 0 1 1.5 0v2.5c0 .138.112.25.25.25h10.5a.25.25 0 0 0 .25-.25v-2.5a.75.75 0 0 1 1.5 0v2.5A1.75 1.75 0 0 1 13.25 14Z"></path>
+							<path d="M7.25 7.689V2a.75.75 0 0 1 1.5 0v5.689l1.97-1.969a.749.749 0 1 1 1.06 1.06l-3.25 3.25a.749.749 0 0 1-1.06 0L4.22 6.78a.749.749 0 1 1 1.06-1.06l1.97 1.969Z"></path>
+						</svg>
+						<span>Download plugin</span>
+					</a>
 					<a class="button button-secondary" href="https://github.com/Automattic/php-toolkit/tree/trunk/plugins/push-md/docs">Read docs</a>
 				</div>
 			</div>
@@ -125,6 +150,18 @@
 						<li><code>[x]</code> Carry site guidance in <code>AGENTS.md</code> and <code>SKILL.md</code>.</li>
 						<li><code>[x]</code> Push only after WordPress accepts the change.</li>
 					</ul>
+					<div class="setup-note">
+						<p class="setup-note-title">Agent skills depend on WordPress Guidelines.</p>
+						<ol>
+							<li>Install and activate the Gutenberg plugin.</li>
+							<li>Open the Gutenberg Experiments page and turn on the Guidelines experiment.</li>
+						</ol>
+						<p>
+							Once WordPress Guidelines are enabled, Push MD exposes skills as
+							<code>wp_guideline/skills/{slug}/SKILL.md</code> and adds the usual agent
+							entry points for local tools.
+						</p>
+					</div>
 				</article>
 
 				<article class="use-case-card">
@@ -185,6 +222,17 @@
 					<p>
 						Yes. Agents, terminals, desktop apps, and editors can use normal Git over HTTPS
 						against the WordPress remote.
+					</p>
+				</article>
+
+				<article class="faq-item">
+					<h3><span class="md-token">###</span> How do agent skills become available?</h3>
+					<p>
+						Push MD stores agent skills as WordPress Guidelines. Today, that means the
+						site needs the Gutenberg plugin installed and active, with the Guidelines
+						experiment turned on from the Gutenberg Experiments page. After that, skills
+						appear in the checkout under <code>wp_guideline/skills/{slug}/SKILL.md</code>,
+						with generated aliases such as <code>AGENTS.md</code> for agent discovery.
 					</p>
 				</article>
 
