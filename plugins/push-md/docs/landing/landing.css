@@ -100,6 +100,21 @@ pre {
 	filter: drop-shadow(0 5px 12px rgba(31, 29, 25, 0.18));
 }
 
+.beta-badge {
+	display: inline-flex;
+	align-items: center;
+	min-height: 22px;
+	padding: 2px 8px;
+	border: 1px solid rgba(176, 93, 51, 0.26);
+	border-radius: 999px;
+	background: rgba(244, 208, 111, 0.28);
+	color: var(--hash);
+	font-size: 12px;
+	font-weight: 780;
+	line-height: 1;
+	text-transform: uppercase;
+}
+
 .site-nav {
 	display: flex;
 	align-items: center;
@@ -251,6 +266,20 @@ pre {
 	flex-wrap: wrap;
 	gap: 12px;
 	margin: 28px 0 0;
+}
+
+.beta-note {
+	max-width: 660px;
+	margin: 18px 0 0;
+	padding: 10px 0 10px 14px;
+	border-left: 3px solid var(--hash);
+	color: var(--muted);
+	font-size: 14px;
+	line-height: 1.5;
+}
+
+.beta-note strong {
+	color: var(--ink);
 }
 
 .terminal-card,

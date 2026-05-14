@@ -1,6 +1,7 @@
 <?php
 /**
  * Plugin Name: Push MD
+ * Plugin URI: https://pushmd.blog/
  * Description: Edit WordPress content with Git, Markdown and block files, reviewable diffs, and safe pushes.
  * Version: 0.6.0
  * Requires at least: 6.9
@@ -57,6 +58,19 @@ add_action(
 		}
 		wp_safe_redirect( admin_url( 'tools.php?page=' . PMD_Admin::PAGE_SLUG ) );
 		exit;
+	}
+);
+
+add_filter(
+	'plugin_action_links_' . plugin_basename( PMD_PLUGIN_FILE ),
+	function ( $actions ) {
+		$actions['push_md_landing_page'] = sprintf(
+			'<a href="%s" target="_blank" rel="noopener noreferrer">%s</a>',
+			esc_url( 'https://pushmd.blog/' ),
+			esc_html__( 'Landing page', 'push-md' )
+		);
+
+		return $actions;
 	}
 );
 
