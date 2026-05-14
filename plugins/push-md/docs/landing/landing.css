@@ -665,6 +665,31 @@ pre {
 	font-weight: 800;
 }
 
+.setup-note {
+	margin-top: 22px;
+	padding: 2px 0 2px 18px;
+	border-left: 3px solid var(--hash);
+	color: var(--muted);
+}
+
+.setup-note p,
+.setup-note ol {
+	max-width: 980px;
+	margin: 10px 0 0;
+}
+
+.setup-note .setup-note-title {
+	margin-top: 0;
+	color: var(--ink);
+	font-weight: 780;
+}
+
+.setup-note ol {
+	display: grid;
+	gap: 6px;
+	padding-left: 22px;
+}
+
 .file-map {
 	display: grid;
 	margin-top: 24px;

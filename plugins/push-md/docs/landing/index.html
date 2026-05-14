@@ -137,6 +137,18 @@
 						<li><code>[x]</code> Carry site guidance in <code>AGENTS.md</code> and <code>SKILL.md</code>.</li>
 						<li><code>[x]</code> Push only after WordPress accepts the change.</li>
 					</ul>
+					<div class="setup-note">
+						<p class="setup-note-title">Agent skills depend on WordPress Guidelines.</p>
+						<ol>
+							<li>Install and activate the Gutenberg plugin.</li>
+							<li>Open the Gutenberg Experiments page and turn on the Guidelines experiment.</li>
+						</ol>
+						<p>
+							Once WordPress Guidelines are enabled, Push MD exposes skills as
+							<code>wp_guideline/skills/{slug}/SKILL.md</code> and adds the usual agent
+							entry points for local tools.
+						</p>
+					</div>
 				</article>
 
 				<article class="use-case-card">
@@ -197,6 +209,17 @@
 					<p>
 						Yes. Agents, terminals, desktop apps, and editors can use normal Git over HTTPS
 						against the WordPress remote.
+					</p>
+				</article>
+
+				<article class="faq-item">
+					<h3><span class="md-token">###</span> How do agent skills become available?</h3>
+					<p>
+						Push MD stores agent skills as WordPress Guidelines. Today, that means the
+						site needs the Gutenberg plugin installed and active, with the Guidelines
+						experiment turned on from the Gutenberg Experiments page. After that, skills
+						appear in the checkout under <code>wp_guideline/skills/{slug}/SKILL.md</code>,
+						with generated aliases such as <code>AGENTS.md</code> for agent discovery.
 					</p>
 				</article>
 
