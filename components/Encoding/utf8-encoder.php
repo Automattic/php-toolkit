@@ -30,40 +30,42 @@ namespace WordPress\Encoding;
  * @param int $codepoint Which code point to convert.
  * @return string Converted code point, or `�` if invalid.
  */
-function codepoint_to_utf8_bytes( $codepoint ) {
-	// Pre-check to ensure a valid code point.
-	if (
+if ( ! function_exists( __NAMESPACE__ . '\\codepoint_to_utf8_bytes' ) ) {
+	function codepoint_to_utf8_bytes( $codepoint ) {
+		// Pre-check to ensure a valid code point.
+		if (
 		$codepoint <= 0 ||
 		( $codepoint >= 0xD800 && $codepoint <= 0xDFFF ) ||
 		$codepoint > 0x10FFFF
-	) {
-		return '�';
+		) {
+			return '�';
+		}
+
+		if ( $codepoint <= 0x7F ) {
+			return chr( $codepoint );
+		}
+
+		if ( $codepoint <= 0x7FF ) {
+			$byte1 = chr( ( 0xC0 | ( ( $codepoint >> 6 ) & 0x1F ) ) );
+			$byte2 = chr( $codepoint & 0x3F | 0x80 );
+
+			return "{$byte1}{$byte2}";
+		}
+
+		if ( $codepoint <= 0xFFFF ) {
+			$byte1 = chr( ( $codepoint >> 12 ) | 0xE0 );
+			$byte2 = chr( ( $codepoint >> 6 ) & 0x3F | 0x80 );
+			$byte3 = chr( $codepoint & 0x3F | 0x80 );
+
+			return "{$byte1}{$byte2}{$byte3}";
+		}
+
+		// Any values above U+10FFFF are eliminated above in the pre-check.
+		$byte1 = chr( ( $codepoint >> 18 ) | 0xF0 );
+		$byte2 = chr( ( $codepoint >> 12 ) & 0x3F | 0x80 );
+		$byte3 = chr( ( $codepoint >> 6 ) & 0x3F | 0x80 );
+		$byte4 = chr( $codepoint & 0x3F | 0x80 );
+
+		return "{$byte1}{$byte2}{$byte3}{$byte4}";
 	}
-
-	if ( $codepoint <= 0x7F ) {
-		return chr( $codepoint );
-	}
-
-	if ( $codepoint <= 0x7FF ) {
-		$byte1 = chr( ( 0xC0 | ( ( $codepoint >> 6 ) & 0x1F ) ) );
-		$byte2 = chr( $codepoint & 0x3F | 0x80 );
-
-		return "{$byte1}{$byte2}";
-	}
-
-	if ( $codepoint <= 0xFFFF ) {
-		$byte1 = chr( ( $codepoint >> 12 ) | 0xE0 );
-		$byte2 = chr( ( $codepoint >> 6 ) & 0x3F | 0x80 );
-		$byte3 = chr( $codepoint & 0x3F | 0x80 );
-
-		return "{$byte1}{$byte2}{$byte3}";
-	}
-
-	// Any values above U+10FFFF are eliminated above in the pre-check.
-	$byte1 = chr( ( $codepoint >> 18 ) | 0xF0 );
-	$byte2 = chr( ( $codepoint >> 12 ) & 0x3F | 0x80 );
-	$byte3 = chr( ( $codepoint >> 6 ) & 0x3F | 0x80 );
-	$byte4 = chr( $codepoint & 0x3F | 0x80 );
-
-	return "{$byte1}{$byte2}{$byte3}{$byte4}";
 }

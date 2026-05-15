@@ -307,8 +307,14 @@ SKILL;
 
 	public static function handle_rest_request( WP_REST_Request $request ) {
 		$previous_error_handler = set_error_handler( array( __CLASS__, 'throw_on_php_warning' ) ); // phpcs:ignore
+		$git_path               = '';
 
 		try {
+			$git_path = self::build_git_path( $request );
+			if ( is_wp_error( $git_path ) ) {
+				return $git_path;
+			}
+
 			if ( ! PMD_Seeder::is_ready() ) {
 				PMD_Seeder::drive( 5 );
 			}
@@ -322,11 +328,6 @@ SKILL;
 				$response->append_bytes( PMD_Seeder::not_ready_message() . "\n" );
 
 				return $response->to_rest_response();
-			}
-
-			$git_path = self::build_git_path( $request );
-			if ( is_wp_error( $git_path ) ) {
-				return $git_path;
 			}
 
 			$request_body = file_get_contents( 'php://input' );
@@ -395,6 +396,14 @@ SKILL;
 
 			return $response->to_rest_response();
 		} catch ( Throwable $exception ) {
+			$service = self::git_service_from_request( $git_path, $request );
+			if ( $service ) {
+				return self::build_protocol_error_response(
+					$service,
+					self::get_throwable_message( $exception )
+				);
+			}
+
 			return new WP_Error(
 				'pmd_error',
 				self::get_throwable_message( $exception ),
@@ -504,6 +513,11 @@ SKILL;
 		unset( $request );
 		if ( '/git-upload-pack' === $git_path || '/git-receive-pack' === $git_path ) {
 			return ltrim( $git_path, '/' );
+		}
+
+		$info_refs_prefix = '/info/refs?service=';
+		if ( 0 === strpos( $git_path, $info_refs_prefix ) ) {
+			return self::normalize_git_service( substr( $git_path, strlen( $info_refs_prefix ) ) );
 		}
 
 		return '';
@@ -994,7 +1008,7 @@ SKILL;
 			if ( self::is_raw_block_post_type( $post_or_type->post_type ) ) {
 				return self::build_raw_block_path(
 					$post_or_type->post_type,
-					$post_or_type->post_name,
+					self::get_export_post_slug( $post_or_type ),
 					self::get_raw_block_post_theme_slug( $post_or_type )
 				);
 			}
@@ -1007,7 +1021,7 @@ SKILL;
 				return self::build_page_markdown_path( $post_or_type );
 			}
 
-			return ltrim( $post_or_type->post_type . '/' . $post_or_type->post_name . '.md', '/' );
+			return ltrim( $post_or_type->post_type . '/' . self::get_export_post_slug( $post_or_type ) . '.md', '/' );
 		}
 
 		if ( self::is_raw_block_post_type( $post_or_type ) ) {
@@ -1020,8 +1034,74 @@ SKILL;
 		return ltrim( $post_or_type . '/' . $slug . '.md', '/' );
 	}
 
+	private static function get_export_post_slug( WP_Post $post ) {
+		if ( '' !== $post->post_name ) {
+			return $post->post_name;
+		}
+
+		return self::get_id_fallback_slug( $post->post_type, $post->ID );
+	}
+
+	private static function get_id_fallback_slug( $post_type, $post_id ) {
+		$post_type = sanitize_title( $post_type );
+		if ( '' === $post_type ) {
+			$post_type = 'post';
+		}
+
+		return $post_type . '-' . intval( $post_id );
+	}
+
+	private static function get_id_from_fallback_slug( $post_type, $slug ) {
+		$prefix = sanitize_title( $post_type );
+		if ( '' === $prefix ) {
+			$prefix = 'post';
+		}
+		$prefix .= '-';
+		if ( 0 !== strpos( $slug, $prefix ) ) {
+			return 0;
+		}
+
+		$id = substr( $slug, strlen( $prefix ) );
+		if ( ! preg_match( '/^[1-9][0-9]*$/', $id ) ) {
+			return 0;
+		}
+
+		return intval( $id );
+	}
+
+	private static function path_uses_id_fallback_slug( $path ) {
+		$post_type = self::path_to_post_type( $path );
+		if ( self::is_raw_block_post_type( $post_type ) || 'wp_global_styles' === $post_type || 'wp_guideline' === $post_type ) {
+			return false;
+		}
+
+		if ( 'page' === $post_type ) {
+			foreach ( self::path_to_page_slugs( $path ) as $slug ) {
+				if ( self::get_id_from_fallback_slug( 'page', $slug ) ) {
+					return true;
+				}
+			}
+
+			return false;
+		}
+
+		return (bool) self::get_id_from_fallback_slug( $post_type, self::path_to_slug( $path ) );
+	}
+
+	private static function is_current_slugless_fallback_path( $path, WP_Post $post ) {
+		return '' === $post->post_name && self::path_uses_id_fallback_slug( $path ) && self::build_markdown_path( $post ) === $path;
+	}
+
+	private static function assert_id_fallback_path_is_current( $path, WP_Post $post ) {
+		if ( ! self::path_uses_id_fallback_slug( $path ) || self::build_markdown_path( $post ) === $path ) {
+			return;
+		}
+
+		throw new Exception( 'Push rejected because this fallback filename is stale after WordPress assigned the post a slug. Pull the latest changes and edit the slug-based file path.' );
+	}
+
 	private static function build_page_markdown_path( WP_Post $post ) {
-		$segments  = array( $post->post_name );
+		$segments  = array( self::get_export_post_slug( $post ) );
 		$seen      = array( intval( $post->ID ) => true );
 		$parent_id = intval( $post->post_parent );
 
@@ -1038,7 +1118,7 @@ SKILL;
 				throw new Exception( 'Git export rejected because a WordPress page has a non-exported parent page. Restore, publish, or reparent the child page before cloning.' );
 			}
 
-			array_unshift( $segments, $parent->post_name );
+			array_unshift( $segments, self::get_export_post_slug( $parent ) );
 			$seen[ $parent_id ] = true;
 			$parent_id          = intval( $parent->post_parent );
 		}
@@ -1667,12 +1747,15 @@ SKILL;
 		}
 
 		self::reject_path_identity_frontmatter( $metadata );
-		$metadata       = self::normalize_supported_frontmatter(
+		$metadata      = self::normalize_supported_frontmatter(
 			$metadata,
 			array( 'id', 'title', 'date', 'status', 'description' )
 		);
-		$post_id        = self::find_post_id_by_path_metadata( $path, $metadata );
-		$existing_post  = $post_id ? get_post( $post_id ) : null;
+		$post_id       = self::find_post_id_by_path_metadata( $path, $metadata );
+		$existing_post = $post_id ? get_post( $post_id ) : null;
+		if ( $existing_post ) {
+			self::assert_id_fallback_path_is_current( $path, $existing_post );
+		}
 		$default_status = $existing_post && 'trash' !== $existing_post->post_status ? $existing_post->post_status : 'draft';
 		$post_status    = self::normalize_frontmatter_status(
 			isset( $metadata['status'] ) ? $metadata['status'] : $default_status
@@ -1698,11 +1781,13 @@ SKILL;
 
 		$postarr = array(
 			'post_type'    => $post_type,
-			'post_name'    => $slug,
 			'post_title'   => isset( $metadata['title'] ) ? $metadata['title'] : ucwords( str_replace( '-', ' ', $slug ) ),
 			'post_status'  => $post_status,
 			'post_content' => $result->get_block_markup(),
 		);
+		if ( ! $existing_post || ! self::is_current_slugless_fallback_path( $path, $existing_post ) ) {
+			$postarr['post_name'] = $slug;
+		}
 		if ( 'page' === $post_type ) {
 			$postarr['post_parent'] = $post_parent;
 		}
@@ -2484,6 +2569,11 @@ SKILL;
 		);
 
 		if ( empty( $posts ) ) {
+			$page_id = self::find_slugless_page_id_by_fallback_slug( $slug, $parent_id, $statuses );
+			if ( $page_id ) {
+				return $page_id;
+			}
+
 			if ( ! $include_trash ) {
 				self::reject_unsupported_status_slug_collision( 'page', $slug, self::$supported_post_statuses, $parent_id );
 				return 0;
@@ -2500,6 +2590,11 @@ SKILL;
 				)
 			);
 			if ( empty( $posts ) ) {
+				$page_id = self::find_slugless_page_id_by_fallback_slug( $slug, $parent_id, array( 'trash' ) );
+				if ( $page_id ) {
+					return $page_id;
+				}
+
 				self::reject_unsupported_status_slug_collision(
 					'page',
 					$slug,
@@ -2531,13 +2626,39 @@ SKILL;
 				)
 			);
 			if ( empty( $parents ) ) {
-				throw new Exception( 'Push rejected because nested page paths must reference existing WordPress parent pages.' );
+				$page_id = self::find_slugless_page_id_by_fallback_slug( $slug, $parent_id, $statuses );
+				if ( ! $page_id ) {
+					throw new Exception( 'Push rejected because nested page paths must reference existing WordPress parent pages.' );
+				}
+
+				$parent_id = $page_id;
+				continue;
 			}
 
 			$parent_id = intval( $parents[0] );
 		}
 
 		return $parent_id;
+	}
+
+	private static function find_slugless_page_id_by_fallback_slug( $slug, $parent_id, $statuses ) {
+		$id = self::get_id_from_fallback_slug( 'page', $slug );
+		if ( ! $id ) {
+			return 0;
+		}
+
+		$post = get_post( $id );
+		if (
+			! $post ||
+			'page' !== $post->post_type ||
+			'' !== $post->post_name ||
+			intval( $post->post_parent ) !== intval( $parent_id ) ||
+			! in_array( $post->post_status, $statuses, true )
+		) {
+			return 0;
+		}
+
+		return intval( $post->ID );
 	}
 
 	private static function path_to_page_parent_id( $path, $include_trash = true ) {
