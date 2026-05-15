@@ -1008,7 +1008,7 @@ SKILL;
 			if ( self::is_raw_block_post_type( $post_or_type->post_type ) ) {
 				return self::build_raw_block_path(
 					$post_or_type->post_type,
-					$post_or_type->post_name,
+					self::get_export_post_slug( $post_or_type ),
 					self::get_raw_block_post_theme_slug( $post_or_type )
 				);
 			}
@@ -1021,7 +1021,7 @@ SKILL;
 				return self::build_page_markdown_path( $post_or_type );
 			}
 
-			return ltrim( $post_or_type->post_type . '/' . $post_or_type->post_name . '.md', '/' );
+			return ltrim( $post_or_type->post_type . '/' . self::get_export_post_slug( $post_or_type ) . '.md', '/' );
 		}
 
 		if ( self::is_raw_block_post_type( $post_or_type ) ) {
@@ -1034,8 +1034,21 @@ SKILL;
 		return ltrim( $post_or_type . '/' . $slug . '.md', '/' );
 	}
 
+	private static function get_export_post_slug( WP_Post $post ) {
+		if ( '' !== $post->post_name ) {
+			return $post->post_name;
+		}
+
+		$post_type = sanitize_title( $post->post_type );
+		if ( '' === $post_type ) {
+			$post_type = 'post';
+		}
+
+		return $post_type . '-' . intval( $post->ID );
+	}
+
 	private static function build_page_markdown_path( WP_Post $post ) {
-		$segments  = array( $post->post_name );
+		$segments  = array( self::get_export_post_slug( $post ) );
 		$seen      = array( intval( $post->ID ) => true );
 		$parent_id = intval( $post->post_parent );
 
@@ -1052,7 +1065,7 @@ SKILL;
 				throw new Exception( 'Git export rejected because a WordPress page has a non-exported parent page. Restore, publish, or reparent the child page before cloning.' );
 			}
 
-			array_unshift( $segments, $parent->post_name );
+			array_unshift( $segments, self::get_export_post_slug( $parent ) );
 			$seen[ $parent_id ] = true;
 			$parent_id          = intval( $parent->post_parent );
 		}
