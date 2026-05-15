@@ -307,8 +307,14 @@ SKILL;
 
 	public static function handle_rest_request( WP_REST_Request $request ) {
 		$previous_error_handler = set_error_handler( array( __CLASS__, 'throw_on_php_warning' ) ); // phpcs:ignore
+		$git_path               = '';
 
 		try {
+			$git_path = self::build_git_path( $request );
+			if ( is_wp_error( $git_path ) ) {
+				return $git_path;
+			}
+
 			if ( ! PMD_Seeder::is_ready() ) {
 				PMD_Seeder::drive( 5 );
 			}
@@ -322,11 +328,6 @@ SKILL;
 				$response->append_bytes( PMD_Seeder::not_ready_message() . "\n" );
 
 				return $response->to_rest_response();
-			}
-
-			$git_path = self::build_git_path( $request );
-			if ( is_wp_error( $git_path ) ) {
-				return $git_path;
 			}
 
 			$request_body = file_get_contents( 'php://input' );
@@ -395,6 +396,14 @@ SKILL;
 
 			return $response->to_rest_response();
 		} catch ( Throwable $exception ) {
+			$service = self::git_service_from_request( $git_path, $request );
+			if ( $service ) {
+				return self::build_protocol_error_response(
+					$service,
+					self::get_throwable_message( $exception )
+				);
+			}
+
 			return new WP_Error(
 				'pmd_error',
 				self::get_throwable_message( $exception ),
@@ -504,6 +513,11 @@ SKILL;
 		unset( $request );
 		if ( '/git-upload-pack' === $git_path || '/git-receive-pack' === $git_path ) {
 			return ltrim( $git_path, '/' );
+		}
+
+		$info_refs_prefix = '/info/refs?service=';
+		if ( 0 === strpos( $git_path, $info_refs_prefix ) ) {
+			return self::normalize_git_service( substr( $git_path, strlen( $info_refs_prefix ) ) );
 		}
 
 		return '';
