@@ -4,6 +4,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+require_once __DIR__ . '/push-md-toolkit-loader.php';
+
 if ( ! class_exists( 'Composer\\Autoload\\ClassLoader' ) ) {
 	require_once __DIR__ . '/../../vendor/composer/ClassLoader.php';
 }
@@ -38,5 +40,5 @@ $pmd_files = array(
 );
 
 foreach ( $pmd_files as $pmd_file ) {
-	require_once $pmd_file;
+	pmd_require_toolkit_file( md5( 'push-md:' . $pmd_file ), $pmd_file );
 }

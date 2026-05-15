@@ -4,6 +4,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+require_once __DIR__ . '/push-md-toolkit-loader.php';
+
 function pmd_load_core_html_api() {
 	if ( class_exists( 'WP_HTML_Tag_Processor' ) && class_exists( 'WP_HTML_Processor' ) ) {
 		return;
@@ -65,8 +67,8 @@ function pmd_load_toolkit_bundle() {
 	$pmd_loader->register( true );
 
 	$pmd_files = require $pmd_toolkit . '/vendor/composer/autoload_files.php';
-	foreach ( $pmd_files as $pmd_file ) {
-		require_once $pmd_file;
+	foreach ( $pmd_files as $pmd_file_identifier => $pmd_file ) {
+		pmd_require_toolkit_file( $pmd_file_identifier, $pmd_file );
 	}
 }
 
