@@ -13,7 +13,7 @@ class PMD_Admin {
 	const REST_NAMESPACE = 'push-md/v1';
 	const STATUS_ROUTE   = '/seed-status';
 	const RETRY_ROUTE    = '/seed-retry';
-	const ASSET_VERSION  = '0.6.0';
+	const ASSET_VERSION  = '0.6.1';
 
 	public static function bootstrap() {
 		add_action( 'admin_menu', array( __CLASS__, 'register_menu' ) );
