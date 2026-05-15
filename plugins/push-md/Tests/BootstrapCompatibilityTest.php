@@ -55,11 +55,21 @@ class PMD_Bootstrap_Compatibility_Test extends TestCase {
 			1 => array( 'pipe', 'w' ),
 			2 => array( 'pipe', 'w' ),
 		);
-		$command         = escapeshellarg( PHP_BINARY ) . ' -d display_errors=1 -r ' . escapeshellarg( $code );
-		$process         = proc_open( $command, $descriptor_spec, $pipes );
+		$script          = tempnam( sys_get_temp_dir(), 'pmd-bootstrap-' );
+		if ( false === $script || false === file_put_contents( $script, "<?php\n" . $code ) ) {
+			$this->fail( 'Failed to write temporary PHP script for bootstrap compatibility test.' );
+		}
+
+		$command = $this->build_php_command( $script );
+		$options = array();
+		if ( '\\' === DIRECTORY_SEPARATOR ) {
+			$options['bypass_shell'] = true;
+		}
+		$process = proc_open( $command, $descriptor_spec, $pipes, null, null, $options );
 
 		if ( ! is_resource( $process ) ) {
-			$this->fail( sprintf( 'Failed to start command: %s', $command ) );
+			unlink( $script );
+			$this->fail( sprintf( 'Failed to start command: %s', $this->format_command_for_message( $command ) ) );
 		}
 
 		fclose( $pipes[0] );
@@ -67,11 +77,35 @@ class PMD_Bootstrap_Compatibility_Test extends TestCase {
 		$stderr = stream_get_contents( $pipes[2] );
 		fclose( $pipes[1] );
 		fclose( $pipes[2] );
+		$exit_code = proc_close( $process );
+		unlink( $script );
 
 		return array(
-			'exit_code' => proc_close( $process ),
+			'exit_code' => $exit_code,
 			'stdout'    => $stdout,
 			'stderr'    => $stderr,
 		);
+	}
+
+	private function build_php_command( $script ) {
+		$args = array( PHP_BINARY, '-d', 'display_errors=1', $script );
+		if ( PHP_VERSION_ID >= 70400 ) {
+			return $args;
+		}
+
+		$command = '';
+		foreach ( $args as $arg ) {
+			$command .= escapeshellarg( $arg ) . ' ';
+		}
+
+		return rtrim( $command );
+	}
+
+	private function format_command_for_message( $command ) {
+		if ( is_array( $command ) ) {
+			return implode( ' ', $command );
+		}
+
+		return $command;
 	}
 }
