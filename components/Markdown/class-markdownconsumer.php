@@ -72,29 +72,14 @@ class MarkdownConsumer implements DataFormatConsumer {
 	}
 
 	private function convert_markdown_to_blocks() {
+		$markdown = $this->extract_frontmatter( $this->markdown );
+
 		$environment = new Environment( array() );
 		$environment->addExtension( new CommonMarkCoreExtension() );
 		$environment->addExtension( new GithubFlavoredMarkdownExtension() );
-		$environment->addExtension(
-			new \Webuni\FrontMatter\Markdown\FrontMatterLeagueCommonMarkExtension(
-				new \Webuni\FrontMatter\FrontMatter()
-			)
-		);
 
-		$parser            = new MarkdownParser( $environment );
-		$document          = $parser->parse( $this->markdown );
-		$this->frontmatter = array();
-		foreach ( $document->data->export() as $key => $value ) {
-			if ( 'attributes' === $key && empty( $value ) ) {
-				// The Frontmatter extension adds an 'attributes' key to the document data
-				// even when there is no actual "attributes" key in the frontmatter.
-				//
-				// Let's skip it when the value is empty.
-				continue;
-			}
-			// Use an array as a value to comply with the WP_Block_Markup_Converter interface.
-			$this->frontmatter[ $key ] = array( $value );
-		}
+		$parser   = new MarkdownParser( $environment );
+		$document = $parser->parse( $markdown );
 
 		$walker = $document->walker();
 		while ( true ) {
@@ -375,6 +360,116 @@ BLOCK;
 				}
 			}
 		}
+	}
+
+	private function extract_frontmatter( $markdown ) {
+		$this->frontmatter = array();
+
+		if ( ! preg_match( '/\A---\r?\n/', $markdown, $opening ) ) {
+			return $markdown;
+		}
+
+		$body_start = strlen( $opening[0] );
+		$offset     = $body_start;
+		$length     = strlen( $markdown );
+
+		while ( $offset < $length ) {
+			$line_end = strpos( $markdown, "\n", $offset );
+			if ( false === $line_end ) {
+				$line      = substr( $markdown, $offset );
+				$next_line = $length;
+			} else {
+				$line      = substr( $markdown, $offset, $line_end - $offset );
+				$next_line = $line_end + 1;
+			}
+
+			if ( '---' === rtrim( $line, "\r" ) ) {
+				$frontmatter = substr( $markdown, $body_start, $offset - $body_start );
+				foreach ( $this->parse_frontmatter_block( $frontmatter ) as $key => $value ) {
+					// Use an array as a value to comply with the WP_Block_Markup_Converter interface.
+					$this->frontmatter[ $key ] = array( $value );
+				}
+
+				return substr( $markdown, $next_line );
+			}
+
+			$offset = $next_line;
+		}
+
+		return $markdown;
+	}
+
+	private function parse_frontmatter_block( $frontmatter ) {
+		$metadata = array();
+		$lines    = preg_split( "/\r\n|\n|\r/", $frontmatter );
+		$count    = count( $lines );
+
+		for ( $i = 0; $i < $count; $i++ ) {
+			$line = $lines[ $i ];
+			if ( '' === trim( $line ) || preg_match( '/^\s*#/', $line ) ) {
+				continue;
+			}
+			if ( preg_match( '/^\s+/', $line ) ) {
+				continue;
+			}
+			if ( ! preg_match( '/^([A-Za-z0-9_.-]+)\s*:(?:\s*(.*))?$/', $line, $matches ) ) {
+				continue;
+			}
+
+			$key = $matches[1];
+			$raw = isset( $matches[2] ) ? trim( $matches[2] ) : '';
+			if ( '' === $raw ) {
+				$nested = false;
+				$j      = $i + 1;
+				while ( $j < $count && preg_match( '/^\s+/', $lines[ $j ] ) ) {
+					if ( '' !== trim( $lines[ $j ] ) ) {
+						$nested = true;
+					}
+					++$j;
+				}
+
+				if ( $nested ) {
+					$metadata[ $key ] = array();
+					$i                = $j - 1;
+					continue;
+				}
+
+				$metadata[ $key ] = '';
+				continue;
+			}
+
+			$metadata[ $key ] = $this->parse_frontmatter_scalar( $raw );
+		}
+
+		return $metadata;
+	}
+
+	private function parse_frontmatter_scalar( $raw ) {
+		if ( preg_match( '/^\[|\{|- /', $raw ) ) {
+			return array();
+		}
+
+		$first = substr( $raw, 0, 1 );
+		$last  = substr( $raw, -1 );
+
+		if ( '"' === $first && '"' === $last ) {
+			$decoded = json_decode( $raw );
+			if ( JSON_ERROR_NONE === json_last_error() && is_string( $decoded ) ) {
+				return $decoded;
+			}
+
+			return stripcslashes( substr( $raw, 1, -1 ) );
+		}
+
+		if ( "'" === $first && "'" === $last ) {
+			return str_replace( "''", "'", substr( $raw, 1, -1 ) );
+		}
+
+		if ( preg_match( '/^-?(?:0|[1-9][0-9]*)$/', $raw ) ) {
+			return (int) $raw;
+		}
+
+		return $raw;
 	}
 
 	/**

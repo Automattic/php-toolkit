@@ -2,9 +2,13 @@
 
 namespace WordPress\Filesystem;
 
-// Table names are configured per-instance and cannot be passed through
-// $wpdb->prepare(). All user-supplied values use placeholders.
+// Table names are configured per-instance, validated as SQL identifiers, and
+// interpolated only after validation. All user-supplied values use placeholders.
+// Direct queries are intentional here: this class is a private Git object store.
 // phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQL.NotPrepared
+// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange
+// phpcs:disable PluginCheck.Security.DirectDB.UnescapedDBParameter
+// phpcs:disable WordPress.Security.EscapeOutput.ExceptionNotEscaped
 
 use Exception;
 use WordPress\ByteStream\MemoryPipe;
@@ -63,16 +67,25 @@ class WpdbFilesystem implements Filesystem {
 	 * import. The next call to `create()` will re-create the schema.
 	 */
 	public static function drop_tables( $wpdb, $table_prefix ) {
-		$files_table   = $table_prefix . 'files';
-		$entries_table = $table_prefix . 'directory_entries';
+		$files_table   = self::sanitize_table_identifier( $table_prefix . 'files' );
+		$entries_table = self::sanitize_table_identifier( $table_prefix . 'directory_entries' );
 		$wpdb->query( "DROP TABLE IF EXISTS {$files_table}" );
 		$wpdb->query( "DROP TABLE IF EXISTS {$entries_table}" );
 	}
 
 	private function __construct( $wpdb, $table_prefix ) {
 		$this->wpdb          = $wpdb;
-		$this->files_table   = $table_prefix . 'files';
-		$this->entries_table = $table_prefix . 'directory_entries';
+		$this->files_table   = self::sanitize_table_identifier( $table_prefix . 'files' );
+		$this->entries_table = self::sanitize_table_identifier( $table_prefix . 'directory_entries' );
+	}
+
+	private static function sanitize_table_identifier( $table ) {
+		$table = (string) $table;
+		if ( ! preg_match( '/\A[A-Za-z0-9_]+\z/', $table ) ) {
+			throw new \InvalidArgumentException( 'Invalid database table identifier.' );
+		}
+
+		return $table;
 	}
 
 	public function get_root(): string {

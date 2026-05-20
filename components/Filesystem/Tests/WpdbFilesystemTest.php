@@ -81,4 +81,10 @@ class WpdbFilesystemTest extends FilesystemTestCase {
 		$this->assertSame( 'pmd_files', $meta['files_table'] );
 		$this->assertSame( 'pmd_directory_entries', $meta['entries_table'] );
 	}
+
+	public function testRejectsUnsafeTablePrefix() {
+		$this->expectException( InvalidArgumentException::class );
+
+		WpdbFilesystem::create( $this->wpdb, 'pmd_;DROP_' );
+	}
 }

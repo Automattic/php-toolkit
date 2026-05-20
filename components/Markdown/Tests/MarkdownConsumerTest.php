@@ -209,6 +209,49 @@ MD;
 		$this->assertEquals( $expected_metadata, $metadata );
 	}
 
+	public function test_frontmatter_subset_extraction() {
+		$markdown = <<<MD
+---
+title: 'It''s ready'
+menu_order: 0
+description:
+---
+
+Content
+MD;
+		$consumer = new MarkdownConsumer( $markdown );
+		$result   = $consumer->consume();
+
+		$this->assertEquals(
+			array(
+				'title'       => array( "It's ready" ),
+				'menu_order'  => array( 0 ),
+				'description' => array( '' ),
+			),
+			$result->get_all_metadata()
+		);
+	}
+
+	public function test_frontmatter_nested_values_are_exposed_for_caller_validation() {
+		$markdown = <<<MD
+---
+title:
+  - "Array Title"
+---
+
+Content
+MD;
+		$consumer = new MarkdownConsumer( $markdown );
+		$result   = $consumer->consume();
+
+		$this->assertEquals(
+			array(
+				'title' => array( array() ),
+			),
+			$result->get_all_metadata()
+		);
+	}
+
 	public function test_gutenberg_fence_is_preserved_as_block_markup() {
 		$markdown = <<<MD
 ```gutenberg

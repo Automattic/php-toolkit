@@ -45,7 +45,7 @@ class PMD_Seeder {
 	const STATE_OPTION    = 'pmd_seed_state';
 	const PROGRESS_OPTION = 'pmd_seed_progress';
 	const SEED_BRANCH     = 'refs/heads/_pmd_seed';
-	const CRON_HOOK       = 'pmd_seed_tick';
+	const CRON_HOOK       = 'push_md_seed_tick';
 	const LOCK_TRANSIENT  = 'pmd_seed_lock';
 
 	const STATE_PENDING     = 'pending';
@@ -66,21 +66,21 @@ class PMD_Seeder {
 	/**
 	 * Resolve budget knobs through filters. The defaults are the
 	 * production values; tests and unusual hosts can shrink them via
-	 * `pmd_seed_batch_size`,
-	 * `pmd_seed_time_budget_seconds`, and
-	 * `pmd_seed_tick_reschedule_seconds` to force the seeder to
+	 * `push_md_seed_batch_size`,
+	 * `push_md_seed_time_budget_seconds`, and
+	 * `push_md_seed_tick_reschedule_seconds` to force the seeder to
 	 * span multiple cron ticks.
 	 */
 	private static function batch_size() {
-		return (int) apply_filters( 'pmd_seed_batch_size', self::BATCH_SIZE );
+		return (int) apply_filters( 'push_md_seed_batch_size', self::BATCH_SIZE );
 	}
 
 	private static function time_budget_seconds() {
-		return (float) apply_filters( 'pmd_seed_time_budget_seconds', self::TIME_BUDGET_SECONDS );
+		return (float) apply_filters( 'push_md_seed_time_budget_seconds', self::TIME_BUDGET_SECONDS );
 	}
 
 	private static function tick_reschedule_seconds() {
-		return (int) apply_filters( 'pmd_seed_tick_reschedule_seconds', self::TICK_RESCHEDULE_SECONDS );
+		return (int) apply_filters( 'push_md_seed_tick_reschedule_seconds', self::TICK_RESCHEDULE_SECONDS );
 	}
 
 	public static function on_activation() {

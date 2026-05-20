@@ -89,21 +89,7 @@ jobs:
         run: bash bin/build-plugins.sh
 
       - name: Inspect Push MD plugin zip
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          test -f dist/plugins/push-md.zip
-          zipinfo -1 dist/plugins/push-md.zip | tee /tmp/push-md-zip-contents.txt
-
-          grep -Fxq 'push-md/push-md.php' /tmp/push-md-zip-contents.txt
-          grep -Fxq 'push-md/readme.txt' /tmp/push-md-zip-contents.txt
-          grep -Fxq 'push-md/php-toolkit/vendor/composer/ClassLoader.php' /tmp/push-md-zip-contents.txt
-
-          ! grep -Eq '^push-md/(Tests|docker-demo|docs)/' /tmp/push-md-zip-contents.txt
-          ! grep -Fxq 'push-md/blueprint-e2e.json' /tmp/push-md-zip-contents.txt
-          ! grep -Fxq 'push-md/push-md-dev-bootstrap.php' /tmp/push-md-zip-contents.txt
-          ! grep -Fxq 'push-md/push-md-phar-bootstrap.php' /tmp/push-md-zip-contents.txt
+        run: bin/inspect-push-md-zip.sh dist/plugins/push-md.zip
 
       - name: Upload Push MD release asset
         env:

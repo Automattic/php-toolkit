@@ -6,7 +6,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 require_once __DIR__ . '/push-md-toolkit-loader.php';
 
-function pmd_load_core_html_api() {
+function push_md_load_core_html_api() {
 	if ( class_exists( 'WP_HTML_Tag_Processor' ) && class_exists( 'WP_HTML_Processor' ) ) {
 		return;
 	}
@@ -41,10 +41,10 @@ function pmd_load_core_html_api() {
 	}
 }
 
-function pmd_load_toolkit_bundle() {
+function push_md_load_toolkit_bundle() {
 	$pmd_toolkit = __DIR__ . '/php-toolkit';
 
-	pmd_load_core_html_api();
+	push_md_load_core_html_api();
 
 	if ( ! class_exists( 'Composer\\Autoload\\ClassLoader' ) ) {
 		require_once $pmd_toolkit . '/vendor/composer/ClassLoader.php';
@@ -68,8 +68,8 @@ function pmd_load_toolkit_bundle() {
 
 	$pmd_files = require $pmd_toolkit . '/vendor/composer/autoload_files.php';
 	foreach ( $pmd_files as $pmd_file_identifier => $pmd_file ) {
-		pmd_require_toolkit_file( $pmd_file_identifier, $pmd_file );
+		push_md_require_toolkit_file( $pmd_file_identifier, $pmd_file );
 	}
 }
 
-pmd_load_toolkit_bundle();
+push_md_load_toolkit_bundle();

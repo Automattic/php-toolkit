@@ -4,16 +4,16 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-function pmd_require_toolkit_file( $pmd_file_identifier, $pmd_file ) {
-	if ( ! isset( $GLOBALS['__composer_autoload_files'] ) ) {
-		$GLOBALS['__composer_autoload_files'] = array();
+function push_md_require_toolkit_file( $push_md_file_identifier, $push_md_file ) {
+	if ( ! isset( $GLOBALS['push_md_composer_autoload_files'] ) ) {
+		$GLOBALS['push_md_composer_autoload_files'] = array();
 	}
 
-	if ( ! empty( $GLOBALS['__composer_autoload_files'][ $pmd_file_identifier ] ) ) {
+	if ( ! empty( $GLOBALS['push_md_composer_autoload_files'][ $push_md_file_identifier ] ) ) {
 		return;
 	}
 
-	$GLOBALS['__composer_autoload_files'][ $pmd_file_identifier ] = true;
+	$GLOBALS['push_md_composer_autoload_files'][ $push_md_file_identifier ] = true;
 
-	require_once $pmd_file;
+	require_once $push_md_file;
 }
