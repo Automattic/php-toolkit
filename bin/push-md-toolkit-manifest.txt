@@ -1,7 +1,7 @@
 # Push MD ships a purpose-built toolkit bundle, not the entire monorepo.
-# Keep Markdown vendored code intact for now; the rest of this list is the
-# runtime surface Push MD uses for Git storage, Git Smart HTTP, and block
-# markup conversion.
+# The build script prunes unused Markdown/front matter vendor files from this
+# readable runtime bundle. The rest of this list is the runtime surface Push MD
+# uses for Git storage, Git Smart HTTP, and block markup conversion.
 
 components/Markdown/
 

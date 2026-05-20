@@ -40,5 +40,5 @@ $pmd_files = array(
 );
 
 foreach ( $pmd_files as $pmd_file ) {
-	pmd_require_toolkit_file( md5( 'push-md:' . $pmd_file ), $pmd_file );
+	push_md_require_toolkit_file( md5( 'push-md:' . $pmd_file ), $pmd_file );
 }

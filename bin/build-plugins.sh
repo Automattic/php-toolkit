@@ -27,6 +27,9 @@ copy_pmd_toolkit_path() {
 	if [ -d "$source_path" ]; then
 		mkdir -p "$target_path"
 		rsync -a \
+			--exclude='.DS_Store' \
+			--include='LICENSE.md' \
+			--include='license.md' \
 			--exclude='*.dist' \
 			--exclude='*.json' \
 			--exclude='*.lock' \
@@ -47,9 +50,34 @@ copy_pmd_toolkit_path() {
 			--exclude='tests/' \
 			--exclude='Tests/' \
 			--exclude='Test/' \
+			--exclude='class-markdownimporter.php' \
 			--exclude='vendor-bin/' \
 			--exclude='vendor-patched/autoload.php' \
+			--exclude='vendor-patched/bin/' \
 			--exclude='vendor-patched/composer/' \
+			--exclude='vendor-patched/webuni/' \
+			--exclude='vendor-patched/symfony/yaml/' \
+			--exclude='vendor-patched/league/commonmark/src/Extension/Attributes/' \
+			--exclude='vendor-patched/league/commonmark/src/Extension/DefaultAttributes/' \
+			--exclude='vendor-patched/league/commonmark/src/Extension/DescriptionList/' \
+			--exclude='vendor-patched/league/commonmark/src/Extension/Embed/' \
+			--exclude='vendor-patched/league/commonmark/src/Extension/Footnote/' \
+			--exclude='vendor-patched/league/commonmark/src/Extension/FrontMatter/' \
+			--exclude='vendor-patched/league/commonmark/src/Extension/HeadingPermalink/' \
+			--exclude='vendor-patched/league/commonmark/src/Extension/Mention/' \
+			--exclude='vendor-patched/league/commonmark/src/Extension/SmartPunct/' \
+			--exclude='vendor-patched/league/commonmark/src/Extension/TableOfContents/' \
+			--exclude='vendor-patched/nette/utils/src/HtmlStringable.php' \
+			--exclude='vendor-patched/nette/utils/src/SmartObject.php' \
+			--exclude='vendor-patched/nette/utils/src/Translator.php' \
+			--exclude='vendor-patched/nette/utils/src/Utils/FileSystem.php' \
+			--exclude='vendor-patched/nette/utils/src/Utils/Finder.php' \
+			--exclude='vendor-patched/nette/utils/src/Utils/Html.php' \
+			--exclude='vendor-patched/nette/utils/src/Utils/Image*.php' \
+			--exclude='vendor-patched/nette/utils/src/Utils/Json.php' \
+			--exclude='vendor-patched/nette/utils/src/Utils/Paginator.php' \
+			--exclude='vendor-patched/nette/utils/src/Utils/Random.php' \
+			--exclude='vendor-patched/nette/utils/src/Iterators/' \
 			"$source_path/" \
 			"$target_path/"
 	elif [ -f "$source_path" ]; then
@@ -210,6 +238,85 @@ pmd_toolkit_write_files( $target_dir, $files );
 PHP
 }
 
+harden_pmd_bundled_php() {
+	local target_dir=$1
+
+	PMD_BUNDLE_TARGET="$target_dir" php <<'PHP'
+<?php
+
+$target_dir = rtrim( getenv( 'PMD_BUNDLE_TARGET' ), '/' );
+
+$phpcs_disable = '// phpcs:disable WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedNamespaceFound,WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedFunctionFound,WordPress.Security.EscapeOutput.ExceptionNotEscaped,WordPress.Security.EscapeOutput.OutputNotEscaped,WordPress.PHP.DevelopmentFunctions.error_log_trigger_error,WordPress.PHP.DevelopmentFunctions.error_log_debug_backtrace,WordPress.PHP.DevelopmentFunctions.error_log_print_r,WordPress.PHP.DevelopmentFunctions.error_log_var_export,WordPress.PHP.DevelopmentFunctions.error_log_set_error_handler,WordPress.WP.AlternativeFunctions,PluginCheck.CodeAnalysis.Heredoc.NotAllowed' . "\n";
+$guard         = "if ( ! defined( 'ABSPATH' ) ) {\n\texit;\n}\n\n";
+
+function push_md_add_phpcs_disable( $code, $phpcs_disable ) {
+	if ( false !== strpos( $code, 'phpcs:disable WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedNamespaceFound' ) ) {
+		return $code;
+	}
+
+	return preg_replace( '/\A<\?php\s*/', "<?php\n" . $phpcs_disable . "\n", $code, 1 );
+}
+
+function push_md_add_direct_access_guard( $code, $guard ) {
+	if (
+		false !== strpos( $code, "defined( 'ABSPATH' )" ) ||
+		false !== strpos( $code, "defined( 'WP_UNINSTALL_PLUGIN' )" )
+	) {
+		return $code;
+	}
+
+	if ( ! preg_match( '/\A<\?php\b/', $code ) ) {
+		return $code;
+	}
+
+	if ( preg_match( '/namespace\s+[^;]+;\s*/', $code, $matches, PREG_OFFSET_CAPTURE ) ) {
+		$insert_at = $matches[0][1] + strlen( $matches[0][0] );
+		$tail      = substr( $code, $insert_at );
+		if ( preg_match( '/\A(?:(?:\s+)|(?:use\s+[^;]+;\s*))*/', $tail, $use_matches ) ) {
+			$insert_at += strlen( $use_matches[0] );
+		}
+
+		return substr( $code, 0, $insert_at ) . $guard . substr( $code, $insert_at );
+	}
+
+	if ( preg_match( '/\A<\?php\s*(?:declare\s*\([^;]+;\s*)*/', $code, $matches ) ) {
+		$insert_at = strlen( $matches[0] );
+
+		return substr( $code, 0, $insert_at ) . $guard . substr( $code, $insert_at );
+	}
+
+	return $code;
+}
+
+$iterator = new RecursiveIteratorIterator(
+	new RecursiveDirectoryIterator(
+		$target_dir,
+		FilesystemIterator::SKIP_DOTS
+	)
+);
+
+foreach ( $iterator as $file ) {
+	if ( 'php' !== strtolower( $file->getExtension() ) ) {
+		continue;
+	}
+
+	$path          = $file->getPathname();
+	$relative_path = substr( $path, strlen( $target_dir ) + 1 );
+	$code          = file_get_contents( $path );
+	if ( false === $code ) {
+		continue;
+	}
+
+	if ( 0 === strpos( $relative_path, 'php-toolkit/' ) ) {
+		$code = push_md_add_phpcs_disable( $code, $phpcs_disable );
+	}
+
+	$code = push_md_add_direct_access_guard( $code, $guard );
+	file_put_contents( $path, $code );
+}
+PHP
+}
+
 copy_pmd_php_toolkit_bundle() {
 	local target_dir=$1
 	local manifest_file="$PROJECT_DIR/bin/push-md-toolkit-manifest.txt"
@@ -255,6 +362,7 @@ copy_pmd_php_toolkit_bundle() {
 
 mkdir -p $DIST_DIR/push-md
 rsync -a \
+	--exclude='.DS_Store' \
 	--exclude='Tests/' \
 	--exclude='docker-demo/' \
 	--exclude='docs/' \
@@ -264,7 +372,9 @@ rsync -a \
 	"$PROJECT_DIR/plugins/push-md/" \
 	"$DIST_DIR/push-md/"
 copy_pmd_php_toolkit_bundle "$DIST_DIR/push-md/php-toolkit"
+harden_pmd_bundled_php "$DIST_DIR/push-md"
 cd $DIST_DIR
 zip -r push-md.zip push-md/
+bash "$PROJECT_DIR/bin/inspect-push-md-zip.sh" "$DIST_DIR/push-md.zip"
 cd $PROJECT_DIR
 rm -rf $DIST_DIR/push-md

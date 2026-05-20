@@ -109,6 +109,10 @@ No. Push MD does not enable or force any authentication method. It works with Wo
 
 The built-in WordPress Application Passwords feature is the default way to use Git over HTTPS when it is available on the site. Other REST authentication plugins may also work if they authenticate the request as a WordPress user before Push MD's permission checks run.
 
+= Does Push MD require Composer or a PHAR archive? =
+
+No. Push MD includes the readable PHP Toolkit runtime files it needs under `php-toolkit/` in the plugin package. The plugin does not install Composer dependencies on the site and does not load an opaque PHAR archive.
+
 = Does this sync my site to GitHub or another Git host? =
 
 No. Push MD makes WordPress itself behave like a Git remote for supported content. You can add GitHub, GitLab, Bitbucket, or another host as a separate remote in your local clone if your workflow needs that.

@@ -83,11 +83,11 @@ class PMD_Plugin {
 	}
 
 	public static function install_default_agent_skill() {
-		if ( ! self::guidelines_available() || ! function_exists( 'wp_install_skill' ) ) {
+		if ( ! self::guidelines_available() || ! function_exists( 'push_md_install_skill' ) ) {
 			return;
 		}
 
-		wp_install_skill(
+		push_md_install_skill(
 			self::AGENT_SKILL_SOURCE,
 			self::AGENT_SKILL_TITLE,
 			'Guide for coding agents working in a Push MD checkout of a WordPress site.',
@@ -97,7 +97,7 @@ class PMD_Plugin {
 			)
 		);
 
-		wp_install_skill(
+		push_md_install_skill(
 			self::TEMPLATE_EDITOR_SKILL_SOURCE,
 			self::TEMPLATE_EDITOR_SKILL_TITLE,
 			'Edit Push MD block theme templates and template parts as raw Gutenberg HTML while preserving Site Editor compatibility.',

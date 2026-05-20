@@ -39,31 +39,20 @@ if ( ! defined( 'PMD_PLUGIN_FILE' ) ) {
 
 register_activation_hook( __FILE__, array( 'PMD_Plugin', 'on_activation' ) );
 
-// After the user clicks Activate, send them straight to the seeder
-// progress page so they can watch the import without hunting for a
-// menu item. Skipped for bulk activations and CLI/AJAX flows so we
-// only intercept the one-click admin "Activate" link.
-add_action(
-	'activated_plugin',
-	function ( $plugin ) {
-		if ( plugin_basename( PMD_PLUGIN_FILE ) !== $plugin ) {
-			return;
-		}
-		if ( wp_doing_ajax() || ( defined( 'WP_CLI' ) && WP_CLI ) ) {
-			return;
-		}
-		$action = isset( $_REQUEST['action'] ) ? sanitize_key( wp_unslash( $_REQUEST['action'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
-		if ( '' !== $action && 'activate' !== $action ) {
-			return;
-		}
-		wp_safe_redirect( admin_url( 'tools.php?page=' . PMD_Admin::PAGE_SLUG ) );
-		exit;
-	}
-);
-
 add_filter(
 	'plugin_action_links_' . plugin_basename( PMD_PLUGIN_FILE ),
 	function ( $actions ) {
+		$actions = array_merge(
+			array(
+				'push_md_open' => sprintf(
+					'<a href="%s">%s</a>',
+					esc_url( admin_url( 'tools.php?page=' . PMD_Admin::PAGE_SLUG ) ),
+					esc_html__( 'Open Push MD', 'push-md' )
+				),
+			),
+			$actions
+		);
+
 		$actions['push_md_landing_page'] = sprintf(
 			'<a href="%s" target="_blank" rel="noopener noreferrer">%s</a>',
 			esc_url( 'https://pushmd.blog/' ),

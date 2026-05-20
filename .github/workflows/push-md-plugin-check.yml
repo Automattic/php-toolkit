@@ -1,0 +1,41 @@
+name: Push MD Plugin Check
+
+on:
+  push:
+    branches: [ trunk ]
+  pull_request:
+
+jobs:
+  plugin-check:
+    name: Push MD Plugin Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.1'
+          extensions: mbstring, json
+          coverage: none
+          tools: composer:v2
+
+      - name: Install Composer dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress --optimize-autoloader
+
+      - name: Build Push MD plugin zip
+        run: bash bin/build-plugins.sh
+
+      - name: Unpack Push MD plugin zip
+        run: |
+          rm -rf .plugin-check-build
+          mkdir .plugin-check-build
+          unzip -q dist/plugins/push-md.zip -d .plugin-check-build
+
+      - name: Run Plugin Check
+        uses: wordpress/plugin-check-action@v1
+        with:
+          build-dir: './.plugin-check-build/push-md'
+          slug: 'push-md'

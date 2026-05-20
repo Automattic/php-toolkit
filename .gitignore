@@ -1,5 +1,7 @@
 vendor/
 **/*/vendor/
+.DS_Store
+**/.DS_Store
 opfs/
 node_modules
 .cursor

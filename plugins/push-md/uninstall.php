@@ -12,12 +12,12 @@ if ( ! defined( 'WP_UNINSTALL_PLUGIN' ) ) {
 	exit;
 }
 
-pmd_uninstall_cleanup();
+push_md_uninstall_cleanup();
 
 /**
  * Clean up every site in multisite installs, or the current site otherwise.
  */
-function pmd_uninstall_cleanup() {
+function push_md_uninstall_cleanup() {
 	if ( is_multisite() && function_exists( 'get_sites' ) && function_exists( 'switch_to_blog' ) && function_exists( 'restore_current_blog' ) ) {
 		$offset = 0;
 		$number = 100;
@@ -33,7 +33,7 @@ function pmd_uninstall_cleanup() {
 
 			foreach ( $site_ids as $site_id ) {
 				switch_to_blog( (int) $site_id );
-				pmd_uninstall_cleanup_site();
+				push_md_uninstall_cleanup_site();
 				restore_current_blog();
 			}
 
@@ -43,24 +43,24 @@ function pmd_uninstall_cleanup() {
 		return;
 	}
 
-	pmd_uninstall_cleanup_site();
+	push_md_uninstall_cleanup_site();
 }
 
 /**
  * Clean up Push MD data for the current site.
  */
-function pmd_uninstall_cleanup_site() {
+function push_md_uninstall_cleanup_site() {
 	delete_option( 'pmd_seed_state' );
 	delete_option( 'pmd_seed_progress' );
 	delete_transient( 'pmd_seed_lock' );
-	wp_clear_scheduled_hook( 'pmd_seed_tick' );
-	pmd_uninstall_drop_repository_tables();
+	wp_clear_scheduled_hook( 'push_md_seed_tick' );
+	push_md_uninstall_drop_repository_tables();
 }
 
 /**
  * Drop the per-site Git object-store tables.
  */
-function pmd_uninstall_drop_repository_tables() {
+function push_md_uninstall_drop_repository_tables() {
 	global $wpdb;
 
 	$table_prefix = preg_replace( '/[^A-Za-z0-9_]/', '', $wpdb->prefix . 'pmd_' );
