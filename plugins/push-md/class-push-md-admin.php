@@ -7,7 +7,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * Admin UI for Push MD.
  */
-class PMD_Admin {
+class Push_MD_Admin {
 
 	const PAGE_SLUG      = 'push-md';
 	const REST_NAMESPACE = 'push-md/v1';
@@ -36,7 +36,7 @@ class PMD_Admin {
 			return;
 		}
 
-		$plugin_file = defined( 'PMD_PLUGIN_FILE' ) ? PMD_PLUGIN_FILE : __FILE__;
+		$plugin_file = defined( 'PUSH_MD_PLUGIN_FILE' ) ? PUSH_MD_PLUGIN_FILE : __FILE__;
 		wp_enqueue_style(
 			'push-md-admin-shell',
 			plugins_url( 'admin-shell.css', $plugin_file ),
@@ -79,17 +79,17 @@ class PMD_Admin {
 	}
 
 	public static function rest_status() {
-		PMD_Seeder::drive( 1.5 );
+		Push_MD_Seeder::drive( 1.5 );
 
-		return rest_ensure_response( PMD_Seeder::get_progress() );
+		return rest_ensure_response( Push_MD_Seeder::get_progress() );
 	}
 
 	public static function rest_retry() {
-		PMD_Seeder::reset();
-		PMD_Seeder::on_activation();
-		PMD_Seeder::tick();
+		Push_MD_Seeder::reset();
+		Push_MD_Seeder::on_activation();
+		Push_MD_Seeder::tick();
 
-		return rest_ensure_response( PMD_Seeder::get_progress() );
+		return rest_ensure_response( Push_MD_Seeder::get_progress() );
 	}
 
 	private static function add_username_to_url( $url, $username ) {
@@ -121,12 +121,12 @@ class PMD_Admin {
 
 		// Drive the seeder before painting so the first screen already
 		// has real checkout state whenever the host can do quick work.
-		PMD_Seeder::drive( 1.5 );
-		$progress   = PMD_Seeder::get_progress();
+		Push_MD_Seeder::drive( 1.5 );
+		$progress   = Push_MD_Seeder::get_progress();
 		$nonce      = wp_create_nonce( 'wp_rest' );
 		$status_url = esc_url_raw( rest_url( self::REST_NAMESPACE . self::STATUS_ROUTE ) );
 		$retry_url  = esc_url_raw( rest_url( self::REST_NAMESPACE . self::RETRY_ROUTE ) );
-		$git_url    = esc_url_raw( rest_url( PMD_Plugin::ROUTE_NAMESPACE . '/md.git' ) );
+		$git_url    = esc_url_raw( rest_url( Push_MD_Plugin::ROUTE_NAMESPACE . '/md.git' ) );
 		$user       = wp_get_current_user();
 		if ( $user && $user->exists() ) {
 			$git_url = self::add_username_to_url( $git_url, $user->user_login );
@@ -249,8 +249,8 @@ class PMD_Admin {
 							</tr>
 							<tr>
 								<th scope="row"><?php esc_html_e( 'Branch', 'push-md' ); ?></th>
-								<td><code><?php echo esc_html( PMD_Plugin::DEFAULT_BRANCH ); ?></code></td>
-								<td><button type="button" class="button push-md-copy-button" data-copy-value="<?php echo esc_attr( PMD_Plugin::DEFAULT_BRANCH ); ?>" aria-label="<?php echo esc_attr( $copy_branch_label ); ?>"><?php echo esc_html( $copy_button_label ); ?></button></td>
+								<td><code><?php echo esc_html( Push_MD_Plugin::DEFAULT_BRANCH ); ?></code></td>
+								<td><button type="button" class="button push-md-copy-button" data-copy-value="<?php echo esc_attr( Push_MD_Plugin::DEFAULT_BRANCH ); ?>" aria-label="<?php echo esc_attr( $copy_branch_label ); ?>"><?php echo esc_html( $copy_button_label ); ?></button></td>
 							</tr>
 							<tr>
 								<th scope="row"><?php esc_html_e( 'Connect an existing repo', 'push-md' ); ?></th>

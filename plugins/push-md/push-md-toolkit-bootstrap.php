@@ -15,8 +15,8 @@ function push_md_load_core_html_api() {
 		return;
 	}
 
-	$pmd_html_api_dir   = ABSPATH . WPINC . '/html-api/';
-	$pmd_html_api_files = array(
+	$push_md_html_api_dir   = ABSPATH . WPINC . '/html-api/';
+	$push_md_html_api_files = array(
 		'class-wp-html-span.php',
 		'class-wp-html-text-replacement.php',
 		'class-wp-html-attribute-token.php',
@@ -33,42 +33,42 @@ function push_md_load_core_html_api() {
 		'class-wp-html-processor.php',
 	);
 
-	foreach ( $pmd_html_api_files as $pmd_html_api_file ) {
-		$pmd_html_api_path = $pmd_html_api_dir . $pmd_html_api_file;
-		if ( is_file( $pmd_html_api_path ) ) {
-			require_once $pmd_html_api_path;
+	foreach ( $push_md_html_api_files as $push_md_html_api_file ) {
+		$push_md_html_api_path = $push_md_html_api_dir . $push_md_html_api_file;
+		if ( is_file( $push_md_html_api_path ) ) {
+			require_once $push_md_html_api_path;
 		}
 	}
 }
 
 function push_md_load_toolkit_bundle() {
-	$pmd_toolkit = __DIR__ . '/php-toolkit';
+	$push_md_toolkit = __DIR__ . '/php-toolkit';
 
 	push_md_load_core_html_api();
 
 	if ( ! class_exists( 'Composer\\Autoload\\ClassLoader' ) ) {
-		require_once $pmd_toolkit . '/vendor/composer/ClassLoader.php';
+		require_once $push_md_toolkit . '/vendor/composer/ClassLoader.php';
 	}
 
-	$pmd_loader   = new Composer\Autoload\ClassLoader();
-	$pmd_classmap = require $pmd_toolkit . '/vendor/composer/autoload_classmap.php';
-	$pmd_loader->addClassMap( $pmd_classmap );
+	$push_md_loader   = new \Composer\Autoload\ClassLoader();
+	$push_md_classmap = require $push_md_toolkit . '/vendor/composer/autoload_classmap.php';
+	$push_md_loader->addClassMap( $push_md_classmap );
 
-	$pmd_psr4 = require $pmd_toolkit . '/vendor/composer/autoload_psr4.php';
-	foreach ( $pmd_psr4 as $pmd_prefix => $pmd_paths ) {
-		$pmd_loader->setPsr4( $pmd_prefix, $pmd_paths );
+	$push_md_psr4 = require $push_md_toolkit . '/vendor/composer/autoload_psr4.php';
+	foreach ( $push_md_psr4 as $push_md_prefix => $push_md_paths ) {
+		$push_md_loader->setPsr4( $push_md_prefix, $push_md_paths );
 	}
 
-	$pmd_namespaces = require $pmd_toolkit . '/vendor/composer/autoload_namespaces.php';
-	foreach ( $pmd_namespaces as $pmd_prefix => $pmd_paths ) {
-		$pmd_loader->set( $pmd_prefix, $pmd_paths );
+	$push_md_namespaces = require $push_md_toolkit . '/vendor/composer/autoload_namespaces.php';
+	foreach ( $push_md_namespaces as $push_md_prefix => $push_md_paths ) {
+		$push_md_loader->set( $push_md_prefix, $push_md_paths );
 	}
 
-	$pmd_loader->register( true );
+	$push_md_loader->register( true );
 
-	$pmd_files = require $pmd_toolkit . '/vendor/composer/autoload_files.php';
-	foreach ( $pmd_files as $pmd_file_identifier => $pmd_file ) {
-		push_md_require_toolkit_file( $pmd_file_identifier, $pmd_file );
+	$push_md_files = require $push_md_toolkit . '/vendor/composer/autoload_files.php';
+	foreach ( $push_md_files as $push_md_file_identifier => $push_md_file ) {
+		push_md_require_toolkit_file( $push_md_file_identifier, $push_md_file );
 	}
 }
 

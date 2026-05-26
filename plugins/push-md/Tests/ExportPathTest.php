@@ -38,28 +38,28 @@ if ( ! function_exists( 'taxonomy_exists' ) ) {
 	}
 }
 
-require_once dirname( __DIR__ ) . '/class-pmd-plugin.php';
+require_once dirname( __DIR__ ) . '/class-push-md-plugin.php';
 
 class PMD_Export_Path_Test extends TestCase {
 
 	public function testPostWithEmptySlugUsesStableIdFallbackPath() {
 		$this->assertSame(
 			'post/post-4937.md',
-			PMD_Plugin::build_markdown_path( $this->post( 4937, 'post', '' ) )
+			Push_MD_Plugin::build_markdown_path( $this->post( 4937, 'post', '' ) )
 		);
 	}
 
 	public function testPageWithEmptySlugUsesStableIdFallbackPath() {
 		$this->assertSame(
 			'page/page-3814.md',
-			PMD_Plugin::build_markdown_path( $this->post( 3814, 'page', '' ) )
+			Push_MD_Plugin::build_markdown_path( $this->post( 3814, 'page', '' ) )
 		);
 	}
 
 	public function testExistingSlugStillDefinesExportPath() {
 		$this->assertSame(
 			'post/amazing-potatoes.md',
-			PMD_Plugin::build_markdown_path( $this->post( 4163, 'post', 'amazing-potatoes' ) )
+			Push_MD_Plugin::build_markdown_path( $this->post( 4163, 'post', 'amazing-potatoes' ) )
 		);
 	}
 
@@ -111,7 +111,7 @@ class PMD_Export_Path_Test extends TestCase {
 	}
 
 	private function assert_id_fallback_path_is_current( $path, WP_Post $post ) {
-		$method = new ReflectionMethod( 'PMD_Plugin', 'assert_id_fallback_path_is_current' );
+		$method = new ReflectionMethod( Push_MD_Plugin::class, 'assert_id_fallback_path_is_current' );
 		$method->setAccessible( true );
 		$method->invoke( null, $path, $post );
 
@@ -119,7 +119,7 @@ class PMD_Export_Path_Test extends TestCase {
 	}
 
 	private function is_current_slugless_fallback_path( $path, WP_Post $post ) {
-		$method = new ReflectionMethod( 'PMD_Plugin', 'is_current_slugless_fallback_path' );
+		$method = new ReflectionMethod( Push_MD_Plugin::class, 'is_current_slugless_fallback_path' );
 		$method->setAccessible( true );
 
 		return $method->invoke( null, $path, $post );

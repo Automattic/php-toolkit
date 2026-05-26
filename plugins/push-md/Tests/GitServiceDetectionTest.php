@@ -11,7 +11,7 @@ if ( ! class_exists( 'WP_REST_Request' ) ) {
 	}
 }
 
-require_once dirname( __DIR__ ) . '/class-pmd-plugin.php';
+require_once dirname( __DIR__ ) . '/class-push-md-plugin.php';
 
 class PMD_Git_Service_Detection_Test extends TestCase {
 
@@ -37,7 +37,7 @@ class PMD_Git_Service_Detection_Test extends TestCase {
 	}
 
 	private function git_service_from_request( $git_path ) {
-		$method = new ReflectionMethod( 'PMD_Plugin', 'git_service_from_request' );
+		$method = new ReflectionMethod( Push_MD_Plugin::class, 'git_service_from_request' );
 		$method->setAccessible( true );
 
 		return $method->invoke( null, $git_path, new WP_REST_Request() );

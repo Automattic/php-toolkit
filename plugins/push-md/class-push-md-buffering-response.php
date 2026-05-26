@@ -1,12 +1,13 @@
 <?php
 
+use WordPress\Git\Protocol\GitProtocolEncoderPipe;
 use WordPress\HttpServer\Response\ResponseWriteStream;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-class PMD_Buffering_Response implements ResponseWriteStream {
+class Push_MD_Buffering_Response implements ResponseWriteStream {
 	const MARKER_HEADER = 'X-Push-MD-Git-Response';
 
 	private $http_code = 200;
@@ -32,7 +33,7 @@ class PMD_Buffering_Response implements ResponseWriteStream {
 
 		$progress = '';
 		foreach ( $messages as $message ) {
-			$progress .= WordPress\Git\Protocol\GitProtocolEncoderPipe::encode_packet_line(
+			$progress .= GitProtocolEncoderPipe::encode_packet_line(
 				rtrim( $message ) . "\n",
 				"\x02"
 			);

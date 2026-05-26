@@ -50,9 +50,9 @@ function push_md_uninstall_cleanup() {
  * Clean up Push MD data for the current site.
  */
 function push_md_uninstall_cleanup_site() {
-	delete_option( 'pmd_seed_state' );
-	delete_option( 'pmd_seed_progress' );
-	delete_transient( 'pmd_seed_lock' );
+	delete_option( 'push_md_seed_state' );
+	delete_option( 'push_md_seed_progress' );
+	delete_transient( 'push_md_seed_lock' );
 	wp_clear_scheduled_hook( 'push_md_seed_tick' );
 	push_md_uninstall_drop_repository_tables();
 }
@@ -63,7 +63,7 @@ function push_md_uninstall_cleanup_site() {
 function push_md_uninstall_drop_repository_tables() {
 	global $wpdb;
 
-	$table_prefix = preg_replace( '/[^A-Za-z0-9_]/', '', $wpdb->prefix . 'pmd_' );
+	$table_prefix = preg_replace( '/[^A-Za-z0-9_]/', '', $wpdb->prefix . 'push_md_' );
 	$tables       = array(
 		$table_prefix . 'files',
 		$table_prefix . 'directory_entries',

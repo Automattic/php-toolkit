@@ -6,6 +6,7 @@ use WordPress\Git\GitEndpoint;
 use WordPress\Git\GitRepository;
 use WordPress\Git\Model\Commit;
 use WordPress\Git\Model\TreeEntry;
+use WordPress\Git\Protocol\GitProtocolEncoderPipe;
 use WordPress\Markdown\MarkdownConsumer;
 use WordPress\Markdown\MarkdownProducer;
 
@@ -18,7 +19,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  *
  * Persistence model: the GitRepository is backed directly by a
  * WpdbFilesystem instance, so every Git object, ref, and config entry the
- * server creates lives in two `{$wpdb->prefix}pmd_*` tables. There
+ * server creates lives in two `{$wpdb->prefix}push_md_*` tables. There
  * is no parallel CPT/manifest layer — Git's own object store is the
  * source of truth for repository history. WordPress posts remain the
  * source of truth for content.
@@ -32,12 +33,12 @@ if ( ! defined( 'ABSPATH' ) ) {
  *   4. for pushes, walks the new commits and applies their Markdown
  *      changes back to WordPress.
  */
-class PMD_Plugin {
+class Push_MD_Plugin {
 	const DEFAULT_BRANCH               = 'trunk';
 	const ROUTE_NAMESPACE              = 'git/v1';
 	const ROUTE_PATTERN                = '/md\.git(?P<path>/.*)?';
 	const EPOCH_TIMESTAMP              = 946684800;
-	const TABLE_PREFIX                 = 'pmd_';
+	const TABLE_PREFIX                 = 'push_md_';
 	const AGENT_SKILL_SOURCE           = 'push-md';
 	const AGENT_SKILL_SLUG             = 'push-md';
 	const AGENT_SKILL_TITLE            = 'Push MD AGENTS.md';
@@ -73,13 +74,13 @@ class PMD_Plugin {
 		add_filter( 'rest_post_dispatch', array( __CLASS__, 'add_authentication_challenge' ), 10, 3 );
 		add_filter( 'rest_pre_serve_request', array( __CLASS__, 'serve_git_response' ), 10, 4 );
 
-		PMD_Seeder::bootstrap();
-		PMD_Admin::bootstrap();
+		Push_MD_Seeder::bootstrap();
+		Push_MD_Admin::bootstrap();
 	}
 
 	public static function on_activation() {
 		self::install_default_agent_skill();
-		PMD_Seeder::on_activation();
+		Push_MD_Seeder::on_activation();
 	}
 
 	public static function install_default_agent_skill() {
@@ -136,115 +137,21 @@ class PMD_Plugin {
 	}
 
 	private static function get_default_agent_skill_content() {
-		return <<<'SKILL'
-# Push MD AGENTS.md
-
-## What This Repository Is
-
-This repository is a Git checkout of a WordPress site exposed by Push MD. WordPress remains the source of truth. The Git history in this clone is a working view for review, editing, and agent workflows.
-
-## Repository Layout
-
-- `post/{slug}.md` contains WordPress posts.
-- `page/{slug}.md` and `page/{parent}/{slug}.md` contain WordPress pages.
-- `wp_template/{slug}.html`, `wp_template_part/{slug}.html`, and `wp_navigation/{slug}.html` contain raw Gutenberg block markup for structural site entities. Theme-qualified WordPress slugs may appear as nested paths such as `wp_template_part/{theme}/header.html`.
-- `wp_theme/{theme}/theme.json` contains read-only theme-provided design settings for agent context.
-- `wp_global_styles/{theme}.json` contains the editable Global Styles overlay for the active theme. Edit this file for site-wide styles and settings instead of editing `wp_theme/{theme}/theme.json`.
-- `wp_guideline/skills/{slug}/SKILL.md` contains coding-agent skills stored as Gutenberg Guidelines.
-- `.agents/skills` and `.claude/skills` point to `wp_guideline/skills` for agent discovery.
-- `AGENTS.md` and `CLAUDE.md` point to this guide.
-
-## Pulling And Pushing
-
-- `git pull` refreshes the checkout from the current WordPress site.
-- `git push` applies supported Markdown changes back to WordPress.
-- Pushed post and page changes create WordPress revisions.
-- Post and page front matter may include `id` so a file rename updates the same WordPress object.
-- Deleted post or page files are trashed in WordPress rather than permanently deleted.
-- If WordPress changed after your last pull, the push is rejected. Pull, review the diff, and then push again.
-
-## Editing Rules
-
-- Preserve post and page front matter unless you are intentionally changing that WordPress metadata.
-- Guideline skill front matter is generated from WordPress fields. Keep the body focused on the guideline content.
-- Template HTML files must stay raw Gutenberg block markup without front matter.
-- Template HTML files may be created or updated, but deletes and renames are rejected because their paths are their WordPress identity.
-- Theme base files are checked out for context. Editing theme-provided templates creates WordPress customizations; `wp_theme/{theme}/theme.json` is read-only in this checkout.
-- Global Styles JSON files may be created or updated, but deletes and renames are rejected. `wp_global_styles/{theme}.json` is the database overlay for `wp_theme/{theme}/theme.json`.
-- Keep theme-scoped templates in their nested paths. For example, edit `wp_template_part/twentytwentyfive/footer.html`; do not create flattened files such as `wp_template_part/twentytwentyfive-footer.html`.
-- A path such as `wp_template_part/twentytwentyfive/footer.html` maps to the WordPress template-part ID `twentytwentyfive//footer`. The customized database post keeps the slug `footer` and stores `twentytwentyfive` in the `wp_theme` taxonomy.
-- Use the `push-md-template-editor` skill before editing `wp_template/*.html`, `wp_template_part/*.html`, or `wp_navigation/*.html`.
-- Preserve unsupported block markup, fenced `gutenberg` blocks, custom blocks, and raw HTML unless the user asks for a conversion.
-- After template or Global Styles edits, run `git status --short` and confirm there are no unintended deleted files, renamed files, `wp_theme` changes, or flattened theme paths.
-- Use forward slashes in paths.
-- Keep changes scoped to site content. This checkout does not represent plugin code, themes, uploads, or the full database.
-SKILL;
+		return self::read_default_skill_file( 'default-agent-skill.md' );
 	}
 
 	private static function get_default_template_editor_skill_content() {
-		return <<<'SKILL'
-# Push MD Template Editor
+		return self::read_default_skill_file( 'default-template-editor-skill.md' );
+	}
 
-Use this skill when editing `wp_template/*.html`, `wp_template_part/*.html`, or `wp_navigation/*.html` in a Push MD checkout.
+	private static function read_default_skill_file( $file_name ) {
+		$content = file_get_contents( __DIR__ . '/' . $file_name ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Reads a bundled local skill file.
 
-## What These Files Are
+		if ( false === $content ) {
+			return '';
+		}
 
-Template HTML files are WordPress structural block entities exported as raw serialized Gutenberg block markup. WordPress remains the source of truth for IDs, titles, status, dates, theme ownership, and other administrative metadata. The file path is the working identity in Git.
-
-Theme-provided templates and template parts appear in this checkout even before they have been customized in WordPress. Editing and pushing one of those files creates or updates the WordPress customization for that path. Theme-provided `wp_theme/{theme}/theme.json` files are exported for context and are read-only. Use `wp_global_styles/{theme}.json` for editable site-wide style and settings changes.
-
-Theme-scoped paths are a filesystem view of WordPress template IDs. For example, `wp_template_part/twentytwentyfive/footer.html` maps to the template-part ID `twentytwentyfive//footer`. When customized, WordPress stores this as a `wp_template_part` post whose slug remains `footer` and whose `wp_theme` taxonomy term is `twentytwentyfive`.
-
-## Hard Rules
-
-- Keep files as raw Gutenberg block HTML. Do not add Markdown or YAML front matter.
-- Create and update template HTML files only. Do not delete or rename them.
-- Treat the path as identity. A nested path such as `wp_template_part/{theme}/header.html` maps back to a theme-qualified WordPress slug.
-- Keep the theme as a directory segment. Do not flatten theme-scoped paths into files such as `wp_template_part/twentytwentyfive-footer.html` or `wp_template/twentytwentyfive-index.html`.
-- Edit theme-provided templates in place. Do not copy them to top-level files unless the user explicitly wants a different non-theme-scoped entity.
-- Do not edit `wp_theme/{theme}/theme.json`; use it to understand theme colors, spacing, typography, and layout settings. Edit `wp_global_styles/{theme}.json` when the user asks for site-wide theme.json-style changes.
-- Preserve unknown blocks, custom blocks, and existing block attributes unless the user explicitly asks to change them.
-- Preserve Gutenberg block comments. They are the block schema, not decorative comments.
-- Do not create theme, plugin, upload, or database files. Push MD exposes content entities only.
-- Use forward slashes in paths.
-
-## Block Theme Markup Rules
-
-- Prefer editable core blocks such as `core/group`, `core/columns`, `core/heading`, `core/paragraph`, `core/image`, `core/query`, `core/post-title`, `core/post-content`, `core/navigation`, and `core/template-part`.
-- Avoid adding `core/html` blocks for normal layout, text, or visual wrappers. Use `core/html` only when the user explicitly needs opaque custom HTML.
-- Reference reusable areas with `core/template-part` blocks instead of duplicating header, footer, or navigation markup across templates.
-- Keep template parts focused: headers in `wp_template_part/header.html` or `wp_template_part/{theme}/header.html`, footers in `wp_template_part/footer.html` or `wp_template_part/{theme}/footer.html`, and navigation in `wp_navigation/*.html` when navigation entities are available.
-- For full-width sections, use WordPress-native alignment attributes instead of CSS-only breakout tricks.
-
-## Full-Width Section Pattern
-
-Use an outer full-width group and an inner wide content shell:
-
-```html
-<!-- wp:group {"align":"full","layout":{"type":"default"}} -->
-<div class="wp-block-group alignfull">
-	<!-- wp:group {"align":"wide","layout":{"type":"constrained"}} -->
-	<div class="wp-block-group alignwide">
-		<!-- wp:heading -->
-		<h2 class="wp-block-heading">Section heading</h2>
-		<!-- /wp:heading -->
-	</div>
-	<!-- /wp:group -->
-</div>
-<!-- /wp:group -->
-```
-
-Use the site's existing markup style when it differs, but keep alignment in block attributes so the Site Editor and front end agree.
-
-## Editing Workflow
-
-- Pull before editing if the user has not already done so.
-- Make the smallest template change that satisfies the request.
-- Check nearby templates and parts before duplicating structure.
-- Run `git status --short` before committing or pushing, and verify template edits stayed on the intended `.html` path with no deletes, renames, flattened theme files, or `wp_theme` changes.
-- After a successful push, pull again if WordPress normalizes or rewrites the exported markup.
-- If a change would require theme files, plugin code, CSS assets, or database settings that are not represented in this checkout, tell the user instead of inventing files.
-SKILL;
+		return $content;
 	}
 
 	public static function register_routes() {
@@ -262,7 +169,7 @@ SKILL;
 	public static function check_permissions( WP_REST_Request $request ) {
 		if ( ! is_user_logged_in() ) {
 			return new WP_Error(
-				'pmd_auth_required',
+				'push_md_auth_required',
 				'Authentication required.',
 				array( 'status' => 401 )
 			);
@@ -270,7 +177,7 @@ SKILL;
 
 		if ( ! self::current_user_can_read_exported_content() ) {
 			return new WP_Error(
-				'pmd_forbidden',
+				'push_md_forbidden',
 				'You do not have permission to read all Push MD content.',
 				array( 'status' => 403 )
 			);
@@ -315,17 +222,17 @@ SKILL;
 				return $git_path;
 			}
 
-			if ( ! PMD_Seeder::is_ready() ) {
-				PMD_Seeder::drive( 5 );
+			if ( ! Push_MD_Seeder::is_ready() ) {
+				Push_MD_Seeder::drive( 5 );
 			}
 
-			if ( ! PMD_Seeder::is_ready() ) {
-				$response = new PMD_Buffering_Response();
+			if ( ! Push_MD_Seeder::is_ready() ) {
+				$response = new Push_MD_Buffering_Response();
 				$response->send_http_code( 503 );
 				$response->send_header( 'Content-Type', 'text/plain; charset=utf-8' );
 				$response->send_header( 'Cache-Control', 'no-cache' );
 				$response->send_header( 'Retry-After', '15' );
-				$response->append_bytes( PMD_Seeder::not_ready_message() . "\n" );
+				$response->append_bytes( Push_MD_Seeder::not_ready_message() . "\n" );
 
 				return $response->to_rest_response();
 			}
@@ -372,7 +279,7 @@ SKILL;
 				}
 			}
 
-			$response = new PMD_Buffering_Response();
+			$response = new Push_MD_Buffering_Response();
 			$endpoint = new GitEndpoint( $repository );
 			$endpoint->handle_request( $git_path, $request_body, $response );
 
@@ -405,7 +312,7 @@ SKILL;
 			}
 
 			return new WP_Error(
-				'pmd_error',
+				'push_md_error',
 				self::get_throwable_message( $exception ),
 				array( 'status' => 500 )
 			);
@@ -422,14 +329,14 @@ SKILL;
 		}
 
 		$headers = $result->get_headers();
-		if ( empty( $headers[ PMD_Buffering_Response::MARKER_HEADER ] ) ) {
+		if ( empty( $headers[ Push_MD_Buffering_Response::MARKER_HEADER ] ) ) {
 			return $served;
 		}
 
 		if ( ! headers_sent() ) {
 			status_header( $result->get_status() );
 			foreach ( $headers as $name => $value ) {
-				if ( PMD_Buffering_Response::MARKER_HEADER === $name ) {
+				if ( Push_MD_Buffering_Response::MARKER_HEADER === $name ) {
 					continue;
 				}
 				header( $name . ': ' . $value );
@@ -460,12 +367,12 @@ SKILL;
 	}
 
 	private static function build_protocol_error_response( $service, $message ) {
-		$response = new PMD_Buffering_Response();
+		$response = new Push_MD_Buffering_Response();
 		$response->send_header( 'Content-Type', 'application/x-' . $service . '-result' );
 		$response->send_header( 'Cache-Control', 'no-cache' );
 		$response->send_header( 'Git-Protocol', 'version=2' );
 		$response->append_bytes(
-			WordPress\Git\Protocol\GitProtocolEncoderPipe::encode_packet_line(
+			GitProtocolEncoderPipe::encode_packet_line(
 				'error ' . rtrim( $message ) . "\n",
 				"\x03"
 			) . '0000'
@@ -485,7 +392,7 @@ SKILL;
 			$service = self::normalize_git_service( $query_params['service'] );
 			if ( '' === $service ) {
 				return new WP_Error(
-					'pmd_invalid_git_service',
+					'push_md_invalid_git_service',
 					'Unsupported Git service requested.',
 					array( 'status' => 400 )
 				);
@@ -751,7 +658,7 @@ SKILL;
 
 			if ( 'wp_guideline' === $post->post_type && self::is_guideline_skill_path( $path ) ) {
 				$has_guideline_skills = true;
-				if ( self::AGENT_SKILL_SOURCE === get_post_meta( $post->ID, 'guideline_source', true ) ) {
+				if ( self::AGENT_SKILL_SOURCE === get_post_meta( $post->ID, 'push_md_guideline_source', true ) ) {
 					$agent_guide_skill_path = $path;
 				}
 			}

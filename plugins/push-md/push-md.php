@@ -28,25 +28,25 @@ if ( file_exists( __DIR__ . '/php-toolkit/vendor/composer/ClassLoader.php' ) ) {
 }
 
 require_once __DIR__ . '/functions.php';
-require_once __DIR__ . '/class-pmd-plugin.php';
-require_once __DIR__ . '/class-pmd-buffering-response.php';
-require_once __DIR__ . '/class-pmd-seeder.php';
-require_once __DIR__ . '/class-pmd-admin.php';
+require_once __DIR__ . '/class-push-md-plugin.php';
+require_once __DIR__ . '/class-push-md-buffering-response.php';
+require_once __DIR__ . '/class-push-md-seeder.php';
+require_once __DIR__ . '/class-push-md-admin.php';
 
-if ( ! defined( 'PMD_PLUGIN_FILE' ) ) {
-	define( 'PMD_PLUGIN_FILE', __FILE__ );
+if ( ! defined( 'PUSH_MD_PLUGIN_FILE' ) ) {
+	define( 'PUSH_MD_PLUGIN_FILE', __FILE__ );
 }
 
-register_activation_hook( __FILE__, array( 'PMD_Plugin', 'on_activation' ) );
+register_activation_hook( __FILE__, array( Push_MD_Plugin::class, 'on_activation' ) );
 
 add_filter(
-	'plugin_action_links_' . plugin_basename( PMD_PLUGIN_FILE ),
+	'plugin_action_links_' . plugin_basename( PUSH_MD_PLUGIN_FILE ),
 	function ( $actions ) {
 		$actions = array_merge(
 			array(
 				'push_md_open' => sprintf(
 					'<a href="%s">%s</a>',
-					esc_url( admin_url( 'tools.php?page=' . PMD_Admin::PAGE_SLUG ) ),
+					esc_url( admin_url( 'tools.php?page=' . Push_MD_Admin::PAGE_SLUG ) ),
 					esc_html__( 'Open Push MD', 'push-md' )
 				),
 			),
@@ -63,4 +63,4 @@ add_filter(
 	}
 );
 
-PMD_Plugin::bootstrap();
+Push_MD_Plugin::bootstrap();

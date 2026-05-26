@@ -288,6 +288,61 @@ function push_md_add_direct_access_guard( $code, $guard ) {
 	return $code;
 }
 
+function push_md_remove_filter_validate_bool_alias( $code ) {
+	return str_replace(
+		"if (!defined('FILTER_VALIDATE_BOOL') && defined('FILTER_VALIDATE_BOOLEAN')) {\n    define('FILTER_VALIDATE_BOOL', \\FILTER_VALIDATE_BOOLEAN);\n}\n\n",
+		'',
+		$code
+	);
+}
+
+function push_md_replace_utf8_decode_fallback( $code ) {
+	return str_replace(
+		'return strlen(@utf8_decode($s));',
+		"\$length = preg_match_all('/./us', \$s, \$matches);\n          return false === \$length ? 0 : \$length;",
+		$code
+	);
+}
+
+function push_md_replace_preg_match_heredocs( $code ) {
+	return preg_replace_callback(
+		"/preg_match\\(<<<(?P<quote>'?)(?P<label>[A-Z]+)(?P=quote)\\n(?P<pattern>.*?)\\n(?P=label)\\n,\\s*(?P<value>\\$[a-zA-Z_][a-zA-Z0-9_]*)\\)/s",
+		function ( $matches ) {
+			if ( "'" === $matches['quote'] ) {
+				$pattern_expression = var_export( $matches['pattern'], true );
+			} else {
+				$pattern   = $matches['pattern'];
+				$arguments = array();
+				foreach ( array( 'atom', 'alpha' ) as $variable_name ) {
+					$needle = '{$' . $variable_name . '}';
+					if ( false === strpos( $pattern, $needle ) ) {
+						continue;
+					}
+
+					$arguments[] = '$' . $variable_name;
+					$pattern     = str_replace( $needle, '%' . count( $arguments ) . '$s', $pattern );
+				}
+
+				$pattern_source = var_export( $pattern, true );
+				if ( ! empty( $arguments ) ) {
+					$pattern_source = 'sprintf(' . $pattern_source . ', ' . implode( ', ', $arguments ) . ')';
+				}
+
+				$pattern_expression = 'str_replace(' .
+					var_export( array( '\\\\', '\\t', '\\$' ), true ) .
+					', ' .
+					var_export( array( '\\', "\t", '$' ), true ) .
+					', ' .
+					$pattern_source .
+					')';
+			}
+
+			return 'preg_match(' . $pattern_expression . ', ' . $matches['value'] . ')';
+		},
+		$code
+	);
+}
+
 $iterator = new RecursiveIteratorIterator(
 	new RecursiveDirectoryIterator(
 		$target_dir,
@@ -309,6 +364,14 @@ foreach ( $iterator as $file ) {
 
 	if ( 0 === strpos( $relative_path, 'php-toolkit/' ) ) {
 		$code = push_md_add_phpcs_disable( $code, $phpcs_disable );
+	}
+
+	if ( 'php-toolkit/components/Markdown/vendor-patched/symfony/polyfill-php80/bootstrap.php' === $relative_path ) {
+		$code = push_md_remove_filter_validate_bool_alias( $code );
+	} elseif ( 'php-toolkit/components/Markdown/vendor-patched/nette/utils/src/Utils/Strings.php' === $relative_path ) {
+		$code = push_md_replace_utf8_decode_fallback( $code );
+	} elseif ( 'php-toolkit/components/Markdown/vendor-patched/nette/utils/src/Utils/Validators.php' === $relative_path ) {
+		$code = push_md_replace_preg_match_heredocs( $code );
 	}
 
 	$code = push_md_add_direct_access_guard( $code, $guard );

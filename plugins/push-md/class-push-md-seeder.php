@@ -23,7 +23,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  *   pending      → newly activated; a single cron tick is queued.
  *   in_progress  → batches are running. Each tick converts a chunk of
  *                  posts to Markdown, creates a "Seed batch" commit on
- *                  `refs/heads/_pmd_seed`, and re-schedules
+ *                  `refs/heads/_push_md_seed`, and re-schedules
  *                  itself when the time/memory budget is up.
  *   finalizing   → all batches done. Keep the parent-less theme base
  *                  commit when one exists, build a single
@@ -40,13 +40,13 @@ if ( ! defined( 'ABSPATH' ) ) {
  *
  * No Action Scheduler dependency — plain WP-Cron only.
  */
-class PMD_Seeder {
+class Push_MD_Seeder {
 
-	const STATE_OPTION    = 'pmd_seed_state';
-	const PROGRESS_OPTION = 'pmd_seed_progress';
-	const SEED_BRANCH     = 'refs/heads/_pmd_seed';
+	const STATE_OPTION    = 'push_md_seed_state';
+	const PROGRESS_OPTION = 'push_md_seed_progress';
+	const SEED_BRANCH     = 'refs/heads/_push_md_seed';
 	const CRON_HOOK       = 'push_md_seed_tick';
-	const LOCK_TRANSIENT  = 'pmd_seed_lock';
+	const LOCK_TRANSIENT  = 'push_md_seed_lock';
 
 	const STATE_PENDING     = 'pending';
 	const STATE_IN_PROGRESS = 'in_progress';
@@ -94,7 +94,7 @@ class PMD_Seeder {
 		// Without this, re-activating after a partial seed hits PK
 		// collisions on /objects/ paths the moment Git tries to write
 		// a blob it had already started writing last time.
-		PMD_Plugin::drop_repository_tables();
+		Push_MD_Plugin::drop_repository_tables();
 
 		update_option( self::STATE_OPTION, self::STATE_PENDING, false );
 		update_option(
@@ -120,7 +120,7 @@ class PMD_Seeder {
 		delete_option( self::PROGRESS_OPTION );
 		delete_transient( self::LOCK_TRANSIENT );
 		wp_clear_scheduled_hook( self::CRON_HOOK );
-		PMD_Plugin::drop_repository_tables();
+		Push_MD_Plugin::drop_repository_tables();
 	}
 
 	public static function get_state() {
@@ -164,12 +164,12 @@ class PMD_Seeder {
 	public static function get_commit_log( $limit = 25 ) {
 		try {
 			global $wpdb;
-			$table = $wpdb->prefix . PMD_Plugin::TABLE_PREFIX . 'files';
+			$table = $wpdb->prefix . Push_MD_Plugin::TABLE_PREFIX . 'files';
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 			if ( ! $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $table ) ) ) {
 				return array();
 			}
-			$repository = PMD_Plugin::open_repository();
+			$repository = Push_MD_Plugin::open_repository();
 		} catch ( Throwable $exception ) {
 			return array();
 		}
@@ -231,13 +231,13 @@ class PMD_Seeder {
 
 		try {
 			global $wpdb;
-			$table = $wpdb->prefix . PMD_Plugin::TABLE_PREFIX . 'files';
+			$table = $wpdb->prefix . Push_MD_Plugin::TABLE_PREFIX . 'files';
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 			if ( ! $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $table ) ) ) {
 				return $preview;
 			}
 
-			$repository = PMD_Plugin::open_repository();
+			$repository = Push_MD_Plugin::open_repository();
 			$tip        = self::get_preview_tip( $repository );
 			if ( ! $tip ) {
 				return $preview;
@@ -464,7 +464,7 @@ class PMD_Seeder {
 	}
 
 	private static function add_checkout_preview_default_guidance_files( &$files, $content_length ) {
-		foreach ( PMD_Plugin::get_default_agent_guidance_preview_files() as $path => $entry ) {
+		foreach ( Push_MD_Plugin::get_default_agent_guidance_preview_files() as $path => $entry ) {
 			if ( self::checkout_preview_has_path( $files, $path ) ) {
 				continue;
 			}
@@ -576,8 +576,8 @@ class PMD_Seeder {
 	private static function initialize() {
 		global $wpdb;
 
-		$post_types          = PMD_Plugin::get_supported_post_types();
-		$post_statuses       = PMD_Plugin::$supported_post_statuses;
+		$post_types          = Push_MD_Plugin::get_supported_post_types();
+		$post_statuses       = Push_MD_Plugin::$supported_post_statuses;
 		$post_type_markers   = implode( ', ', array_fill( 0, count( $post_types ), '%s' ) );
 		$post_status_markers = implode( ', ', array_fill( 0, count( $post_statuses ), '%s' ) );
 		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare,WordPress.DB.DirectDatabaseQuery
@@ -620,7 +620,7 @@ class PMD_Seeder {
 	}
 
 	private static function initialize_theme_base_commit() {
-		$theme_base_files = PMD_Plugin::export_theme_base_content();
+		$theme_base_files = Push_MD_Plugin::export_theme_base_content();
 		if ( empty( $theme_base_files ) ) {
 			return '';
 		}
@@ -630,19 +630,19 @@ class PMD_Seeder {
 			$updates[ $path ] = $entry['content'];
 		}
 
-		$repository = PMD_Plugin::open_repository();
+		$repository = Push_MD_Plugin::open_repository();
 		if ( ! $repository->branch_exists( self::SEED_BRANCH ) ) {
 			$repository->set_branch_tip( self::SEED_BRANCH, Commit::NULL_HASH );
 		}
 		$repository->set_branch_tip( 'HEAD', 'ref: ' . self::SEED_BRANCH . "\n" );
 
-		$identity = PMD_Plugin::repository_identity( $repository );
+		$identity = Push_MD_Plugin::repository_identity( $repository );
 		$now      = gmdate( Commit::DATE_FORMAT );
 		$base_oid = $repository->commit(
 			array(
 				'updates' => $updates,
 				'commit'  => array(
-					'message'        => PMD_Plugin::THEME_BASE_COMMIT_MESSAGE,
+					'message'        => Push_MD_Plugin::THEME_BASE_COMMIT_MESSAGE,
 					'author'         => $identity,
 					'author_date'    => $now,
 					'committer'      => $identity,
@@ -651,14 +651,14 @@ class PMD_Seeder {
 			)
 		);
 
-		$repository->set_branch_tip( PMD_Plugin::THEME_BASE_REF, $base_oid );
+		$repository->set_branch_tip( Push_MD_Plugin::THEME_BASE_REF, $base_oid );
 		$repository->set_branch_tip( 'HEAD', "ref: refs/heads/trunk\n" );
 
 		return $base_oid;
 	}
 
 	private static function process_batches() {
-		$repository = PMD_Plugin::open_repository();
+		$repository = Push_MD_Plugin::open_repository();
 		// Stage seed commits on a side branch so trunk stays empty (and
 		// clones keep being rejected) until finalization. The branch
 		// file must exist before commit() runs, otherwise it falls back
@@ -685,13 +685,13 @@ class PMD_Seeder {
 			$last_id   = $progress['last_id'];
 			$processed = $progress['processed'];
 			foreach ( $batch as $post ) {
-				$path             = PMD_Plugin::build_markdown_path( $post );
-				$updates[ $path ] = PMD_Plugin::export_post_to_markdown( $post );
+				$path             = Push_MD_Plugin::build_markdown_path( $post );
+				$updates[ $path ] = Push_MD_Plugin::export_post_to_markdown( $post );
 				$last_id          = $post->ID;
 				++$processed;
 			}
 
-			$identity = PMD_Plugin::repository_identity( $repository );
+			$identity = Push_MD_Plugin::repository_identity( $repository );
 			$now      = gmdate( Commit::DATE_FORMAT );
 			$repository->commit(
 				array(
@@ -734,14 +734,14 @@ class PMD_Seeder {
 	}
 
 	private static function finalize() {
-		$repository = PMD_Plugin::open_repository();
+		$repository = Push_MD_Plugin::open_repository();
 		$repository->set_branch_tip( 'HEAD', "ref: refs/heads/trunk\n" );
 
 		$seed_tip = $repository->branch_exists( self::SEED_BRANCH )
 			? $repository->get_branch_tip( self::SEED_BRANCH )
 			: Commit::NULL_HASH;
 		$progress = self::get_progress_storage();
-		$identity = PMD_Plugin::repository_identity( $repository );
+		$identity = Push_MD_Plugin::repository_identity( $repository );
 		$now      = gmdate( Commit::DATE_FORMAT );
 		$base_oid = isset( $progress['theme_base_oid'] ) ? $progress['theme_base_oid'] : '';
 
@@ -811,8 +811,8 @@ class PMD_Seeder {
 	private static function next_batch( $after_id ) {
 		global $wpdb;
 
-		$post_types          = PMD_Plugin::get_supported_post_types();
-		$post_statuses       = PMD_Plugin::$supported_post_statuses;
+		$post_types          = Push_MD_Plugin::get_supported_post_types();
+		$post_statuses       = Push_MD_Plugin::$supported_post_statuses;
 		$post_type_markers   = implode( ', ', array_fill( 0, count( $post_types ), '%s' ) );
 		$post_status_markers = implode( ', ', array_fill( 0, count( $post_statuses ), '%s' ) );
 		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQL.NotPrepared,WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber,WordPress.DB.DirectDatabaseQuery
