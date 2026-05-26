@@ -18,7 +18,7 @@ if ( ! function_exists( 'push_md_install_skill' ) ) {
 			array(
 				'post_type'      => 'wp_guideline',
 				'post_status'    => array( 'publish', 'draft', 'pending', 'future', 'private', 'trash' ),
-				'meta_key'       => 'guideline_source', // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key
+				'meta_key'       => 'push_md_guideline_source', // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key
 				'meta_value'     => $source_identifier, // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_value
 				'posts_per_page' => 1,
 				'no_found_rows'  => true,
@@ -54,7 +54,7 @@ if ( ! function_exists( 'push_md_install_skill' ) ) {
 		}
 
 		wp_set_object_terms( $post_id, 'skill', 'wp_guideline_type' );
-		update_post_meta( $post_id, 'guideline_source', sanitize_text_field( $source_identifier ) );
+		update_post_meta( $post_id, 'push_md_guideline_source', sanitize_text_field( $source_identifier ) );
 
 		return array(
 			'id'      => (int) $post_id,

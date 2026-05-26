@@ -1,5 +1,5 @@
 === Push MD ===
-Contributors: zieladam, artpi, automattic
+Contributors: artpi, zieladam
 Tags: git, markdown, content, workflow
 Requires at least: 6.9
 Tested up to: 6.9

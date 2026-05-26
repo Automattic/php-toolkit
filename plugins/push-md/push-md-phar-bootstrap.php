@@ -6,41 +6,41 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 require_once __DIR__ . '/push-md-toolkit-loader.php';
 
-$pmd_phar = 'phar://' . __DIR__ . '/php-toolkit.phar';
+$push_md_phar = 'phar://' . __DIR__ . '/php-toolkit.phar';
 
 if ( ! class_exists( 'Composer\\Autoload\\ClassLoader' ) ) {
-	require_once $pmd_phar . '/vendor/composer/ClassLoader.php';
+	require_once $push_md_phar . '/vendor/composer/ClassLoader.php';
 }
 
-$pmd_loader = new Composer\Autoload\ClassLoader();
+$push_md_loader = new \Composer\Autoload\ClassLoader();
 
-$pmd_classmap = require $pmd_phar . '/vendor/composer/autoload_classmap.php';
-$pmd_loader->addClassMap( $pmd_classmap );
+$push_md_classmap = require $push_md_phar . '/vendor/composer/autoload_classmap.php';
+$push_md_loader->addClassMap( $push_md_classmap );
 
-$pmd_psr4 = require $pmd_phar . '/vendor/composer/autoload_psr4.php';
-foreach ( $pmd_psr4 as $prefix => $paths ) {
-	$pmd_loader->setPsr4( $prefix, $paths );
+$push_md_psr4 = require $push_md_phar . '/vendor/composer/autoload_psr4.php';
+foreach ( $push_md_psr4 as $push_md_prefix => $push_md_paths ) {
+	$push_md_loader->setPsr4( $push_md_prefix, $push_md_paths );
 }
 
-$pmd_namespaces = require $pmd_phar . '/vendor/composer/autoload_namespaces.php';
-foreach ( $pmd_namespaces as $prefix => $paths ) {
-	$pmd_loader->set( $prefix, $paths );
+$push_md_namespaces = require $push_md_phar . '/vendor/composer/autoload_namespaces.php';
+foreach ( $push_md_namespaces as $push_md_prefix => $push_md_paths ) {
+	$push_md_loader->set( $push_md_prefix, $push_md_paths );
 }
 
-$pmd_loader->register( true );
+$push_md_loader->register( true );
 
-$pmd_files = array(
-	$pmd_phar . '/components/DataLiberation/URL/functions.php',
-	$pmd_phar . '/components/Encoding/utf8.php',
-	$pmd_phar . '/components/Encoding/compat-utf8.php',
-	$pmd_phar . '/components/Encoding/utf8-encoder.php',
-	$pmd_phar . '/components/Filesystem/functions.php',
-	$pmd_phar . '/components/Zip/functions.php',
-	$pmd_phar . '/components/Polyfill/mbstring.php',
-	$pmd_phar . '/components/Polyfill/php-functions.php',
-	$pmd_phar . '/components/Git/functions.php',
+$push_md_files = array(
+	$push_md_phar . '/components/DataLiberation/URL/functions.php',
+	$push_md_phar . '/components/Encoding/utf8.php',
+	$push_md_phar . '/components/Encoding/compat-utf8.php',
+	$push_md_phar . '/components/Encoding/utf8-encoder.php',
+	$push_md_phar . '/components/Filesystem/functions.php',
+	$push_md_phar . '/components/Zip/functions.php',
+	$push_md_phar . '/components/Polyfill/mbstring.php',
+	$push_md_phar . '/components/Polyfill/php-functions.php',
+	$push_md_phar . '/components/Git/functions.php',
 );
 
-foreach ( $pmd_files as $pmd_file ) {
-	push_md_require_toolkit_file( md5( 'push-md:' . $pmd_file ), $pmd_file );
+foreach ( $push_md_files as $push_md_file ) {
+	push_md_require_toolkit_file( md5( 'push-md:' . $push_md_file ), $push_md_file );
 }

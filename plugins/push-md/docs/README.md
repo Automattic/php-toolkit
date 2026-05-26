@@ -126,17 +126,17 @@ The Git Smart HTTP discovery `service` query is whitelisted to
 Push MD stores its derived Git object store in two per-site database tables:
 
 ```text
-{$wpdb->prefix}pmd_files
-{$wpdb->prefix}pmd_directory_entries
+{$wpdb->prefix}push_md_files
+{$wpdb->prefix}push_md_directory_entries
 ```
 
 Seeder/import progress is stored in:
 
 ```text
-pmd_seed_state
-pmd_seed_progress
-pmd_seed_lock
-pmd_seed_tick
+push_md_seed_state
+push_md_seed_progress
+push_md_seed_lock
+push_md_seed_tick
 ```
 
 The database tables contain derived Git repository data and Push MD Git
@@ -302,7 +302,7 @@ For a release candidate, test the zip on a clean WordPress install:
    from the older clone.
 9. Test private, draft, pending, and future content visibility with users that
    should and should not read the full export.
-10. Uninstall the plugin and confirm `pmd_*` tables and seed state are
+10. Uninstall the plugin and confirm `push_md_*` tables and seed state are
     removed while WordPress content remains.
 11. Reinstall and confirm a fresh repository can be seeded from current content.
 

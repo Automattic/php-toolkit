@@ -249,13 +249,11 @@ class MarkdownConsumer implements DataFormatConsumer {
 						$image_tag = $html->get_updated_html();
 						// @TODO: Decide between inline image and the image block.
 						if ( $this->drop_current_paragraph_if_empty() ) {
-							$image_block = <<<BLOCK
-							<!-- wp:image -->
-							<figure class="wp-block-image size-full">
-								$image_tag
-							</figure>
-							<!-- /wp:image -->
-BLOCK;
+							$image_block  = '<!-- wp:image -->' . "\n";
+							$image_block .= '<figure class="wp-block-image size-full">' . "\n";
+							$image_block .= $image_tag . "\n";
+							$image_block .= '</figure>' . "\n";
+							$image_block .= '<!-- /wp:image -->';
 							$this->append_content( $image_block );
 							$this->push_block( 'paragraph' );
 							$this->append_content( '<p>' );
