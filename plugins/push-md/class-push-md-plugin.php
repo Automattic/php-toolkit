@@ -145,7 +145,7 @@ class Push_MD_Plugin {
 	}
 
 	private static function read_default_skill_file( $file_name ) {
-		$content = file_get_contents( __DIR__ . '/' . $file_name ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Reads a bundled local skill file.
+		$content = file_get_contents( __DIR__ . '/skills/' . $file_name ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Reads a bundled local skill file.
 
 		if ( false === $content ) {
 			return '';

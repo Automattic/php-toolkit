@@ -30,7 +30,7 @@ jobs:
           echo "version=${RELEASE_TAG#v}" >> "$GITHUB_OUTPUT"
 
       - name: Checkout trunk
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: trunk
           fetch-depth: 0
@@ -76,12 +76,12 @@ jobs:
           set -euo pipefail
 
           git status --short
-          if git diff --quiet -- plugins/push-md/push-md.php plugins/push-md/readme.txt plugins/push-md/class-pmd-admin.php; then
+          if git diff --quiet -- plugins/push-md/push-md.php plugins/push-md/readme.txt plugins/push-md/class-push-md-admin.php; then
             echo "Push MD release metadata already matches $RELEASE_TAG."
             exit 0
           fi
 
-          git add plugins/push-md/push-md.php plugins/push-md/readme.txt plugins/push-md/class-pmd-admin.php
+          git add plugins/push-md/push-md.php plugins/push-md/readme.txt plugins/push-md/class-push-md-admin.php
           git commit -m "chore(push-md): release $RELEASE_TAG"
           git push origin HEAD:trunk
 

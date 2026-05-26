@@ -73,7 +73,7 @@ pmd_update_version_field(
 );
 pmd_update_version_field(
 	$root_dir,
-	'plugins/push-md/class-pmd-admin.php',
+	'plugins/push-md/class-push-md-admin.php',
 	"/(const ASSET_VERSION\s*=\s*')[^']+(';)/",
 	$version
 );

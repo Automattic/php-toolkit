@@ -33,7 +33,7 @@ jobs:
       WP_ADMIN_PASS: password
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Set up PHP
         uses: shivammathur/setup-php@v2

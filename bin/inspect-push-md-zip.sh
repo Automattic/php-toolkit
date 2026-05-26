@@ -58,8 +58,8 @@ reject_content_pattern() {
 
 require_file 'push-md/push-md.php'
 require_file 'push-md/readme.txt'
-require_file 'push-md/default-agent-skill.md'
-require_file 'push-md/default-template-editor-skill.md'
+require_file 'push-md/skills/default-agent-skill.md'
+require_file 'push-md/skills/default-template-editor-skill.md'
 require_file 'push-md/php-toolkit/vendor/composer/ClassLoader.php'
 require_file 'push-md/php-toolkit/components/Markdown/class-markdownconsumer.php'
 require_file 'push-md/php-toolkit/components/Markdown/vendor-patched/league/commonmark/LICENSE'
@@ -69,6 +69,7 @@ require_file 'push-md/php-toolkit/components/Markdown/vendor-patched/nette/utils
 
 reject_pattern '(^|/)\.DS_Store$' 'Push MD zip must not contain macOS metadata files.'
 reject_pattern '\.phar$' 'Push MD zip must not contain PHAR archives.'
+reject_pattern '^push-md/[^/]+\.md$' 'Push MD zip must not contain unexpected Markdown files in the plugin root.'
 reject_pattern '^push-md/(Tests|docker-demo|docs)/' 'Push MD zip must not contain development-only plugin directories.'
 reject_pattern '^push-md/(blueprint-e2e\.json|push-md-dev-bootstrap\.php|push-md-phar-bootstrap\.php)$' 'Push MD zip contains development or PHAR bootstrap files.'
 reject_pattern '(^|/)(composer\.(json|lock)|package(-lock)?\.json|phpunit\.xml(\.dist)?|phpcs\.xml|rector\.php)$' 'Push MD zip contains source-only project metadata.'
