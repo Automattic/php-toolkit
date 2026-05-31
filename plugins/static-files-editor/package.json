@@ -21,5 +21,9 @@
     },
     "devDependencies": {
         "webpack-cli": "^6.0.1"
+    },
+    "overrides": {
+        "basic-ftp": "5.2.1",
+        "form-data": "4.0.4"
     }
 }
