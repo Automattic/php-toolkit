@@ -589,6 +589,11 @@ class Push_MD_Seeder {
 		);
 		// phpcs:enable
 
+		$collisions = Push_MD_Plugin::detect_export_path_collisions();
+		if ( ! empty( $collisions ) ) {
+			throw new Exception( self::format_collision_failure_message( $collisions ) );
+		}
+
 		$existing   = self::get_progress_storage();
 		$tick_count = isset( $existing['tick_count'] ) ? intval( $existing['tick_count'] ) : 0;
 		$progress   = array(
@@ -617,6 +622,26 @@ class Push_MD_Seeder {
 		} else {
 			update_option( self::STATE_OPTION, self::STATE_IN_PROGRESS, false );
 		}
+	}
+
+	private static function format_collision_failure_message( $collisions ) {
+		$shown   = array_slice( $collisions, 0, 5 );
+		$details = array();
+		foreach ( $shown as $collision ) {
+			$details[] = sprintf(
+				'%s (post IDs %s)',
+				$collision['path'],
+				implode( ', ', array_map( 'intval', $collision['post_ids'] ) )
+			);
+		}
+
+		$message   = 'Push MD import blocked because multiple WordPress entities map to the same path. Change a slug or trash a duplicate, then retry: ' . implode( '; ', $details );
+		$remaining = count( $collisions ) - count( $shown );
+		if ( $remaining > 0 ) {
+			$message .= sprintf( ' (and %d more)', $remaining );
+		}
+
+		return $message . '.';
 	}
 
 	private static function initialize_theme_base_commit() {

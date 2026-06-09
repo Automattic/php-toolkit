@@ -9,11 +9,12 @@ if ( ! defined( 'ABSPATH' ) ) {
  */
 class Push_MD_Admin {
 
-	const PAGE_SLUG      = 'push-md';
-	const REST_NAMESPACE = 'push-md/v1';
-	const STATUS_ROUTE   = '/seed-status';
-	const RETRY_ROUTE    = '/seed-retry';
-	const ASSET_VERSION  = '0.6.6';
+	const PAGE_SLUG            = 'push-md';
+	const REST_NAMESPACE       = 'push-md/v1';
+	const STATUS_ROUTE         = '/seed-status';
+	const RETRY_ROUTE          = '/seed-retry';
+	const ASSET_VERSION        = '0.6.6';
+	const COLLISIONS_TRANSIENT = 'push_md_collisions';
 
 	public static function bootstrap() {
 		add_action( 'admin_menu', array( __CLASS__, 'register_menu' ) );
@@ -81,15 +82,66 @@ class Push_MD_Admin {
 	public static function rest_status() {
 		Push_MD_Seeder::drive( 1.5 );
 
-		return rest_ensure_response( Push_MD_Seeder::get_progress() );
+		$progress               = Push_MD_Seeder::get_progress();
+		$progress['collisions'] = self::collisions_for_display();
+
+		return rest_ensure_response( $progress );
 	}
 
 	public static function rest_retry() {
 		Push_MD_Seeder::reset();
 		Push_MD_Seeder::on_activation();
 		Push_MD_Seeder::tick();
+		delete_transient( self::COLLISIONS_TRANSIENT );
 
-		return rest_ensure_response( Push_MD_Seeder::get_progress() );
+		$progress               = Push_MD_Seeder::get_progress();
+		$progress['collisions'] = self::collisions_for_display();
+
+		return rest_ensure_response( $progress );
+	}
+
+	/**
+	 * Build the collision report consumed by the admin page and status route.
+	 *
+	 * Detection mirrors the export query and can scan every supported post, so
+	 * the result is cached briefly because the status route is polled.
+	 *
+	 * @return array List of array( 'path' => string, 'posts' => array ) where
+	 *               each post carries id, title, status, and an edit URL.
+	 */
+	private static function collisions_for_display() {
+		$cached = get_transient( self::COLLISIONS_TRANSIENT );
+		if ( is_array( $cached ) ) {
+			return $cached;
+		}
+
+		$payload = array();
+		foreach ( Push_MD_Plugin::detect_export_path_collisions() as $collision ) {
+			$posts = array();
+			foreach ( $collision['post_ids'] as $post_id ) {
+				$post = get_post( $post_id );
+				if ( ! $post ) {
+					continue;
+				}
+
+				$edit_url = get_edit_post_link( $post_id, 'raw' );
+				$posts[]  = array(
+					'id'       => intval( $post_id ),
+					'title'    => $post->post_title,
+					'status'   => $post->post_status,
+					'edit_url' => $edit_url ? $edit_url : '',
+				);
+			}
+
+			$payload[] = array(
+				'path'  => $collision['path'],
+				'posts' => $posts,
+			);
+		}
+
+		set_transient( self::COLLISIONS_TRANSIENT, $payload, 30 );
+
+		return $payload;
 	}
 
 	private static function add_username_to_url( $url, $username ) {
@@ -122,12 +174,14 @@ class Push_MD_Admin {
 		// Drive the seeder before painting so the first screen already
 		// has real checkout state whenever the host can do quick work.
 		Push_MD_Seeder::drive( 1.5 );
-		$progress   = Push_MD_Seeder::get_progress();
-		$nonce      = wp_create_nonce( 'wp_rest' );
-		$status_url = esc_url_raw( rest_url( self::REST_NAMESPACE . self::STATUS_ROUTE ) );
-		$retry_url  = esc_url_raw( rest_url( self::REST_NAMESPACE . self::RETRY_ROUTE ) );
-		$git_url    = esc_url_raw( rest_url( Push_MD_Plugin::ROUTE_NAMESPACE . '/md.git' ) );
-		$user       = wp_get_current_user();
+		$progress               = Push_MD_Seeder::get_progress();
+		$collisions             = self::collisions_for_display();
+		$progress['collisions'] = $collisions;
+		$nonce                  = wp_create_nonce( 'wp_rest' );
+		$status_url             = esc_url_raw( rest_url( self::REST_NAMESPACE . self::STATUS_ROUTE ) );
+		$retry_url              = esc_url_raw( rest_url( self::REST_NAMESPACE . self::RETRY_ROUTE ) );
+		$git_url                = esc_url_raw( rest_url( Push_MD_Plugin::ROUTE_NAMESPACE . '/md.git' ) );
+		$user                   = wp_get_current_user();
 		if ( $user && $user->exists() ) {
 			$git_url = self::add_username_to_url( $git_url, $user->user_login );
 		}
@@ -190,6 +244,12 @@ class Push_MD_Admin {
 						<span class="push-md-state-dot" aria-hidden="true"></span>
 						<span id="push-md-state"><?php echo esc_html( $progress['state'] ); ?></span>
 					</div>
+				</div>
+
+				<div class="push-md-panel push-md-collisions-panel" id="push-md-collisions-panel"<?php echo empty( $collisions ) ? ' hidden' : ''; ?>>
+					<h2><?php esc_html_e( 'Path collisions', 'push-md' ); ?></h2>
+					<p><?php esc_html_e( 'Two or more items map to the same file path, which blocks Push MD from exporting until you resolve it. Change a slug or trash a duplicate, then pull again.', 'push-md' ); ?></p>
+					<ul class="push-md-collisions-list" id="push-md-collisions-list"></ul>
 				</div>
 
 				<div class="push-md-emulator-note">

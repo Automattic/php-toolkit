@@ -645,7 +645,14 @@ class Push_MD_Plugin {
 
 			$path = self::build_markdown_path( $post );
 			if ( isset( $files[ $path ] ) ) {
-				throw new Exception( 'Git export rejected because multiple WordPress entities map to the same Push MD path: ' . esc_html( $path ) );
+				throw new Exception(
+					sprintf(
+						'Git export rejected because multiple WordPress entities map to the same Push MD path: %1$s (WordPress post IDs %2$d and %3$d). Change a slug or trash a duplicate, then pull again.',
+						esc_html( $path ),
+						intval( $files[ $path ]['post']->ID ),
+						intval( $post->ID )
+					)
+				);
 			}
 
 			$content = self::export_post_to_markdown( $post );
@@ -690,6 +697,55 @@ class Push_MD_Plugin {
 		ksort( $files );
 
 		return $files;
+	}
+
+	/**
+	 * Detect WordPress entities that would export to the same Push MD path.
+	 *
+	 * Mirrors the post query used by export_wordpress_content() so the report
+	 * matches what blocks the export. Posts whose path cannot be built (for
+	 * example a page whose parent hierarchy is broken) are skipped because that
+	 * is a separate export failure, not a path collision.
+	 *
+	 * @return array List of array( 'path' => string, 'post_ids' => int[] ) for
+	 *               every path claimed by more than one post.
+	 */
+	public static function detect_export_path_collisions() {
+		$posts = get_posts(
+			array(
+				'post_type'      => self::get_export_post_types(),
+				'post_status'    => self::$supported_post_statuses,
+				'posts_per_page' => -1,
+				'orderby'        => 'ID',
+				'order'          => 'ASC',
+			)
+		);
+
+		$paths = array();
+		foreach ( $posts as $post ) {
+			try {
+				$path = self::build_markdown_path( $post );
+			} catch ( Exception $e ) {
+				continue;
+			}
+
+			if ( ! isset( $paths[ $path ] ) ) {
+				$paths[ $path ] = array();
+			}
+			$paths[ $path ][] = intval( $post->ID );
+		}
+
+		$collisions = array();
+		foreach ( $paths as $path => $post_ids ) {
+			if ( count( $post_ids ) > 1 ) {
+				$collisions[] = array(
+					'path'     => $path,
+					'post_ids' => $post_ids,
+				);
+			}
+		}
+
+		return $collisions;
 	}
 
 	private static function add_default_agent_guidance_files( &$files, &$has_guideline_skills, &$agent_guide_skill_path ) {
