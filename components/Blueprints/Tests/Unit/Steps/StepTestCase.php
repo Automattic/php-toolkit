@@ -66,7 +66,12 @@ class StepTestCase extends TestCase {
 
 		file_put_contents(
 			wp_join_unix_paths( $this->execution_context_path, 'blueprint.json' ),
-			json_encode( [ "version" => 2 ] )
+			json_encode(
+				[
+					"version"           => 2,
+					"wordpressVersion"  => "6.9.4",
+				]
+			)
 		);
 
 		$config
