@@ -91,6 +91,19 @@ function push_md_token_is_use_context( $tokens, $index ) {
 	return false;
 }
 
+function push_md_token_is_namespace_declaration_root( $tokens, $index ) {
+	for ( $i = $index - 1; $i >= 0; --$i ) {
+		$token = $tokens[ $i ];
+		if ( is_array( $token ) && in_array( $token[0], array( T_WHITESPACE, T_COMMENT, T_DOC_COMMENT ), true ) ) {
+			continue;
+		}
+
+		return is_array( $token ) && T_NAMESPACE === $token[0];
+	}
+
+	return false;
+}
+
 function push_md_token_name_ids() {
 	$ids = array();
 	foreach ( array( 'T_NAME_QUALIFIED', 'T_NAME_FULLY_QUALIFIED' ) as $constant ) {
@@ -150,8 +163,11 @@ function push_md_scope_php_code( $code, $relative_path ) {
 
 		if (
 			T_STRING === $token[0] &&
-			isset( $global_symbols[ $token[1] ] ) &&
-			push_md_token_is_use_context( $tokens, $index )
+			(
+				push_md_token_is_namespace_declaration_root( $tokens, $index ) ||
+				push_md_token_is_use_context( $tokens, $index )
+			) &&
+			push_md_scope_qualified_name( $token[1] ) !== $token[1]
 		) {
 			$rewritten .= push_md_scope_qualified_name( $token[1] );
 			continue;
