@@ -127,6 +127,37 @@ function pmd_toolkit_export_path_expression( $relative_path ) {
 	return '$baseDir . ' . var_export( '/' . $relative_path, true );
 }
 
+function pmd_toolkit_scope_symbol_name( $symbol ) {
+	$scope_root = 'PushMDVendor';
+	$roots      = array(
+		'Composer'  => true,
+		'Dflydev'   => true,
+		'League'    => true,
+		'Nette'     => true,
+		'Psr'       => true,
+		'Symfony'   => true,
+		'WordPress' => true,
+	);
+	$globals    = array(
+		'Attribute'           => true,
+		'PhpToken'            => true,
+		'Stringable'          => true,
+		'UnhandledMatchError' => true,
+		'ValueError'          => true,
+	);
+	$parts      = explode( '\\', $symbol );
+
+	if ( $scope_root === $parts[0] ) {
+		return $symbol;
+	}
+
+	if ( isset( $roots[ $parts[0] ] ) || ( 1 === count( $parts ) && isset( $globals[ $parts[0] ] ) ) ) {
+		return $scope_root . '\\' . $symbol;
+	}
+
+	return $symbol;
+}
+
 function pmd_toolkit_write_classmap( $target_dir, $classmap ) {
 	ksort( $classmap );
 	$code = pmd_toolkit_php_header() . "return array(\n";
@@ -188,7 +219,7 @@ foreach (
 		if ( 0 === strpos( $relative_path, 'components/Markdown/vendor-patched/composer/' ) ) {
 			continue;
 		}
-		$classmap[ $class ] = $relative_path;
+		$classmap[ pmd_toolkit_scope_symbol_name( $class ) ] = $relative_path;
 	}
 }
 
@@ -206,10 +237,11 @@ foreach (
 			if ( null === $relative_path || ! pmd_toolkit_dir_exists( $target_dir, $relative_path ) ) {
 				continue;
 			}
-			if ( ! isset( $psr4[ $prefix ] ) ) {
-				$psr4[ $prefix ] = array();
+			$scoped_prefix = pmd_toolkit_scope_symbol_name( rtrim( $prefix, '\\' ) ) . '\\';
+			if ( ! isset( $psr4[ $scoped_prefix ] ) ) {
+				$psr4[ $scoped_prefix ] = array();
 			}
-			$psr4[ $prefix ][] = $relative_path;
+			$psr4[ $scoped_prefix ][] = $relative_path;
 		}
 	}
 }
@@ -396,6 +428,12 @@ copy_pmd_php_toolkit_bundle() {
 	generate_pmd_toolkit_autoload "$target_dir"
 }
 
+scope_pmd_php_bundle() {
+	local target_dir=$1
+
+	php "$PROJECT_DIR/bin/scope-push-md-bundle.php" "$target_dir"
+}
+
 # Temporarily disabled while the release workflow only publishes Push MD.
 # Restore these blocks when the older plugin zips should be built again.
 #
@@ -435,6 +473,7 @@ rsync -a \
 	"$PROJECT_DIR/plugins/push-md/" \
 	"$DIST_DIR/push-md/"
 copy_pmd_php_toolkit_bundle "$DIST_DIR/push-md/php-toolkit"
+scope_pmd_php_bundle "$DIST_DIR/push-md"
 harden_pmd_bundled_php "$DIST_DIR/push-md"
 cd $DIST_DIR
 zip -r push-md.zip push-md/

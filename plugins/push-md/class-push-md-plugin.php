@@ -3106,10 +3106,6 @@ class Push_MD_Plugin {
 	}
 
 	public static function throw_on_php_warning( $severity, $message, $file, $line ) {
-		if ( 0 === ( error_reporting() & $severity ) ) { // phpcs:ignore
-			return false;
-		}
-
 		throw new ErrorException( esc_html( $message ), 0, (int) $severity, esc_html( $file ), (int) $line );
 	}
 }
