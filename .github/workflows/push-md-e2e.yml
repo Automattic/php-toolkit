@@ -136,17 +136,17 @@ jobs:
         run: |
           for i in $(seq 1 30); do
             wp --path="$WP_DIR" cron event run --due-now > /dev/null 2>&1 || true
-            STATE=$(wp --path="$WP_DIR" option get pmd_seed_state 2>/dev/null || echo "pending")
+            STATE=$(wp --path="$WP_DIR" option get push_md_seed_state 2>/dev/null || echo "pending")
             echo "tick $i: state=$STATE"
             if [ "$STATE" = "done" ]; then exit 0; fi
             if [ "$STATE" = "failed" ]; then
-              wp --path="$WP_DIR" option get pmd_seed_progress
+              wp --path="$WP_DIR" option get push_md_seed_progress
               exit 1
             fi
             sleep 1
           done
           echo "Seeder never reached 'done' state." >&2
-          wp --path="$WP_DIR" option get pmd_seed_progress
+          wp --path="$WP_DIR" option get push_md_seed_progress
           exit 1
 
       - name: Create Application Password
