@@ -10,6 +10,26 @@ jobs:
     name: Push MD Plugin Check
     runs-on: ubuntu-latest
 
+    services:
+      mysql:
+        image: mysql:8
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: wordpress
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -uroot -proot"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    env:
+      WP_DIR: ${{ github.workspace }}/.ci/plugin-check-wordpress
+      WP_URL: http://127.0.0.1:8081
+      WP_ADMIN_USER: admin
+      WP_ADMIN_PASS: password
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
@@ -18,7 +38,7 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: '8.1'
-          extensions: mbstring, json
+          extensions: mbstring, json, zip, mysqli
           coverage: none
           tools: composer:v2
 
@@ -34,8 +54,46 @@ jobs:
           mkdir .plugin-check-build
           unzip -q dist/plugins/push-md.zip -d .plugin-check-build
 
+      - name: Install wp-cli
+        run: |
+          curl -sSLO https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar
+          chmod +x wp-cli.phar
+          sudo mv wp-cli.phar /usr/local/bin/wp
+
+      - name: Wait for MySQL
+        run: |
+          for _ in $(seq 1 30); do
+            if mysqladmin ping -h 127.0.0.1 -P 3306 -uroot -proot --silent; then exit 0; fi
+            sleep 2
+          done
+          echo "MySQL never came up." >&2
+          exit 1
+
+      - name: Install WordPress and Plugin Check
+        run: |
+          mkdir -p "$WP_DIR"
+          wp --path="$WP_DIR" core download
+          wp --path="$WP_DIR" config create \
+            --dbname=wordpress \
+            --dbuser=root \
+            --dbpass=root \
+            --dbhost=127.0.0.1:3306 \
+            --extra-php <<'PHP'
+          define( 'WP_ENVIRONMENT_TYPE', 'local' );
+          define( 'WP_DEBUG', true );
+          PHP
+          wp --path="$WP_DIR" core install \
+            --url="$WP_URL" \
+            --title="Push MD Plugin Check" \
+            --admin_user="$WP_ADMIN_USER" \
+            --admin_email="admin@example.com" \
+            --admin_password="$WP_ADMIN_PASS" \
+            --skip-email
+          wp --path="$WP_DIR" plugin install plugin-check --activate
+          rm -rf "$WP_DIR/wp-content/plugins/push-md"
+          cp -R .plugin-check-build/push-md "$WP_DIR/wp-content/plugins/push-md"
+
       - name: Run Plugin Check
-        uses: wordpress/plugin-check-action@v1
-        with:
-          build-dir: './.plugin-check-build/push-md'
-          slug: 'push-md'
+        run: |
+          wp --path="$WP_DIR" plugin check push-md \
+            --require="$WP_DIR/wp-content/plugins/plugin-check/cli.php"
