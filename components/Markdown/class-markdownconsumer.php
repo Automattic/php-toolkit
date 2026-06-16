@@ -443,7 +443,12 @@ class MarkdownConsumer implements DataFormatConsumer {
 	}
 
 	private function parse_frontmatter_scalar( $raw ) {
-		if ( preg_match( '/^\[|\{|- /', $raw ) ) {
+		// Detect YAML flow sequences ([...]), flow mappings ({...}), and block
+		// sequence items (- item) by their leading indicator. The `^` must bind all
+		// three alternatives: without the group, `\{` and `- ` matched anywhere in
+		// the value, so any quoted scalar containing "{" or "- " (e.g. a title like
+		// "Jetpack 13.0 - AI Assistant") was wrongly parsed as an empty array.
+		if ( preg_match( '/^(?:\[|\{|- )/', $raw ) ) {
 			return array();
 		}
 
