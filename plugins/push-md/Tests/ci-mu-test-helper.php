@@ -29,3 +29,29 @@ add_filter( 'push_md_seed_time_budget_seconds', static function () {
 add_filter( 'push_md_seed_tick_reschedule_seconds', static function () {
 	return 0;
 } );
+
+// CI-only route so the e2e suite can flip push_md_allow_create_on_missing_id
+// (local one-way seeding mode) over HTTP -- the test process has no wp-cli.
+// Admin-only; this mu-plugin is dropped in only by the e2e workflow.
+add_action( 'rest_api_init', static function () {
+	register_rest_route(
+		'push-md-test/v1',
+		'/allow-create-on-missing-id',
+		array(
+			'methods'             => 'POST',
+			'permission_callback' => static function () {
+				return current_user_can( 'manage_options' );
+			},
+			'callback'            => static function ( $request ) {
+				$enabled = (bool) $request->get_param( 'enabled' );
+				if ( $enabled ) {
+					update_option( 'push_md_allow_create_on_missing_id', 1 );
+				} else {
+					delete_option( 'push_md_allow_create_on_missing_id' );
+				}
+
+				return array( 'enabled' => $enabled );
+			},
+		)
+	);
+} );

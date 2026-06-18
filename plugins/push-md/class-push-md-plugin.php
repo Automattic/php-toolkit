@@ -2452,15 +2452,21 @@ class Push_MD_Plugin {
 				$include_trash
 			);
 		}
+		// During local one-way seeding (push_md_allow_create_on_missing_id), the front
+		// matter ids are foreign production ids that do not map to this site, so resolve
+		// purely by slug/path and ignore the id. This stops a production id that happens
+		// to collide with an unrelated local post id from rejecting the whole push.
+		// Production pushes leave the option off and keep strict id-based resolution.
+		$ignore_frontmatter_id = self::allow_create_on_missing_id();
 		if ( 'page' === $post_type ) {
-			if ( isset( $metadata['id'] ) ) {
+			if ( isset( $metadata['id'] ) && ! $ignore_frontmatter_id ) {
 				return self::find_post_id_by_frontmatter_id( $path, $metadata, $include_trash );
 			}
 
 			return self::find_page_id_by_path( $path, $include_trash );
 		}
 
-		if ( isset( $metadata['id'] ) ) {
+		if ( isset( $metadata['id'] ) && ! $ignore_frontmatter_id ) {
 			return self::find_post_id_by_frontmatter_id( $path, $metadata, $include_trash );
 		}
 

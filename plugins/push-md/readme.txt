@@ -4,7 +4,7 @@ Tags: git, markdown, content, workflow
 Requires at least: 6.9
 Tested up to: 7.0
 Requires PHP: 7.2
-Stable tag: 0.6.6
+Stable tag: 0.6.7
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -142,6 +142,10 @@ Uninstalling Push MD removes its Git object-store database tables, seed progress
 The removed tables contain Push MD's derived Git repository history. Reinstalling Push MD can seed a new repository from the current WordPress content, but it cannot restore the previous Push MD Git history unless you kept a clone or database backup.
 
 == Changelog ==
+
+= 0.6.7 =
+
+When seeding content onto a fresh site (the push_md_allow_create_on_missing_id option), resolve posts and pages by slug/path and ignore the Markdown front matter id. Foreign production ids that happen to collide with unrelated local post ids no longer reject the push. Production pushes are unaffected and keep strict id-based resolution.
 
 = 0.6.6 =
 
