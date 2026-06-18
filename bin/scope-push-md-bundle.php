@@ -65,6 +65,25 @@ function push_md_scope_qualified_name( $name ) {
 	return $leading . $name;
 }
 
+function push_md_should_fully_qualify_scoped_name( $tokens, $index, $original_name, $scoped_name ) {
+	if ( $original_name === $scoped_name ) {
+		return false;
+	}
+
+	if ( isset( $scoped_name[0] ) && '\\' === $scoped_name[0] ) {
+		return false;
+	}
+
+	if (
+		push_md_token_is_namespace_declaration_root( $tokens, $index ) ||
+		push_md_token_is_use_context( $tokens, $index )
+	) {
+		return false;
+	}
+
+	return true;
+}
+
 function push_md_token_is_use_context( $tokens, $index ) {
 	for ( $i = $index - 1; $i >= 0; --$i ) {
 		$token = $tokens[ $i ];
@@ -78,7 +97,7 @@ function push_md_token_is_use_context( $tokens, $index ) {
 			continue;
 		}
 		if ( is_array( $token ) && T_USE === $token[0] ) {
-			return true;
+			return ! push_md_token_is_inside_class_like_scope( $tokens, $i );
 		}
 		if ( in_array( $token, array( ';', '{', '}' ), true ) ) {
 			return false;
@@ -89,6 +108,55 @@ function push_md_token_is_use_context( $tokens, $index ) {
 	}
 
 	return false;
+}
+
+function push_md_token_is_class_like_declaration( $tokens, $index ) {
+	$token = $tokens[ $index ];
+	if ( ! is_array( $token ) || ! in_array( $token[0], array( T_CLASS, T_INTERFACE, T_TRAIT ), true ) ) {
+		return false;
+	}
+
+	for ( $i = $index - 1; $i >= 0; --$i ) {
+		$previous = $tokens[ $i ];
+		if ( is_array( $previous ) && in_array( $previous[0], array( T_WHITESPACE, T_COMMENT, T_DOC_COMMENT ), true ) ) {
+			continue;
+		}
+
+		return ! ( is_array( $previous ) && T_DOUBLE_COLON === $previous[0] );
+	}
+
+	return true;
+}
+
+function push_md_token_is_inside_class_like_scope( $tokens, $index ) {
+	$scope_stack        = array();
+	$pending_class_like = false;
+
+	for ( $i = 0; $i < $index; ++$i ) {
+		$token = $tokens[ $i ];
+
+		if ( push_md_token_is_class_like_declaration( $tokens, $i ) ) {
+			$pending_class_like = true;
+			continue;
+		}
+
+		if ( '{' === $token ) {
+			$scope_stack[]      = $pending_class_like ? 'class' : 'block';
+			$pending_class_like = false;
+			continue;
+		}
+
+		if ( ';' === $token ) {
+			$pending_class_like = false;
+			continue;
+		}
+
+		if ( '}' === $token && ! empty( $scope_stack ) ) {
+			array_pop( $scope_stack );
+		}
+	}
+
+	return in_array( 'class', $scope_stack, true );
 }
 
 function push_md_token_is_namespace_declaration_root( $tokens, $index ) {
@@ -157,7 +225,11 @@ function push_md_scope_php_code( $code, $relative_path ) {
 		}
 
 		if ( in_array( $token[0], $name_token_ids, true ) ) {
-			$rewritten .= push_md_scope_qualified_name( $token[1] );
+			$scoped_name = push_md_scope_qualified_name( $token[1] );
+			if ( push_md_should_fully_qualify_scoped_name( $tokens, $index, $token[1], $scoped_name ) ) {
+				$scoped_name = '\\' . $scoped_name;
+			}
+			$rewritten .= $scoped_name;
 			continue;
 		}
 

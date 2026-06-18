@@ -278,7 +278,11 @@ class MarkdownProducer implements DataFormatProducer {
 			default:
 				// Short-circuit empty entries produced by the block parser.
 				if ( ! $block_name ) {
-					return '';
+					if ( '' === trim( $inner_html ) ) {
+						return '';
+					}
+
+					return $this->html_to_markdown( $inner_html ) . "\n\n";
 				}
 				$markdown   = array();
 				$markdown[] = '';

@@ -28,6 +28,14 @@ class MarkdownProducerTest extends TestCase {
 				'blocks' => '<!-- wp:paragraph --><p>A simple paragraph</p><!-- /wp:paragraph -->',
 				'expected' => "A simple paragraph\n\n",
 			),
+			'Classic content without block delimiters' => array(
+				'blocks' => 'Classic content created through REST',
+				'expected' => "Classic content created through REST\n\n",
+			),
+			'Classic paragraph HTML without block delimiters' => array(
+				'blocks' => '<p>A classic paragraph</p>',
+				'expected' => "A classic paragraph\n\n",
+			),
 			'A simple paragraph – no blank text nodes – single space at the end' => array(
 				'blocks' => '<!-- wp:paragraph --><p>A simple paragraph </p><!-- /wp:paragraph -->',
 				'expected' => "A simple paragraph \n\n",
