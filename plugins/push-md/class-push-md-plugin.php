@@ -3,6 +3,7 @@
 use WordPress\DataLiberation\DataFormatConsumer\BlocksWithMetadata;
 use WordPress\Filesystem\WpdbFilesystem;
 use WordPress\Git\GitEndpoint;
+use WordPress\Git\GitException;
 use WordPress\Git\GitRepository;
 use WordPress\Git\Model\Commit;
 use WordPress\Git\Model\TreeEntry;
@@ -2796,31 +2797,59 @@ class Push_MD_Plugin {
 			throw new Exception( 'Preview branch not found.' );
 		}
 
-		$current_head = $repository->get_branch_tip( 'refs/heads/' . self::DEFAULT_BRANCH );
-		$branch_tip   = $repository->get_branch_tip( $ref_name );
-		$repository->get_commits_range(
-			$branch_tip,
-			$current_head,
-			array(
-				'include_ancestor' => false,
-			)
-		);
+		$current_head    = $repository->get_branch_tip( 'refs/heads/' . self::DEFAULT_BRANCH );
+		$branch_tip      = $repository->get_branch_tip( $ref_name );
+		$branches        = self::get_preview_branches();
+		$branch_metadata = isset( $branches[ $branch_name ] ) && is_array( $branches[ $branch_name ] )
+			? $branches[ $branch_name ]
+			: array();
+		$base_oid        = isset( $branch_metadata['base_oid'] ) && is_string( $branch_metadata['base_oid'] )
+			? $branch_metadata['base_oid']
+			: $current_head;
+		$merged_oid      = $branch_tip;
 
-		self::validate_repository_changes_for_wordpress( $repository, $current_head, $branch_tip );
-		$push_summary = self::apply_repository_diff_to_wordpress( $repository, $current_head, $branch_tip, false );
-		$repository->set_branch_tip( 'refs/heads/' . self::DEFAULT_BRANCH, $branch_tip );
+		$can_fast_forward = true;
+		$range_exception  = null;
+		try {
+			$repository->get_commits_range(
+				$branch_tip,
+				$current_head,
+				array(
+					'include_ancestor' => false,
+				)
+			);
+		} catch ( GitException $exception ) {
+			$can_fast_forward = false;
+			$range_exception  = $exception;
+		}
 
-		$branches = self::get_preview_branches();
+		if ( $can_fast_forward ) {
+			self::validate_repository_changes_for_wordpress( $repository, $current_head, $branch_tip );
+			$push_summary = self::apply_repository_diff_to_wordpress( $repository, $current_head, $branch_tip, false );
+			$repository->set_branch_tip( 'refs/heads/' . self::DEFAULT_BRANCH, $branch_tip );
+		} else {
+			if ( ! is_string( $base_oid ) || '' === $base_oid || Commit::is_null_hash( $base_oid ) || ! $repository->has_object( $base_oid ) ) {
+				throw $range_exception;
+			}
+
+			self::validate_repository_changes_for_wordpress( $repository, $base_oid, $branch_tip );
+			$push_summary = self::apply_repository_diff_to_wordpress( $repository, $base_oid, $branch_tip, false );
+			self::sync_repository_from_wordpress( $repository );
+			$merged_oid = $repository->get_branch_tip( 'refs/heads/' . self::DEFAULT_BRANCH );
+		}
+
 		if ( isset( $branches[ $branch_name ] ) && is_array( $branches[ $branch_name ] ) ) {
-			$branches[ $branch_name ]['merged_at'] = time();
-			$branches[ $branch_name ]['tip_oid']   = $branch_tip;
+			$branches[ $branch_name ]['merged_at']  = time();
+			$branches[ $branch_name ]['tip_oid']    = $branch_tip;
+			$branches[ $branch_name ]['merged_oid'] = $merged_oid;
 			update_option( self::BRANCH_PREVIEWS_OPTION, $branches, false );
 		}
 
 		return array(
-			'branch'  => $branch_name,
-			'tip_oid' => $branch_tip,
-			'changes' => $push_summary,
+			'branch'     => $branch_name,
+			'tip_oid'    => $branch_tip,
+			'merged_oid' => $merged_oid,
+			'changes'    => $push_summary,
 		);
 	}
 
