@@ -343,6 +343,8 @@ class WpdbFilesystem implements Filesystem {
 				$e
 			);
 		}
+
+		return true;
 	}
 
 	public function rmdir( $path, $options = array() ) {

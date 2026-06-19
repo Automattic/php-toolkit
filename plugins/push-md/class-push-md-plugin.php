@@ -49,6 +49,8 @@ class Push_MD_Plugin {
 	const THEME_BASE_COMMIT_MESSAGE    = 'Initial theme base from WordPress';
 	const THEME_BASE_SYNC_MESSAGE      = 'Sync theme base from WordPress';
 	const WORDPRESS_SYNC_MESSAGE       = 'Sync from WordPress';
+	const BRANCH_PREVIEWS_OPTION       = 'push_md_branch_previews';
+	const BRANCH_QUERY_PARAM           = 'branch';
 
 	public static $supported_post_types    = array( 'post', 'page' );
 	public static $supported_post_statuses = array( 'publish', 'draft', 'pending', 'private', 'future' );
@@ -58,6 +60,10 @@ class Push_MD_Plugin {
 	private static $theme_scoped_raw_block_post_types = array( 'wp_template', 'wp_template_part' );
 
 	private static $json_post_types = array( 'wp_global_styles' );
+
+	private static $active_preview_branch        = null;
+	private static $active_preview_files         = null;
+	private static $active_preview_changed_paths = array();
 
 	private static $guideline_type_directories = array(
 		'artifact'    => 'artifacts',
@@ -70,6 +76,7 @@ class Push_MD_Plugin {
 
 	public static function bootstrap() {
 		add_action( 'init', array( __CLASS__, 'install_default_agent_skill' ), 20 );
+		add_action( 'parse_request', array( __CLASS__, 'maybe_enable_branch_preview' ), 1 );
 		add_action( 'rest_api_init', array( __CLASS__, 'register_routes' ) );
 		add_filter( 'rest_post_dispatch', array( __CLASS__, 'add_authentication_challenge' ), 10, 3 );
 		add_filter( 'rest_pre_serve_request', array( __CLASS__, 'serve_git_response' ), 10, 4 );
@@ -212,6 +219,501 @@ class Push_MD_Plugin {
 		return true;
 	}
 
+	public static function maybe_enable_branch_preview() {
+		if ( is_admin() || ! isset( $_GET[ self::BRANCH_QUERY_PARAM ] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Read-only frontend preview switch.
+			return;
+		}
+
+		$branch_name = wp_unslash( $_GET[ self::BRANCH_QUERY_PARAM ] ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Read-only frontend preview switch.
+		if ( ! is_string( $branch_name ) ) {
+			return;
+		}
+		if ( ! self::is_valid_preview_branch_name( $branch_name ) ) {
+			return;
+		}
+
+		self::maybe_authenticate_branch_preview_request();
+		if ( ! current_user_can( 'manage_options' ) ) {
+			return;
+		}
+
+		try {
+			$repository = self::open_repository();
+			$ref_name   = 'refs/heads/' . $branch_name;
+			if ( ! $repository->branch_exists( $ref_name ) ) {
+				return;
+			}
+
+			$tip = $repository->get_branch_tip( $ref_name );
+			if ( Commit::is_null_hash( $tip ) ) {
+				return;
+			}
+
+			$base_files      = array();
+			$branches        = self::get_preview_branches();
+			$branch_metadata = isset( $branches[ $branch_name ] ) && is_array( $branches[ $branch_name ] )
+				? $branches[ $branch_name ]
+				: array();
+			$base_oid        = isset( $branch_metadata['base_oid'] ) && is_string( $branch_metadata['base_oid'] )
+				? $branch_metadata['base_oid']
+				: $repository->get_branch_tip( 'refs/heads/' . self::DEFAULT_BRANCH );
+			if ( is_string( $base_oid ) && '' !== $base_oid && ! Commit::is_null_hash( $base_oid ) && $repository->has_object( $base_oid ) ) {
+				$base_files = self::read_repository_entries_from_commit( $repository, $base_oid );
+			}
+
+			self::$active_preview_branch        = $branch_name;
+			self::$active_preview_files         = self::read_repository_entries_from_commit( $repository, $tip );
+			self::$active_preview_changed_paths = self::calculate_preview_changed_paths( $base_files, self::$active_preview_files );
+
+			add_filter( 'posts_pre_query', array( __CLASS__, 'filter_preview_posts_pre_query' ), 10, 2 );
+			add_filter( 'the_posts', array( __CLASS__, 'filter_preview_posts' ), 10, 2 );
+			add_filter( 'pre_handle_404', array( __CLASS__, 'filter_preview_404' ), 10, 2 );
+			add_filter( 'pre_get_block_template', array( __CLASS__, 'filter_preview_block_template' ), 10, 3 );
+			add_filter( 'get_block_templates', array( __CLASS__, 'filter_preview_block_templates' ), 10, 3 );
+			add_filter( 'wp_theme_json_data_user', array( __CLASS__, 'filter_preview_global_styles' ) );
+			add_filter( 'render_block_core/navigation', array( __CLASS__, 'filter_preview_navigation_block' ), 10, 2 );
+			add_action( 'send_headers', array( __CLASS__, 'send_branch_preview_headers' ) );
+			add_action( 'wp_footer', array( __CLASS__, 'render_branch_preview_notice' ) );
+		} catch ( Throwable $exception ) {
+			self::$active_preview_branch        = null;
+			self::$active_preview_files         = null;
+			self::$active_preview_changed_paths = array();
+		}
+	}
+
+	private static function maybe_authenticate_branch_preview_request() {
+		if ( is_user_logged_in() || ! function_exists( 'wp_authenticate_application_password' ) ) {
+			return;
+		}
+		if ( empty( $_SERVER['PHP_AUTH_USER'] ) || ! isset( $_SERVER['PHP_AUTH_PW'] ) ) {
+			return;
+		}
+
+		$username = (string) wp_unslash( $_SERVER['PHP_AUTH_USER'] );
+		$password = (string) wp_unslash( $_SERVER['PHP_AUTH_PW'] );
+		add_filter( 'application_password_is_api_request', '__return_true' );
+		try {
+			$user = wp_authenticate_application_password( null, $username, $password );
+		} finally {
+			remove_filter( 'application_password_is_api_request', '__return_true' );
+		}
+		if ( $user instanceof WP_User ) {
+			wp_set_current_user( $user->ID );
+		}
+	}
+
+	public static function filter_preview_posts_pre_query( $posts, $query ) {
+		if ( ! self::is_branch_preview_active() || ! method_exists( $query, 'is_main_query' ) || ! $query->is_main_query() ) {
+			return $posts;
+		}
+		if ( is_array( $posts ) ) {
+			return $posts;
+		}
+
+		$path = self::preview_request_path_from_query( $query );
+		if ( '' === $path || ! isset( self::$active_preview_files[ $path ] ) ) {
+			return $posts;
+		}
+		if ( self::preview_path_maps_to_existing_post( $path, self::$active_preview_files[ $path ] ) ) {
+			return $posts;
+		}
+
+		$post = self::preview_post_from_entry( $path, self::$active_preview_files[ $path ], null );
+		if ( ! $post ) {
+			return $posts;
+		}
+
+		$query->is_singular       = true;
+		$query->is_single         = 'post' === $post->post_type;
+		$query->is_page           = 'page' === $post->post_type;
+		$query->is_home           = false;
+		$query->is_archive        = false;
+		$query->is_404            = false;
+		$query->posts             = array( $post );
+		$query->post_count        = 1;
+		$query->found_posts       = 1;
+		$query->queried_object    = $post;
+		$query->queried_object_id = $post->ID;
+
+		return array( $post );
+	}
+
+	public static function filter_preview_posts( $posts, $query ) {
+		if ( ! self::is_branch_preview_active() || ! is_array( $posts ) || ! method_exists( $query, 'is_main_query' ) || ! $query->is_main_query() ) {
+			return $posts;
+		}
+
+		$preview_posts = array();
+		foreach ( $posts as $post ) {
+			if ( ! $post instanceof WP_Post || ! in_array( $post->post_type, self::get_supported_post_types(), true ) ) {
+				$preview_posts[] = $post;
+				continue;
+			}
+
+			try {
+				$path = self::build_markdown_path( $post );
+			} catch ( Throwable $exception ) {
+				$preview_posts[] = $post;
+				continue;
+			}
+
+			if ( ! isset( self::$active_preview_files[ $path ] ) ) {
+				continue;
+			}
+
+			$preview_post = self::preview_post_from_entry( $path, self::$active_preview_files[ $path ], $post );
+			if ( $preview_post ) {
+				$preview_posts[] = $preview_post;
+			}
+		}
+
+		return $preview_posts;
+	}
+
+	public static function filter_preview_404( $preempt, $query ) {
+		if ( self::is_branch_preview_active() && method_exists( $query, 'is_main_query' ) && $query->is_main_query() && ! empty( $query->posts ) ) {
+			return false;
+		}
+
+		return $preempt;
+	}
+
+	public static function filter_preview_block_template( $block_template, $id, $template_type ) {
+		if ( ! self::is_branch_preview_active() || ! self::is_raw_block_post_type( $template_type ) ) {
+			return $block_template;
+		}
+
+		foreach ( self::preview_raw_block_paths_for_id( $template_type, $id ) as $path ) {
+			if ( isset( self::$active_preview_files[ $path ] ) && self::is_branch_preview_path_changed( $path ) ) {
+				return self::preview_block_template_from_entry( $path, self::$active_preview_files[ $path ], $block_template, $id );
+			}
+		}
+
+		return $block_template;
+	}
+
+	public static function filter_preview_block_templates( $query_result, $query, $template_type ) {
+		unset( $query );
+
+		if ( ! self::is_branch_preview_active() || ! self::is_raw_block_post_type( $template_type ) || ! is_array( $query_result ) ) {
+			return $query_result;
+		}
+
+		$templates = array();
+		$seen      = array();
+		foreach ( $query_result as $block_template ) {
+			$preview_template = $block_template;
+			if ( is_object( $block_template ) && isset( $block_template->id ) ) {
+				$preview_template = self::filter_preview_block_template( $block_template, $block_template->id, $template_type );
+			}
+			if ( is_object( $preview_template ) && isset( $preview_template->id ) ) {
+				$seen[ $preview_template->id ] = true;
+			}
+			$templates[] = $preview_template;
+		}
+
+		foreach ( self::$active_preview_files as $path => $entry ) {
+			if ( TreeEntry::FILE_MODE_SYMBOLIC_LINK === $entry['mode'] || ! self::is_branch_preview_path_changed( $path ) || ! self::is_raw_block_path( $path ) ) {
+				continue;
+			}
+
+			$identity = self::path_to_raw_block_identity( $path );
+			if ( $template_type !== $identity['post_type'] ) {
+				continue;
+			}
+
+			$template = self::preview_block_template_from_entry( $path, $entry, null, '' );
+			if ( ! $template || isset( $seen[ $template->id ] ) ) {
+				continue;
+			}
+
+			$seen[ $template->id ] = true;
+			$templates[]           = $template;
+		}
+
+		return $templates;
+	}
+
+	public static function filter_preview_global_styles( $theme_json ) {
+		if ( ! self::is_branch_preview_active() || ! method_exists( $theme_json, 'update_with' ) || ! function_exists( 'get_stylesheet' ) ) {
+			return $theme_json;
+		}
+
+		$path = self::build_global_styles_path( get_stylesheet() );
+		if ( ! isset( self::$active_preview_files[ $path ] ) || ! self::is_branch_preview_path_changed( $path ) || TreeEntry::FILE_MODE_SYMBOLIC_LINK === self::$active_preview_files[ $path ]['mode'] ) {
+			return $theme_json;
+		}
+
+		$config = self::parse_global_styles_json( $path, self::$active_preview_files[ $path ]['content'] );
+		$theme_json->update_with( $config );
+
+		return $theme_json;
+	}
+
+	public static function filter_preview_navigation_block( $block_content, $block ) {
+		if ( ! self::is_branch_preview_active() || empty( $block['attrs']['ref'] ) ) {
+			return $block_content;
+		}
+
+		$post = get_post( intval( $block['attrs']['ref'] ) );
+		if ( ! $post || 'wp_navigation' !== $post->post_type ) {
+			return $block_content;
+		}
+
+		$path = self::build_markdown_path( $post );
+		if ( ! isset( self::$active_preview_files[ $path ] ) || ! self::is_branch_preview_path_changed( $path ) || TreeEntry::FILE_MODE_SYMBOLIC_LINK === self::$active_preview_files[ $path ]['mode'] ) {
+			return $block_content;
+		}
+
+		return do_blocks( self::$active_preview_files[ $path ]['content'] );
+	}
+
+	public static function send_branch_preview_headers() {
+		if ( ! self::is_branch_preview_active() || headers_sent() ) {
+			return;
+		}
+
+		header( 'Cache-Control: no-store, no-cache, must-revalidate, max-age=0' );
+		header( 'X-Push-MD-Preview-Branch: ' . self::$active_preview_branch );
+	}
+
+	public static function render_branch_preview_notice() {
+		if ( ! self::is_branch_preview_active() ) {
+			return;
+		}
+		?>
+		<div id="push-md-branch-preview-notice" style="position:fixed;right:16px;bottom:16px;z-index:99999;padding:8px 10px;border-radius:4px;background:#1d2327;color:#f6f7f7;font:13px/1.4 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;box-shadow:0 6px 18px rgba(0,0,0,.2);">
+			<?php
+			echo esc_html(
+				sprintf(
+					/* translators: %s: preview branch name. */
+					__( 'Push MD preview: %s', 'push-md' ),
+					self::$active_preview_branch
+				)
+			);
+			?>
+		</div>
+		<?php
+	}
+
+	private static function is_branch_preview_active() {
+		return null !== self::$active_preview_branch && is_array( self::$active_preview_files );
+	}
+
+	private static function is_branch_preview_path_changed( $path ) {
+		return isset( self::$active_preview_changed_paths[ $path ] );
+	}
+
+	private static function calculate_preview_changed_paths( $base_files, $preview_files ) {
+		$changed_paths = array();
+		foreach ( $preview_files as $path => $entry ) {
+			if ( ! isset( $base_files[ $path ] ) || ! self::repository_entries_match( $base_files[ $path ], $entry ) ) {
+				$changed_paths[ $path ] = true;
+			}
+		}
+
+		return $changed_paths;
+	}
+
+	private static function preview_request_path_from_query( $query ) {
+		$query_vars = isset( $query->query_vars ) && is_array( $query->query_vars ) ? $query->query_vars : array();
+
+		if ( ! empty( $query_vars['pagename'] ) ) {
+			$page_path = trim( (string) $query_vars['pagename'], '/' );
+			if ( '' !== $page_path ) {
+				return 'page/' . $page_path . '.md';
+			}
+		}
+		if ( ! empty( $query_vars['name'] ) ) {
+			$post_slug = trim( (string) $query_vars['name'], '/' );
+			if ( '' !== $post_slug ) {
+				return 'post/' . $post_slug . '.md';
+			}
+		}
+
+		global $wp;
+		$request_path = isset( $wp->request ) ? trim( (string) $wp->request, '/' ) : '';
+		if ( '' === $request_path ) {
+			return '';
+		}
+
+		$page_path = 'page/' . $request_path . '.md';
+		if ( isset( self::$active_preview_files[ $page_path ] ) ) {
+			return $page_path;
+		}
+
+		$post_path = 'post/' . basename( $request_path ) . '.md';
+		if ( false === strpos( $request_path, '/' ) && isset( self::$active_preview_files[ $post_path ] ) ) {
+			return $post_path;
+		}
+
+		return '';
+	}
+
+	private static function preview_post_from_entry( $path, $entry, $existing_post ) {
+		if ( TreeEntry::FILE_MODE_SYMBOLIC_LINK === $entry['mode'] ) {
+			return null;
+		}
+
+		$post_type = self::path_to_post_type( $path );
+		if ( self::is_raw_block_post_type( $post_type ) || 'wp_global_styles' === $post_type ) {
+			return null;
+		}
+
+		if ( 'wp_guideline' === $post_type ) {
+			$metadata     = array();
+			$block_markup = $entry['content'];
+			if ( self::is_guideline_skill_path( $path ) ) {
+				$skill        = self::split_guideline_skill_markdown( $entry['content'] );
+				$metadata     = $skill['metadata'];
+				$block_markup = $skill['content'];
+			}
+		} else {
+			self::assert_markdown_front_matter_is_closed( $entry['content'] );
+			$consumer     = new MarkdownConsumer( $entry['content'] );
+			$result       = $consumer->consume();
+			$block_markup = $result->get_block_markup();
+			$metadata     = array();
+			foreach ( $result->get_all_metadata() as $key => $value ) {
+				$metadata[ $key ] = is_array( $value ) ? reset( $value ) : $value;
+			}
+			$metadata = self::normalize_supported_frontmatter(
+				$metadata,
+				array( 'id', 'title', 'date', 'status', 'description' )
+			);
+		}
+
+		$slug = self::path_to_slug( $path );
+		$post = $existing_post ? clone $existing_post : self::create_virtual_preview_post( $path, $post_type, $slug );
+		if ( ! $post ) {
+			return null;
+		}
+
+		$post->post_content = $block_markup;
+		$post->post_title   = isset( $metadata['title'] ) ? $metadata['title'] : ( $post->post_title ? $post->post_title : ucwords( str_replace( '-', ' ', $slug ) ) );
+		$post->post_excerpt = isset( $metadata['description'] ) ? $metadata['description'] : $post->post_excerpt;
+		if ( isset( $metadata['status'] ) ) {
+			$post->post_status = self::normalize_frontmatter_status( $metadata['status'] );
+		}
+
+		return $post;
+	}
+
+	private static function preview_path_maps_to_existing_post( $path, $entry ) {
+		if ( TreeEntry::FILE_MODE_SYMBOLIC_LINK === $entry['mode'] ) {
+			return false;
+		}
+
+		$post_type = self::path_to_post_type( $path );
+		if ( ! in_array( $post_type, array( 'post', 'page' ), true ) ) {
+			return false;
+		}
+
+		self::assert_markdown_front_matter_is_closed( $entry['content'] );
+		$metadata = self::parse_markdown_metadata( $entry['content'] );
+
+		return (bool) self::find_post_id_by_path_metadata( $path, $metadata, false );
+	}
+
+	private static function create_virtual_preview_post( $path, $post_type, $slug ) {
+		if ( ! class_exists( 'WP_Post' ) ) {
+			return null;
+		}
+
+		$post_id  = -1 * abs( crc32( $path ) );
+		$post_obj = (object) array(
+			'ID'                    => $post_id,
+			'post_author'           => get_current_user_id(),
+			'post_date'             => current_time( 'mysql' ),
+			'post_date_gmt'         => current_time( 'mysql', true ),
+			'post_content'          => '',
+			'post_title'            => ucwords( str_replace( '-', ' ', $slug ) ),
+			'post_excerpt'          => '',
+			'post_status'           => 'publish',
+			'comment_status'        => 'closed',
+			'ping_status'           => 'closed',
+			'post_password'         => '',
+			'post_name'             => $slug,
+			'to_ping'               => '',
+			'pinged'                => '',
+			'post_modified'         => current_time( 'mysql' ),
+			'post_modified_gmt'     => current_time( 'mysql', true ),
+			'post_content_filtered' => '',
+			'post_parent'           => 0,
+			'guid'                  => self::get_preview_branch_url( self::$active_preview_branch ) . '#' . rawurlencode( $path ),
+			'menu_order'            => 0,
+			'post_type'             => $post_type,
+			'post_mime_type'        => '',
+			'comment_count'         => 0,
+			'filter'                => 'raw',
+		);
+
+		if ( 'page' === $post_type ) {
+			$parent_slugs = self::path_to_page_slugs( $path );
+			array_pop( $parent_slugs );
+			if ( ! empty( $parent_slugs ) ) {
+				$post_obj->post_parent = -1 * abs( crc32( 'page/' . implode( '/', $parent_slugs ) . '.md' ) );
+			}
+		}
+
+		return new WP_Post( $post_obj );
+	}
+
+	private static function preview_raw_block_paths_for_id( $post_type, $id ) {
+		$id    = (string) $id;
+		$paths = array();
+		if ( '' === $id ) {
+			return $paths;
+		}
+
+		if ( false !== strpos( $id, '//' ) ) {
+			list( $theme_slug, $slug ) = explode( '//', $id, 2 );
+			if ( '' !== $theme_slug && '' !== $slug ) {
+				$paths[] = self::build_raw_block_path( $post_type, str_replace( '//', '/', $slug ), $theme_slug );
+			}
+		}
+
+		$paths[] = self::build_raw_block_path( $post_type, str_replace( '//', '/', $id ) );
+
+		return array_values( array_unique( $paths ) );
+	}
+
+	private static function preview_block_template_from_entry( $path, $entry, $existing_template, $requested_id ) {
+		if ( TreeEntry::FILE_MODE_SYMBOLIC_LINK === $entry['mode'] || ! class_exists( 'WP_Block_Template' ) ) {
+			return null;
+		}
+
+		self::assert_raw_block_html_has_no_front_matter( $entry['content'] );
+		self::assert_raw_block_html_has_block_markup( $entry['content'] );
+		self::assert_block_markup_is_safe( $entry['content'] );
+
+		$identity = self::path_to_raw_block_identity( $path );
+		$template = $existing_template instanceof WP_Block_Template ? clone $existing_template : new WP_Block_Template();
+		$theme    = $identity['theme'];
+		if ( '' === $theme && false !== strpos( (string) $requested_id, '//' ) ) {
+			list( $theme ) = explode( '//', (string) $requested_id, 2 );
+		}
+		if ( '' === $theme && function_exists( 'get_stylesheet' ) && self::is_theme_scoped_raw_block_post_type( $identity['post_type'] ) ) {
+			$theme = self::sanitize_repository_path_segment( get_stylesheet() );
+		}
+
+		$template->id             = '' !== $theme && self::is_theme_scoped_raw_block_post_type( $identity['post_type'] ) ? $theme . '//' . $identity['slug'] : $identity['slug'];
+		$template->theme          = $theme;
+		$template->content        = $entry['content'];
+		$template->slug           = $identity['slug'];
+		$template->source         = 'custom';
+		$template->type           = $identity['post_type'];
+		$template->title          = ucwords( str_replace( '-', ' ', str_replace( '//', '/', $identity['slug'] ) ) );
+		$template->status         = 'publish';
+		$template->has_theme_file = false;
+		$template->origin         = 'custom';
+		if ( 'wp_template_part' === $identity['post_type'] && empty( $template->area ) ) {
+			$template->area = 'uncategorized';
+		}
+
+		return $template;
+	}
+
 	public static function handle_rest_request( WP_REST_Request $request ) {
 		$previous_error_handler = set_error_handler( array( __CLASS__, 'throw_on_php_warning' ) ); // phpcs:ignore
 		$git_path               = '';
@@ -257,7 +759,7 @@ class Push_MD_Plugin {
 
 			$push_header = null;
 			if ( self::is_push_request( $git_path ) ) {
-				$push_header = self::parse_push_header( $request_body );
+				$push_header = self::parse_push_header( $request_body, $repository, $current_head );
 				if ( false === $push_header ) {
 					return self::build_protocol_error_response(
 						'git-receive-pack',
@@ -270,13 +772,6 @@ class Push_MD_Plugin {
 						$push_header['error']
 					);
 				}
-
-				if ( $push_header['old_oid'] !== $current_head ) {
-					return self::build_protocol_error_response(
-						'git-receive-pack',
-						'Push rejected because the remote changed. Pull the latest changes and try again.'
-					);
-				}
 			}
 
 			$response = new Push_MD_Buffering_Response();
@@ -285,12 +780,17 @@ class Push_MD_Plugin {
 
 			if ( self::is_push_request( $git_path ) ) {
 				try {
-					$push_summary = self::apply_repository_changes_to_wordpress(
-						$repository,
-						$push_header['old_oid'],
-						$push_header['new_oid']
-					);
-					$response->append_progress_messages( self::format_push_summary_messages( $push_summary ) );
+					if ( $push_header['is_preview'] ) {
+						self::finalize_preview_branch_push( $repository, $push_header );
+						$response->append_progress_messages( self::format_preview_branch_push_messages( $push_header ) );
+					} else {
+						$push_summary = self::apply_repository_changes_to_wordpress(
+							$repository,
+							$push_header['old_oid'],
+							$push_header['new_oid']
+						);
+						$response->append_progress_messages( self::format_push_summary_messages( $push_summary ) );
+					}
 				} catch ( Throwable $exception ) {
 					self::rollback_rejected_push_ref( $repository, $push_header );
 
@@ -1316,24 +1816,56 @@ class Push_MD_Plugin {
 	}
 
 	private static function apply_repository_changes_to_wordpress( GitRepository $repository, $old_commit, $new_commit ) {
-		$commit_hashes = self::get_push_commit_hashes( $repository, $old_commit, $new_commit );
-		$push_summary  = array();
-
-		foreach ( $commit_hashes as $commit_hash ) {
-			self::validate_single_commit_content_changes( $repository, $commit_hash );
-		}
+		self::validate_repository_changes_for_wordpress( $repository, $old_commit, $new_commit );
 
 		$push_summary = self::apply_repository_diff_to_wordpress( $repository, $old_commit, $new_commit, false );
 
 		return $push_summary;
 	}
 
+	private static function validate_repository_changes_for_wordpress( GitRepository $repository, $old_commit, $new_commit ) {
+		$commit_hashes = self::get_push_commit_hashes( $repository, $old_commit, $new_commit );
+
+		foreach ( $commit_hashes as $commit_hash ) {
+			self::validate_single_commit_content_changes( $repository, $commit_hash );
+		}
+
+		self::apply_repository_diff_to_wordpress( $repository, $old_commit, $new_commit, false, true );
+	}
+
+	private static function finalize_preview_branch_push( GitRepository $repository, $push_header ) {
+		if ( $push_header['is_delete'] ) {
+			self::delete_preview_branch_metadata( $push_header['branch_name'] );
+			return;
+		}
+
+		self::validate_repository_changes_for_wordpress(
+			$repository,
+			$push_header['validation_old_oid'],
+			$push_header['new_oid']
+		);
+		self::update_preview_branch_metadata( $push_header );
+	}
+
 	private static function rollback_rejected_push_ref( GitRepository $repository, $push_header ) {
-		$branch_name = 'refs/heads/' . self::DEFAULT_BRANCH;
+		$branch_name = isset( $push_header['ref_name'] ) ? $push_header['ref_name'] : 'refs/heads/' . self::DEFAULT_BRANCH;
 
 		try {
-			if ( $push_header['new_oid'] === $repository->get_branch_tip( $branch_name ) ) {
+			if ( $push_header['is_delete'] ) {
 				$repository->set_branch_tip( $branch_name, $push_header['old_oid'] );
+				return;
+			}
+
+			if ( ! $repository->branch_exists( $branch_name ) ) {
+				return;
+			}
+
+			if ( $push_header['new_oid'] === $repository->get_branch_tip( $branch_name ) ) {
+				if ( Commit::is_null_hash( $push_header['old_oid'] ) ) {
+					$repository->delete_branch( $branch_name );
+				} else {
+					$repository->set_branch_tip( $branch_name, $push_header['old_oid'] );
+				}
 			}
 		} catch ( Throwable $exception ) {
 			// Preserve the original rejection reason for the Git client.
@@ -1377,7 +1909,7 @@ class Push_MD_Plugin {
 		}
 	}
 
-	private static function apply_repository_diff_to_wordpress( GitRepository $repository, $old_commit, $new_commit, $skip_modified_checks ) {
+	private static function apply_repository_diff_to_wordpress( GitRepository $repository, $old_commit, $new_commit, $skip_modified_checks, $dry_run = false ) {
 		$old_files = Commit::is_null_hash( $old_commit )
 			? array()
 			: self::read_repository_entries_from_commit( $repository, $old_commit );
@@ -1450,6 +1982,10 @@ class Push_MD_Plugin {
 				'post_id' => $post_id,
 				'path'    => $path,
 			);
+		}
+
+		if ( $dry_run ) {
+			return array();
 		}
 
 		foreach ( $upsert_plans as $plan ) {
@@ -2154,8 +2690,138 @@ class Push_MD_Plugin {
 		return $messages;
 	}
 
+	private static function format_preview_branch_push_messages( $push_header ) {
+		if ( ! empty( $push_header['is_delete'] ) ) {
+			return array(
+				sprintf(
+					'Push MD deleted preview branch %s.',
+					self::sanitize_push_summary_text( $push_header['branch_name'] )
+				),
+			);
+		}
+
+		return array(
+			sprintf(
+				'Push MD stored preview branch %s without changing WordPress content.',
+				self::sanitize_push_summary_text( $push_header['branch_name'] )
+			),
+			sprintf(
+				'Preview: %s',
+				self::sanitize_push_summary_text( self::get_preview_branch_url( $push_header['branch_name'] ) )
+			),
+			'Merge this branch from the Push MD admin REST API or Tools page when ready.',
+		);
+	}
+
 	private static function sanitize_push_summary_text( $text ) {
 		return str_replace( array( "\r", "\n" ), ' ', (string) $text );
+	}
+
+	public static function get_preview_branch_url( $branch_name ) {
+		return add_query_arg(
+			self::BRANCH_QUERY_PARAM,
+			$branch_name,
+			home_url( '/' )
+		);
+	}
+
+	public static function get_preview_branches() {
+		$branches = get_option( self::BRANCH_PREVIEWS_OPTION, array() );
+
+		return is_array( $branches ) ? $branches : array();
+	}
+
+	private static function update_preview_branch_metadata( $push_header ) {
+		$branches    = self::get_preview_branches();
+		$branch_name = $push_header['branch_name'];
+		$existing    = isset( $branches[ $branch_name ] ) && is_array( $branches[ $branch_name ] )
+			? $branches[ $branch_name ]
+			: array();
+		$created_at  = isset( $existing['created_at'] ) ? intval( $existing['created_at'] ) : time();
+
+		$branches[ $branch_name ] = array(
+			'branch'     => $branch_name,
+			'ref'        => $push_header['ref_name'],
+			'owner'      => get_current_user_id(),
+			'base_oid'   => $push_header['base_oid'],
+			'tip_oid'    => $push_header['new_oid'],
+			'url'        => self::get_preview_branch_url( $branch_name ),
+			'created_at' => $created_at,
+			'updated_at' => time(),
+		);
+
+		update_option( self::BRANCH_PREVIEWS_OPTION, $branches, false );
+	}
+
+	private static function delete_preview_branch_metadata( $branch_name ) {
+		$branches = self::get_preview_branches();
+		unset( $branches[ $branch_name ] );
+
+		update_option( self::BRANCH_PREVIEWS_OPTION, $branches, false );
+	}
+
+	public static function list_preview_branches() {
+		$repository = self::open_repository();
+		$branches   = self::get_preview_branches();
+		$response   = array();
+
+		foreach ( $branches as $branch_name => $branch ) {
+			if ( ! is_array( $branch ) || ! self::is_valid_preview_branch_name( $branch_name ) ) {
+				continue;
+			}
+
+			$ref_name = 'refs/heads/' . $branch_name;
+			if ( ! $repository->branch_exists( $ref_name ) ) {
+				continue;
+			}
+
+			$branch['tip_oid'] = $repository->get_branch_tip( $ref_name );
+			$branch['url']     = self::get_preview_branch_url( $branch_name );
+			$response[]        = $branch;
+		}
+
+		return $response;
+	}
+
+	public static function merge_preview_branch( $branch_name ) {
+		if ( ! self::is_valid_preview_branch_name( $branch_name ) ) {
+			throw new Exception( 'Invalid preview branch name.' );
+		}
+
+		$repository = self::open_repository();
+		self::sync_repository_from_wordpress( $repository );
+
+		$ref_name = 'refs/heads/' . $branch_name;
+		if ( ! $repository->branch_exists( $ref_name ) ) {
+			throw new Exception( 'Preview branch not found.' );
+		}
+
+		$current_head = $repository->get_branch_tip( 'refs/heads/' . self::DEFAULT_BRANCH );
+		$branch_tip   = $repository->get_branch_tip( $ref_name );
+		$repository->get_commits_range(
+			$branch_tip,
+			$current_head,
+			array(
+				'include_ancestor' => false,
+			)
+		);
+
+		self::validate_repository_changes_for_wordpress( $repository, $current_head, $branch_tip );
+		$push_summary = self::apply_repository_diff_to_wordpress( $repository, $current_head, $branch_tip, false );
+		$repository->set_branch_tip( 'refs/heads/' . self::DEFAULT_BRANCH, $branch_tip );
+
+		$branches = self::get_preview_branches();
+		if ( isset( $branches[ $branch_name ] ) && is_array( $branches[ $branch_name ] ) ) {
+			$branches[ $branch_name ]['merged_at'] = time();
+			$branches[ $branch_name ]['tip_oid']   = $branch_tip;
+			update_option( self::BRANCH_PREVIEWS_OPTION, $branches, false );
+		}
+
+		return array(
+			'branch'  => $branch_name,
+			'tip_oid' => $branch_tip,
+			'changes' => $push_summary,
+		);
 	}
 
 	private static function get_repository_identity( GitRepository $repository ) {
@@ -2984,7 +3650,7 @@ class Push_MD_Plugin {
 		}
 	}
 
-	private static function parse_push_header( $request_bytes ) {
+	private static function parse_push_header( $request_bytes, GitRepository $repository, $current_head ) {
 		$commands = self::parse_push_commands( $request_bytes );
 		if ( empty( $commands ) ) {
 			return false;
@@ -2996,21 +3662,112 @@ class Push_MD_Plugin {
 		}
 
 		$command = $commands[0];
-		if ( 'refs/heads/' . self::DEFAULT_BRANCH !== $command['ref'] ) {
+		if ( 0 !== strpos( $command['ref'], 'refs/heads/' ) ) {
 			return array(
-				'error' => 'Push rejected because Push MD only accepts pushes to trunk.',
-			);
-		}
-		if ( Commit::is_null_hash( $command['new_oid'] ) ) {
-			return array(
-				'error' => 'Push rejected because deleting trunk is not supported.',
+				'error' => 'Push rejected because Push MD only accepts branch refs.',
 			);
 		}
 
+		$branch_name = substr( $command['ref'], strlen( 'refs/heads/' ) );
+		if ( self::DEFAULT_BRANCH === $branch_name ) {
+			if ( Commit::is_null_hash( $command['new_oid'] ) ) {
+				return array(
+					'error' => 'Push rejected because deleting trunk is not supported.',
+				);
+			}
+			if ( $command['old_oid'] !== $current_head ) {
+				return array(
+					'error' => 'Push rejected because the remote changed. Pull the latest changes and try again.',
+				);
+			}
+
+			return array(
+				'old_oid'            => $command['old_oid'],
+				'new_oid'            => $command['new_oid'],
+				'ref_name'           => $command['ref'],
+				'branch_name'        => $branch_name,
+				'is_preview'         => false,
+				'is_delete'          => false,
+				'base_oid'           => $current_head,
+				'validation_old_oid' => $command['old_oid'],
+			);
+		}
+
+		if ( ! self::is_valid_preview_branch_name( $branch_name ) ) {
+			return array(
+				'error' => 'Push rejected because the preview branch name is not supported.',
+			);
+		}
+
+		$is_delete      = Commit::is_null_hash( $command['new_oid'] );
+		$branch_exists  = $repository->branch_exists( $command['ref'] );
+		$current_branch = $branch_exists ? $repository->get_branch_tip( $command['ref'] ) : Commit::NULL_HASH;
+
+		if ( $command['old_oid'] !== $current_branch ) {
+			return array(
+				'error' => 'Push rejected because the preview branch changed. Fetch the latest branch state and try again.',
+			);
+		}
+
+		$metadata           = self::get_preview_branches();
+		$existing_metadata  = isset( $metadata[ $branch_name ] ) && is_array( $metadata[ $branch_name ] ) ? $metadata[ $branch_name ] : array();
+		$base_oid           = isset( $existing_metadata['base_oid'] ) && is_string( $existing_metadata['base_oid'] )
+			? $existing_metadata['base_oid']
+			: $current_head;
+		$validation_old_oid = Commit::is_null_hash( $command['old_oid'] ) ? $base_oid : $command['old_oid'];
+
 		return array(
-			'old_oid' => $command['old_oid'],
-			'new_oid' => $command['new_oid'],
+			'old_oid'            => $command['old_oid'],
+			'new_oid'            => $command['new_oid'],
+			'ref_name'           => $command['ref'],
+			'branch_name'        => $branch_name,
+			'is_preview'         => true,
+			'is_delete'          => $is_delete,
+			'base_oid'           => $base_oid,
+			'validation_old_oid' => $validation_old_oid,
 		);
+	}
+
+	private static function is_valid_preview_branch_name( $branch_name ) {
+		if ( ! is_string( $branch_name ) || '' === $branch_name ) {
+			return false;
+		}
+		if ( self::DEFAULT_BRANCH === $branch_name || '_push_md_seed' === $branch_name || 'HEAD' === strtoupper( $branch_name ) ) {
+			return false;
+		}
+		if ( 0 === strpos( $branch_name, 'push-md/' ) ) {
+			return false;
+		}
+		if (
+			false !== strpos( $branch_name, '..' ) ||
+			false !== strpos( $branch_name, '@{' ) ||
+			false !== strpos( $branch_name, '//' ) ||
+			false !== strpos( $branch_name, '\\' ) ||
+			false !== strpos( $branch_name, ' ' )
+		) {
+			return false;
+		}
+		if ( '/' === $branch_name[0] || '/' === substr( $branch_name, -1 ) || '.' === substr( $branch_name, -1 ) ) {
+			return false;
+		}
+		if ( preg_match( '/[\x00-\x20~^:?*\[\]]/', $branch_name ) ) {
+			return false;
+		}
+
+		$segments = explode( '/', $branch_name );
+		foreach ( $segments as $segment ) {
+			if (
+				'' === $segment ||
+				'.' === $segment ||
+				'..' === $segment ||
+				'.' === $segment[0] ||
+				'.lock' === substr( $segment, -5 )
+			) {
+				return false;
+			}
+		}
+
+		return true;
 	}
 
 	private static function parse_push_commands( $request_bytes ) {

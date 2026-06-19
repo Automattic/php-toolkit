@@ -548,7 +548,10 @@ RESPONSE
 			                 ->getMock();
 
 			$git_encoder = new GitProtocolEncoderPipe( $response );
-			$this->server->handle_push_request( $test['request'], $git_encoder );
+			$this->assertTrue(
+				$this->server->handle_push_request( $test['request'], $git_encoder ),
+				"$name: Push request should succeed"
+			);
 
 			$response_body = $git_encoder->consume_all();
 			// Should contain "ok" response

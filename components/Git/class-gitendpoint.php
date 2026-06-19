@@ -425,7 +425,12 @@ class GitEndpoint {
 		// Handle deletion.
 		if ( Commit::is_null_hash( $new_oid ) ) {
 			if ( $this->repository->delete_branch( $ref_name ) ) {
-				$git_response->append_packet_line( "ok $ref_name\n" );
+				$git_response->append_sideband_packet_line( "unpack ok\n" );
+				$git_response->append_sideband_packet_line( "ok $ref_name\n" );
+				$git_response->append_sideband_packet_line( '0000' );
+				$git_response->append_packet_line( '0000' );
+
+				return true;
 			} else {
 				$git_response->append_error_packet_line( "error $ref_name delete failed\n" );
 				$git_response->append_error_packet_line( '0000' );
