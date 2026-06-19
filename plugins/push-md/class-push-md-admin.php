@@ -15,7 +15,7 @@ class Push_MD_Admin {
 	const RETRY_ROUTE    = '/seed-retry';
 	const BRANCHES_ROUTE = '/branches';
 	const MERGE_ROUTE    = '/branches/merge';
-	const ASSET_VERSION  = '0.6.7';
+	const ASSET_VERSION  = '0.6.8';
 
 	public static function bootstrap() {
 		add_action( 'admin_menu', array( __CLASS__, 'register_menu' ) );
@@ -173,12 +173,14 @@ class Push_MD_Admin {
 		// Drive the seeder before painting so the first screen already
 		// has real checkout state whenever the host can do quick work.
 		Push_MD_Seeder::drive( 1.5 );
-		$progress   = Push_MD_Seeder::get_progress();
-		$nonce      = wp_create_nonce( 'wp_rest' );
-		$status_url = esc_url_raw( rest_url( self::REST_NAMESPACE . self::STATUS_ROUTE ) );
-		$retry_url  = esc_url_raw( rest_url( self::REST_NAMESPACE . self::RETRY_ROUTE ) );
-		$git_url    = esc_url_raw( rest_url( Push_MD_Plugin::ROUTE_NAMESPACE . '/md.git' ) );
-		$user       = wp_get_current_user();
+		$progress     = Push_MD_Seeder::get_progress();
+		$nonce        = wp_create_nonce( 'wp_rest' );
+		$status_url   = esc_url_raw( rest_url( self::REST_NAMESPACE . self::STATUS_ROUTE ) );
+		$retry_url    = esc_url_raw( rest_url( self::REST_NAMESPACE . self::RETRY_ROUTE ) );
+		$branches_url = esc_url_raw( rest_url( self::REST_NAMESPACE . self::BRANCHES_ROUTE ) );
+		$merge_url    = esc_url_raw( rest_url( self::REST_NAMESPACE . self::MERGE_ROUTE ) );
+		$git_url      = esc_url_raw( rest_url( Push_MD_Plugin::ROUTE_NAMESPACE . '/md.git' ) );
+		$user         = wp_get_current_user();
 		if ( $user && $user->exists() ) {
 			$git_url = self::add_username_to_url( $git_url, $user->user_login );
 		}
@@ -211,6 +213,8 @@ class Push_MD_Admin {
 			'nonce'           => $nonce,
 			'statusUrl'       => $status_url,
 			'retryUrl'        => $retry_url,
+			'branchesUrl'     => $branches_url,
+			'mergeBranchUrl'  => $merge_url,
 			'remoteUrl'       => $git_url,
 			'cloneCommand'    => $clone_command,
 			'checkoutDir'     => $site_slug,
@@ -315,6 +319,15 @@ class Push_MD_Admin {
 							</tr>
 						</tbody>
 					</table>
+				</div>
+
+				<div class="push-md-panel push-md-branches-panel">
+					<div class="push-md-branches-header">
+						<h2><?php esc_html_e( 'Branch Previews', 'push-md' ); ?></h2>
+						<button type="button" class="button" id="push-md-branches-refresh"><?php esc_html_e( 'Refresh', 'push-md' ); ?></button>
+					</div>
+					<div class="push-md-branch-message" id="push-md-branches-message" aria-live="polite"></div>
+					<div class="push-md-branch-list" id="push-md-branch-list"></div>
 				</div>
 
 				<div class="push-md-panel push-md-commit-panel">
