@@ -15,12 +15,17 @@ set -euo pipefail
 
 cd /var/www/html
 
-for _ in $(seq 1 60); do
-	if [ -f wp-load.php ]; then
+for _ in $(seq 1 120); do
+	if [ -f wp-load.php ] && [ -f wp-config.php ]; then
 		break
 	fi
 	sleep 1
 done
+
+if [ ! -f wp-load.php ] || [ ! -f wp-config.php ]; then
+	echo "WordPress files were not ready in /var/www/html." >&2
+	exit 1
+fi
 
 if ! wp core is-installed 2>/dev/null; then
 	wp core install \
@@ -32,6 +37,22 @@ if ! wp core is-installed 2>/dev/null; then
 		--skip-email
 	wp option update permalink_structure '/%postname%/'
 	wp rewrite flush --hard
+	wp option update gutenberg-experiments '{"gutenberg-guidelines":true}' --format=json
+
+	wp post update 1 \
+		--post_title='Hello World' \
+		--post_content='<!-- wp:paragraph --><p>Hello from WordPress</p><!-- /wp:paragraph -->' \
+		--post_status=publish
+	wp post update 2 \
+		--post_title='Sample Page' \
+		--post_content='<!-- wp:paragraph --><p>Page from WordPress</p><!-- /wp:paragraph -->' \
+		--post_status=publish
+	wp post create \
+		--post_type=wp_template \
+		--post_name='blog-home' \
+		--post_title='Blog Home' \
+		--post_content='<!-- wp:group --><div class="wp-block-group"><!-- wp:paragraph --><p>Template from WordPress</p><!-- /wp:paragraph --></div><!-- /wp:group -->' \
+		--post_status=publish
 
 	wp post generate \
 		--count=120 \
