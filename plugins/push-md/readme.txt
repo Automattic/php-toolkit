@@ -99,6 +99,10 @@ Push MD checks permissions for each changed object. Updating or trashing existin
 
 No. File paths are the identity model. Push MD rejects `id`, `slug`, `type`, and unknown front matter fields. Rename or move files only when the corresponding path operation is supported and safe.
 
+= What happens if two posts map to the same file path? =
+
+Every exported item needs a unique file path. If two or more items would map to the same path — for example two posts that share a slug after an import or migration — Push MD blocks the export and reports the conflict on Tools → Push MD, naming the conflicting posts. Change one post's slug or trash the duplicate, then pull again.
+
 = Can I still edit content in WP-Admin? =
 
 Yes. WordPress remains the source of truth. Pull before editing locally to pick up recent WP-Admin changes, and Push MD will reject stale pushes that could overwrite newer WordPress edits.
@@ -138,6 +142,14 @@ Uninstalling Push MD removes its Git object-store database tables, seed progress
 The removed tables contain Push MD's derived Git repository history. Reinstalling Push MD can seed a new repository from the current WordPress content, but it cannot restore the previous Push MD Git history unless you kept a clone or database backup.
 
 == Changelog ==
+
+= 0.6.7 =
+
+When seeding content onto a fresh site (the push_md_allow_create_on_missing_id option), resolve posts and pages by slug/path and ignore the Markdown front matter id. Foreign production ids that happen to collide with unrelated local post ids no longer reject the push. Production pushes are unaffected and keep strict id-based resolution.
+
+= 0.6.6 =
+
+Reject exports when multiple WordPress items map to the same file path, with a clearer Git error and a Path collisions report on Tools → Push MD so the conflict can be resolved at the source.
 
 = 0.5.0 =
 

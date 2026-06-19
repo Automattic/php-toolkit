@@ -30,6 +30,8 @@
 	var cwdEl             = document.getElementById( 'push-md-prompt-cwd' );
 	var titleEl           = document.getElementById( 'push-md-terminal-title' );
 	var commitListEl      = document.getElementById( 'push-md-commit-list' );
+	var collisionPanelEl  = document.getElementById( 'push-md-collisions-panel' );
+	var collisionListEl   = document.getElementById( 'push-md-collisions-list' );
 	var checkout          = normalizeCheckout( progress.checkout );
 	var cwd               = '/';
 	var history           = [];
@@ -58,6 +60,7 @@
 		);
 		messageEl.textContent = progress.message;
 		renderCommits( progress.commits || [] );
+		renderCollisions( progress.collisions || [] );
 		if (previousState !== 'done' && progress.state === 'done' && ! hasAnnouncedReady) {
 			hasAnnouncedReady = true;
 			appendLine( __( 'remote: Initial import complete. The checkout is ready.', 'push-md' ), 'is-success' );
@@ -117,6 +120,51 @@
 				item.appendChild( oid );
 				item.appendChild( subject );
 				commitListEl.appendChild( item );
+			}
+		);
+	}
+
+	function renderCollisions(collisions) {
+		if ( ! collisionPanelEl || ! collisionListEl) {
+			return;
+		}
+		collisionListEl.textContent = '';
+		if ( ! collisions.length) {
+			collisionPanelEl.hidden = true;
+			return;
+		}
+		collisionPanelEl.hidden = false;
+		collisions.forEach(
+			function (collision) {
+				var item     = document.createElement( 'li' );
+				var pathCode = document.createElement( 'code' );
+				pathCode.textContent = collision.path;
+				item.appendChild( pathCode );
+
+				var postsList = document.createElement( 'ul' );
+				(collision.posts || []).forEach(
+					function (post) {
+						var label = sprintf(
+							/* translators: 1: Post title, 2: Post ID, 3: Post status. */
+							__( '%1$s (ID %2$d, %3$s)', 'push-md' ),
+							post.title || __( '(untitled)', 'push-md' ),
+							post.id,
+							post.status
+						);
+						var postItem = document.createElement( 'li' );
+						if (post.edit_url) {
+							var link         = document.createElement( 'a' );
+							link.href        = post.edit_url;
+							link.textContent = label;
+							postItem.appendChild( link );
+						} else {
+							postItem.textContent = label;
+						}
+						postsList.appendChild( postItem );
+					}
+				);
+				item.appendChild( postsList );
+				collisionListEl.appendChild( item );
 			}
 		);
 	}

@@ -132,6 +132,183 @@ class PMD_End_To_End_Test extends TestCase {
 		}
 	}
 
+	/**
+	 * Seeding mode (push_md_allow_create_on_missing_id) must resolve by slug and
+	 * ignore the front matter id, even when that id points at a *different* post of
+	 * the same type. Without the fix this rejects with "conflicts with the WordPress
+	 * post already mapped to this file path".
+	 */
+	public function testSeedingResolvesBySlugWhenIdPointsAtAnotherPost() {
+		$this->set_allow_create_on_missing_id( true );
+		try {
+			$suffix = uniqid( 'pmd-stype-' );
+			$id_a   = $this->create_page_via_rest(
+				array(
+					'slug'    => $suffix . '-a',
+					'title'   => 'Stype A ' . $suffix,
+					'status'  => 'publish',
+					'content' => '<!-- wp:paragraph --><p>STYPE-A-ORIG</p><!-- /wp:paragraph -->',
+				)
+			);
+			$id_b = $this->create_page_via_rest(
+				array(
+					'slug'    => $suffix . '-b',
+					'title'   => 'Stype B ' . $suffix,
+					'status'  => 'publish',
+					'content' => '<!-- wp:paragraph --><p>STYPE-B-ORIG</p><!-- /wp:paragraph -->',
+				)
+			);
+
+			$clone   = $this->clone_repo( $suffix );
+			$this->configure_git( $clone );
+			$page_md = $clone . '/page/' . $suffix . '-a.md';
+			$this->assertFileExists( $page_md );
+			// Point page A's file at page B's id (same type, different post) and edit body.
+			$this->edit_file( $page_md, 'id: "' . $id_a . '"', 'id: "' . $id_b . '"' );
+			$this->edit_file( $page_md, 'STYPE-A-ORIG', 'STYPE-A-UPDATED' );
+			$this->commit_and_push( $clone, 'page/' . $suffix . '-a.md', 'Seed: id points at another post' );
+
+			// The update must land on page A (slug match), not page B (the id'd post).
+			$this->assertStringContainsString( 'STYPE-A-UPDATED', $this->fetch_content( $id_a, 'pages' ) );
+			$this->assertStringContainsString( 'STYPE-B-ORIG', $this->fetch_content( $id_b, 'pages' ) );
+		} finally {
+			$this->set_allow_create_on_missing_id( false );
+		}
+	}
+
+	/**
+	 * Seeding mode must resolve by slug even when the front matter id collides with a
+	 * post of a *different* type. Without the fix this rejects with "references a
+	 * different WordPress post type".
+	 */
+	public function testSeedingResolvesBySlugWhenIdCollidesWithOtherType() {
+		$this->set_allow_create_on_missing_id( true );
+		try {
+			$suffix  = uniqid( 'pmd-xtype-' );
+			$post_id = $this->create_post_via_rest(
+				array(
+					'slug'    => $suffix . '-post',
+					'title'   => 'Xtype Post ' . $suffix,
+					'status'  => 'publish',
+					'content' => '<!-- wp:paragraph --><p>XTYPE-POST-ORIG</p><!-- /wp:paragraph -->',
+				)
+			);
+			$page_id = $this->create_page_via_rest(
+				array(
+					'slug'    => $suffix . '-page',
+					'title'   => 'Xtype Page ' . $suffix,
+					'status'  => 'publish',
+					'content' => '<!-- wp:paragraph --><p>XTYPE-PAGE-ORIG</p><!-- /wp:paragraph -->',
+				)
+			);
+
+			$clone   = $this->clone_repo( $suffix );
+			$this->configure_git( $clone );
+			$page_md = $clone . '/page/' . $suffix . '-page.md';
+			$this->assertFileExists( $page_md );
+			// Point the page file at the *post's* id (cross-type collision) and edit body.
+			$this->edit_file( $page_md, 'id: "' . $page_id . '"', 'id: "' . $post_id . '"' );
+			$this->edit_file( $page_md, 'XTYPE-PAGE-ORIG', 'XTYPE-PAGE-UPDATED' );
+			$this->commit_and_push( $clone, 'page/' . $suffix . '-page.md', 'Seed: cross-type id collision' );
+
+			$this->assertStringContainsString( 'XTYPE-PAGE-UPDATED', $this->fetch_content( $page_id, 'pages' ) );
+			$this->assertStringContainsString( 'XTYPE-POST-ORIG', $this->fetch_content( $post_id, 'posts' ) );
+		} finally {
+			$this->set_allow_create_on_missing_id( false );
+		}
+	}
+
+	/**
+	 * Two files in one push whose front matter ids collide must both resolve by their
+	 * own slugs. Without the fix this rejects with "multiple Markdown files reference
+	 * the same WordPress post ID".
+	 */
+	public function testSeedingAllowsTwoFilesWithCollidingIds() {
+		$this->set_allow_create_on_missing_id( true );
+		try {
+			$suffix  = uniqid( 'pmd-dup-' );
+			$page_id = $this->create_page_via_rest(
+				array(
+					'slug'    => $suffix . '-page',
+					'title'   => 'Dup Page ' . $suffix,
+					'status'  => 'publish',
+					'content' => '<!-- wp:paragraph --><p>DUP-PAGE-ORIG</p><!-- /wp:paragraph -->',
+				)
+			);
+			$post_id = $this->create_post_via_rest(
+				array(
+					'slug'    => $suffix . '-post',
+					'title'   => 'Dup Post ' . $suffix,
+					'status'  => 'publish',
+					'content' => '<!-- wp:paragraph --><p>DUP-POST-ORIG</p><!-- /wp:paragraph -->',
+				)
+			);
+
+			$clone = $this->clone_repo( $suffix );
+			$this->configure_git( $clone );
+			$page_md = $clone . '/page/' . $suffix . '-page.md';
+			$post_md = $clone . '/post/' . $suffix . '-post.md';
+			$this->assertFileExists( $page_md );
+			$this->assertFileExists( $post_md );
+			// Make both files claim the same id (the post's), so id-based resolution
+			// would map both to one post; slug-based resolution keeps them distinct.
+			$this->edit_file( $page_md, 'id: "' . $page_id . '"', 'id: "' . $post_id . '"' );
+			$this->edit_file( $page_md, 'DUP-PAGE-ORIG', 'DUP-PAGE-UPDATED' );
+			$this->edit_file( $post_md, 'DUP-POST-ORIG', 'DUP-POST-UPDATED' );
+
+			$this->run_cmd( array( 'git', '-C', $clone, 'add', 'page/' . $suffix . '-page.md', 'post/' . $suffix . '-post.md' ) );
+			$this->run_cmd( array( 'git', '-C', $clone, 'commit', '-m', 'Seed: two files, colliding ids' ) );
+			$this->run_cmd( array( 'git', '-C', $clone, 'push', 'origin', 'trunk' ) );
+
+			$this->assertStringContainsString( 'DUP-PAGE-UPDATED', $this->fetch_content( $page_id, 'pages' ) );
+			$this->assertStringContainsString( 'DUP-POST-UPDATED', $this->fetch_content( $post_id, 'posts' ) );
+		} finally {
+			$this->set_allow_create_on_missing_id( false );
+		}
+	}
+
+	/**
+	 * Production mode (option off) must still reject a front matter id that references
+	 * a different post type -- the strict guard is preserved.
+	 */
+	public function testProductionStillRejectsCrossTypeIdMismatch() {
+		$this->set_allow_create_on_missing_id( false );
+		$suffix  = uniqid( 'pmd-strict-' );
+		$post_id = $this->create_post_via_rest(
+			array(
+				'slug'    => $suffix . '-post',
+				'title'   => 'Strict Post ' . $suffix,
+				'status'  => 'publish',
+				'content' => '<!-- wp:paragraph --><p>STRICT-POST-ORIG</p><!-- /wp:paragraph -->',
+			)
+		);
+		$page_id = $this->create_page_via_rest(
+			array(
+				'slug'    => $suffix . '-page',
+				'title'   => 'Strict Page ' . $suffix,
+				'status'  => 'publish',
+				'content' => '<!-- wp:paragraph --><p>STRICT-PAGE-ORIG</p><!-- /wp:paragraph -->',
+			)
+		);
+
+		$clone   = $this->clone_repo( $suffix );
+		$this->configure_git( $clone );
+		$page_md = $clone . '/page/' . $suffix . '-page.md';
+		$this->assertFileExists( $page_md );
+		$this->edit_file( $page_md, 'id: "' . $page_id . '"', 'id: "' . $post_id . '"' );
+		$this->edit_file( $page_md, 'STRICT-PAGE-ORIG', 'STRICT-PAGE-UPDATED' );
+
+		$this->run_cmd( array( 'git', '-C', $clone, 'add', 'page/' . $suffix . '-page.md' ) );
+		$this->run_cmd( array( 'git', '-C', $clone, 'commit', '-m', 'Strict: cross-type id mismatch' ) );
+		$push = $this->run_cmd( array( 'git', '-C', $clone, 'push', 'origin', 'trunk' ), true );
+
+		$this->assertNotSame( 0, $push['code'], 'Production push must reject a cross-type id mismatch.' );
+		$this->assertStringContainsString(
+			'Push rejected because Markdown front matter id references a different WordPress post type.',
+			$push['output']
+		);
+	}
+
 	public function testFullRoundTrip() {
 		$hierarchy_suffix = uniqid( 'hierarchy-' );
 		$parent_a_slug    = 'parent-a-' . $hierarchy_suffix;
@@ -1062,6 +1239,50 @@ class PMD_End_To_End_Test extends TestCase {
 		$status   = curl_getinfo( $ch, CURLINFO_HTTP_CODE );
 		curl_close( $ch );
 		$this->assertSame( 200, $status, "REST update failed: $response" );
+	}
+
+	private function create_post_via_rest( array $payload ) {
+		$ch = curl_init( $this->base_url . '/wp-json/wp/v2/posts?context=edit' );
+		curl_setopt_array(
+			$ch,
+			array(
+				CURLOPT_RETURNTRANSFER => true,
+				CURLOPT_CUSTOMREQUEST  => 'POST',
+				CURLOPT_HTTPHEADER     => array( $this->auth_header, 'Content-Type: application/json' ),
+				CURLOPT_POSTFIELDS     => pmd_e2e_json_encode( $payload ),
+			)
+		);
+		$response = curl_exec( $ch );
+		$status   = curl_getinfo( $ch, CURLINFO_HTTP_CODE );
+		curl_close( $ch );
+		$this->assertTrue( 200 === $status || 201 === $status, "REST post create failed: $response" );
+
+		$post = json_decode( $response, true );
+		$this->assertIsArray( $post, "Unexpected REST post create response: $response" );
+		$this->assertArrayHasKey( 'id', $post, "REST post create response had no ID: $response" );
+
+		return intval( $post['id'] );
+	}
+
+	private function set_allow_create_on_missing_id( $enabled ) {
+		$ch = curl_init( $this->base_url . '/wp-json/push-md-test/v1/allow-create-on-missing-id' );
+		curl_setopt_array(
+			$ch,
+			array(
+				CURLOPT_RETURNTRANSFER => true,
+				CURLOPT_CUSTOMREQUEST  => 'POST',
+				CURLOPT_HTTPHEADER     => array( $this->auth_header, 'Content-Type: application/json' ),
+				CURLOPT_POSTFIELDS     => pmd_e2e_json_encode( array( 'enabled' => (bool) $enabled ) ),
+			)
+		);
+		$response = curl_exec( $ch );
+		$status   = curl_getinfo( $ch, CURLINFO_HTTP_CODE );
+		curl_close( $ch );
+		$this->assertSame(
+			200,
+			$status,
+			'Could not toggle push_md_allow_create_on_missing_id (is ci-mu-test-helper.php installed?): ' . $response
+		);
 	}
 
 	private function curl_get( $url ) {

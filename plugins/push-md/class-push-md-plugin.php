@@ -645,7 +645,14 @@ class Push_MD_Plugin {
 
 			$path = self::build_markdown_path( $post );
 			if ( isset( $files[ $path ] ) ) {
-				throw new Exception( 'Git export rejected because multiple WordPress entities map to the same Push MD path: ' . esc_html( $path ) );
+				throw new Exception(
+					sprintf(
+						'Git export rejected because multiple WordPress entities map to the same Push MD path: %1$s (WordPress post IDs %2$d and %3$d). Change a slug or trash a duplicate, then pull again.',
+						esc_html( $path ),
+						intval( $files[ $path ]['post']->ID ),
+						intval( $post->ID )
+					)
+				);
 			}
 
 			$content = self::export_post_to_markdown( $post );
@@ -690,6 +697,55 @@ class Push_MD_Plugin {
 		ksort( $files );
 
 		return $files;
+	}
+
+	/**
+	 * Detect WordPress entities that would export to the same Push MD path.
+	 *
+	 * Mirrors the post query used by export_wordpress_content() so the report
+	 * matches what blocks the export. Posts whose path cannot be built (for
+	 * example a page whose parent hierarchy is broken) are skipped because that
+	 * is a separate export failure, not a path collision.
+	 *
+	 * @return array List of array( 'path' => string, 'post_ids' => int[] ) for
+	 *               every path claimed by more than one post.
+	 */
+	public static function detect_export_path_collisions() {
+		$posts = get_posts(
+			array(
+				'post_type'      => self::get_export_post_types(),
+				'post_status'    => self::$supported_post_statuses,
+				'posts_per_page' => -1,
+				'orderby'        => 'ID',
+				'order'          => 'ASC',
+			)
+		);
+
+		$paths = array();
+		foreach ( $posts as $post ) {
+			try {
+				$path = self::build_markdown_path( $post );
+			} catch ( Exception $e ) {
+				continue;
+			}
+
+			if ( ! isset( $paths[ $path ] ) ) {
+				$paths[ $path ] = array();
+			}
+			$paths[ $path ][] = intval( $post->ID );
+		}
+
+		$collisions = array();
+		foreach ( $paths as $path => $post_ids ) {
+			if ( count( $post_ids ) > 1 ) {
+				$collisions[] = array(
+					'path'     => $path,
+					'post_ids' => $post_ids,
+				);
+			}
+		}
+
+		return $collisions;
 	}
 
 	private static function add_default_agent_guidance_files( &$files, &$has_guideline_skills, &$agent_guide_skill_path ) {
@@ -1452,6 +1508,19 @@ class Push_MD_Plugin {
 			);
 		}
 
+		if ( self::allow_create_on_missing_id() ) {
+			// Seeding a fresh site: apply ancestor pages before their nested children so
+			// each parent exists before a child resolves it. Sorting paths ascending
+			// orders e.g. page/features.md before page/features/security.md (the ".md"
+			// dot sorts before the "/" path separator).
+			usort(
+				$upsert_plans,
+				static function ( $a, $b ) {
+					return strcmp( $a['path'], $b['path'] );
+				}
+			);
+		}
+
 		foreach ( $upsert_plans as $plan ) {
 			$applied = self::upsert_post_from_markdown(
 				$plan['path'],
@@ -1628,6 +1697,24 @@ class Push_MD_Plugin {
 				throw new Exception( 'Push rejected because executable file modes are not supported by Push MD content exports.' );
 			}
 		}
+	}
+
+	/**
+	 * Public entry point for seeding a single content file into this site.
+	 *
+	 * Delegates to the private upsert. Intended for non-git transports that have
+	 * the markdown in hand (e.g. a WordPress Playground runPHP blueprint step that
+	 * cannot reach the git endpoint). Set the push_md_allow_create_on_missing_id
+	 * option BEFORE calling this if the front matter id may not exist on the
+	 * target (a fresh seed/preview site); this method does not change that option.
+	 *
+	 * @param string $path     Repo-relative content path, e.g. post/<slug>.md.
+	 * @param string $markdown The file's markdown (with front matter).
+	 * @param array  $options  Optional upsert options (e.g. skip_modified_check).
+	 * @return array{post_id:int,change:?array} Same shape upsert returns.
+	 */
+	public static function seed_markdown_file( $path, $markdown, $options = array() ) {
+		return self::upsert_post_from_markdown( $path, $markdown, $options );
 	}
 
 	private static function upsert_post_from_markdown( $path, $markdown, $options = array() ) {
@@ -2365,15 +2452,21 @@ class Push_MD_Plugin {
 				$include_trash
 			);
 		}
+		// During local one-way seeding (push_md_allow_create_on_missing_id), the front
+		// matter ids are foreign production ids that do not map to this site, so resolve
+		// purely by slug/path and ignore the id. This stops a production id that happens
+		// to collide with an unrelated local post id from rejecting the whole push.
+		// Production pushes leave the option off and keep strict id-based resolution.
+		$ignore_frontmatter_id = self::allow_create_on_missing_id();
 		if ( 'page' === $post_type ) {
-			if ( isset( $metadata['id'] ) ) {
+			if ( isset( $metadata['id'] ) && ! $ignore_frontmatter_id ) {
 				return self::find_post_id_by_frontmatter_id( $path, $metadata, $include_trash );
 			}
 
 			return self::find_page_id_by_path( $path, $include_trash );
 		}
 
-		if ( isset( $metadata['id'] ) ) {
+		if ( isset( $metadata['id'] ) && ! $ignore_frontmatter_id ) {
 			return self::find_post_id_by_frontmatter_id( $path, $metadata, $include_trash );
 		}
 
@@ -2425,6 +2518,15 @@ class Push_MD_Plugin {
 		$post      = get_post( $id );
 
 		if ( ! $post ) {
+			if ( self::allow_create_on_missing_id() ) {
+				// Local one-way seeding (e.g. a fresh Studio site): the front matter id
+				// references a post id that does not exist here. Fall back to slug/path
+				// resolution so the push updates a matching post or creates a new one,
+				// instead of rejecting the whole push. Stays idempotent across re-seeds.
+				$path_metadata = $metadata;
+				unset( $path_metadata['id'] );
+				return self::find_post_id_by_path_metadata( $path, $path_metadata, $include_trash );
+			}
 			throw new Exception( 'Push rejected because Markdown front matter id does not reference an existing WordPress post.' );
 		}
 		if ( $post_type !== $post->post_type ) {
@@ -2446,6 +2548,20 @@ class Push_MD_Plugin {
 		}
 
 		return $id;
+	}
+
+	/**
+	 * Whether a push may resolve by slug/path (updating or creating a post) when a
+	 * front matter id does not reference an existing post, instead of rejecting.
+	 *
+	 * Defaults to false so production pushes still fail fast on an id mismatch -- a
+	 * guard against pushing to the wrong or incomplete site. Local one-way seeding
+	 * (e.g. Studio) opts in via the push_md_allow_create_on_missing_id option, or a
+	 * filter of the same name.
+	 */
+	private static function allow_create_on_missing_id() {
+		return (bool) get_option( 'push_md_allow_create_on_missing_id', false )
+			|| (bool) apply_filters( 'push_md_allow_create_on_missing_id', false );
 	}
 
 	private static function normalize_frontmatter_post_id( $id ) {
@@ -2535,6 +2651,14 @@ class Push_MD_Plugin {
 			if ( empty( $parents ) ) {
 				$page_id = self::find_slugless_page_id_by_fallback_slug( $slug, $parent_id, $statuses );
 				if ( ! $page_id ) {
+					if ( self::allow_create_on_missing_id() ) {
+						// Seeding a fresh site: this parent page does not exist yet. The
+						// validation (dry-run) pass tolerates the gap by returning no
+						// parent, and the apply pass applies ancestor pages before their
+						// children (the upsert plans are path-sorted), so the real parent
+						// exists by the time a child page is created.
+						return 0;
+					}
 					throw new Exception( 'Push rejected because nested page paths must reference existing WordPress parent pages.' );
 				}
 
