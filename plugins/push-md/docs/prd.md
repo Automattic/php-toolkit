@@ -91,14 +91,22 @@ partial writes, lossy conversion, ambiguous identity, or silent normalization.
 - Updating or trashing content requires permission to edit or delete that object.
 - Publishing, scheduling, or making content private requires the corresponding
   WordPress capabilities.
+- Branch preview URLs require an authenticated administrator. Preview access is
+  not tokenized in v1.
+- Merging a branch preview requires an authenticated Push MD admin action.
 
 ## 4. Git Endpoint And Protocol Scope
 
 - The canonical remote URL is `/wp-json/git/v1/md.git`.
-- The repository branch is `trunk`.
+- The primary publishing branch is `trunk`.
 - Pushes may update only one ref at a time.
-- Pushes to branches other than `trunk` are rejected.
+- Pushes to `trunk` are publishing pushes. They validate the pushed range and,
+  on success, apply supported content changes to WordPress.
+- Pushes to non-`trunk` branches are branch preview pushes. They validate the
+  pushed range and store Git objects, refs, and preview metadata, but they must
+  not mutate WordPress content.
 - Deleting `trunk` is rejected.
+- Deleting a preview branch may remove only the Git ref and preview metadata.
 - Stale pushes are rejected when WordPress content changed after the client last
   fetched the remote state.
 - If a push is rejected, WordPress content must remain unchanged.
@@ -240,32 +248,142 @@ Push validation rejects:
   files.
 - Creates, edits, or deletes of generated guidance symlinks.
 - Parent page deletes while child page files still exist.
-- Multi-ref pushes, non-`trunk` pushes, and `trunk` deletion.
+- Multi-ref pushes, invalid or protected branch names, and `trunk` deletion.
 - Pushes based on a stale remote state.
 
 Errors should be actionable from a Git client and should explain whether the
 user needs to pull/rebase, fix a file, change permissions, or avoid an
 unsupported operation.
 
-## 9. Conflict Model
+## 9. Branch Previews
 
-Before accepting a push, Push MD refreshes the remote view from WordPress. If
-WordPress changed since the client's base commit, the push is rejected. The user
-or agent must pull, rebase or merge locally, resolve conflicts, and push again.
+Branch previews let a user push a branch, view the site as that branch would
+render, and merge it only when ready. They must be additive to the current
+`trunk` workflow: existing `trunk` clone, pull, push, import, revision, and
+permission behavior must not change.
+
+### 9.1 Branch Storage
+
+- Preview branches live in the same wpdb-backed Git object store as `trunk`,
+  using the existing `{$wpdb->prefix}push_md_files` and
+  `{$wpdb->prefix}push_md_directory_entries` tables.
+- A branch push may create or update `refs/heads/{branch}` and write Git
+  objects needed by that ref.
+- A branch push may store lightweight preview metadata, such as branch ref,
+  owner user ID, base commit, tip commit, created time, and last pushed time.
+- Branch pushes must not call WordPress content mutation APIs, including
+  `wp_insert_post()`, `wp_update_post()`, `wp_trash_post()`, template writes,
+  Global Styles writes, term writes, or revision-producing updates.
+- The Git object store and preview metadata are derived Push MD state, not site
+  content. It is acceptable for branch pushes to update that derived state.
+
+### 9.2 Branch Creation And Updates
+
+- A user can create a branch from the current `trunk` tip with normal Git
+  commands, for example `git checkout -b my-change` followed by
+  `git push origin my-change`.
+- When a preview branch is first created, Push MD records the current `trunk`
+  tip as that branch's base commit. Validation for the initial branch push
+  covers the diff from that base commit to the branch tip, not every historical
+  commit already present on `trunk`.
+- Updating an existing preview branch validates the newly pushed range from the
+  previous branch tip to the new branch tip.
+- Push MD accepts only safe `refs/heads/*` preview branch names. Reserved refs
+  such as `trunk`, `_push_md_seed`, internal remote refs, path traversal, empty
+  segments, and ambiguous ref names are rejected.
+- Branch pushes run the same content validation as `trunk` pushes, including
+  path rules, front matter rules, block markup validation, Global Styles JSON
+  validation, symlink and executable mode rejection, read-only theme JSON
+  rejection, and page hierarchy checks.
+- Permission checks still run for the content changes represented by the branch
+  so a user cannot stage a preview they would be forbidden to publish.
+- If validation fails, the branch ref must remain at its previous value and
+  WordPress content must remain unchanged.
+- On success, Git output includes an admin preview URL for the branch.
+
+### 9.3 Admin Preview URLs
+
+- Each preview branch is available at a deterministic URL that uses the branch
+  query parameter, for example `https://example.com/?branch=my-change`.
+- The `branch` query value must be a branch name, not a ref path. Push MD maps
+  it to `refs/heads/{branch}` after validating it with the same safe branch-name
+  rules used for branch pushes.
+- Branch names must be URL-encoded when needed.
+- Preview requests require a logged-in administrator. Users who are not logged
+  in, or who cannot administer Push MD, must see the normal live site or an
+  authorization failure rather than branch content.
+- Push MD must not issue, store, or require preview tokens for v1 branch
+  previews.
+- Preview URLs must send no-cache headers and should make preview mode visible
+  to administrators so the branch view is not confused with live content.
+
+### 9.4 Request-Scoped Rendering Overlay
+
+- A preview request renders the public frontend through a request-scoped overlay
+  derived from the selected branch tip.
+- The overlay can replace, add, or hide supported posts and pages for that
+  request without saving any `WP_Post` rows.
+- The overlay can replace supported block templates, template parts,
+  navigation posts, and Global Styles for that request without creating
+  customizations or revisions.
+- The overlay should use WordPress rendering APIs and filters where possible so
+  themes, blocks, shortcodes, and normal frontend behavior still run.
+- Preview rendering must never persist branch content as canonical WordPress
+  content. If a preview request crashes or exits early, the live site state must
+  remain unchanged.
+
+### 9.5 Merge To WordPress
+
+- Publishing a preview branch requires an explicit authenticated Push MD admin
+  action, exposed through REST and optionally the Tools > Push MD UI.
+- Merge is fast-forward-only in v1. Before merging, Push MD refreshes `trunk`
+  from current WordPress content and verifies that the preview branch descends
+  from the current `trunk` tip.
+- If WordPress or `trunk` changed since the branch was based, merge is rejected.
+  The user must pull or rebase `trunk`, update the branch, and push it again.
+- A merge validates the branch again immediately before applying it.
+- Only after validation succeeds may Push MD apply the branch diff through
+  WordPress APIs and create normal WordPress revisions.
+- If any branch change cannot be applied, no earlier branch change may remain
+  applied to WordPress.
+- After a successful merge, `trunk` should point at the merged branch tip or an
+  equivalent merge commit that represents the applied WordPress state.
+
+### 9.6 Out Of Scope For Branch Preview v1
+
+- No GitHub-style pull request system, comments, reviews, required checks, or
+  external Git host integration.
+- No WP-Admin editor or Site Editor preview overlay in v1; the target preview
+  surface is the public frontend.
+- No preview support for media uploads, plugin/theme PHP code, arbitrary
+  database tables, or unsupported post types.
+- No automatic publishing from a non-`trunk` branch push.
+
+## 10. Conflict Model
+
+Before accepting a publishing push to `trunk`, Push MD refreshes the remote view
+from WordPress. If WordPress changed since the client's base commit, the push is
+rejected. The user or agent must pull, rebase or merge locally, resolve
+conflicts, and push again.
+
+Before merging a preview branch, Push MD performs the same freshness check
+against current `trunk`. A stale branch can still exist as a preview, but it
+cannot be merged until it is rebased or otherwise updated on top of current
+`trunk`.
 
 This keeps WordPress as the source of truth and avoids overwriting WP-Admin
 edits with stale local content.
 
-## 10. Core User Flows
+## 11. Core User Flows
 
-### 10.1 Clone
+### 11.1 Clone
 
 1. A user authenticates with Basic Auth and an application password.
 2. The user runs `git clone https://example.com/wp-json/git/v1/md.git`.
 3. The clone checks out `trunk`.
 4. The working tree contains supported WordPress content and agent guidance.
 
-### 10.2 Edit A Post Or Page
+### 11.2 Edit A Post Or Page
 
 1. The user edits `post/{slug}.md`, `page/{slug}.md`, or a nested page path.
 2. The user commits locally.
@@ -273,20 +391,20 @@ edits with stale local content.
 4. Push MD validates the whole push, checks permissions, updates WordPress,
    and lets WordPress create revisions.
 
-### 10.3 Create Content
+### 11.3 Create Content
 
 1. The user adds a new `post/{slug}.md` or page file.
 2. Front matter is optional except where WordPress behavior requires a value.
 3. Push MD creates the matching post or page using safe WordPress defaults.
 4. Nested pages require an existing exported parent path.
 
-### 10.4 Delete And Restore Content
+### 11.4 Delete And Restore Content
 
 1. Deleting a post or page file trashes the matching WordPress object.
 2. Re-adding the same file path restores that trashed object.
 3. The plugin rejects deletes that would leave exported child pages orphaned.
 
-### 10.5 Edit Block Theme Content
+### 11.5 Edit Block Theme Content
 
 1. The user edits a supported `.html` block entity file or
    `wp_global_styles/{theme}.json`.
@@ -294,7 +412,7 @@ edits with stale local content.
 3. Theme source files remain read-only.
 4. Deletes and renames are rejected.
 
-### 10.6 Resolve A Stale Push
+### 11.6 Resolve A Stale Push
 
 1. A user edits content in WP-Admin after another user cloned.
 2. The stale local clone attempts to push.
@@ -302,7 +420,28 @@ edits with stale local content.
 4. The local user pulls, rebases or merges, resolves conflicts, and pushes the
    resolved tree.
 
-## 11. Testing And Reliability
+### 11.7 Create A Branch Preview
+
+1. The user creates a local branch from current `trunk`.
+2. The user edits files, commits locally, and pushes the branch.
+3. Push MD validates the pushed commits and permissions.
+4. Push MD stores the branch ref and preview metadata without changing
+   WordPress content or revisions.
+5. Git output returns an admin preview URL such as
+   `https://example.com/?branch=my-change`.
+6. A logged-in administrator can view the public frontend rendered from the
+   branch overlay.
+
+### 11.8 Merge A Branch Preview
+
+1. An admin opens the branch in Push MD and chooses merge.
+2. Push MD refreshes `trunk` from current WordPress content.
+3. Push MD rejects the merge if the branch is stale, invalid, or unauthorized.
+4. Push MD applies the branch diff through WordPress APIs.
+5. WordPress creates the normal revisions and canonical content changes.
+6. A fresh pull from `trunk` includes the merged content.
+
+## 12. Testing And Reliability
 
 The plugin should keep a mix of focused unit tests and end-to-end Git flow tests.
 
@@ -312,6 +451,14 @@ Required coverage:
 - Basic Auth for clone and push.
 - REST/WP-Admin edits flowing back through Git.
 - Stale push rejection.
+- Branch push validation without WordPress content mutation.
+- Branch preview URLs use `?branch=<branch_name>` and require an authenticated
+  administrator.
+- Branch preview metadata does not include token values or token hashes.
+- Preview overlay renders branch posts, pages, templates, template parts,
+  navigation, and Global Styles without creating revisions.
+- Branch merge freshness checks, successful application, and stale merge
+  rejection.
 - Multi-file and multi-commit push rejection without partial WordPress writes.
 - Malformed front matter rejection.
 - Rejection of `id`, `slug`, `type`, and unknown front matter fields.
@@ -327,7 +474,7 @@ Required coverage:
 The smoke-test script should remain usable by agents as an acceptance harness
 against a local WordPress playground or sandbox site.
 
-## 12. Future Work
+## 13. Future Work
 
 - Media mirroring for referenced attachments, including relative Markdown links,
   binary hashing, and safe import of new media.
@@ -336,10 +483,13 @@ against a local WordPress playground or sandbox site.
 - Additional post types with explicit path and permission rules.
 - Better large-site pagination, streaming, and memory limits.
 - Optional mapping between Git commits and WordPress revision sets.
+- Branch preview collaboration features such as comments, review state,
+  approvals, and external Git host links.
+- WP-Admin editor and Site Editor branch preview support.
 - WordPress.com or Jetpack transport once the standalone plugin behavior is
   stable.
 
-## 13. Success Metrics
+## 14. Success Metrics
 
 - A user can clone a test site and see supported content as files.
 - A user can edit an existing post/page locally and push it without data loss.
@@ -347,6 +497,11 @@ against a local WordPress playground or sandbox site.
 - A user can safely trash and restore content through file deletion/re-addition.
 - Block theme files and Global Styles overlays round-trip through supported
   create/update flows.
+- A user can push a preview branch and receive an admin preview URL without
+  changing WordPress content or creating revisions.
+- A logged-in administrator can see branch content on the public frontend.
+- An admin can merge a fresh preview branch and see the expected WordPress
+  content and revisions afterward.
 - Unsafe pushes fail before any WordPress content changes.
 - Stale pushes are rejected and recoverable through normal Git pull/rebase
   workflows.
