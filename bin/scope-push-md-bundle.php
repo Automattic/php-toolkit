@@ -157,7 +157,20 @@ function push_md_scope_php_code( $code, $relative_path ) {
 		}
 
 		if ( in_array( $token[0], $name_token_ids, true ) ) {
-			$rewritten .= push_md_scope_qualified_name( $token[1] );
+			$scoped_name = push_md_scope_qualified_name( $token[1] );
+
+			if (
+				$scoped_name !== $token[1] &&
+				isset( $scoped_name[0] ) && '\\' !== $scoped_name[0] &&
+				! push_md_token_is_namespace_declaration_root( $tokens, $index )
+			) {
+				// Fully-qualify inline references; a relative scoped name resolves against
+				// the already-scoped namespace and doubles the prefix. Namespace
+				// declarations must stay relative.
+				$scoped_name = '\\' . $scoped_name;
+			}
+
+			$rewritten .= $scoped_name;
 			continue;
 		}
 

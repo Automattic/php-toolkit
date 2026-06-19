@@ -88,6 +88,7 @@ reject_content_pattern 'utf8_decode[[:space:]]*\(' 'Push MD zip must not call de
 reject_content_pattern "define[[:space:]]*\\([[:space:]]*['\"]FILTER_VALIDATE_BOOL['\"]" 'Push MD zip must not define the unprefixed FILTER_VALIDATE_BOOL constant.'
 reject_content_pattern 'namespace[[:space:]]+Artpi\\PushMD' 'Push MD zip should use reviewer-friendly prefixes rather than the temporary namespace-only approach.'
 reject_content_pattern 'namespace[[:space:]]+(WordPress|League|Nette|Symfony|Dflydev|Psr|Composer)(\\|[[:space:]]*[{;])' 'Push MD zip must scope bundled runtime namespaces.'
+reject_content_pattern '^[[:space:]]+use[[:space:]]+PushMDVendor\\' 'Push MD zip scopes an inline trait `use` to a relative name (missing leading backslash) — PHP would double the namespace prefix and fatal on load.'
 reject_content_pattern "['\"](PhpToken|ValueError|Attribute|UnhandledMatchError|Stringable)['\"][[:space:]]*=>" 'Push MD autoload metadata must not register unprefixed PHP 8 polyfill stubs.'
 reject_content_pattern 'class[[:space:]]+PMD_|interface[[:space:]]+PMD_|trait[[:space:]]+PMD_|function[[:space:]]+PMD_|define[[:space:]]*\([[:space:]]*['\''"]PMD_' 'Push MD zip must not declare old three-letter PMD globals.'
 reject_content_pattern '['\''"]pmd_(seed|auth|required|forbidden|error|invalid|files|directory_entries)' 'Push MD zip must not use old three-letter pmd_ storage or error identifiers.'
