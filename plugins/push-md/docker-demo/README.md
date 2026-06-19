@@ -1,8 +1,10 @@
 # Push MD demo (Docker)
 
-A self-contained WordPress install pre-loaded with 120 posts and the
-Push MD plugin **deactivated**, so you can press "Activate" yourself
-and watch the async seeder build the initial import.
+A self-contained WordPress install pre-loaded with the same seeded
+Hello World post, Sample Page, custom `blog-home` template, and
+bulk posts used by the Push MD E2E workflow. The Push MD plugin is
+left **deactivated**, so you can press "Activate" yourself and watch
+the async seeder build the initial import.
 
 ## Run it
 
