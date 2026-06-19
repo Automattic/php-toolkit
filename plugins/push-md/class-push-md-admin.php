@@ -13,6 +13,8 @@ class Push_MD_Admin {
 	const REST_NAMESPACE = 'push-md/v1';
 	const STATUS_ROUTE   = '/seed-status';
 	const RETRY_ROUTE    = '/seed-retry';
+	const BRANCHES_ROUTE = '/branches';
+	const MERGE_ROUTE    = '/branches/merge';
 	const ASSET_VERSION  = '0.6.7';
 
 	public static function bootstrap() {
@@ -72,6 +74,31 @@ class Push_MD_Admin {
 				'permission_callback' => array( __CLASS__, 'admin_only' ),
 			)
 		);
+		register_rest_route(
+			self::REST_NAMESPACE,
+			self::BRANCHES_ROUTE,
+			array(
+				'methods'             => 'GET',
+				'callback'            => array( __CLASS__, 'rest_branches' ),
+				'permission_callback' => array( __CLASS__, 'admin_only' ),
+			)
+		);
+		register_rest_route(
+			self::REST_NAMESPACE,
+			self::MERGE_ROUTE,
+			array(
+				'methods'             => 'POST',
+				'callback'            => array( __CLASS__, 'rest_merge_branch' ),
+				'permission_callback' => array( __CLASS__, 'admin_only' ),
+				'args'                => array(
+					'branch' => array(
+						'required'          => true,
+						'type'              => 'string',
+						'sanitize_callback' => 'sanitize_text_field',
+					),
+				),
+			)
+		);
 	}
 
 	public static function admin_only() {
@@ -90,6 +117,30 @@ class Push_MD_Admin {
 		Push_MD_Seeder::tick();
 
 		return rest_ensure_response( Push_MD_Seeder::get_progress() );
+	}
+
+	public static function rest_branches() {
+		return rest_ensure_response(
+			array(
+				'branches' => Push_MD_Plugin::list_preview_branches(),
+			)
+		);
+	}
+
+	public static function rest_merge_branch( WP_REST_Request $request ) {
+		try {
+			return rest_ensure_response(
+				Push_MD_Plugin::merge_preview_branch(
+					(string) $request->get_param( 'branch' )
+				)
+			);
+		} catch ( Throwable $exception ) {
+			return new WP_Error(
+				'push_md_branch_merge_failed',
+				$exception->getMessage(),
+				array( 'status' => 400 )
+			);
+		}
 	}
 
 	private static function add_username_to_url( $url, $username ) {

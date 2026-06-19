@@ -132,6 +132,105 @@ class PMD_End_To_End_Test extends TestCase {
 		}
 	}
 
+	public function testBranchPreviewPushRendersForAuthenticatedAdminWithoutMutatingLiveContent() {
+		$suffix       = uniqid( 'branch-preview-' );
+		$slug         = $suffix;
+		$new_slug     = 'branch-only-' . $suffix;
+		$branch       = 'preview/' . $suffix;
+		$live_text    = 'Live branch preview ' . $suffix;
+		$preview_text = 'Preview branch content ' . $suffix;
+		$new_text     = 'Branch-only preview content ' . $suffix;
+		$post_id      = $this->create_post_via_rest(
+			array(
+				'slug'    => $slug,
+				'title'   => 'Branch Preview ' . $suffix,
+				'status'  => 'publish',
+				'content' => '<!-- wp:paragraph --><p>' . $live_text . '</p><!-- /wp:paragraph -->',
+			)
+		);
+
+		$revision_count_before = $this->count_revisions( $post_id, 'posts' );
+		$clone_dir             = $this->clone_repo( 'branch-preview' );
+		$this->configure_git( $clone_dir );
+		$this->assertFileExists( $clone_dir . '/post/' . $slug . '.md' );
+
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'checkout', '-b', $branch ) );
+		$this->edit_file(
+			$clone_dir . '/post/' . $slug . '.md',
+			$live_text,
+			$preview_text
+		);
+		file_put_contents(
+			$clone_dir . '/post/' . $new_slug . '.md',
+			"---\nstatus: \"publish\"\ntitle: \"Branch Only $suffix\"\n---\n\n$new_text\n"
+		);
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'add', 'post/' . $slug . '.md', 'post/' . $new_slug . '.md' ) );
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'commit', '-m', 'Preview branch content' ) );
+
+		$push_result = $this->run_cmd( array( 'git', '-C', $clone_dir, 'push', 'origin', 'HEAD:refs/heads/' . $branch ) );
+		$this->assertStringContainsString( 'Push MD stored preview branch ' . $branch . ' without changing WordPress content.', $push_result['output'] );
+		$this->assertStringContainsString( 'Preview: ', $push_result['output'] );
+		$this->assertStringContainsString( '?branch=', $push_result['output'] );
+
+		$this->assertSame( $revision_count_before, $this->count_revisions( $post_id, 'posts' ), 'Branch push must not create WordPress revisions.' );
+		$this->assertStringContainsString( $live_text, $this->fetch_content( $post_id, 'posts' ) );
+		$this->assertStringNotContainsString( $preview_text, $this->fetch_content( $post_id, 'posts' ) );
+		$this->assert_slug_absent( $new_slug, 'posts' );
+
+		$preview_url = $this->base_url . '/' . rawurlencode( $slug ) . '/?branch=' . rawurlencode( $branch );
+		$public_body = $this->curl_get_public( $preview_url );
+		$this->assertStringContainsString( $live_text, $public_body );
+		$this->assertStringNotContainsString( $preview_text, $public_body );
+		$this->assertStringNotContainsString(
+			$new_text,
+			$this->curl_get_public( $this->base_url . '/' . rawurlencode( $new_slug ) . '/?branch=' . rawurlencode( $branch ) )
+		);
+
+		$preview_response = $this->curl_get_with_headers( $preview_url, true );
+		$this->assertSame( 200, $preview_response['status'], 'Authenticated preview request should render the post.' );
+		$this->assertStringContainsString( $preview_text, $preview_response['body'] );
+		$this->assertStringNotContainsString( $live_text, $preview_response['body'] );
+		$new_preview_response = $this->curl_get_with_headers(
+			$this->base_url . '/' . rawurlencode( $new_slug ) . '/?branch=' . rawurlencode( $branch ),
+			true
+		);
+		$this->assertSame( 200, $new_preview_response['status'], 'Authenticated preview request should render branch-only posts.' );
+		$this->assertStringContainsString( $new_text, $new_preview_response['body'] );
+		$this->assertArrayHasKey( 'cache-control', $preview_response['headers'] );
+		$this->assertArrayHasKey( 'x-push-md-preview-branch', $preview_response['headers'] );
+		$this->assertStringContainsString( 'no-store', implode( ', ', $preview_response['headers']['cache-control'] ) );
+		$this->assertSame( array( $branch ), $preview_response['headers']['x-push-md-preview-branch'] );
+		$this->assertSame( $revision_count_before, $this->count_revisions( $post_id, 'posts' ), 'Preview rendering must not create WordPress revisions.' );
+
+		$branches = json_decode( $this->curl_get( $this->base_url . '/wp-json/push-md/v1/branches' ), true );
+		$this->assertIsArray( $branches, 'Unexpected branch listing response.' );
+		$this->assertArrayHasKey( 'branches', $branches );
+		$branch_metadata = $this->find_branch_metadata( $branches['branches'], $branch );
+		$this->assertNotEmpty( $branch_metadata, 'Preview branch metadata was not listed.' );
+		$this->assertStringContainsString( '?branch=', $branch_metadata['url'] );
+		$this->assertArrayHasNoTokenKeys( $branch_metadata );
+
+		$merge_response = $this->curl_post_json(
+			$this->base_url . '/wp-json/push-md/v1/branches/merge',
+			array(
+				'branch' => $branch,
+			)
+		);
+		$this->assertSame( 200, $merge_response['status'], 'Branch merge should succeed: ' . $merge_response['body'] );
+		$merge = json_decode( $merge_response['body'], true );
+		$this->assertSame( $branch, $merge['branch'] );
+		$this->assertNotEmpty( $merge['changes'] );
+		$this->assertStringContainsString( $preview_text, $this->fetch_content( $post_id, 'posts' ) );
+		$new_post_id = $this->fetch_id_by_slug( $new_slug, 'posts' );
+		$this->assertStringContainsString( $new_text, $this->fetch_content( $new_post_id, 'posts' ) );
+		$this->assertGreaterThan( $revision_count_before, $this->count_revisions( $post_id, 'posts' ), 'Branch merge should create a normal WordPress revision.' );
+
+		$delete_result = $this->run_cmd( array( 'git', '-C', $clone_dir, 'push', 'origin', ':refs/heads/' . $branch ) );
+		$this->assertStringContainsString( 'Push MD deleted preview branch ' . $branch . '.', $delete_result['output'] );
+		$branches_after_delete = json_decode( $this->curl_get( $this->base_url . '/wp-json/push-md/v1/branches' ), true );
+		$this->assertSame( array(), $this->find_branch_metadata( $branches_after_delete['branches'], $branch ) );
+	}
+
 	public function testFullRoundTrip() {
 		$hierarchy_suffix = uniqid( 'hierarchy-' );
 		$parent_a_slug    = 'parent-a-' . $hierarchy_suffix;
@@ -1014,6 +1113,29 @@ class PMD_End_To_End_Test extends TestCase {
 		return intval( $page['id'] );
 	}
 
+	private function create_post_via_rest( array $payload ) {
+		$ch = curl_init( $this->base_url . '/wp-json/wp/v2/posts?context=edit' );
+		curl_setopt_array(
+			$ch,
+			array(
+				CURLOPT_RETURNTRANSFER => true,
+				CURLOPT_CUSTOMREQUEST  => 'POST',
+				CURLOPT_HTTPHEADER     => array( $this->auth_header, 'Content-Type: application/json' ),
+				CURLOPT_POSTFIELDS     => pmd_e2e_json_encode( $payload ),
+			)
+		);
+		$response = curl_exec( $ch );
+		$status   = curl_getinfo( $ch, CURLINFO_HTTP_CODE );
+		curl_close( $ch );
+		$this->assertTrue( 200 === $status || 201 === $status, "REST post create failed: $response" );
+
+		$post = json_decode( $response, true );
+		$this->assertIsArray( $post, "Unexpected REST post create response: $response" );
+		$this->assertArrayHasKey( 'id', $post, "REST post create response had no ID: $response" );
+
+		return intval( $post['id'] );
+	}
+
 	private function update_page_via_rest( $id, array $payload ) {
 		$ch = curl_init( $this->base_url . '/wp-json/wp/v2/pages/' . $id . '?context=edit' );
 		curl_setopt_array(
@@ -1079,6 +1201,78 @@ class PMD_End_To_End_Test extends TestCase {
 		return $body;
 	}
 
+	private function curl_get_public( $url ) {
+		$ch = curl_init( $url );
+		curl_setopt_array(
+			$ch,
+			array(
+				CURLOPT_RETURNTRANSFER => true,
+			)
+		);
+		$body = curl_exec( $ch );
+		curl_close( $ch );
+
+		return $body;
+	}
+
+	private function curl_get_with_headers( $url, $authenticated ) {
+		$headers = array();
+		$options = array(
+			CURLOPT_RETURNTRANSFER => true,
+			CURLOPT_HEADERFUNCTION => function ( $ch, $header ) use ( &$headers ) {
+				unset( $ch );
+				$length = strlen( $header );
+				$header = trim( $header );
+				if ( false !== strpos( $header, ':' ) ) {
+					list( $name, $value ) = explode( ':', $header, 2 );
+					$name = strtolower( trim( $name ) );
+					if ( ! isset( $headers[ $name ] ) ) {
+						$headers[ $name ] = array();
+					}
+					$headers[ $name ][] = trim( $value );
+				}
+
+				return $length;
+			},
+		);
+		if ( $authenticated ) {
+			$options[ CURLOPT_HTTPHEADER ] = array( $this->auth_header );
+		}
+
+		$ch = curl_init( $url );
+		curl_setopt_array( $ch, $options );
+		$body   = curl_exec( $ch );
+		$status = curl_getinfo( $ch, CURLINFO_HTTP_CODE );
+		curl_close( $ch );
+
+		return array(
+			'status'  => $status,
+			'headers' => $headers,
+			'body'    => $body,
+		);
+	}
+
+	private function curl_post_json( $url, array $payload ) {
+		$ch = curl_init( $url );
+		curl_setopt_array(
+			$ch,
+			array(
+				CURLOPT_RETURNTRANSFER => true,
+				CURLOPT_CUSTOMREQUEST  => 'POST',
+				CURLOPT_HTTPHEADER     => array( $this->auth_header, 'Content-Type: application/json' ),
+				CURLOPT_POSTFIELDS     => pmd_e2e_json_encode( $payload ),
+			)
+		);
+		$body   = curl_exec( $ch );
+		$status = curl_getinfo( $ch, CURLINFO_HTTP_CODE );
+		curl_close( $ch );
+
+		return array(
+			'status' => $status,
+			'body'   => $body,
+		);
+	}
+
 	private function http_status( $url ) {
 		$ch = curl_init( $url );
 		curl_setopt_array(
@@ -1094,6 +1288,41 @@ class PMD_End_To_End_Test extends TestCase {
 		curl_close( $ch );
 
 		return $status;
+	}
+
+	private function count_revisions( $id, $endpoint ) {
+		$body      = $this->curl_get( $this->base_url . '/wp-json/wp/v2/' . $endpoint . '/' . $id . '/revisions?context=edit' );
+		$revisions = json_decode( $body, true );
+		$this->assertIsArray( $revisions, "Unexpected revisions response for $endpoint/$id: $body" );
+
+		return count( $revisions );
+	}
+
+	private function find_branch_metadata( $branches, $branch_name ) {
+		if ( ! is_array( $branches ) ) {
+			return array();
+		}
+
+		foreach ( $branches as $branch ) {
+			if ( is_array( $branch ) && isset( $branch['branch'] ) && $branch_name === $branch['branch'] ) {
+				return $branch;
+			}
+		}
+
+		return array();
+	}
+
+	private function assertArrayHasNoTokenKeys( $value ) {
+		if ( ! is_array( $value ) ) {
+			return;
+		}
+
+		foreach ( $value as $key => $nested_value ) {
+			$key = strtolower( (string) $key );
+			$this->assertStringNotContainsString( 'token', $key );
+			$this->assertStringNotContainsString( 'secret', $key );
+			$this->assertArrayHasNoTokenKeys( $nested_value );
+		}
 	}
 
 	private function run_cmd( array $args, $allow_failure = false ) {

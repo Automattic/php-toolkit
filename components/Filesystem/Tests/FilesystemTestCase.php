@@ -67,7 +67,7 @@ abstract class FilesystemTestCase extends TestCase {
 
 	public function testRmRemovesExistingFile() {
 		$this->fs->put_contents( '/test.txt', 'test' );
-		$this->fs->rm( '/test.txt' );
+		$this->assertTrue( $this->fs->rm( '/test.txt' ) );
 		$this->assertFalse( $this->fs->exists( '/test.txt' ) );
 	}
 

@@ -69,8 +69,10 @@ class SQLiteFilesystem implements Filesystem {
 		$result = $stmt->execute();
 
 		$entries = array();
-		while ( $row = $result->fetchArray( SQLITE3_ASSOC ) ) {
+		$row     = $result->fetchArray( SQLITE3_ASSOC );
+		while ( $row ) {
 			$entries[] = $row['name'];
+			$row       = $result->fetchArray( SQLITE3_ASSOC );
 		}
 
 		return $entries;
@@ -279,6 +281,8 @@ class SQLiteFilesystem implements Filesystem {
 				$e
 			);
 		}
+
+		return true;
 	}
 
 	public function rmdir( $path, $options = array() ) {
