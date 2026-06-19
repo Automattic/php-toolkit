@@ -197,6 +197,9 @@ class PMD_End_To_End_Test extends TestCase {
 		$this->assertSame( 200, $preview_response['status'], 'Authenticated preview request should render the post.' );
 		$this->assertStringContainsString( $preview_text, $preview_response['body'] );
 		$this->assertStringNotContainsString( $live_text, $preview_response['body'] );
+		$this->assertStringContainsString( 'PushMD Branch', $preview_response['body'] );
+		$this->assertStringContainsString( 'Live site', $preview_response['body'] );
+		$this->assertStringContainsString( $branch . ' (active)', $preview_response['body'] );
 		$new_preview_response = $this->curl_get_with_headers(
 			$this->base_url . '/' . rawurlencode( $new_slug ) . '/?branch=' . rawurlencode( $branch ),
 			true
