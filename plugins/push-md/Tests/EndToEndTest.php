@@ -222,6 +222,14 @@ class PMD_End_To_End_Test extends TestCase {
 		$branch_metadata = $this->find_branch_metadata( $branches['branches'], $branch );
 		$this->assertNotEmpty( $branch_metadata, 'Preview branch metadata was not listed.' );
 		$this->assertStringContainsString( '?branch=', $branch_metadata['url'] );
+		$this->assertArrayHasKey( 'changed_urls', $branch_metadata );
+		$this->assertIsArray( $branch_metadata['changed_urls'] );
+		$updated_preview_url = $this->find_changed_url_item( $branch_metadata['changed_urls'], 'post/' . $slug . '.md' );
+		$created_preview_url = $this->find_changed_url_item( $branch_metadata['changed_urls'], 'post/' . $new_slug . '.md' );
+		$this->assertSame( 'updated', $updated_preview_url['action'] );
+		$this->assertSame( 'created', $created_preview_url['action'] );
+		$this->assertStringContainsString( '/' . rawurlencode( $slug ) . '/?branch=' . $branch, $updated_preview_url['url'] );
+		$this->assertStringContainsString( '/' . rawurlencode( $new_slug ) . '/?branch=' . $branch, $created_preview_url['url'] );
 		$this->assertArrayHasNoTokenKeys( $branch_metadata );
 
 		$live_only_id = $this->create_post_via_rest(
@@ -1575,6 +1583,20 @@ class PMD_End_To_End_Test extends TestCase {
 		foreach ( $branches as $branch ) {
 			if ( is_array( $branch ) && isset( $branch['branch'] ) && $branch_name === $branch['branch'] ) {
 				return $branch;
+			}
+		}
+
+		return array();
+	}
+
+	private function find_changed_url_item( $items, $path ) {
+		if ( ! is_array( $items ) ) {
+			return array();
+		}
+
+		foreach ( $items as $item ) {
+			if ( is_array( $item ) && isset( $item['path'] ) && $path === $item['path'] ) {
+				return $item;
 			}
 		}
 

@@ -3240,7 +3240,19 @@ class Push_MD_Plugin {
 
 			$branch['tip_oid'] = $repository->get_branch_tip( $ref_name );
 			$branch['url']     = self::get_preview_branch_url( $branch_name );
-			$response[]        = $branch;
+			try {
+				$branch['changed_urls'] = self::get_preview_branch_changed_url_items(
+					$repository,
+					array(
+						'branch_name' => $branch_name,
+						'base_oid'    => isset( $branch['base_oid'] ) ? $branch['base_oid'] : '',
+						'new_oid'     => $branch['tip_oid'],
+					)
+				);
+			} catch ( Throwable $exception ) {
+				$branch['changed_urls'] = array();
+			}
+			$response[] = $branch;
 		}
 
 		return $response;

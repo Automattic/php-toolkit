@@ -14,6 +14,8 @@
 	var nonce             = config.nonce || '';
 	var statusUrl         = config.statusUrl || '';
 	var retryUrl          = config.retryUrl || '';
+	var branchesUrl       = config.branchesUrl || '';
+	var mergeBranchUrl    = config.mergeBranchUrl || '';
 	var remoteUrl         = config.remoteUrl || '';
 	var checkoutDir       = config.checkoutDir || 'site';
 	var cloneCommand      = config.cloneCommand || ('git clone ' + remoteUrl + ' ' + checkoutDir);
@@ -30,6 +32,9 @@
 	var cwdEl             = document.getElementById( 'push-md-prompt-cwd' );
 	var titleEl           = document.getElementById( 'push-md-terminal-title' );
 	var commitListEl      = document.getElementById( 'push-md-commit-list' );
+	var branchListEl      = document.getElementById( 'push-md-branch-list' );
+	var branchMessageEl   = document.getElementById( 'push-md-branches-message' );
+	var branchRefreshEl   = document.getElementById( 'push-md-branches-refresh' );
 	var checkout          = normalizeCheckout( progress.checkout );
 	var cwd               = '/';
 	var history           = [];
@@ -119,6 +124,285 @@
 				commitListEl.appendChild( item );
 			}
 		);
+	}
+
+	function setBranchMessage(message, className) {
+		if ( ! branchMessageEl) {
+			return;
+		}
+
+		branchMessageEl.className   = 'push-md-branch-message' + (className ? ' ' + className : '');
+		branchMessageEl.textContent = message || '';
+	}
+
+	function parseJsonResponse(response) {
+		return response.text().then(
+			function (text) {
+				var data = {};
+				if (text) {
+					try {
+						data = JSON.parse( text );
+					} catch (error) {
+						data = { message: text };
+					}
+				}
+
+				if ( ! response.ok) {
+					throw new Error( data.message || response.statusText || __( 'Request failed.', 'push-md' ) );
+				}
+
+				return data;
+			}
+		);
+	}
+
+	function fetchBranches() {
+		if ( ! branchesUrl || ! branchListEl || ! branchMessageEl) {
+			return;
+		}
+
+		setBranchMessage( __( 'Loading preview branches...', 'push-md' ), 'is-muted' );
+		fetch(
+			branchesUrl,
+			{
+				credentials: 'same-origin',
+				headers: { 'X-WP-Nonce': nonce }
+			}
+		).then(
+			parseJsonResponse
+		).then(
+			function (data) {
+				renderBranches( data.branches || [] );
+			}
+		).catch(
+			function (error) {
+				branchListEl.textContent = '';
+				setBranchMessage( error.message || __( 'Could not load preview branches.', 'push-md' ), 'is-error' );
+			}
+		);
+	}
+
+	function renderBranches(branches) {
+		branchListEl.textContent = '';
+		branches = Array.isArray( branches ) ? branches.slice( 0 ) : [];
+		branches.sort(
+			function (left, right) {
+				return intval( right.updated_at ) - intval( left.updated_at );
+			}
+		);
+
+		if ( ! branches.length) {
+			setBranchMessage( __( 'No preview branches.', 'push-md' ), 'is-muted' );
+			return;
+		}
+
+		setBranchMessage( '' );
+		branches.forEach(
+			function (branch) {
+				branchListEl.appendChild( createBranchRow( branch ) );
+			}
+		);
+	}
+
+	function createBranchRow(branch) {
+		var branchName = String( branch.branch || '' );
+		var previewUrl = String( branch.url || '' );
+		var row        = document.createElement( 'div' );
+		var details    = document.createElement( 'div' );
+		var actions    = document.createElement( 'div' );
+		var name       = document.createElement( 'code' );
+		var meta       = document.createElement( 'div' );
+		var preview    = document.createElement( 'a' );
+		var copy       = document.createElement( 'button' );
+		var merge      = document.createElement( 'button' );
+
+		row.className     = 'push-md-branch-row';
+		details.className = 'push-md-branch-details';
+		actions.className = 'push-md-branch-actions';
+		name.className    = 'push-md-branch-name';
+		meta.className    = 'push-md-branch-meta';
+		name.textContent  = branchName;
+
+		meta.appendChild(
+			createMetaItem(
+				__( 'Updated', 'push-md' ),
+				formatTimestamp( branch.updated_at )
+			)
+		);
+		if (branch.tip_oid) {
+			meta.appendChild( createMetaItem( __( 'Tip', 'push-md' ), shortOid( branch.tip_oid ) ) );
+		}
+		if (branch.base_oid) {
+			meta.appendChild( createMetaItem( __( 'Base', 'push-md' ), shortOid( branch.base_oid ) ) );
+		}
+		if (branch.merged_at) {
+			meta.appendChild( createMetaItem( __( 'Merged', 'push-md' ), formatTimestamp( branch.merged_at ) ) );
+		}
+
+		details.appendChild( name );
+		details.appendChild( meta );
+		details.appendChild( createChangedUrlList( branch.changed_urls || [] ) );
+
+		preview.className = 'button';
+		preview.href      = previewUrl;
+		preview.target    = '_blank';
+		preview.rel       = 'noopener noreferrer';
+		preview.textContent = __( 'Preview', 'push-md' );
+
+		copy.type        = 'button';
+		copy.className   = 'button';
+		copy.textContent = __( 'Copy URL', 'push-md' );
+		copy.addEventListener(
+			'click',
+			function () {
+				copyText( previewUrl, copy );
+			}
+		);
+
+		merge.type        = 'button';
+		merge.className   = 'button button-primary';
+		merge.textContent = __( 'Merge', 'push-md' );
+		if (branch.merged_at) {
+			merge.disabled    = true;
+			merge.textContent = __( 'Merged', 'push-md' );
+		} else {
+			merge.addEventListener(
+				'click',
+				function () {
+					mergeBranch( branchName, merge );
+				}
+			);
+		}
+
+		actions.appendChild( preview );
+		actions.appendChild( copy );
+		actions.appendChild( merge );
+		row.appendChild( details );
+		row.appendChild( actions );
+
+		return row;
+	}
+
+	function createMetaItem(label, value) {
+		var item        = document.createElement( 'span' );
+		var labelEl     = document.createElement( 'span' );
+		var valueEl     = document.createElement( 'strong' );
+		item.className  = 'push-md-branch-meta-item';
+		labelEl.textContent = label + ': ';
+		valueEl.textContent = value;
+		item.appendChild( labelEl );
+		item.appendChild( valueEl );
+
+		return item;
+	}
+
+	function createChangedUrlList(changedUrls) {
+		var list = document.createElement( 'ul' );
+		list.className = 'push-md-changed-url-list';
+		changedUrls = Array.isArray( changedUrls ) ? changedUrls : [];
+
+		if ( ! changedUrls.length) {
+			var empty = document.createElement( 'li' );
+			empty.className   = 'is-muted';
+			empty.textContent = __( 'No changed preview URLs available.', 'push-md' );
+			list.appendChild( empty );
+			return list;
+		}
+
+		changedUrls.forEach(
+			function (item) {
+				var row    = document.createElement( 'li' );
+				var action = document.createElement( 'span' );
+				var link   = document.createElement( 'a' );
+
+				action.className   = 'push-md-changed-action';
+				action.textContent = formatChangedAction( item.action );
+				link.href          = String( item.url || '' );
+				link.target        = '_blank';
+				link.rel           = 'noopener noreferrer';
+				link.textContent   = String( item.path || item.url || '' );
+
+				row.appendChild( action );
+				row.appendChild( link );
+				list.appendChild( row );
+			}
+		);
+
+		return list;
+	}
+
+	function formatChangedAction(action) {
+		if (action === 'created') {
+			return __( 'Created', 'push-md' );
+		}
+		if (action === 'deleted') {
+			return __( 'Deleted', 'push-md' );
+		}
+		if (action === 'updated') {
+			return __( 'Updated', 'push-md' );
+		}
+
+		return __( 'Changed', 'push-md' );
+	}
+
+	function mergeBranch(branchName, button) {
+		if ( ! mergeBranchUrl) {
+			return;
+		}
+		if ( ! window.confirm( sprintf( __( 'Merge "%s" into live WordPress content?', 'push-md' ), branchName ) ) ) {
+			return;
+		}
+
+		var originalText   = button.textContent;
+		button.disabled    = true;
+		button.textContent = __( 'Merging...', 'push-md' );
+		setBranchMessage( sprintf( __( 'Merging %s...', 'push-md' ), branchName ), 'is-warning' );
+
+		fetch(
+			mergeBranchUrl,
+			{
+				method: 'POST',
+				credentials: 'same-origin',
+				headers: {
+					'Content-Type': 'application/json',
+					'X-WP-Nonce': nonce
+				},
+				body: JSON.stringify( { branch: branchName } )
+			}
+		).then(
+			parseJsonResponse
+		).then(
+			function (data) {
+				setBranchMessage( sprintf( __( 'Merged %s into live content.', 'push-md' ), data.branch || branchName ), 'is-success' );
+				fetchBranches();
+				poll();
+			}
+		).catch(
+			function (error) {
+				button.disabled    = false;
+				button.textContent = originalText;
+				setBranchMessage( error.message || sprintf( __( 'Could not merge %s.', 'push-md' ), branchName ), 'is-error' );
+			}
+		);
+	}
+
+	function intval(value) {
+		var parsed = parseInt( value, 10 );
+		return isNaN( parsed ) ? 0 : parsed;
+	}
+
+	function formatTimestamp(value) {
+		var timestamp = intval( value );
+		if ( ! timestamp) {
+			return __( 'Unknown', 'push-md' );
+		}
+
+		return new Date( timestamp * 1000 ).toLocaleString();
+	}
+
+	function shortOid(value) {
+		value = String( value || '' );
+		return value.length > 12 ? value.substring( 0, 12 ) : value;
 	}
 
 	function appendLine(text, className) {
@@ -869,7 +1153,12 @@
 		}
 	);
 
+	if (branchRefreshEl) {
+		branchRefreshEl.addEventListener( 'click', fetchBranches );
+	}
+
 	render( progress );
+	fetchBranches();
 	updatePrompt();
 	bootTranscript();
 	poll();
