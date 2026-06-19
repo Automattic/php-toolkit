@@ -270,6 +270,7 @@ class Push_MD_Plugin {
 			add_filter( 'the_posts', array( __CLASS__, 'filter_preview_posts' ), 10, 2 );
 			add_filter( 'pre_handle_404', array( __CLASS__, 'filter_preview_404' ), 10, 2 );
 			add_filter( 'pre_get_block_template', array( __CLASS__, 'filter_preview_block_template' ), 10, 3 );
+			add_filter( 'pre_get_block_file_template', array( __CLASS__, 'filter_preview_block_template' ), 10, 3 );
 			add_filter( 'get_block_templates', array( __CLASS__, 'filter_preview_block_templates' ), 10, 3 );
 			add_filter( 'wp_theme_json_data_user', array( __CLASS__, 'filter_preview_global_styles' ) );
 			add_filter( 'render_block_core/navigation', array( __CLASS__, 'filter_preview_navigation_block' ), 10, 2 );
@@ -506,9 +507,18 @@ class Push_MD_Plugin {
 	}
 
 	private static function calculate_preview_changed_paths( $base_files, $preview_files ) {
+		return self::calculate_repository_changed_paths( $base_files, $preview_files );
+	}
+
+	private static function calculate_repository_changed_paths( $base_files, $changed_files ) {
 		$changed_paths = array();
-		foreach ( $preview_files as $path => $entry ) {
+		foreach ( $changed_files as $path => $entry ) {
 			if ( ! isset( $base_files[ $path ] ) || ! self::repository_entries_match( $base_files[ $path ], $entry ) ) {
+				$changed_paths[ $path ] = true;
+			}
+		}
+		foreach ( array_keys( $base_files ) as $path ) {
+			if ( ! isset( $changed_files[ $path ] ) ) {
 				$changed_paths[ $path ] = true;
 			}
 		}
@@ -2832,6 +2842,7 @@ class Push_MD_Plugin {
 				throw $range_exception;
 			}
 
+			self::assert_preview_branch_merge_has_no_overlapping_changes( $repository, $base_oid, $current_head, $branch_tip );
 			self::validate_repository_changes_for_wordpress( $repository, $base_oid, $branch_tip );
 			$push_summary = self::apply_repository_diff_to_wordpress( $repository, $base_oid, $branch_tip, false );
 			self::sync_repository_from_wordpress( $repository );
@@ -2851,6 +2862,34 @@ class Push_MD_Plugin {
 			'merged_oid' => $merged_oid,
 			'changes'    => $push_summary,
 		);
+	}
+
+	private static function assert_preview_branch_merge_has_no_overlapping_changes( GitRepository $repository, $base_oid, $current_head, $branch_tip ) {
+		$base_files    = Commit::is_null_hash( $base_oid )
+			? array()
+			: self::read_repository_entries_from_commit( $repository, $base_oid );
+		$current_files = self::read_repository_entries_from_commit( $repository, $current_head );
+		$branch_files  = self::read_repository_entries_from_commit( $repository, $branch_tip );
+
+		$current_changed_paths = self::calculate_repository_changed_paths( $base_files, $current_files );
+		$branch_changed_paths  = self::calculate_repository_changed_paths( $base_files, $branch_files );
+
+		foreach ( array_keys( $branch_changed_paths ) as $path ) {
+			if ( ! isset( $current_changed_paths[ $path ] ) ) {
+				continue;
+			}
+
+			$current_entry = isset( $current_files[ $path ] ) ? $current_files[ $path ] : null;
+			$branch_entry  = isset( $branch_files[ $path ] ) ? $branch_files[ $path ] : null;
+			if ( $current_entry && $branch_entry && self::repository_entries_match( $current_entry, $branch_entry ) ) {
+				continue;
+			}
+			if ( ! $current_entry && ! $branch_entry ) {
+				continue;
+			}
+
+			throw new Exception( 'Push rejected because WordPress content changed since the preview branch was created. Pull the latest changes and recreate the preview branch.' );
+		}
 	}
 
 	private static function get_repository_identity( GitRepository $repository ) {
