@@ -274,6 +274,7 @@ class Push_MD_Plugin {
 			add_filter( 'get_block_templates', array( __CLASS__, 'filter_preview_block_templates' ), 10, 3 );
 			add_filter( 'wp_theme_json_data_user', array( __CLASS__, 'filter_preview_global_styles' ) );
 			add_filter( 'render_block_core/navigation', array( __CLASS__, 'filter_preview_navigation_block' ), 10, 2 );
+			add_filter( 'pre_get_shortlink', array( __CLASS__, 'filter_preview_shortlink' ), 10, 4 );
 			add_action( 'send_headers', array( __CLASS__, 'send_branch_preview_headers' ) );
 			add_action( 'wp_footer', array( __CLASS__, 'render_branch_preview_notice' ) );
 		} catch ( Throwable $exception ) {
@@ -341,11 +342,12 @@ class Push_MD_Plugin {
 	}
 
 	public static function filter_preview_posts( $posts, $query ) {
-		if ( ! self::is_branch_preview_active() || ! is_array( $posts ) || ! method_exists( $query, 'is_main_query' ) || ! $query->is_main_query() ) {
+		if ( ! self::is_branch_preview_active() || ! is_array( $posts ) ) {
 			return $posts;
 		}
 
 		$preview_posts = array();
+		$seen_paths    = array();
 		foreach ( $posts as $post ) {
 			if ( ! $post instanceof WP_Post || ! in_array( $post->post_type, self::get_supported_post_types(), true ) ) {
 				$preview_posts[] = $post;
@@ -359,6 +361,7 @@ class Push_MD_Plugin {
 				continue;
 			}
 
+			$seen_paths[ $path ] = true;
 			if ( ! isset( self::$active_preview_files[ $path ] ) ) {
 				continue;
 			}
@@ -369,7 +372,230 @@ class Push_MD_Plugin {
 			}
 		}
 
+		$posts_before_branch_only = count( $preview_posts );
+		$preview_posts            = self::append_branch_only_preview_posts_for_query( $preview_posts, $query, $seen_paths );
+		if ( count( $preview_posts ) !== $posts_before_branch_only ) {
+			$preview_posts = self::sort_preview_posts_for_query( $preview_posts, $query );
+		}
+
+		if ( is_object( $query ) ) {
+			$query->posts      = $preview_posts;
+			$query->post_count = count( $preview_posts );
+			if ( isset( $query->found_posts ) && $query->found_posts < $query->post_count ) {
+				$query->found_posts = $query->post_count;
+			}
+		}
+
 		return $preview_posts;
+	}
+
+	private static function append_branch_only_preview_posts_for_query( $preview_posts, $query, $seen_paths ) {
+		if ( ! self::preview_query_can_include_branch_only_posts( $query ) ) {
+			return $preview_posts;
+		}
+
+		foreach ( self::$active_preview_files as $path => $entry ) {
+			if ( isset( $seen_paths[ $path ] ) || ! self::is_branch_preview_path_changed( $path ) || TreeEntry::FILE_MODE_SYMBOLIC_LINK === $entry['mode'] ) {
+				continue;
+			}
+
+			try {
+				$post_type = self::path_to_post_type( $path );
+				if ( ! in_array( $post_type, self::$supported_post_types, true ) || self::preview_path_maps_to_existing_post( $path, $entry ) ) {
+					continue;
+				}
+
+				$post = self::preview_post_from_entry( $path, $entry, null );
+			} catch ( Throwable $exception ) {
+				continue;
+			}
+
+			if ( $post && self::preview_post_matches_query( $post, $query ) ) {
+				$preview_posts[] = $post;
+			}
+		}
+
+		return $preview_posts;
+	}
+
+	private static function preview_query_can_include_branch_only_posts( $query ) {
+		if ( ! is_object( $query ) ) {
+			return false;
+		}
+
+		if ( ! empty( $query->is_singular ) || ! empty( $query->is_single ) || ! empty( $query->is_page ) ) {
+			return false;
+		}
+
+		$query_vars = isset( $query->query_vars ) && is_array( $query->query_vars ) ? $query->query_vars : array();
+		if ( isset( $query_vars['fields'] ) && '' !== $query_vars['fields'] && 'all' !== $query_vars['fields'] ) {
+			return false;
+		}
+
+		foreach ( array( 'p', 'page_id', 'name', 'pagename' ) as $singular_var ) {
+			if ( ! empty( $query_vars[ $singular_var ] ) ) {
+				return false;
+			}
+		}
+
+		if ( ! empty( $query_vars['post__in'] ) ) {
+			return false;
+		}
+
+		return true;
+	}
+
+	private static function preview_post_matches_query( WP_Post $post, $query ) {
+		$query_vars = isset( $query->query_vars ) && is_array( $query->query_vars ) ? $query->query_vars : array();
+
+		if ( ! in_array( $post->post_type, self::preview_query_post_types( $query_vars ), true ) ) {
+			return false;
+		}
+		if ( ! self::preview_post_status_matches_query( $post, $query_vars ) ) {
+			return false;
+		}
+		if ( ! self::preview_post_date_matches_query( $post, $query_vars ) ) {
+			return false;
+		}
+		if ( ! self::preview_post_search_matches_query( $post, $query_vars ) ) {
+			return false;
+		}
+		if ( ! empty( $query_vars['post__not_in'] ) && in_array( $post->ID, array_map( 'intval', (array) $query_vars['post__not_in'] ), true ) ) {
+			return false;
+		}
+		if ( ! empty( $query_vars['post_name__in'] ) && ! in_array( $post->post_name, (array) $query_vars['post_name__in'], true ) ) {
+			return false;
+		}
+
+		return true;
+	}
+
+	private static function preview_query_post_types( $query_vars ) {
+		$post_type = isset( $query_vars['post_type'] ) ? $query_vars['post_type'] : '';
+		if ( '' === $post_type ) {
+			return array( 'post' );
+		}
+		if ( 'any' === $post_type ) {
+			return self::$supported_post_types;
+		}
+
+		return array_values( array_intersect( (array) $post_type, self::$supported_post_types ) );
+	}
+
+	private static function preview_post_status_matches_query( WP_Post $post, $query_vars ) {
+		if ( empty( $query_vars['post_status'] ) ) {
+			return 'publish' === $post->post_status;
+		}
+
+		$post_status = (array) $query_vars['post_status'];
+		if ( in_array( 'any', $post_status, true ) ) {
+			return true;
+		}
+
+		return in_array( $post->post_status, $post_status, true );
+	}
+
+	private static function preview_post_date_matches_query( WP_Post $post, $query_vars ) {
+		$timestamp = self::timestamp_from_gmt_string( $post->post_date_gmt );
+		if ( false === $timestamp ) {
+			$timestamp = self::timestamp_from_gmt_string( get_gmt_from_date( $post->post_date ) );
+		}
+		if ( false === $timestamp ) {
+			return true;
+		}
+
+		$checks = array(
+			'year'     => 'Y',
+			'monthnum' => 'n',
+			'day'      => 'j',
+			'hour'     => 'G',
+			'minute'   => 'i',
+			'second'   => 's',
+		);
+		foreach ( $checks as $query_var => $format ) {
+			if ( ! isset( $query_vars[ $query_var ] ) || '' === (string) $query_vars[ $query_var ] ) {
+				continue;
+			}
+			if ( in_array( $query_var, array( 'year', 'monthnum', 'day' ), true ) && 0 === intval( $query_vars[ $query_var ] ) ) {
+				continue;
+			}
+			if ( intval( gmdate( $format, $timestamp ) ) !== intval( $query_vars[ $query_var ] ) ) {
+				return false;
+			}
+		}
+
+		return true;
+	}
+
+	private static function preview_post_search_matches_query( WP_Post $post, $query_vars ) {
+		if ( empty( $query_vars['s'] ) ) {
+			return true;
+		}
+
+		$needle = strtolower( trim( (string) $query_vars['s'] ) );
+		if ( '' === $needle ) {
+			return true;
+		}
+
+		$haystack = strtolower( wp_strip_all_tags( $post->post_title . ' ' . $post->post_content ) );
+
+		return false !== strpos( $haystack, $needle );
+	}
+
+	private static function sort_preview_posts_for_query( $posts, $query ) {
+		if ( ! self::preview_query_can_sort_by_date( $query ) ) {
+			return $posts;
+		}
+
+		$order = isset( $query->query_vars['order'] ) ? strtoupper( (string) $query->query_vars['order'] ) : 'DESC';
+		usort(
+			$posts,
+			function ( $a, $b ) use ( $order ) {
+				if ( ! $a instanceof WP_Post || ! $b instanceof WP_Post ) {
+					return 0;
+				}
+
+				$a_time = self::preview_post_sort_timestamp( $a );
+				$b_time = self::preview_post_sort_timestamp( $b );
+				if ( $a_time === $b_time ) {
+					return 0;
+				}
+
+				if ( 'ASC' === $order ) {
+					return $a_time < $b_time ? -1 : 1;
+				}
+
+				return $a_time > $b_time ? -1 : 1;
+			}
+		);
+
+		return $posts;
+	}
+
+	private static function preview_query_can_sort_by_date( $query ) {
+		if ( ! is_object( $query ) || ! isset( $query->query_vars ) || ! is_array( $query->query_vars ) ) {
+			return false;
+		}
+
+		$orderby = isset( $query->query_vars['orderby'] ) ? $query->query_vars['orderby'] : '';
+		if ( '' === $orderby || 'date' === $orderby ) {
+			return true;
+		}
+		if ( is_array( $orderby ) ) {
+			$keys = array_keys( $orderby );
+			return array( 'date' ) === $keys || in_array( 'date', $orderby, true );
+		}
+
+		return false;
+	}
+
+	private static function preview_post_sort_timestamp( WP_Post $post ) {
+		$timestamp = self::timestamp_from_gmt_string( $post->post_date_gmt );
+		if ( false === $timestamp ) {
+			$timestamp = self::timestamp_from_gmt_string( get_gmt_from_date( $post->post_date ) );
+		}
+
+		return false === $timestamp ? 0 : $timestamp;
 	}
 
 	public static function filter_preview_404( $preempt, $query ) {
@@ -468,6 +694,16 @@ class Push_MD_Plugin {
 		}
 
 		return do_blocks( self::$active_preview_files[ $path ]['content'] );
+	}
+
+	public static function filter_preview_shortlink( $shortlink, $id, $context, $allow_slugs ) {
+		unset( $id, $context, $allow_slugs );
+
+		if ( self::is_branch_preview_active() ) {
+			return '';
+		}
+
+		return $shortlink;
 	}
 
 	public static function send_branch_preview_headers() {
@@ -605,6 +841,11 @@ class Push_MD_Plugin {
 		$post->post_excerpt = isset( $metadata['description'] ) ? $metadata['description'] : $post->post_excerpt;
 		if ( isset( $metadata['status'] ) ) {
 			$post->post_status = self::normalize_frontmatter_status( $metadata['status'] );
+		}
+		$post_date_gmt = self::frontmatter_date_to_mysql_gmt( $metadata );
+		if ( '' !== $post_date_gmt ) {
+			$post->post_date_gmt = $post_date_gmt;
+			$post->post_date     = get_date_from_gmt( $post_date_gmt );
 		}
 
 		return $post;
@@ -793,7 +1034,7 @@ class Push_MD_Plugin {
 				try {
 					if ( $push_header['is_preview'] ) {
 						self::finalize_preview_branch_push( $repository, $push_header );
-						$response->append_progress_messages( self::format_preview_branch_push_messages( $push_header ) );
+						$response->append_progress_messages( self::format_preview_branch_push_messages( $push_header, $repository ) );
 					} else {
 						$push_summary = self::apply_repository_changes_to_wordpress(
 							$repository,
@@ -2701,7 +2942,7 @@ class Push_MD_Plugin {
 		return $messages;
 	}
 
-	private static function format_preview_branch_push_messages( $push_header ) {
+	private static function format_preview_branch_push_messages( $push_header, ?GitRepository $repository = null ) {
 		if ( ! empty( $push_header['is_delete'] ) ) {
 			return array(
 				sprintf(
@@ -2711,7 +2952,7 @@ class Push_MD_Plugin {
 			);
 		}
 
-		return array(
+		$messages = array(
 			sprintf(
 				'Push MD stored preview branch %s without changing WordPress content.',
 				self::sanitize_push_summary_text( $push_header['branch_name'] )
@@ -2720,8 +2961,133 @@ class Push_MD_Plugin {
 				'Preview: %s',
 				self::sanitize_push_summary_text( self::get_preview_branch_url( $push_header['branch_name'] ) )
 			),
-			'Merge this branch from the Push MD admin REST API or Tools page when ready.',
 		);
+
+		$changed_urls = array();
+		if ( $repository ) {
+			try {
+				$changed_urls = self::get_preview_branch_changed_url_items( $repository, $push_header );
+			} catch ( Throwable $exception ) {
+				$changed_urls = array();
+			}
+		}
+
+		if ( ! empty( $changed_urls ) ) {
+			$messages[] = 'Changed preview URLs:';
+			foreach ( $changed_urls as $changed_url ) {
+				$messages[] = sprintf(
+					'- %s %s: %s',
+					ucfirst( $changed_url['action'] ),
+					self::sanitize_push_summary_text( $changed_url['path'] ),
+					self::sanitize_push_summary_text( $changed_url['url'] )
+				);
+			}
+		}
+
+		$messages[] = 'Merge this branch from the Push MD admin REST API or Tools page when ready.';
+
+		return $messages;
+	}
+
+	private static function get_preview_branch_changed_url_items( GitRepository $repository, $push_header ) {
+		$branch_name = isset( $push_header['branch_name'] ) ? $push_header['branch_name'] : '';
+		$new_oid     = isset( $push_header['new_oid'] ) ? $push_header['new_oid'] : '';
+		if ( '' === $branch_name || '' === $new_oid || Commit::is_null_hash( $new_oid ) ) {
+			return array();
+		}
+
+		$base_files = array();
+		$base_oid   = isset( $push_header['base_oid'] ) ? $push_header['base_oid'] : '';
+		if ( is_string( $base_oid ) && '' !== $base_oid && ! Commit::is_null_hash( $base_oid ) && $repository->has_object( $base_oid ) ) {
+			$base_files = self::read_repository_entries_from_commit( $repository, $base_oid );
+		}
+
+		$changed_files = self::read_repository_entries_from_commit( $repository, $new_oid );
+		$changed_paths = self::calculate_repository_changed_paths( $base_files, $changed_files );
+		ksort( $changed_paths );
+
+		$items = array();
+		foreach ( array_keys( $changed_paths ) as $path ) {
+			$entry   = isset( $changed_files[ $path ] )
+				? $changed_files[ $path ]
+				: ( isset( $base_files[ $path ] ) ? $base_files[ $path ] : null );
+			$items[] = array(
+				'action' => isset( $changed_files[ $path ] ) ? ( isset( $base_files[ $path ] ) ? 'updated' : 'created' ) : 'deleted',
+				'path'   => $path,
+				'url'    => self::get_preview_url_for_repository_path( $path, $entry, $branch_name ),
+			);
+		}
+
+		return $items;
+	}
+
+	private static function get_preview_url_for_repository_path( $path, $entry, $branch_name ) {
+		$branch_url = self::get_preview_branch_url( $branch_name );
+		if ( ! is_array( $entry ) || TreeEntry::FILE_MODE_SYMBOLIC_LINK === $entry['mode'] ) {
+			return $branch_url;
+		}
+
+		try {
+			$post_type = self::path_to_post_type( $path );
+			if ( ! in_array( $post_type, self::$supported_post_types, true ) ) {
+				return $branch_url;
+			}
+
+			self::assert_markdown_front_matter_is_closed( $entry['content'] );
+			$metadata = self::parse_markdown_metadata( $entry['content'] );
+			$post_id  = self::find_post_id_by_path_metadata( $path, $metadata, false );
+			if ( $post_id ) {
+				$url = get_permalink( $post_id );
+			} elseif ( 'page' === $post_type ) {
+				$url = self::get_preview_page_permalink_for_path( $path );
+			} else {
+				$post = self::preview_post_from_entry( $path, $entry, null );
+				$url  = $post ? self::get_preview_post_permalink( $post ) : '';
+			}
+			if ( $url ) {
+				return add_query_arg( self::BRANCH_QUERY_PARAM, $branch_name, $url );
+			}
+		} catch ( Throwable $exception ) {
+			return $branch_url;
+		}
+
+		return $branch_url;
+	}
+
+	private static function get_preview_page_permalink_for_path( $path ) {
+		$page_path = implode( '/', self::path_to_page_slugs( $path ) );
+		if ( '' === (string) get_option( 'permalink_structure' ) ) {
+			return add_query_arg( 'pagename', $page_path, home_url( '/' ) );
+		}
+
+		return home_url( user_trailingslashit( '/' . $page_path, 'page' ) );
+	}
+
+	private static function get_preview_post_permalink( WP_Post $post ) {
+		$structure = (string) get_option( 'permalink_structure' );
+		if ( '' === $structure || ( false !== strpos( $structure, '%post_id%' ) && false === strpos( $structure, '%postname%' ) ) ) {
+			return add_query_arg( 'name', $post->post_name, home_url( '/' ) );
+		}
+
+		$timestamp = self::preview_post_sort_timestamp( $post );
+		if ( ! $timestamp ) {
+			$timestamp = time();
+		}
+
+		$author = get_userdata( $post->post_author );
+		$tokens = array(
+			'%year%'     => gmdate( 'Y', $timestamp ),
+			'%monthnum%' => gmdate( 'm', $timestamp ),
+			'%day%'      => gmdate( 'd', $timestamp ),
+			'%hour%'     => gmdate( 'H', $timestamp ),
+			'%minute%'   => gmdate( 'i', $timestamp ),
+			'%second%'   => gmdate( 's', $timestamp ),
+			'%postname%' => $post->post_name,
+			'%category%' => 'uncategorized',
+			'%author%'   => $author ? $author->user_nicename : '',
+		);
+
+		return home_url( user_trailingslashit( strtr( $structure, $tokens ), 'single' ) );
 	}
 
 	private static function sanitize_push_summary_text( $text ) {

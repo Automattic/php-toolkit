@@ -173,6 +173,11 @@ class PMD_End_To_End_Test extends TestCase {
 		$this->assertStringContainsString( 'Push MD stored preview branch ' . $branch . ' without changing WordPress content.', $push_result['output'] );
 		$this->assertStringContainsString( 'Preview: ', $push_result['output'] );
 		$this->assertStringContainsString( '?branch=', $push_result['output'] );
+		$this->assertStringContainsString( 'Changed preview URLs:', $push_result['output'] );
+		$this->assertStringContainsString( 'Updated post/' . $slug . '.md: ', $push_result['output'] );
+		$this->assertStringContainsString( 'Created post/' . $new_slug . '.md: ', $push_result['output'] );
+		$this->assertStringContainsString( '/' . rawurlencode( $slug ) . '/?branch=' . $branch, $push_result['output'] );
+		$this->assertStringContainsString( '/' . rawurlencode( $new_slug ) . '/?branch=' . $branch, $push_result['output'] );
 
 		$this->assertSame( $revision_count_before, $this->count_revisions( $post_id, 'posts' ), 'Branch push must not create WordPress revisions.' );
 		$this->assertStringContainsString( $live_text, $this->fetch_content( $post_id, 'posts' ) );
@@ -198,6 +203,10 @@ class PMD_End_To_End_Test extends TestCase {
 		);
 		$this->assertSame( 200, $new_preview_response['status'], 'Authenticated preview request should render branch-only posts.' );
 		$this->assertStringContainsString( $new_text, $new_preview_response['body'] );
+		$home_preview_response = $this->curl_get_with_headers( $this->base_url . '/?branch=' . rawurlencode( $branch ), true );
+		$this->assertSame( 200, $home_preview_response['status'], 'Authenticated preview homepage should render.' );
+		$this->assertStringContainsString( $new_text, $home_preview_response['body'], 'Authenticated branch preview query loops should include branch-only posts.' );
+		$this->assertStringNotContainsString( $new_text, $this->curl_get_public( $this->base_url . '/?branch=' . rawurlencode( $branch ) ) );
 		$this->assertArrayHasKey( 'cache-control', $preview_response['headers'] );
 		$this->assertArrayHasKey( 'x-push-md-preview-branch', $preview_response['headers'] );
 		$this->assertStringContainsString( 'no-store', implode( ', ', $preview_response['headers']['cache-control'] ) );
