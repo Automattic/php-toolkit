@@ -136,10 +136,12 @@ class PMD_End_To_End_Test extends TestCase {
 		$suffix       = uniqid( 'branch-preview-' );
 		$slug         = $suffix;
 		$new_slug     = 'branch-only-' . $suffix;
+		$live_slug    = 'live-only-' . $suffix;
 		$branch       = 'preview/' . $suffix;
 		$live_text    = 'Live branch preview ' . $suffix;
 		$preview_text = 'Preview branch content ' . $suffix;
 		$new_text     = 'Branch-only preview content ' . $suffix;
+		$live_only    = 'Live-only concurrent content ' . $suffix;
 		$post_id      = $this->create_post_via_rest(
 			array(
 				'slug'    => $slug,
@@ -210,6 +212,15 @@ class PMD_End_To_End_Test extends TestCase {
 		$this->assertStringContainsString( '?branch=', $branch_metadata['url'] );
 		$this->assertArrayHasNoTokenKeys( $branch_metadata );
 
+		$live_only_id = $this->create_post_via_rest(
+			array(
+				'slug'    => $live_slug,
+				'title'   => 'Live Only ' . $suffix,
+				'status'  => 'publish',
+				'content' => '<!-- wp:paragraph --><p>' . $live_only . '</p><!-- /wp:paragraph -->',
+			)
+		);
+
 		$merge_response = $this->curl_post_json(
 			$this->base_url . '/wp-json/push-md/v1/branches/merge',
 			array(
@@ -223,6 +234,7 @@ class PMD_End_To_End_Test extends TestCase {
 		$this->assertStringContainsString( $preview_text, $this->fetch_content( $post_id, 'posts' ) );
 		$new_post_id = $this->fetch_id_by_slug( $new_slug, 'posts' );
 		$this->assertStringContainsString( $new_text, $this->fetch_content( $new_post_id, 'posts' ) );
+		$this->assertStringContainsString( $live_only, $this->fetch_content( $live_only_id, 'posts' ) );
 		$this->assertGreaterThan( $revision_count_before, $this->count_revisions( $post_id, 'posts' ), 'Branch merge should create a normal WordPress revision.' );
 
 		$delete_result = $this->run_cmd( array( 'git', '-C', $clone_dir, 'push', 'origin', ':refs/heads/' . $branch ) );
