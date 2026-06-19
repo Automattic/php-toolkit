@@ -13,7 +13,7 @@ class Push_MD_Admin {
 	const REST_NAMESPACE       = 'push-md/v1';
 	const STATUS_ROUTE         = '/seed-status';
 	const RETRY_ROUTE          = '/seed-retry';
-	const ASSET_VERSION        = '0.6.6';
+	const ASSET_VERSION        = '0.6.7';
 	const COLLISIONS_TRANSIENT = 'push_md_collisions';
 
 	public static function bootstrap() {
