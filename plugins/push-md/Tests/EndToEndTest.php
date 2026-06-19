@@ -237,10 +237,204 @@ class PMD_End_To_End_Test extends TestCase {
 		$this->assertStringContainsString( $live_only, $this->fetch_content( $live_only_id, 'posts' ) );
 		$this->assertGreaterThan( $revision_count_before, $this->count_revisions( $post_id, 'posts' ), 'Branch merge should create a normal WordPress revision.' );
 
-		$delete_result = $this->run_cmd( array( 'git', '-C', $clone_dir, 'push', 'origin', ':refs/heads/' . $branch ) );
-		$this->assertStringContainsString( 'Push MD deleted preview branch ' . $branch . '.', $delete_result['output'] );
+		$this->delete_preview_branch( $clone_dir, $branch );
 		$branches_after_delete = json_decode( $this->curl_get( $this->base_url . '/wp-json/push-md/v1/branches' ), true );
 		$this->assertSame( array(), $this->find_branch_metadata( $branches_after_delete['branches'], $branch ) );
+	}
+
+	public function testPreviewBranchUpdatesRenderLatestBranchCommitWithoutMutatingLiveContent() {
+		$suffix             = uniqid( 'branch-update-' );
+		$slug               = $suffix;
+		$branch             = 'preview/' . $suffix;
+		$live_text          = 'Live update branch preview ' . $suffix;
+		$first_preview_text = 'First preview branch update ' . $suffix;
+		$next_preview_text  = 'Second preview branch update ' . $suffix;
+		$post_id            = $this->create_post_via_rest(
+			array(
+				'slug'    => $slug,
+				'title'   => 'Branch Update Preview ' . $suffix,
+				'status'  => 'publish',
+				'content' => '<!-- wp:paragraph --><p>' . $live_text . '</p><!-- /wp:paragraph -->',
+			)
+		);
+
+		$revision_count_before = $this->count_revisions( $post_id, 'posts' );
+		$clone_dir             = $this->clone_repo( 'branch-update' );
+		$this->configure_git( $clone_dir );
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'checkout', '-b', $branch ) );
+
+		$this->edit_file(
+			$clone_dir . '/post/' . $slug . '.md',
+			$live_text,
+			$first_preview_text
+		);
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'add', 'post/' . $slug . '.md' ) );
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'commit', '-m', 'First preview branch update' ) );
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'push', 'origin', 'HEAD:refs/heads/' . $branch ) );
+		$first_tip = trim( $this->run_cmd( array( 'git', '-C', $clone_dir, 'rev-parse', 'HEAD' ) )['output'] );
+
+		$first_preview_response = $this->curl_get_with_headers(
+			$this->base_url . '/' . rawurlencode( $slug ) . '/?branch=' . rawurlencode( $branch ),
+			true
+		);
+		$this->assertSame( 200, $first_preview_response['status'], 'Authenticated preview request should render the first branch tip.' );
+		$this->assertStringContainsString( $first_preview_text, $first_preview_response['body'] );
+		$this->assertStringNotContainsString( $live_text, $first_preview_response['body'] );
+		$branches = json_decode( $this->curl_get( $this->base_url . '/wp-json/push-md/v1/branches' ), true );
+		$this->assertSame( $first_tip, $this->find_branch_metadata( $branches['branches'], $branch )['tip_oid'] );
+
+		$this->edit_file(
+			$clone_dir . '/post/' . $slug . '.md',
+			$first_preview_text,
+			$next_preview_text
+		);
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'add', 'post/' . $slug . '.md' ) );
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'commit', '-m', 'Second preview branch update' ) );
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'push', 'origin', 'HEAD:refs/heads/' . $branch ) );
+		$next_tip = trim( $this->run_cmd( array( 'git', '-C', $clone_dir, 'rev-parse', 'HEAD' ) )['output'] );
+		$this->assertNotSame( $first_tip, $next_tip );
+
+		$next_preview_response = $this->curl_get_with_headers(
+			$this->base_url . '/' . rawurlencode( $slug ) . '/?branch=' . rawurlencode( $branch ),
+			true
+		);
+		$this->assertSame( 200, $next_preview_response['status'], 'Authenticated preview request should render the latest branch tip.' );
+		$this->assertStringContainsString( $next_preview_text, $next_preview_response['body'] );
+		$this->assertStringNotContainsString( $first_preview_text, $next_preview_response['body'] );
+		$this->assertStringNotContainsString( $live_text, $next_preview_response['body'] );
+		$branches = json_decode( $this->curl_get( $this->base_url . '/wp-json/push-md/v1/branches' ), true );
+		$this->assertSame( $next_tip, $this->find_branch_metadata( $branches['branches'], $branch )['tip_oid'] );
+
+		$this->assertSame( $revision_count_before, $this->count_revisions( $post_id, 'posts' ), 'Preview branch updates must not create WordPress revisions.' );
+		$this->assertStringContainsString( $live_text, $this->fetch_content( $post_id, 'posts' ) );
+		$this->assertStringNotContainsString( $next_preview_text, $this->fetch_content( $post_id, 'posts' ) );
+
+		$this->delete_preview_branch( $clone_dir, $branch );
+	}
+
+	public function testPreviewBranchMergeRejectsWhenSamePostChangedInWordPress() {
+		$suffix          = uniqid( 'branch-conflict-' );
+		$slug            = $suffix;
+		$branch          = 'preview/' . $suffix;
+		$live_text       = 'Live conflict branch preview ' . $suffix;
+		$preview_text    = 'Preview conflict branch update ' . $suffix;
+		$concurrent_text = 'Concurrent WordPress update ' . $suffix;
+		$post_id         = $this->create_post_via_rest(
+			array(
+				'slug'    => $slug,
+				'title'   => 'Branch Conflict Preview ' . $suffix,
+				'status'  => 'publish',
+				'content' => '<!-- wp:paragraph --><p>' . $live_text . '</p><!-- /wp:paragraph -->',
+			)
+		);
+
+		$clone_dir = $this->clone_repo( 'branch-conflict' );
+		$this->configure_git( $clone_dir );
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'checkout', '-b', $branch ) );
+		$this->edit_file(
+			$clone_dir . '/post/' . $slug . '.md',
+			$live_text,
+			$preview_text
+		);
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'add', 'post/' . $slug . '.md' ) );
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'commit', '-m', 'Preview conflicting branch edit' ) );
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'push', 'origin', 'HEAD:refs/heads/' . $branch ) );
+
+		sleep( 1 );
+		$this->update_post_via_rest(
+			$post_id,
+			array(
+				'content' => '<!-- wp:paragraph --><p>' . $concurrent_text . '</p><!-- /wp:paragraph -->',
+			)
+		);
+
+		$merge_response = $this->curl_post_json(
+			$this->base_url . '/wp-json/push-md/v1/branches/merge',
+			array(
+				'branch' => $branch,
+			)
+		);
+		$this->assertSame( 400, $merge_response['status'], 'Branch merge should reject stale branch content: ' . $merge_response['body'] );
+		$this->assertStringContainsString( 'WordPress content changed since the preview branch was created', $merge_response['body'] );
+		$this->assertStringContainsString( $concurrent_text, $this->fetch_content( $post_id, 'posts' ) );
+		$this->assertStringNotContainsString( $preview_text, $this->fetch_content( $post_id, 'posts' ) );
+
+		$this->delete_preview_branch( $clone_dir, $branch );
+	}
+
+	public function testPreviewBranchRendersChangedTemplatePartForAuthenticatedAdminWithoutMutatingLiveContent() {
+		$suffix       = uniqid( 'branch-template-' );
+		$branch       = 'preview/' . $suffix;
+		$preview_text = 'Preview footer template part ' . $suffix;
+		$clone_dir    = $this->clone_repo( 'branch-template' );
+		$this->configure_git( $clone_dir );
+
+		$footer_files = glob( $clone_dir . '/wp_template_part/*/footer.html' );
+		$this->assertNotEmpty( $footer_files, 'Expected an active theme footer template part.' );
+		$footer_path     = $footer_files[0];
+		$footer_relative = substr( $footer_path, strlen( $clone_dir ) + 1 );
+		$original_footer = file_get_contents( $footer_path );
+		$this->assertStringNotContainsString( $preview_text, $this->curl_get_public( $this->base_url . '/' ) );
+
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'checkout', '-b', $branch ) );
+		file_put_contents(
+			$footer_path,
+			'<!-- wp:group {"layout":{"type":"constrained"}} -->' . "\n"
+			. '<div class="wp-block-group">' . "\n"
+			. "\t" . '<!-- wp:paragraph -->' . "\n"
+			. "\t" . '<p>' . $preview_text . '</p>' . "\n"
+			. "\t" . '<!-- /wp:paragraph -->' . "\n"
+			. '</div>' . "\n"
+			. '<!-- /wp:group -->'
+		);
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'add', $footer_relative ) );
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'commit', '-m', 'Preview footer template part' ) );
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'push', 'origin', 'HEAD:refs/heads/' . $branch ) );
+
+		$public_preview_response = $this->curl_get_with_headers( $this->base_url . '/?branch=' . rawurlencode( $branch ), false );
+		$this->assertSame( 200, $public_preview_response['status'], 'Public preview request should fall back to live content.' );
+		$this->assertStringNotContainsString( $preview_text, $public_preview_response['body'] );
+
+		$admin_preview_response = $this->curl_get_with_headers( $this->base_url . '/?branch=' . rawurlencode( $branch ), true );
+		$this->assertSame( 200, $admin_preview_response['status'], 'Authenticated preview request should render the branch template part.' );
+		$this->assertStringContainsString( $preview_text, $admin_preview_response['body'] );
+		$this->assertArrayHasKey( 'x-push-md-preview-branch', $admin_preview_response['headers'] );
+		$this->assertSame( array( $branch ), $admin_preview_response['headers']['x-push-md-preview-branch'] );
+		$this->assertStringNotContainsString( $preview_text, $this->curl_get_public( $this->base_url . '/' ) );
+
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'checkout', 'trunk' ) );
+		$this->assertSame( $original_footer, file_get_contents( $footer_path ), 'Preview template part push must not mutate the live trunk checkout.' );
+
+		$this->delete_preview_branch( $clone_dir, $branch );
+	}
+
+	public function testPreviewBranchRestRoutesRequireAdmin() {
+		$suffix        = uniqid( 'branch-permission-' );
+		$list_url      = $this->base_url . '/wp-json/push-md/v1/branches';
+		$merge_url     = $this->base_url . '/wp-json/push-md/v1/branches/merge';
+		$branch        = 'preview/' . $suffix;
+		$anonymous     = $this->curl_get_with_headers( $list_url, false );
+		$anon_merge    = $this->curl_post_json_with_auth( $merge_url, array( 'branch' => $branch ), false );
+		$username      = 'branch-subscriber-' . $suffix;
+		$subscriber_id = $this->create_user_via_rest(
+			array(
+				'username' => $username,
+				'email'    => $username . '@example.com',
+				'password' => 'subscriber-password-' . $suffix,
+				'roles'    => array( 'subscriber' ),
+			)
+		);
+		$subscriber_password = $this->create_application_password_via_rest( $subscriber_id, 'Branch Permission E2E ' . $suffix );
+		$subscriber_header   = 'Authorization: Basic ' . base64_encode( $username . ':' . $subscriber_password );
+		$subscriber_list     = $this->curl_get_with_headers( $list_url, $subscriber_header );
+		$subscriber_merge    = $this->curl_post_json_with_auth( $merge_url, array( 'branch' => $branch ), $subscriber_header );
+		$admin_list          = $this->curl_get_with_headers( $list_url, true );
+
+		$this->assertContains( $anonymous['status'], array( 401, 403 ), 'Anonymous branch list request should be denied.' );
+		$this->assertContains( $anon_merge['status'], array( 401, 403 ), 'Anonymous branch merge request should be denied.' );
+		$this->assertSame( 403, $subscriber_list['status'], 'Subscriber branch list request should be denied.' );
+		$this->assertSame( 403, $subscriber_merge['status'], 'Subscriber branch merge request should be denied.' );
+		$this->assertSame( 200, $admin_list['status'], 'Admin branch list request should be allowed.' );
 	}
 
 	public function testFullRoundTrip() {
@@ -1198,6 +1392,33 @@ class PMD_End_To_End_Test extends TestCase {
 		$this->assertSame( 200, $status, "REST update failed: $response" );
 	}
 
+	private function create_user_via_rest( array $payload ) {
+		$response = $this->curl_post_json( $this->base_url . '/wp-json/wp/v2/users?context=edit', $payload );
+		$this->assertTrue( 200 === $response['status'] || 201 === $response['status'], 'REST user create failed: ' . $response['body'] );
+
+		$user = json_decode( $response['body'], true );
+		$this->assertIsArray( $user, 'Unexpected REST user create response: ' . $response['body'] );
+		$this->assertArrayHasKey( 'id', $user, 'REST user create response had no ID: ' . $response['body'] );
+
+		return intval( $user['id'] );
+	}
+
+	private function create_application_password_via_rest( $user_id, $name ) {
+		$response = $this->curl_post_json(
+			$this->base_url . '/wp-json/wp/v2/users/' . $user_id . '/application-passwords',
+			array(
+				'name' => $name,
+			)
+		);
+		$this->assertTrue( 200 === $response['status'] || 201 === $response['status'], 'REST application password create failed: ' . $response['body'] );
+
+		$app_password = json_decode( $response['body'], true );
+		$this->assertIsArray( $app_password, 'Unexpected REST application password create response: ' . $response['body'] );
+		$this->assertArrayHasKey( 'password', $app_password, 'REST application password create response had no password: ' . $response['body'] );
+
+		return preg_replace( '/\s+/', '', $app_password['password'] );
+	}
+
 	private function curl_get( $url ) {
 		$ch = curl_init( $url );
 		curl_setopt_array(
@@ -1229,6 +1450,7 @@ class PMD_End_To_End_Test extends TestCase {
 
 	private function curl_get_with_headers( $url, $authenticated ) {
 		$headers = array();
+		$request_headers = $this->request_headers_for_auth( $authenticated );
 		$options = array(
 			CURLOPT_RETURNTRANSFER => true,
 			CURLOPT_HEADERFUNCTION => function ( $ch, $header ) use ( &$headers ) {
@@ -1247,8 +1469,8 @@ class PMD_End_To_End_Test extends TestCase {
 				return $length;
 			},
 		);
-		if ( $authenticated ) {
-			$options[ CURLOPT_HTTPHEADER ] = array( $this->auth_header );
+		if ( $request_headers ) {
+			$options[ CURLOPT_HTTPHEADER ] = $request_headers;
 		}
 
 		$ch = curl_init( $url );
@@ -1265,13 +1487,17 @@ class PMD_End_To_End_Test extends TestCase {
 	}
 
 	private function curl_post_json( $url, array $payload ) {
+		return $this->curl_post_json_with_auth( $url, $payload, true );
+	}
+
+	private function curl_post_json_with_auth( $url, array $payload, $authenticated ) {
 		$ch = curl_init( $url );
 		curl_setopt_array(
 			$ch,
 			array(
 				CURLOPT_RETURNTRANSFER => true,
 				CURLOPT_CUSTOMREQUEST  => 'POST',
-				CURLOPT_HTTPHEADER     => array( $this->auth_header, 'Content-Type: application/json' ),
+				CURLOPT_HTTPHEADER     => $this->request_headers_for_auth( $authenticated, true ),
 				CURLOPT_POSTFIELDS     => pmd_e2e_json_encode( $payload ),
 			)
 		);
@@ -1283,6 +1509,25 @@ class PMD_End_To_End_Test extends TestCase {
 			'status' => $status,
 			'body'   => $body,
 		);
+	}
+
+	private function request_headers_for_auth( $authenticated, $include_json = false ) {
+		$headers = array();
+		if ( true === $authenticated ) {
+			$headers[] = $this->auth_header;
+		} elseif ( is_string( $authenticated ) && '' !== $authenticated ) {
+			$headers[] = $authenticated;
+		}
+		if ( $include_json ) {
+			$headers[] = 'Content-Type: application/json';
+		}
+
+		return $headers;
+	}
+
+	private function delete_preview_branch( $clone_dir, $branch ) {
+		$delete_result = $this->run_cmd( array( 'git', '-C', $clone_dir, 'push', 'origin', ':refs/heads/' . $branch ) );
+		$this->assertStringContainsString( 'Push MD deleted preview branch ' . $branch . '.', $delete_result['output'] );
 	}
 
 	private function http_status( $url ) {
