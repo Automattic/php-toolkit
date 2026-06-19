@@ -78,6 +78,7 @@ class Push_MD_Plugin {
 	public static function bootstrap() {
 		add_action( 'init', array( __CLASS__, 'install_default_agent_skill' ), 20 );
 		add_action( 'parse_request', array( __CLASS__, 'maybe_enable_branch_preview' ), 1 );
+		add_action( 'admin_bar_menu', array( __CLASS__, 'add_admin_bar_branch_switcher' ), 90 );
 		add_action( 'rest_api_init', array( __CLASS__, 'register_routes' ) );
 		add_filter( 'rest_post_dispatch', array( __CLASS__, 'add_authentication_challenge' ), 10, 3 );
 		add_filter( 'rest_pre_serve_request', array( __CLASS__, 'serve_git_response' ), 10, 4 );
@@ -732,6 +733,91 @@ class Push_MD_Plugin {
 			?>
 		</div>
 		<?php
+	}
+
+	public static function add_admin_bar_branch_switcher( $wp_admin_bar ) {
+		if ( ! current_user_can( 'manage_options' ) || ! is_object( $wp_admin_bar ) || ! method_exists( $wp_admin_bar, 'add_node' ) ) {
+			return;
+		}
+
+		$branches = self::get_preview_branches();
+		if ( empty( $branches ) ) {
+			return;
+		}
+
+		uasort(
+			$branches,
+			function ( $a, $b ) {
+				$a_updated = is_array( $a ) && isset( $a['updated_at'] ) ? intval( $a['updated_at'] ) : 0;
+				$b_updated = is_array( $b ) && isset( $b['updated_at'] ) ? intval( $b['updated_at'] ) : 0;
+
+				return $b_updated - $a_updated;
+			}
+		);
+
+		$parent_id = method_exists( $wp_admin_bar, 'get_node' ) && $wp_admin_bar->get_node( 'site-name' )
+			? 'site-name'
+			: false;
+		$wp_admin_bar->add_node(
+			array(
+				'id'     => 'push-md-branch-switcher',
+				'parent' => $parent_id,
+				'title'  => esc_html__( 'PushMD Branch', 'push-md' ),
+			)
+		);
+
+		$wp_admin_bar->add_node(
+			array(
+				'id'     => 'push-md-branch-live',
+				'parent' => 'push-md-branch-switcher',
+				'title'  => null === self::$active_preview_branch
+					? esc_html__( 'Live site (active)', 'push-md' )
+					: esc_html__( 'Live site', 'push-md' ),
+				'href'   => self::get_admin_bar_live_url(),
+			)
+		);
+
+		foreach ( $branches as $branch_name => $branch ) {
+			if ( ! is_array( $branch ) || ! self::is_valid_preview_branch_name( $branch_name ) ) {
+				continue;
+			}
+
+			$title = $branch_name === self::$active_preview_branch
+				? sprintf(
+					/* translators: %s: preview branch name. */
+					__( '%s (active)', 'push-md' ),
+					$branch_name
+				)
+				: $branch_name;
+			$wp_admin_bar->add_node(
+				array(
+					'id'     => 'push-md-branch-' . md5( $branch_name ),
+					'parent' => 'push-md-branch-switcher',
+					'title'  => esc_html( $title ),
+					'href'   => self::get_admin_bar_branch_url( $branch_name ),
+				)
+			);
+		}
+	}
+
+	private static function get_admin_bar_live_url() {
+		return remove_query_arg( self::BRANCH_QUERY_PARAM, self::get_admin_bar_base_url() );
+	}
+
+	private static function get_admin_bar_branch_url( $branch_name ) {
+		return add_query_arg( self::BRANCH_QUERY_PARAM, $branch_name, self::get_admin_bar_base_url() );
+	}
+
+	private static function get_admin_bar_base_url() {
+		if ( is_admin() ) {
+			return home_url( '/' );
+		}
+
+		$request_uri = isset( $_SERVER['REQUEST_URI'] )
+			? sanitize_text_field( wp_unslash( $_SERVER['REQUEST_URI'] ) )
+			: '/';
+
+		return home_url( $request_uri );
 	}
 
 	private static function is_branch_preview_active() {
