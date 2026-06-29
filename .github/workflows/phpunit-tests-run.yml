@@ -33,7 +33,7 @@ jobs:
     steps:
       # Dev drive speeds up Windows CI tests from ~25 minutes to ~15 minutes
       - name: Setup RAM Disk (Windows only)
-        uses: samypr100/setup-dev-drive@cf663fdf88945e3faaa980ec525b5bc2350fbf9d # v3.4.3
+        uses: samypr100/setup-dev-drive@30f0f98ae5636b2b6501e181dfb3631b9974818d # v4.0.0
         with:
           drive-size: 15GB
         if: ${{ inputs.os == 'windows-latest' }}
@@ -48,7 +48,7 @@ jobs:
           TMP: ${{ env.DEV_DRIVE }}\tmp
 
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Set up PHP
         uses: shivammathur/setup-php@7c071dfe9dc99bdf297fa79cb49ea005b9fcadbc # 2.37.1
