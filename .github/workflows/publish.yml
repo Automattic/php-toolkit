@@ -30,7 +30,7 @@ jobs:
           echo "version=${RELEASE_TAG#v}" >> "$GITHUB_OUTPUT"
 
       - name: Checkout trunk
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           ref: trunk
           fetch-depth: 0
