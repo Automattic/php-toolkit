@@ -9,11 +9,9 @@ on:
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
-# Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
+# Sets permissions of the GITHUB_TOKEN to publish the generated Pages branch.
 permissions:
-  contents: read
-  pages: write
-  id-token: write
+  contents: write
 
 # Allow only one concurrent deployment, skipping runs queued between the run in-progress and latest queued.
 # However, do NOT cancel in-progress runs as we want to allow these production deployments to complete.
@@ -22,26 +20,51 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  # Single deploy job since we're just deploying
   deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
-    env:
-      PAGES_ARTIFACT_NAME: github-pages-${{ github.run_id }}-${{ github.run_attempt }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
-      - name: Setup Pages
-        uses: actions/configure-pages@v6
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v5
         with:
-          name: ${{ env.PAGES_ARTIFACT_NAME }}
-          path: 'plugins/push-md/docs/landing'
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v5
-        with:
-          artifact_name: ${{ env.PAGES_ARTIFACT_NAME }}
+          fetch-depth: 0
+
+      - name: Publish landing branch
+        env:
+          CUSTOM_DOMAIN: pushmd.blog
+          SOURCE_DIR: plugins/push-md/docs/landing
+          TARGET_BRANCH: gh-pages
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          publish_dir="${RUNNER_TEMP}/push-md-pages"
+          rm -rf "$publish_dir"
+          mkdir -p "$publish_dir"
+
+          cp -R "${SOURCE_DIR}/." "$publish_dir/"
+          find "$publish_dir" -name .DS_Store -type f -delete
+          printf '%s\n' "$CUSTOM_DOMAIN" > "$publish_dir/CNAME"
+          touch "$publish_dir/.nojekyll"
+
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+
+          git fetch origin "$TARGET_BRANCH" || true
+          if git show-ref --verify --quiet "refs/remotes/origin/${TARGET_BRANCH}"; then
+            git switch --force-create "$TARGET_BRANCH" "origin/${TARGET_BRANCH}"
+          else
+            git switch --orphan "$TARGET_BRANCH"
+          fi
+
+          git rm -r --ignore-unmatch .
+          find . -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
+          cp -R "${publish_dir}/." .
+
+          git add -A
+          if git diff --cached --quiet; then
+            echo "Pages branch already up to date."
+            exit 0
+          fi
+
+          git commit -m "Deploy Push MD landing ${GITHUB_SHA}"
+          git push origin "HEAD:${TARGET_BRANCH}"
