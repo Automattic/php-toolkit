@@ -1,4 +1,4 @@
-=== Push MD ===
+=== Push MD - Git Sync for WordPress Content ===
 Contributors: artpi, zieladam
 Tags: git, markdown, content, workflow
 Requires at least: 6.9
