@@ -8,7 +8,7 @@ Stable tag: 0.6.7
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-Use Git to edit WordPress content as Markdown while WordPress keeps roles, revisions, and rendering.
+Use Git to edit WordPress content with agents and local tools. Pull WP-Admin changes, push Markdown updates, and keep WordPress in charge.
 
 == Description ==
 
