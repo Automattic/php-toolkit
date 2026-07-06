@@ -237,13 +237,15 @@ dist/plugins/push-md.zip
 ```
 
 `bin/build-plugins.sh` copies `plugins/push-md/`, excludes development-only
-paths, adds `dist/php-toolkit.phar`, and zips the result. It excludes:
+paths, adds the scoped readable `php-toolkit/` runtime, and zips the result.
+It excludes:
 
 - `Tests/`
 - `docker-demo/`
 - `docs/`
 - `blueprint-e2e.json`
 - `push-md-dev-bootstrap.php`
+- `push-md-phar-bootstrap.php`
 
 Inspect the release zip before submission:
 
@@ -252,7 +254,31 @@ zipinfo -1 dist/plugins/push-md.zip
 ```
 
 The zip should include `readme.txt`, `uninstall.php`, admin assets, plugin PHP
-files, `push-md-phar-bootstrap.php`, and `php-toolkit.phar`.
+files, `push-md-toolkit-bootstrap.php`, and `php-toolkit/`.
+
+## Publish To WordPress.org SVN
+
+Use the built release zip as the source of truth for WordPress.org:
+
+```bash
+WPORG_USERNAME='<wordpress.org-username>' \
+WPORG_PASSWORD='<svn-password>' \
+bin/deploy-push-md-wporg-svn.sh dist/plugins/push-md.zip
+```
+
+The script validates that `readme.txt` and `push-md.php` use the same release
+version, checks out `https://plugins.svn.wordpress.org/push-md/`, unpacks the
+contents of the zip's top-level `push-md/` directory into SVN `trunk/`, creates
+`tags/<version>` from `trunk/`, and commits the release. Use
+`WPORG_DRY_RUN=1` to prepare and inspect the SVN working copy without
+committing.
+
+The GitHub release workflow in `.github/workflows/publish.yml` can run the same
+script after uploading `push-md.zip`. Configure repository secrets named
+`WPORG_USERNAME` and `WPORG_PASSWORD` to enable it. The workflow skips
+WordPress.org deployment for prereleases, release versions with suffixes such
+as `1.2.3-beta`, and releases where those secrets are absent, so GitHub release
+assets can still be published independently.
 
 ## Local Verification
 

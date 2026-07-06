@@ -89,7 +89,7 @@ jobs:
         run: bash bin/build-plugins.sh
 
       - name: Inspect Push MD plugin zip
-        run: bin/inspect-push-md-zip.sh dist/plugins/push-md.zip
+        run: bash bin/inspect-push-md-zip.sh dist/plugins/push-md.zip
 
       - name: Upload Push MD release asset
         env:
@@ -97,6 +97,37 @@ jobs:
         run: |
           gh --version
           gh release upload "$RELEASE_TAG" dist/plugins/push-md.zip --clobber
+
+      - name: Deploy Push MD to WordPress.org SVN
+        env:
+          WPORG_PLUGIN_SLUG: push-md
+          WPORG_USERNAME: ${{ secrets.WPORG_USERNAME }}
+          WPORG_PASSWORD: ${{ secrets.WPORG_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ "${{ github.event.release.prerelease }}" = "true" ]; then
+            echo "Skipping WordPress.org SVN deploy for prerelease $RELEASE_TAG."
+            exit 0
+          fi
+
+          if [[ "${{ steps.release.outputs.version }}" == *-* ]]; then
+            echo "Skipping WordPress.org SVN deploy for non-stable release version ${{ steps.release.outputs.version }}."
+            exit 0
+          fi
+
+          if [ -z "$WPORG_USERNAME" ] || [ -z "$WPORG_PASSWORD" ]; then
+            echo "Skipping WordPress.org SVN deploy because WPORG_USERNAME or WPORG_PASSWORD is not configured."
+            exit 0
+          fi
+
+          if ! command -v svn >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y subversion
+          fi
+
+          bin/deploy-push-md-wporg-svn.sh dist/plugins/push-md.zip
 
 # Temporarily disabled legacy release flow. Restore these sections when the
 # repository release process should publish Composer packages, PHARs, examples,
