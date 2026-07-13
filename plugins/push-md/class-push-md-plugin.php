@@ -2175,10 +2175,24 @@ class Push_MD_Plugin {
 		self::apply_repository_diff_to_wordpress( $repository, $old_commit, $new_commit, false, true );
 	}
 
-	private static function finalize_preview_branch_push( GitRepository $repository, $push_header ) {
+	private static function finalize_preview_branch_push( GitRepository $repository, &$push_header ) {
 		if ( $push_header['is_delete'] ) {
 			self::delete_preview_branch_metadata( $push_header['branch_name'] );
 			return;
+		}
+
+		if (
+			! Commit::is_null_hash( $push_header['old_oid'] ) &&
+			! self::is_commit_ancestor( $repository, $push_header['validation_old_oid'], $push_header['new_oid'] )
+		) {
+			$current_head = $repository->get_branch_tip( 'refs/heads/' . self::DEFAULT_BRANCH );
+			if ( ! self::is_commit_ancestor( $repository, $current_head, $push_header['new_oid'] ) ) {
+				throw new Exception( 'Push rejected because preview branch replacements must be rebased onto the latest trunk. Fetch trunk, rebase your preview branch, and push again with --force-with-lease.' );
+			}
+
+			$push_header['base_oid']           = $current_head;
+			$push_header['validation_old_oid'] = $current_head;
+			$push_header['is_replace']         = true;
 		}
 
 		self::validate_repository_changes_for_wordpress(
@@ -2187,6 +2201,29 @@ class Push_MD_Plugin {
 			$push_header['new_oid']
 		);
 		self::update_preview_branch_metadata( $push_header );
+	}
+
+	private static function is_commit_ancestor( GitRepository $repository, $ancestor, $descendant ) {
+		if ( $ancestor === $descendant || Commit::is_null_hash( $ancestor ) ) {
+			return true;
+		}
+		if ( Commit::is_null_hash( $descendant ) ) {
+			return false;
+		}
+
+		try {
+			$repository->get_commits_range(
+				$descendant,
+				$ancestor,
+				array(
+					'include_ancestor' => false,
+				)
+			);
+
+			return true;
+		} catch ( GitException $exception ) {
+			return false;
+		}
 	}
 
 	private static function rollback_rejected_push_ref( GitRepository $repository, $push_header ) {

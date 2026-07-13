@@ -350,6 +350,90 @@ class PMD_End_To_End_Test extends TestCase {
 		$this->delete_preview_branch( $clone_dir, $branch );
 	}
 
+	public function testPreviewBranchForceWithLeaseUpdateAfterRebaseResetsBaseToCurrentTrunk() {
+		$suffix             = uniqid( 'branch-rebase-' );
+		$slug               = $suffix;
+		$live_slug          = 'live-only-' . $suffix;
+		$branch             = 'preview/' . $suffix;
+		$live_text          = 'Live rebase branch preview ' . $suffix;
+		$first_preview_text = 'First rebase branch update ' . $suffix;
+		$next_preview_text  = 'Second rebase branch update ' . $suffix;
+		$live_only_text     = 'Live-only rebase content ' . $suffix;
+		$post_id            = $this->create_post_via_rest(
+			array(
+				'slug'    => $slug,
+				'title'   => 'Branch Rebase Preview ' . $suffix,
+				'status'  => 'publish',
+				'content' => '<!-- wp:paragraph --><p>' . $live_text . '</p><!-- /wp:paragraph -->',
+			)
+		);
+
+		$clone_dir = $this->clone_repo( 'branch-rebase' );
+		$this->configure_git( $clone_dir );
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'checkout', '-b', $branch ) );
+		$this->edit_file(
+			$clone_dir . '/post/' . $slug . '.md',
+			$live_text,
+			$first_preview_text
+		);
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'add', 'post/' . $slug . '.md' ) );
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'commit', '-m', 'First rebased preview branch update' ) );
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'push', 'origin', 'HEAD:refs/heads/' . $branch ) );
+		$first_tip = trim( $this->run_cmd( array( 'git', '-C', $clone_dir, 'rev-parse', 'HEAD' ) )['output'] );
+
+		$this->create_post_via_rest(
+			array(
+				'slug'    => $live_slug,
+				'title'   => 'Live Only Rebase ' . $suffix,
+				'status'  => 'publish',
+				'content' => '<!-- wp:paragraph --><p>' . $live_only_text . '</p><!-- /wp:paragraph -->',
+			)
+		);
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'fetch', 'origin', 'trunk' ) );
+		$rebased_base = trim( $this->run_cmd( array( 'git', '-C', $clone_dir, 'rev-parse', 'origin/trunk' ) )['output'] );
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'rebase', 'origin/trunk' ) );
+		$this->edit_file(
+			$clone_dir . '/post/' . $slug . '.md',
+			$first_preview_text,
+			$next_preview_text
+		);
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'add', 'post/' . $slug . '.md' ) );
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'commit', '-m', 'Second rebased preview branch update' ) );
+		$push_result = $this->run_cmd(
+			array(
+				'git',
+				'-C',
+				$clone_dir,
+				'push',
+				'--force-with-lease=refs/heads/' . $branch . ':' . $first_tip,
+				'origin',
+				'HEAD:refs/heads/' . $branch,
+			)
+		);
+		$this->assertStringContainsString( 'Push MD stored preview branch ' . $branch . ' without changing WordPress content.', $push_result['output'] );
+		$next_tip = trim( $this->run_cmd( array( 'git', '-C', $clone_dir, 'rev-parse', 'HEAD' ) )['output'] );
+		$this->assertNotSame( $first_tip, $next_tip );
+
+		$next_preview_response = $this->curl_get_with_headers(
+			$this->base_url . '/' . rawurlencode( $slug ) . '/?branch=' . rawurlencode( $branch ),
+			true
+		);
+		$this->assertSame( 200, $next_preview_response['status'], 'Authenticated rebased preview request should render the latest branch tip.' );
+		$this->assertStringContainsString( $next_preview_text, $next_preview_response['body'] );
+		$this->assertStringNotContainsString( $first_preview_text, $next_preview_response['body'] );
+		$this->assertStringContainsString( $live_text, $this->fetch_content( $post_id, 'posts' ) );
+		$this->assertStringNotContainsString( $next_preview_text, $this->fetch_content( $post_id, 'posts' ) );
+
+		$branches        = json_decode( $this->curl_get( $this->base_url . '/wp-json/push-md/v1/branches' ), true );
+		$branch_metadata = $this->find_branch_metadata( $branches['branches'], $branch );
+		$this->assertSame( $next_tip, $branch_metadata['tip_oid'] );
+		$this->assertSame( $rebased_base, $branch_metadata['base_oid'], 'Rebased preview updates should reset the preview base to current trunk.' );
+		$this->assertNotEmpty( $this->find_changed_url_item( $branch_metadata['changed_urls'], 'post/' . $slug . '.md' ) );
+		$this->assertSame( array(), $this->find_changed_url_item( $branch_metadata['changed_urls'], 'post/' . $live_slug . '.md' ) );
+
+		$this->delete_preview_branch( $clone_dir, $branch );
+	}
+
 	public function testPreviewBranchMergeRejectsWhenSamePostChangedInWordPress() {
 		$suffix          = uniqid( 'branch-conflict-' );
 		$slug            = $suffix;
