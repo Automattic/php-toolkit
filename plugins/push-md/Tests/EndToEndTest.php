@@ -357,6 +357,7 @@ class PMD_End_To_End_Test extends TestCase {
 		$branch             = 'preview/' . $suffix;
 		$live_text          = 'Live rebase branch preview ' . $suffix;
 		$first_preview_text = 'First rebase branch update ' . $suffix;
+		$unsafe_text        = 'Unsafe rebase branch update ' . $suffix;
 		$next_preview_text  = 'Second rebase branch update ' . $suffix;
 		$live_only_text     = 'Live-only rebase content ' . $suffix;
 		$post_id            = $this->create_post_via_rest(
@@ -389,6 +390,33 @@ class PMD_End_To_End_Test extends TestCase {
 				'content' => '<!-- wp:paragraph --><p>' . $live_only_text . '</p><!-- /wp:paragraph -->',
 			)
 		);
+
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'reset', '--hard', 'origin/trunk' ) );
+		$this->edit_file(
+			$clone_dir . '/post/' . $slug . '.md',
+			$live_text,
+			$unsafe_text
+		);
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'add', 'post/' . $slug . '.md' ) );
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'commit', '-m', 'Unsafe rebased preview branch update' ) );
+		$unsafe_push_result = $this->run_cmd(
+			array(
+				'git',
+				'-C',
+				$clone_dir,
+				'push',
+				'--force-with-lease=refs/heads/' . $branch . ':' . $first_tip,
+				'origin',
+				'HEAD:refs/heads/' . $branch,
+			),
+			true
+		);
+		$this->assertNotSame( 0, $unsafe_push_result['code'], 'Preview branch replacements that are not based on current trunk should be rejected.' );
+		$this->assertStringContainsString( 'Push rejected because preview branch replacements must be rebased onto the latest trunk.', $unsafe_push_result['output'] );
+		$remote_branch_after_rejection = $this->run_cmd( array( 'git', 'ls-remote', $this->remote_url(), 'refs/heads/' . $branch ) );
+		$this->assertStringContainsString( $first_tip, $remote_branch_after_rejection['output'], 'Rejected preview branch replacements should roll back the remote preview branch.' );
+
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'reset', '--hard', $first_tip ) );
 		$this->run_cmd( array( 'git', '-C', $clone_dir, 'fetch', 'origin', 'trunk' ) );
 		$rebased_base = trim( $this->run_cmd( array( 'git', '-C', $clone_dir, 'rev-parse', 'origin/trunk' ) )['output'] );
 		$this->run_cmd( array( 'git', '-C', $clone_dir, 'rebase', 'origin/trunk' ) );
