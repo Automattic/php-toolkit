@@ -250,6 +250,7 @@ class PMD_End_To_End_Test extends TestCase {
 		$this->assertSame( 200, $merge_response['status'], 'Branch merge should succeed: ' . $merge_response['body'] );
 		$merge = json_decode( $merge_response['body'], true );
 		$this->assertSame( $branch, $merge['branch'] );
+		$this->assertTrue( $merge['branch_deleted'], 'Merged preview branch ref should be deleted.' );
 		$this->assertNotEmpty( $merge['changes'] );
 		$this->assertStringContainsString( $preview_text, $this->fetch_content( $post_id, 'posts' ) );
 		$new_post_id = $this->fetch_id_by_slug( $new_slug, 'posts' );
@@ -262,9 +263,21 @@ class PMD_End_To_End_Test extends TestCase {
 		$this->assertNotEmpty( $seed_status['commits'], 'Commit history should not be empty after branch merge.' );
 		$this->assertSame( 'Preview branch content', $seed_status['commits'][0]['subject'], 'Branch merge should preserve the branch commit subject at the top of commit history.' );
 
-		$this->delete_preview_branch( $clone_dir, $branch );
-		$branches_after_delete = json_decode( $this->curl_get( $this->base_url . '/wp-json/push-md/v1/branches' ), true );
-		$this->assertSame( array(), $this->find_branch_metadata( $branches_after_delete['branches'], $branch ) );
+		$merged_preview_response = $this->curl_get_with_headers( $preview_url, true );
+		$this->assertSame( 200, $merged_preview_response['status'], 'Merged preview branch URL should fall back to the live site.' );
+		$this->assertArrayNotHasKey( 'x-push-md-preview-branch', $merged_preview_response['headers'], 'Merged preview branch URLs should not activate preview rendering.' );
+
+		$remote_branch = $this->run_cmd( array( 'git', 'ls-remote', $this->remote_url(), 'refs/heads/' . $branch ) );
+		$this->assertSame( '', trim( $remote_branch['output'] ), 'Merged preview branch ref should no longer be advertised.' );
+
+		$branches_after_merge = json_decode( $this->curl_get( $this->base_url . '/wp-json/push-md/v1/branches' ), true );
+		$merged_metadata      = $this->find_branch_metadata( $branches_after_merge['branches'], $branch );
+		$this->assertNotEmpty( $merged_metadata, 'Merged preview branch metadata should remain available for history.' );
+		$this->assertSame( 'merged', $merged_metadata['status'] );
+		$this->assertFalse( $merged_metadata['active'] );
+		$this->assertNotEmpty( $merged_metadata['merged_at'] );
+		$this->assertSame( $branch, $merged_metadata['branch'] );
+		$this->assertNotEmpty( $merged_metadata['changed_urls'], 'Merged branch history should keep the changed URL list.' );
 	}
 
 	public function testPreviewBranchUpdatesRenderLatestBranchCommitWithoutMutatingLiveContent() {

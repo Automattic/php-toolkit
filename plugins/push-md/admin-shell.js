@@ -196,17 +196,52 @@
 			return;
 		}
 
-		setBranchMessage( '' );
+		var activeBranches = [];
+		var mergedBranches = [];
 		branches.forEach(
 			function (branch) {
-				branchListEl.appendChild( createBranchRow( branch ) );
+				if (branch.merged_at) {
+					mergedBranches.push( branch );
+				} else {
+					activeBranches.push( branch );
+				}
 			}
 		);
+
+		setBranchMessage( '' );
+		if (activeBranches.length) {
+			branchListEl.appendChild( createBranchSection( __( 'Active previews', 'push-md' ), activeBranches, 'is-active' ) );
+		}
+		if (mergedBranches.length) {
+			branchListEl.appendChild( createBranchSection( __( 'Merged branches', 'push-md' ), mergedBranches, 'is-merged' ) );
+		}
+		if ( ! activeBranches.length) {
+			setBranchMessage( __( 'No active preview branches.', 'push-md' ), 'is-muted' );
+		}
+	}
+
+	function createBranchSection(title, branches, className) {
+		var section = document.createElement( 'div' );
+		var heading = document.createElement( 'h3' );
+
+		section.className = 'push-md-branch-section ' + className;
+		heading.className = 'push-md-branch-section-title';
+		heading.textContent = title;
+		section.appendChild( heading );
+
+		branches.forEach(
+			function (branch) {
+				section.appendChild( createBranchRow( branch ) );
+			}
+		);
+
+		return section;
 	}
 
 	function createBranchRow(branch) {
 		var branchName = String( branch.branch || '' );
 		var previewUrl = String( branch.url || '' );
+		var isMerged   = !! branch.merged_at;
 		var row        = document.createElement( 'div' );
 		var details    = document.createElement( 'div' );
 		var actions    = document.createElement( 'div' );
@@ -216,7 +251,7 @@
 		var copy       = document.createElement( 'button' );
 		var merge      = document.createElement( 'button' );
 
-		row.className     = 'push-md-branch-row';
+		row.className     = 'push-md-branch-row' + (isMerged ? ' is-merged' : '');
 		details.className = 'push-md-branch-details';
 		actions.className = 'push-md-branch-actions';
 		name.className    = 'push-md-branch-name';
@@ -241,12 +276,24 @@
 
 		details.appendChild( name );
 		details.appendChild( meta );
-		details.appendChild( createChangedUrlList( branch.changed_urls || [] ) );
+		details.appendChild( createChangedUrlList( branch.changed_urls || [], isMerged ) );
 
-		preview.className = 'button';
-		preview.href      = previewUrl;
-		preview.target    = '_blank';
-		preview.rel       = 'noopener noreferrer';
+		if (isMerged) {
+			merge.type        = 'button';
+			merge.className   = 'button';
+			merge.disabled    = true;
+			merge.textContent = __( 'Merged', 'push-md' );
+			actions.appendChild( merge );
+			row.appendChild( details );
+			row.appendChild( actions );
+
+			return row;
+		}
+
+		preview.className   = 'button';
+		preview.href        = previewUrl;
+		preview.target      = '_blank';
+		preview.rel         = 'noopener noreferrer';
 		preview.textContent = __( 'Preview', 'push-md' );
 
 		copy.type        = 'button';
@@ -262,17 +309,12 @@
 		merge.type        = 'button';
 		merge.className   = 'button button-primary';
 		merge.textContent = __( 'Merge', 'push-md' );
-		if (branch.merged_at) {
-			merge.disabled    = true;
-			merge.textContent = __( 'Merged', 'push-md' );
-		} else {
-			merge.addEventListener(
-				'click',
-				function () {
-					mergeBranch( branchName, merge );
-				}
-			);
-		}
+		merge.addEventListener(
+			'click',
+			function () {
+				mergeBranch( branchName, merge );
+			}
+		);
 
 		actions.appendChild( preview );
 		actions.appendChild( copy );
@@ -296,7 +338,7 @@
 		return item;
 	}
 
-	function createChangedUrlList(changedUrls) {
+	function createChangedUrlList(changedUrls, isMerged) {
 		var list = document.createElement( 'ul' );
 		list.className = 'push-md-changed-url-list';
 		changedUrls = Array.isArray( changedUrls ) ? changedUrls : [];
@@ -313,17 +355,20 @@
 			function (item) {
 				var row    = document.createElement( 'li' );
 				var action = document.createElement( 'span' );
-				var link   = document.createElement( 'a' );
+				var target = isMerged ? document.createElement( 'span' ) : document.createElement( 'a' );
 
 				action.className   = 'push-md-changed-action';
 				action.textContent = formatChangedAction( item.action );
-				link.href          = String( item.url || '' );
-				link.target        = '_blank';
-				link.rel           = 'noopener noreferrer';
-				link.textContent   = String( item.path || item.url || '' );
+				target.className   = 'push-md-changed-target';
+				target.textContent = String( item.path || item.url || '' );
+				if ( ! isMerged) {
+					target.href   = String( item.url || '' );
+					target.target = '_blank';
+					target.rel    = 'noopener noreferrer';
+				}
 
 				row.appendChild( action );
-				row.appendChild( link );
+				row.appendChild( target );
 				list.appendChild( row );
 			}
 		);

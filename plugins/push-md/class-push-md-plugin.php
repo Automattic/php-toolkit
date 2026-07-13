@@ -251,12 +251,16 @@ class Push_MD_Plugin {
 				return;
 			}
 
-			$base_files      = array();
 			$branches        = self::get_preview_branches();
 			$branch_metadata = isset( $branches[ $branch_name ] ) && is_array( $branches[ $branch_name ] )
 				? $branches[ $branch_name ]
 				: array();
-			$base_oid        = isset( $branch_metadata['base_oid'] ) && is_string( $branch_metadata['base_oid'] )
+			if ( self::is_preview_branch_merged( $branch_metadata ) ) {
+				return;
+			}
+
+			$base_files = array();
+			$base_oid   = isset( $branch_metadata['base_oid'] ) && is_string( $branch_metadata['base_oid'] )
 				? $branch_metadata['base_oid']
 				: $repository->get_branch_tip( 'refs/heads/' . self::DEFAULT_BRANCH );
 			if ( is_string( $base_oid ) && '' !== $base_oid && ! Commit::is_null_hash( $base_oid ) && $repository->has_object( $base_oid ) ) {
@@ -740,7 +744,7 @@ class Push_MD_Plugin {
 			return;
 		}
 
-		$branches = self::get_preview_branches();
+		$branches = self::get_active_preview_branches();
 		if ( empty( $branches ) ) {
 			return;
 		}
@@ -3194,13 +3198,32 @@ class Push_MD_Plugin {
 		return is_array( $branches ) ? $branches : array();
 	}
 
+	private static function get_active_preview_branches() {
+		$branches = self::get_preview_branches();
+		$active   = array();
+
+		foreach ( $branches as $branch_name => $branch ) {
+			if ( ! is_array( $branch ) || ! self::is_valid_preview_branch_name( $branch_name ) || self::is_preview_branch_merged( $branch ) ) {
+				continue;
+			}
+
+			$active[ $branch_name ] = $branch;
+		}
+
+		return $active;
+	}
+
+	private static function is_preview_branch_merged( $branch ) {
+		return is_array( $branch ) && ! empty( $branch['merged_at'] );
+	}
+
 	private static function update_preview_branch_metadata( $push_header ) {
 		$branches    = self::get_preview_branches();
 		$branch_name = $push_header['branch_name'];
 		$existing    = isset( $branches[ $branch_name ] ) && is_array( $branches[ $branch_name ] )
 			? $branches[ $branch_name ]
 			: array();
-		$created_at  = isset( $existing['created_at'] ) ? intval( $existing['created_at'] ) : time();
+		$created_at  = isset( $existing['created_at'] ) && ! self::is_preview_branch_merged( $existing ) ? intval( $existing['created_at'] ) : time();
 
 		$branches[ $branch_name ] = array(
 			'branch'     => $branch_name,
@@ -3233,23 +3256,30 @@ class Push_MD_Plugin {
 				continue;
 			}
 
-			$ref_name = 'refs/heads/' . $branch_name;
-			if ( ! $repository->branch_exists( $ref_name ) ) {
+			$ref_name  = 'refs/heads/' . $branch_name;
+			$is_merged = self::is_preview_branch_merged( $branch );
+			if ( ! $is_merged && ! $repository->branch_exists( $ref_name ) ) {
 				continue;
 			}
 
-			$branch['tip_oid'] = $repository->get_branch_tip( $ref_name );
-			$branch['url']     = self::get_preview_branch_url( $branch_name );
-			try {
-				$branch['changed_urls'] = self::get_preview_branch_changed_url_items(
-					$repository,
-					array(
-						'branch_name' => $branch_name,
-						'base_oid'    => isset( $branch['base_oid'] ) ? $branch['base_oid'] : '',
-						'new_oid'     => $branch['tip_oid'],
-					)
-				);
-			} catch ( Throwable $exception ) {
+			$branch['status'] = $is_merged ? 'merged' : 'active';
+			$branch['active'] = ! $is_merged;
+			if ( ! $is_merged ) {
+				$branch['tip_oid'] = $repository->get_branch_tip( $ref_name );
+				$branch['url']     = self::get_preview_branch_url( $branch_name );
+				try {
+					$branch['changed_urls'] = self::get_preview_branch_changed_url_items(
+						$repository,
+						array(
+							'branch_name' => $branch_name,
+							'base_oid'    => isset( $branch['base_oid'] ) ? $branch['base_oid'] : '',
+							'new_oid'     => $branch['tip_oid'],
+						)
+					);
+				} catch ( Throwable $exception ) {
+					$branch['changed_urls'] = array();
+				}
+			} elseif ( ! isset( $branch['changed_urls'] ) || ! is_array( $branch['changed_urls'] ) ) {
 				$branch['changed_urls'] = array();
 			}
 			$response[] = $branch;
@@ -3277,10 +3307,27 @@ class Push_MD_Plugin {
 		$branch_metadata = isset( $branches[ $branch_name ] ) && is_array( $branches[ $branch_name ] )
 			? $branches[ $branch_name ]
 			: array();
-		$base_oid        = isset( $branch_metadata['base_oid'] ) && is_string( $branch_metadata['base_oid'] )
+		if ( self::is_preview_branch_merged( $branch_metadata ) ) {
+			throw new Exception( 'Preview branch has already been merged.' );
+		}
+
+		$base_oid     = isset( $branch_metadata['base_oid'] ) && is_string( $branch_metadata['base_oid'] )
 			? $branch_metadata['base_oid']
 			: $current_head;
-		$merged_oid      = $branch_tip;
+		$merged_oid   = $branch_tip;
+		$changed_urls = array();
+		try {
+			$changed_urls = self::get_preview_branch_changed_url_items(
+				$repository,
+				array(
+					'branch_name' => $branch_name,
+					'base_oid'    => $base_oid,
+					'new_oid'     => $branch_tip,
+				)
+			);
+		} catch ( Throwable $exception ) {
+			$changed_urls = array();
+		}
 
 		$can_fast_forward = true;
 		$range_exception  = null;
@@ -3314,18 +3361,51 @@ class Push_MD_Plugin {
 			$repository->set_branch_tip( 'refs/heads/' . self::DEFAULT_BRANCH, $merged_oid );
 		}
 
-		if ( isset( $branches[ $branch_name ] ) && is_array( $branches[ $branch_name ] ) ) {
-			$branches[ $branch_name ]['merged_at']  = time();
-			$branches[ $branch_name ]['tip_oid']    = $branch_tip;
-			$branches[ $branch_name ]['merged_oid'] = $merged_oid;
+		$merged_at                 = time();
+		$archived_branch           = $branch_metadata;
+		$archived_branch['branch'] = $branch_name;
+		$archived_branch['ref']    = $ref_name;
+		if ( ! isset( $archived_branch['owner'] ) ) {
+			$archived_branch['owner'] = get_current_user_id();
+		}
+		if ( ! isset( $archived_branch['created_at'] ) ) {
+			$archived_branch['created_at'] = $merged_at;
+		}
+		$archived_branch['updated_at']     = isset( $archived_branch['updated_at'] ) ? intval( $archived_branch['updated_at'] ) : $merged_at;
+		$archived_branch['base_oid']       = $base_oid;
+		$archived_branch['tip_oid']        = $branch_tip;
+		$archived_branch['merged_oid']     = $merged_oid;
+		$archived_branch['merged_at']      = $merged_at;
+		$archived_branch['merged_by']      = get_current_user_id();
+		$archived_branch['url']            = self::get_preview_branch_url( $branch_name );
+		$archived_branch['changed_urls']   = $changed_urls;
+		$archived_branch['ref_deleted_at'] = 0;
+		$branches[ $branch_name ]          = $archived_branch;
+		update_option( self::BRANCH_PREVIEWS_OPTION, $branches, false );
+
+		$branch_deleted = false;
+		try {
+			if ( $repository->branch_exists( $ref_name ) ) {
+				$repository->delete_branch( $ref_name );
+				$branch_deleted = true;
+			}
+		} catch ( Throwable $exception ) {
+			$branch_deleted = false;
+		}
+
+		if ( $branch_deleted ) {
+			$branches                                      = self::get_preview_branches();
+			$branches[ $branch_name ]['ref_deleted_at']    = time();
+			$branches[ $branch_name ]['ref_delete_failed'] = false;
 			update_option( self::BRANCH_PREVIEWS_OPTION, $branches, false );
 		}
 
 		return array(
-			'branch'     => $branch_name,
-			'tip_oid'    => $branch_tip,
-			'merged_oid' => $merged_oid,
-			'changes'    => $push_summary,
+			'branch'         => $branch_name,
+			'tip_oid'        => $branch_tip,
+			'merged_oid'     => $merged_oid,
+			'branch_deleted' => $branch_deleted,
+			'changes'        => $push_summary,
 		);
 	}
 
@@ -4342,7 +4422,7 @@ class Push_MD_Plugin {
 
 		$metadata           = self::get_preview_branches();
 		$existing_metadata  = isset( $metadata[ $branch_name ] ) && is_array( $metadata[ $branch_name ] ) ? $metadata[ $branch_name ] : array();
-		$base_oid           = isset( $existing_metadata['base_oid'] ) && is_string( $existing_metadata['base_oid'] )
+		$base_oid           = ! self::is_preview_branch_merged( $existing_metadata ) && isset( $existing_metadata['base_oid'] ) && is_string( $existing_metadata['base_oid'] )
 			? $existing_metadata['base_oid']
 			: $current_head;
 		$validation_old_oid = Commit::is_null_hash( $command['old_oid'] ) ? $base_oid : $command['old_oid'];
