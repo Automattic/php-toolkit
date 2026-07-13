@@ -15,7 +15,7 @@ class Push_MD_Admin {
 	const RETRY_ROUTE    = '/seed-retry';
 	const BRANCHES_ROUTE = '/branches';
 	const MERGE_ROUTE    = '/branches/merge';
-	const ASSET_VERSION  = '0.6.9';
+	const ASSET_VERSION  = '0.6.8';
 
 	public static function bootstrap() {
 		add_action( 'admin_menu', array( __CLASS__, 'register_menu' ) );
