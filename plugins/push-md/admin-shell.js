@@ -241,7 +241,7 @@
 	function createBranchRow(branch) {
 		var branchName = String( branch.branch || '' );
 		var previewUrl = String( branch.url || '' );
-		var isMerged   = !! branch.merged_at;
+		var isMerged   = Boolean( branch.merged_at );
 		var row        = document.createElement( 'div' );
 		var details    = document.createElement( 'div' );
 		var actions    = document.createElement( 'div' );
