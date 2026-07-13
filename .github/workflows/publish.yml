@@ -101,7 +101,7 @@ jobs:
       - name: Deploy Push MD to WordPress.org SVN
         env:
           WPORG_PLUGIN_SLUG: push-md
-          WPORG_USERNAME: ${{ secrets.WPORG_USERNAME }}
+          WPORG_USERNAME: ${{ vars.WPORG_USERNAME }}
           WPORG_PASSWORD: ${{ secrets.WPORG_PASSWORD }}
         shell: bash
         run: |
