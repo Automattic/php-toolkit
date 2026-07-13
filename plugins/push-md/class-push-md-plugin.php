@@ -3079,15 +3079,25 @@ class Push_MD_Plugin {
 			);
 		}
 
-		$messages = array(
-			sprintf(
+		$messages = array();
+		if ( ! empty( $push_header['is_replace'] ) ) {
+			$messages[] = sprintf(
+				'Push MD replaced preview branch %s after rebase without changing WordPress content.',
+				self::sanitize_push_summary_text( $push_header['branch_name'] )
+			);
+			$messages[] = sprintf(
+				'Preview base reset to trunk %s.',
+				self::sanitize_push_summary_text( substr( $push_header['base_oid'], 0, 12 ) )
+			);
+		} else {
+			$messages[] = sprintf(
 				'Push MD stored preview branch %s without changing WordPress content.',
 				self::sanitize_push_summary_text( $push_header['branch_name'] )
-			),
-			sprintf(
-				'Preview: %s',
-				self::sanitize_push_summary_text( self::get_preview_branch_url( $push_header['branch_name'] ) )
-			),
+			);
+		}
+		$messages[] = sprintf(
+			'Preview: %s',
+			self::sanitize_push_summary_text( self::get_preview_branch_url( $push_header['branch_name'] ) )
 		);
 
 		$changed_urls = array();

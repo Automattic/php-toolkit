@@ -410,7 +410,8 @@ class PMD_End_To_End_Test extends TestCase {
 				'HEAD:refs/heads/' . $branch,
 			)
 		);
-		$this->assertStringContainsString( 'Push MD stored preview branch ' . $branch . ' without changing WordPress content.', $push_result['output'] );
+		$this->assertStringContainsString( 'Push MD replaced preview branch ' . $branch . ' after rebase without changing WordPress content.', $push_result['output'] );
+		$this->assertStringContainsString( 'Preview base reset to trunk ' . substr( $rebased_base, 0, 12 ) . '.', $push_result['output'] );
 		$next_tip = trim( $this->run_cmd( array( 'git', '-C', $clone_dir, 'rev-parse', 'HEAD' ) )['output'] );
 		$this->assertNotSame( $first_tip, $next_tip );
 
