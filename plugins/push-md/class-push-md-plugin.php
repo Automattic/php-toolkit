@@ -3308,9 +3308,10 @@ class Push_MD_Plugin {
 
 			self::assert_preview_branch_merge_has_no_overlapping_changes( $repository, $base_oid, $current_head, $branch_tip );
 			self::validate_repository_changes_for_wordpress( $repository, $base_oid, $branch_tip );
-			$push_summary = self::apply_repository_diff_to_wordpress( $repository, $base_oid, $branch_tip, false );
-			self::sync_repository_from_wordpress( $repository );
-			$merged_oid = $repository->get_branch_tip( 'refs/heads/' . self::DEFAULT_BRANCH );
+			$merged_oid = self::replay_preview_branch_commits_onto_trunk( $repository, $branch_name, $base_oid, $branch_tip, $current_head );
+			self::validate_repository_changes_for_wordpress( $repository, $current_head, $merged_oid );
+			$push_summary = self::apply_repository_diff_to_wordpress( $repository, $current_head, $merged_oid, false );
+			$repository->set_branch_tip( 'refs/heads/' . self::DEFAULT_BRANCH, $merged_oid );
 		}
 
 		if ( isset( $branches[ $branch_name ] ) && is_array( $branches[ $branch_name ] ) ) {
@@ -3325,6 +3326,104 @@ class Push_MD_Plugin {
 			'tip_oid'    => $branch_tip,
 			'merged_oid' => $merged_oid,
 			'changes'    => $push_summary,
+		);
+	}
+
+	private static function replay_preview_branch_commits_onto_trunk( GitRepository $repository, $branch_name, $base_oid, $branch_tip, $current_head ) {
+		$commit_hashes = $repository->get_commits_range(
+			$branch_tip,
+			$base_oid,
+			array(
+				'include_ancestor' => false,
+			)
+		);
+		$commit_hashes = array_reverse( $commit_hashes );
+
+		$temporary_ref = 'refs/heads/push-md/merge-preview-' . md5( $branch_name . $branch_tip . $current_head . microtime( true ) );
+		$previous_head = $repository->get_branch_tip( 'HEAD', array( 'follow_symrefs' => false ) );
+		$repository->set_branch_tip( $temporary_ref, $current_head );
+
+		try {
+			$repository->set_branch_tip( 'HEAD', 'ref: ' . $temporary_ref . "\n" );
+			$replayed_tip = $current_head;
+
+			foreach ( $commit_hashes as $commit_hash ) {
+				$commit      = $repository->read_object( $commit_hash )->as_commit();
+				$parent_hash = empty( $commit->parents ) ? Commit::NULL_HASH : $commit->get_first_parent_hash();
+				$old_files   = Commit::is_null_hash( $parent_hash )
+					? array()
+					: self::read_repository_entries_from_commit( $repository, $parent_hash );
+				$new_files   = self::read_repository_entries_from_commit( $repository, $commit_hash );
+				$head_files  = self::read_repository_entries_from_commit( $repository, $replayed_tip );
+				$delta       = self::calculate_preview_branch_replay_delta( $head_files, $old_files, $new_files );
+
+				if ( empty( $delta['updates'] ) && empty( $delta['symlinks'] ) && empty( $delta['deletes'] ) ) {
+					continue;
+				}
+
+				$replayed_tip = $repository->commit(
+					array(
+						'updates'         => $delta['updates'],
+						'create_symlinks' => $delta['symlinks'],
+						'deletes'         => $delta['deletes'],
+						'commit'          => array(
+							'message'        => $commit->message,
+							'author'         => $commit->author,
+							'author_date'    => $commit->author_date,
+							'committer'      => $commit->committer,
+							'committer_date' => $commit->committer_date,
+						),
+					)
+				);
+			}
+
+			return $replayed_tip;
+		} finally {
+			$repository->set_branch_tip( 'HEAD', $previous_head );
+			if ( $repository->branch_exists( $temporary_ref ) ) {
+				$repository->delete_branch( $temporary_ref );
+			}
+		}
+	}
+
+	private static function calculate_preview_branch_replay_delta( $head_files, $old_files, $new_files ) {
+		$branch_delta = self::calculate_file_delta( $old_files, $new_files );
+		$updates      = array();
+		$symlinks     = array();
+		$deletes      = array();
+
+		foreach ( $branch_delta['updates'] as $path => $content ) {
+			$entry = array(
+				'mode'    => TreeEntry::FILE_MODE_REGULAR_NON_EXECUTABLE,
+				'content' => $content,
+			);
+			if ( isset( $head_files[ $path ] ) && self::repository_entries_match( $head_files[ $path ], $entry ) ) {
+				continue;
+			}
+			$updates[ $path ] = $content;
+		}
+
+		foreach ( $branch_delta['symlinks'] as $path => $target ) {
+			$entry = array(
+				'mode'    => TreeEntry::FILE_MODE_SYMBOLIC_LINK,
+				'content' => $target,
+			);
+			if ( isset( $head_files[ $path ] ) && self::repository_entries_match( $head_files[ $path ], $entry ) ) {
+				continue;
+			}
+			$symlinks[ $path ] = $target;
+		}
+
+		foreach ( $branch_delta['deletes'] as $path ) {
+			if ( isset( $head_files[ $path ] ) ) {
+				$deletes[] = $path;
+			}
+		}
+
+		return array(
+			'updates'  => $updates,
+			'symlinks' => $symlinks,
+			'deletes'  => $deletes,
 		);
 	}
 

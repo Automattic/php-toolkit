@@ -256,6 +256,11 @@ class PMD_End_To_End_Test extends TestCase {
 		$this->assertStringContainsString( $new_text, $this->fetch_content( $new_post_id, 'posts' ) );
 		$this->assertStringContainsString( $live_only, $this->fetch_content( $live_only_id, 'posts' ) );
 		$this->assertGreaterThan( $revision_count_before, $this->count_revisions( $post_id, 'posts' ), 'Branch merge should create a normal WordPress revision.' );
+		$seed_status = json_decode( $this->curl_get( $this->base_url . '/wp-json/push-md/v1/seed-status' ), true );
+		$this->assertIsArray( $seed_status, 'Unexpected seed status response after branch merge.' );
+		$this->assertArrayHasKey( 'commits', $seed_status );
+		$this->assertNotEmpty( $seed_status['commits'], 'Commit history should not be empty after branch merge.' );
+		$this->assertSame( 'Preview branch content', $seed_status['commits'][0]['subject'], 'Branch merge should preserve the branch commit subject at the top of commit history.' );
 
 		$this->delete_preview_branch( $clone_dir, $branch );
 		$branches_after_delete = json_decode( $this->curl_get( $this->base_url . '/wp-json/push-md/v1/branches' ), true );
