@@ -3,6 +3,17 @@ name: Publish Push MD release asset
 on:
   release:
     types: [published]
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Release tag to publish, e.g. v0.6.8
+        required: true
+        type: string
+      prerelease:
+        description: Skip the WordPress.org SVN deploy.
+        required: true
+        default: false
+        type: boolean
 
 permissions:
   contents: write
@@ -13,7 +24,8 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      RELEASE_TAG: ${{ github.event.release.tag_name }}
+      RELEASE_TAG: ${{ github.event.release.tag_name || inputs.release_tag }}
+      RELEASE_IS_PRERELEASE: ${{ github.event.release.prerelease || inputs.prerelease || false }}
 
     steps:
       - name: Validate release tag
@@ -107,7 +119,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          if [ "${{ github.event.release.prerelease }}" = "true" ]; then
+          if [ "$RELEASE_IS_PRERELEASE" = "true" ]; then
             echo "Skipping WordPress.org SVN deploy for prerelease $RELEASE_TAG."
             exit 0
           fi
