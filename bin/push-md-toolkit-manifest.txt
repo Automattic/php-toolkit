@@ -56,4 +56,8 @@ components/Git/Protocol/Parser/
 
 components/HttpServer/Response/class-responsewritestream.php
 
+components/Merge/Diff/class-diff.php
+components/Merge/Diff/class-differ.php
+components/Merge/Diff/class-linediffer.php
+
 components/Polyfill/mbstring.php
