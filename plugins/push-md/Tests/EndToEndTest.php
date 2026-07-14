@@ -61,6 +61,28 @@ class PMD_End_To_End_Test extends TestCase {
 		$this->assertGreaterThan( 0, $state['total'], "Seeder reports zero total posts: $body" );
 	}
 
+	public function testLegacyBranchPreviewMigrationIsIdempotent() {
+		$branch = 'legacy/' . uniqid();
+		$url    = $this->base_url . '/wp-json/push-md-test/v1/migrate-legacy-preview';
+		$first  = $this->curl_post_json( $url, array( 'branch' => $branch ) );
+		$this->assertSame( 200, $first['status'], 'Legacy migration helper failed: ' . $first['body'] );
+		$first_result = json_decode( $first['body'], true );
+		$this->assertNotEmpty( $first_result['id'] );
+		$this->assertSame( 'push_md_active', $first_result['status'] );
+		$this->assertSame( $branch, $first_result['branch'] );
+		$this->assertSame( str_repeat( 'a', 40 ), $first_result['base_oid'] );
+		$this->assertSame( str_repeat( 'b', 40 ), $first_result['tip_oid'] );
+		$this->assertSame( 'pending', $first_result['review_state'] );
+		$this->assertTrue( $first_result['option_removed'] );
+
+		$second = $this->curl_post_json( $url, array( 'branch' => $branch ) );
+		$this->assertSame( 200, $second['status'], 'Repeated legacy migration failed: ' . $second['body'] );
+		$second_result = json_decode( $second['body'], true );
+		$this->assertSame( $first_result['id'], $second_result['id'] );
+		$this->assertSame( 'pending', $second_result['review_state'] );
+		$this->assertTrue( $second_result['option_removed'] );
+	}
+
 	public function testSeedingSpansMultipleCronTicks() {
 		// The CI workflow seeds 30 posts and drops a mu-plugin that
 		// shrinks the batch size to 5 and the time budget to 0
@@ -167,7 +189,7 @@ class PMD_End_To_End_Test extends TestCase {
 			"---\nstatus: \"publish\"\ntitle: \"Branch Only $suffix\"\n---\n\n$new_text\n"
 		);
 		$this->run_cmd( array( 'git', '-C', $clone_dir, 'add', 'post/' . $slug . '.md', 'post/' . $new_slug . '.md' ) );
-		$this->run_cmd( array( 'git', '-C', $clone_dir, 'commit', '-m', 'Preview branch content' ) );
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'commit', '-m', 'Preview branch content', '-m', 'Adds a new post and updates the existing preview.' ) );
 
 		$push_result = $this->run_cmd( array( 'git', '-C', $clone_dir, 'push', 'origin', 'HEAD:refs/heads/' . $branch ) );
 		$this->assertStringContainsString( 'Push MD stored preview branch ' . $branch . ' without changing WordPress content.', $push_result['output'] );
@@ -216,7 +238,7 @@ class PMD_End_To_End_Test extends TestCase {
 		$this->assertSame( array( $branch ), $preview_response['headers']['x-push-md-preview-branch'] );
 		$this->assertSame( $revision_count_before, $this->count_revisions( $post_id, 'posts' ), 'Preview rendering must not create WordPress revisions.' );
 
-		$branches = json_decode( $this->curl_get( $this->base_url . '/wp-json/push-md/v1/branches' ), true );
+		$branches = array( 'branches' => $this->get_pull_requests() );
 		$this->assertIsArray( $branches, 'Unexpected branch listing response.' );
 		$this->assertArrayHasKey( 'branches', $branches );
 		$branch_metadata = $this->find_branch_metadata( $branches['branches'], $branch );
@@ -231,6 +253,172 @@ class PMD_End_To_End_Test extends TestCase {
 		$this->assertStringContainsString( '/' . rawurlencode( $slug ) . '/?branch=' . $branch, $updated_preview_url['url'] );
 		$this->assertStringContainsString( '/' . rawurlencode( $new_slug ) . '/?branch=' . $branch, $created_preview_url['url'] );
 		$this->assertArrayHasNoTokenKeys( $branch_metadata );
+		$this->assertNotEmpty( $branch_metadata['pull_request_id'] );
+		$this->assertNotEmpty( $branch_metadata['diff']['files'] );
+		$this->assertNotEmpty( $branch_metadata['diff']['commits'] );
+		$this->assertSame( 'Preview branch content', $branch_metadata['diff']['commits'][0]['subject'] );
+		$this->assertSame( 'Adds a new post and updates the existing preview.', $branch_metadata['diff']['commits'][0]['description'] );
+		$this->assertSame( 'pending', $branch_metadata['review_state'] );
+
+		$description = 'This Pull Request updates preview content ' . $suffix;
+		$description_response = $this->curl_post_json(
+			$this->base_url . '/wp-json/wp/v2/push-md-pull-requests/' . $branch_metadata['pull_request_id'],
+			array( 'content' => $description )
+		);
+		$this->assertSame( 200, $description_response['status'], 'The active Pull Request description should be editable: ' . $description_response['body'] );
+		$description_item = json_decode( $description_response['body'], true );
+		$this->assertSame( $description, $description_item['content']['raw'] );
+
+		$general_note_response = $this->curl_post_json(
+			$this->base_url . '/wp-json/wp/v2/comments',
+			array(
+				'post'    => $branch_metadata['pull_request_id'],
+				'type'    => 'note',
+				'content' => 'General Pull Request note ' . $suffix,
+			)
+		);
+		$this->assertSame( 201, $general_note_response['status'], 'A general Pull Request Note should be created: ' . $general_note_response['body'] );
+		$branches_after_general_note = array( 'branches' => $this->get_pull_requests() );
+		$this->assertSame( 'pending', $this->find_branch_metadata( $branches_after_general_note['branches'], $branch )['review_state'], 'An ordinary Note must not change the review state.' );
+
+		$approved_note_response = $this->curl_post_json(
+			$this->base_url . '/wp-json/wp/v2/comments',
+			array(
+				'post'    => $branch_metadata['pull_request_id'],
+				'type'    => 'note',
+				'content' => 'Approve Pull Request ' . $suffix,
+				'meta'    => array( 'push_md_review_state' => 'approved' ),
+			)
+		);
+		$this->assertSame( 201, $approved_note_response['status'], 'A state-changing Note should be created: ' . $approved_note_response['body'] );
+		$approved_note = json_decode( $approved_note_response['body'], true );
+		$this->assertSame( 'approved', $approved_note['meta']['push_md_review_state'] );
+		$branches_after_approval = array( 'branches' => $this->get_pull_requests() );
+		$this->assertSame( 'approved', $this->find_branch_metadata( $branches_after_approval['branches'], $branch )['review_state'] );
+
+		$approved_note_update = $this->curl_post_json(
+			$this->base_url . '/wp-json/wp/v2/comments/' . $approved_note['id'],
+			array( 'content' => 'State-changing Notes are immutable.' )
+		);
+		$this->assertSame( 409, $approved_note_update['status'], 'A state-changing Note must not be edited.' );
+		$approved_note_delete = $this->curl_delete( $this->base_url . '/wp-json/wp/v2/comments/' . $approved_note['id'] . '?force=true' );
+		$this->assertSame( 409, $approved_note_delete['status'], 'A state-changing Note must not be deleted.' );
+
+		$invalid_state_response = $this->curl_post_json(
+			$this->base_url . '/wp-json/wp/v2/comments',
+			array(
+				'post'    => $branch_metadata['pull_request_id'],
+				'type'    => 'note',
+				'content' => 'Invalid Pull Request state ' . $suffix,
+				'meta'    => array( 'push_md_review_state' => 'not_registered' ),
+			)
+		);
+		$this->assertSame( 400, $invalid_state_response['status'], 'An unregistered review state must be rejected.' );
+
+		$inline_anchor = $this->find_diff_anchor( $branch_metadata['diff']['files'] );
+		$this->assertNotEmpty( $inline_anchor, 'The changed files should expose at least one inline Note anchor.' );
+		$inline_note_response = $this->curl_post_json(
+			$this->base_url . '/wp-json/wp/v2/comments',
+			array(
+				'post'    => $branch_metadata['pull_request_id'],
+				'type'    => 'note',
+				'content' => 'Inline Pull Request note ' . $suffix,
+				'meta'    => array(
+					'push_md_path' => $inline_anchor['path'],
+					'push_md_side' => $inline_anchor['side'],
+					'push_md_line' => $inline_anchor['line'],
+				),
+			)
+		);
+		$this->assertSame( 201, $inline_note_response['status'], 'An inline Pull Request Note should be created: ' . $inline_note_response['body'] );
+		$inline_note = json_decode( $inline_note_response['body'], true );
+		$this->assertSame( $inline_anchor['path'], $inline_note['meta']['push_md_path'] );
+		$this->assertSame( $inline_anchor['side'], $inline_note['meta']['push_md_side'] );
+		$this->assertSame( $inline_anchor['line'], $inline_note['meta']['push_md_line'] );
+		$this->assertSame( $branch_metadata['tip_oid'], $inline_note['push_md_tip_oid'] );
+
+		$inline_state_response = $this->curl_post_json(
+			$this->base_url . '/wp-json/wp/v2/comments',
+			array(
+				'post'    => $branch_metadata['pull_request_id'],
+				'type'    => 'note',
+				'content' => 'Inline state change ' . $suffix,
+				'meta'    => array(
+					'push_md_path'         => $inline_anchor['path'],
+					'push_md_side'         => $inline_anchor['side'],
+					'push_md_line'         => $inline_anchor['line'],
+					'push_md_review_state' => 'approved',
+				),
+			)
+		);
+		$this->assertSame( 400, $inline_state_response['status'], 'An inline Note must not change the review state.' );
+
+		$custom_state_response = $this->curl_post_json(
+			$this->base_url . '/wp-json/wp/v2/comments',
+			array(
+				'post'    => $branch_metadata['pull_request_id'],
+				'type'    => 'note',
+				'content' => 'Request Pull Request changes ' . $suffix,
+				'meta'    => array( 'push_md_review_state' => 'changes_requested' ),
+			)
+		);
+		$this->assertSame( 201, $custom_state_response['status'], 'A filtered review state should be accepted: ' . $custom_state_response['body'] );
+		$custom_state_note = json_decode( $custom_state_response['body'], true );
+		$this->assertSame( 'changes_requested', $custom_state_note['meta']['push_md_review_state'] );
+		$branches_after_custom_state = array( 'branches' => $this->get_pull_requests() );
+		$this->assertSame( 'changes_requested', $this->find_branch_metadata( $branches_after_custom_state['branches'], $branch )['review_state'] );
+
+		$final_approval_response = $this->curl_post_json(
+			$this->base_url . '/wp-json/wp/v2/comments',
+			array(
+				'post'    => $branch_metadata['pull_request_id'],
+				'type'    => 'note',
+				'content' => 'Approve corrected Pull Request ' . $suffix,
+				'meta'    => array( 'push_md_review_state' => 'approved' ),
+			)
+		);
+		$this->assertSame( 201, $final_approval_response['status'], 'A later Note should correct the review state: ' . $final_approval_response['body'] );
+
+		$invalid_anchor_response = $this->curl_post_json(
+			$this->base_url . '/wp-json/wp/v2/comments',
+			array(
+				'post'    => $branch_metadata['pull_request_id'],
+				'type'    => 'note',
+				'content' => 'Invalid inline Pull Request note ' . $suffix,
+				'meta'    => array(
+					'push_md_path' => $inline_anchor['path'],
+					'push_md_side' => $inline_anchor['side'],
+					'push_md_line' => 999999,
+				),
+			)
+		);
+		$this->assertSame( 409, $invalid_anchor_response['status'], 'An inline Note must point at the current diff.' );
+
+		$incomplete_anchor_response = $this->curl_post_json(
+			$this->base_url . '/wp-json/wp/v2/comments',
+			array(
+				'post'    => $branch_metadata['pull_request_id'],
+				'type'    => 'note',
+				'content' => 'Incomplete inline Pull Request note ' . $suffix,
+				'meta'    => array( 'push_md_path' => $inline_anchor['path'] ),
+			)
+		);
+		$this->assertSame( 400, $incomplete_anchor_response['status'], 'An inline Note must provide the complete anchor.' );
+
+		$direct_update_response = $this->curl_post_json(
+			$this->base_url . '/wp-json/wp/v2/push-md-pull-requests/' . $branch_metadata['pull_request_id'],
+			array( 'title' => 'REST must not update Pull Requests' )
+		);
+		$this->assertSame( 403, $direct_update_response['status'], 'The native controller must not update Pull Requests directly.' );
+		$direct_create_response = $this->curl_post_json(
+			$this->base_url . '/wp-json/wp/v2/push-md-pull-requests',
+			array( 'title' => 'REST must not create Pull Requests' )
+		);
+		$this->assertSame( 403, $direct_create_response['status'], 'The native controller must not create Pull Requests directly.' );
+		$direct_delete_response = $this->curl_delete(
+			$this->base_url . '/wp-json/wp/v2/push-md-pull-requests/' . $branch_metadata['pull_request_id'] . '?force=true'
+		);
+		$this->assertSame( 403, $direct_delete_response['status'], 'The native controller must not delete Pull Requests directly.' );
 
 		$live_only_id = $this->create_post_via_rest(
 			array(
@@ -270,14 +458,33 @@ class PMD_End_To_End_Test extends TestCase {
 		$remote_branch = $this->run_cmd( array( 'git', 'ls-remote', $this->remote_url(), 'refs/heads/' . $branch ) );
 		$this->assertSame( '', trim( $remote_branch['output'] ), 'Merged preview branch ref should no longer be advertised.' );
 
-		$branches_after_merge = json_decode( $this->curl_get( $this->base_url . '/wp-json/push-md/v1/branches' ), true );
+		$branches_after_merge = array( 'branches' => $this->get_pull_requests() );
 		$merged_metadata      = $this->find_branch_metadata( $branches_after_merge['branches'], $branch );
 		$this->assertNotEmpty( $merged_metadata, 'Merged preview branch metadata should remain available for history.' );
 		$this->assertSame( 'merged', $merged_metadata['status'] );
 		$this->assertFalse( $merged_metadata['active'] );
 		$this->assertNotEmpty( $merged_metadata['merged_at'] );
 		$this->assertSame( $branch, $merged_metadata['branch'] );
+		$this->assertSame( 'approved', $merged_metadata['review_state'], 'Merge must preserve the review state.' );
 		$this->assertNotEmpty( $merged_metadata['changed_urls'], 'Merged branch history should keep the changed URL list.' );
+		$merged_pull_request = json_decode(
+			$this->curl_get( $this->base_url . '/wp-json/wp/v2/push-md-pull-requests/' . $branch_metadata['pull_request_id'] . '?context=edit&_fields=content' ),
+			true
+		);
+		$this->assertSame( $description, $merged_pull_request['content']['raw'], 'Merge must preserve the Pull Request description.' );
+		$merged_description_update = $this->curl_post_json(
+			$this->base_url . '/wp-json/wp/v2/push-md-pull-requests/' . $branch_metadata['pull_request_id'],
+			array( 'content' => 'Merged descriptions are read-only.' )
+		);
+		$this->assertSame( 409, $merged_description_update['status'], 'A merged Pull Request description must be read-only.' );
+
+		$closed_note_update = $this->curl_post_json(
+			$this->base_url . '/wp-json/wp/v2/comments/' . $inline_note['id'],
+			array( 'content' => 'Merged Pull Request Notes are immutable.' )
+		);
+		$this->assertSame( 409, $closed_note_update['status'], 'Merged Pull Request Notes must be read-only.' );
+		$closed_note_delete = $this->curl_delete( $this->base_url . '/wp-json/wp/v2/comments/' . $inline_note['id'] . '?force=true' );
+		$this->assertSame( 409, $closed_note_delete['status'], 'Merged Pull Request Notes must not be deleted.' );
 	}
 
 	public function testPreviewBranchUpdatesRenderLatestBranchCommitWithoutMutatingLiveContent() {
@@ -318,8 +525,26 @@ class PMD_End_To_End_Test extends TestCase {
 		$this->assertSame( 200, $first_preview_response['status'], 'Authenticated preview request should render the first branch tip.' );
 		$this->assertStringContainsString( $first_preview_text, $first_preview_response['body'] );
 		$this->assertStringNotContainsString( $live_text, $first_preview_response['body'] );
-		$branches = json_decode( $this->curl_get( $this->base_url . '/wp-json/push-md/v1/branches' ), true );
-		$this->assertSame( $first_tip, $this->find_branch_metadata( $branches['branches'], $branch )['tip_oid'] );
+		$branches = array( 'branches' => $this->get_pull_requests() );
+		$first_branch_metadata = $this->find_branch_metadata( $branches['branches'], $branch );
+		$this->assertSame( $first_tip, $first_branch_metadata['tip_oid'] );
+		$this->assertSame( 'pending', $first_branch_metadata['review_state'] );
+		$description = 'Description preserved across pushes ' . $suffix;
+		$description_response = $this->curl_post_json(
+			$this->base_url . '/wp-json/wp/v2/push-md-pull-requests/' . $first_branch_metadata['pull_request_id'],
+			array( 'content' => $description )
+		);
+		$this->assertSame( 200, $description_response['status'], 'The active Pull Request description should be editable: ' . $description_response['body'] );
+		$approval_response = $this->curl_post_json(
+			$this->base_url . '/wp-json/wp/v2/comments',
+			array(
+				'post'    => $first_branch_metadata['pull_request_id'],
+				'type'    => 'note',
+				'content' => 'Approve before another push ' . $suffix,
+				'meta'    => array( 'push_md_review_state' => 'approved' ),
+			)
+		);
+		$this->assertSame( 201, $approval_response['status'], 'The review state should be changeable before another push: ' . $approval_response['body'] );
 
 		$this->edit_file(
 			$clone_dir . '/post/' . $slug . '.md',
@@ -340,14 +565,35 @@ class PMD_End_To_End_Test extends TestCase {
 		$this->assertStringContainsString( $next_preview_text, $next_preview_response['body'] );
 		$this->assertStringNotContainsString( $first_preview_text, $next_preview_response['body'] );
 		$this->assertStringNotContainsString( $live_text, $next_preview_response['body'] );
-		$branches = json_decode( $this->curl_get( $this->base_url . '/wp-json/push-md/v1/branches' ), true );
-		$this->assertSame( $next_tip, $this->find_branch_metadata( $branches['branches'], $branch )['tip_oid'] );
+		$branches = array( 'branches' => $this->get_pull_requests() );
+		$next_branch_metadata = $this->find_branch_metadata( $branches['branches'], $branch );
+		$this->assertSame( $next_tip, $next_branch_metadata['tip_oid'] );
+		$this->assertSame( 'approved', $next_branch_metadata['review_state'], 'A later push must preserve the review state.' );
+		$pull_request_after_push = json_decode(
+			$this->curl_get( $this->base_url . '/wp-json/wp/v2/push-md-pull-requests/' . $first_branch_metadata['pull_request_id'] . '?context=edit&_fields=content' ),
+			true
+		);
+		$this->assertSame( $description, $pull_request_after_push['content']['raw'], 'A later push must preserve the Pull Request description.' );
 
 		$this->assertSame( $revision_count_before, $this->count_revisions( $post_id, 'posts' ), 'Preview branch updates must not create WordPress revisions.' );
 		$this->assertStringContainsString( $live_text, $this->fetch_content( $post_id, 'posts' ) );
 		$this->assertStringNotContainsString( $next_preview_text, $this->fetch_content( $post_id, 'posts' ) );
 
 		$this->delete_preview_branch( $clone_dir, $branch );
+		$branches_after_close = array( 'branches' => $this->get_pull_requests() );
+		$closed_metadata      = $this->find_branch_metadata( $branches_after_close['branches'], $branch );
+		$this->assertSame( 'closed', $closed_metadata['status'] );
+		$this->assertSame( 'approved', $closed_metadata['review_state'], 'Closing a Pull Request must preserve the review state.' );
+		$pull_request_after_close = json_decode(
+			$this->curl_get( $this->base_url . '/wp-json/wp/v2/push-md-pull-requests/' . $first_branch_metadata['pull_request_id'] . '?context=edit&_fields=content' ),
+			true
+		);
+		$this->assertSame( $description, $pull_request_after_close['content']['raw'], 'Closing a Pull Request must preserve its description.' );
+		$closed_description_update = $this->curl_post_json(
+			$this->base_url . '/wp-json/wp/v2/push-md-pull-requests/' . $first_branch_metadata['pull_request_id'],
+			array( 'content' => 'Closed descriptions are read-only.' )
+		);
+		$this->assertSame( 409, $closed_description_update['status'], 'A closed Pull Request description must be read-only.' );
 	}
 
 	public function testPreviewBranchForceWithLeaseUpdateAfterRebaseResetsBaseToCurrentTrunk() {
@@ -453,7 +699,7 @@ class PMD_End_To_End_Test extends TestCase {
 		$this->assertStringContainsString( $live_text, $this->fetch_content( $post_id, 'posts' ) );
 		$this->assertStringNotContainsString( $next_preview_text, $this->fetch_content( $post_id, 'posts' ) );
 
-		$branches        = json_decode( $this->curl_get( $this->base_url . '/wp-json/push-md/v1/branches' ), true );
+		$branches        = array( 'branches' => $this->get_pull_requests() );
 		$branch_metadata = $this->find_branch_metadata( $branches['branches'], $branch );
 		$this->assertSame( $next_tip, $branch_metadata['tip_oid'] );
 		$this->assertSame( $rebased_base, $branch_metadata['base_oid'], 'Rebased preview updates should reset the preview base to current trunk.' );
@@ -561,7 +807,7 @@ class PMD_End_To_End_Test extends TestCase {
 
 	public function testPreviewBranchRestRoutesRequireAdmin() {
 		$suffix        = uniqid( 'branch-permission-' );
-		$list_url      = $this->base_url . '/wp-json/push-md/v1/branches';
+		$list_url      = $this->base_url . '/wp-json/wp/v2/push-md-pull-requests?context=edit&status=push_md_active,push_md_merged,push_md_closed';
 		$merge_url     = $this->base_url . '/wp-json/push-md/v1/branches/merge';
 		$branch        = 'preview/' . $suffix;
 		$anonymous     = $this->curl_get_with_headers( $list_url, false );
@@ -580,11 +826,19 @@ class PMD_End_To_End_Test extends TestCase {
 		$subscriber_list     = $this->curl_get_with_headers( $list_url, $subscriber_header );
 		$subscriber_merge    = $this->curl_post_json_with_auth( $merge_url, array( 'branch' => $branch ), $subscriber_header );
 		$admin_list          = $this->curl_get_with_headers( $list_url, true );
+		$admin_pull_requests = json_decode( $admin_list['body'], true );
+		$this->assertNotEmpty( $admin_pull_requests, 'The permission test requires an existing Pull Request.' );
+		$subscriber_update = $this->curl_post_json_with_auth(
+			$this->base_url . '/wp-json/wp/v2/push-md-pull-requests/' . $admin_pull_requests[0]['id'],
+			array( 'content' => 'Subscribers cannot edit Pull Request descriptions.' ),
+			$subscriber_header
+		);
 
 		$this->assertContains( $anonymous['status'], array( 401, 403 ), 'Anonymous branch list request should be denied.' );
 		$this->assertContains( $anon_merge['status'], array( 401, 403 ), 'Anonymous branch merge request should be denied.' );
 		$this->assertSame( 403, $subscriber_list['status'], 'Subscriber branch list request should be denied.' );
 		$this->assertSame( 403, $subscriber_merge['status'], 'Subscriber branch merge request should be denied.' );
+		$this->assertSame( 403, $subscriber_update['status'], 'Subscriber Pull Request description updates should be denied.' );
 		$this->assertSame( 200, $admin_list['status'], 'Admin branch list request should be allowed.' );
 	}
 
@@ -1363,10 +1617,10 @@ class PMD_End_To_End_Test extends TestCase {
 		$this->assertStringContainsString( 'Update template HTML from Git', $log['output'] );
 		$this->assertStringContainsString( 'Create and delete content from Git', $log['output'] );
 
-		// 11) The CPT-based persistence model is gone.
-		$this->assertNotSame(
+		// 11) Pull Requests use the native CPT REST controller.
+		$this->assertSame(
 			200,
-			$this->http_status( $this->base_url . '/wp-json/wp/v2/types/pmd_commit' )
+			$this->http_status( $this->base_url . '/wp-json/wp/v2/types/push_md_pull_request' )
 		);
 	}
 
@@ -1641,6 +1895,26 @@ class PMD_End_To_End_Test extends TestCase {
 		return $this->curl_post_json_with_auth( $url, $payload, true );
 	}
 
+	private function curl_delete( $url ) {
+		$ch = curl_init( $url );
+		curl_setopt_array(
+			$ch,
+			array(
+				CURLOPT_RETURNTRANSFER => true,
+				CURLOPT_CUSTOMREQUEST  => 'DELETE',
+				CURLOPT_HTTPHEADER     => array( $this->auth_header ),
+			)
+		);
+		$body   = curl_exec( $ch );
+		$status = curl_getinfo( $ch, CURLINFO_HTTP_CODE );
+		curl_close( $ch );
+
+		return array(
+			'status' => $status,
+			'body'   => $body,
+		);
+	}
+
 	private function curl_post_json_with_auth( $url, array $payload, $authenticated ) {
 		$ch = curl_init( $url );
 		curl_setopt_array(
@@ -1704,6 +1978,82 @@ class PMD_End_To_End_Test extends TestCase {
 		$this->assertIsArray( $revisions, "Unexpected revisions response for $endpoint/$id: $body" );
 
 		return count( $revisions );
+	}
+
+	private function get_pull_requests() {
+		$url   = $this->base_url . '/wp-json/wp/v2/push-md-pull-requests'
+			. '?context=edit&per_page=100&status=push_md_active,push_md_merged,push_md_closed'
+			. '&_fields=id,status,date,modified,author,meta,push_md_preview_url,push_md_diff';
+		$body  = $this->curl_get( $url );
+		$items = json_decode( $body, true );
+		$this->assertIsArray( $items, 'Unexpected Pull Request listing response: ' . $body );
+
+		$pull_requests = array();
+		foreach ( $items as $item ) {
+			$meta   = isset( $item['meta'] ) && is_array( $item['meta'] ) ? $item['meta'] : array();
+			$status = isset( $item['status'] ) ? $item['status'] : '';
+			$diff   = isset( $item['push_md_diff'] ) && is_array( $item['push_md_diff'] )
+				? $item['push_md_diff']
+				: array( 'files' => array() );
+			$changed_urls = array();
+			foreach ( $diff['files'] as $file ) {
+				$changed_urls[] = array(
+					'action' => isset( $file['action'] ) ? $file['action'] : '',
+					'path'   => isset( $file['path'] ) ? $file['path'] : '',
+					'url'    => isset( $file['preview_url'] ) ? $file['preview_url'] : '',
+				);
+			}
+
+			$pull_request = array(
+				'pull_request_id' => isset( $item['id'] ) ? intval( $item['id'] ) : 0,
+				'branch'          => isset( $meta['push_md_branch'] ) ? $meta['push_md_branch'] : '',
+				'owner'           => isset( $item['author'] ) ? intval( $item['author'] ) : 0,
+				'base_oid'        => isset( $meta['push_md_base_oid'] ) ? $meta['push_md_base_oid'] : '',
+				'tip_oid'         => isset( $meta['push_md_tip_oid'] ) ? $meta['push_md_tip_oid'] : '',
+				'review_state'    => isset( $meta['push_md_review_state'] ) ? $meta['push_md_review_state'] : 'pending',
+				'url'             => isset( $item['push_md_preview_url'] ) ? $item['push_md_preview_url'] : '',
+				'status'          => str_replace( 'push_md_', '', $status ),
+				'active'          => 'push_md_active' === $status,
+				'created_at'      => isset( $item['date'] ) ? strtotime( $item['date'] ) : 0,
+				'updated_at'      => isset( $item['modified'] ) ? strtotime( $item['modified'] ) : 0,
+				'changed_urls'    => $changed_urls,
+				'diff'            => $diff,
+			);
+			if ( 'push_md_merged' === $status ) {
+				$pull_request['merged_oid'] = isset( $meta['push_md_merged_oid'] ) ? $meta['push_md_merged_oid'] : '';
+				$pull_request['merged_by']  = isset( $meta['push_md_merged_by'] ) ? intval( $meta['push_md_merged_by'] ) : 0;
+				$pull_request['merged_at']  = $pull_request['updated_at'];
+			}
+			$pull_requests[] = $pull_request;
+		}
+
+		return $pull_requests;
+	}
+
+	private function find_diff_anchor( $files ) {
+		foreach ( $files as $file ) {
+			if ( empty( $file['path'] ) || empty( $file['rows'] ) ) {
+				continue;
+			}
+			foreach ( $file['rows'] as $row ) {
+				if ( ! empty( $row['new_line'] ) ) {
+					return array(
+						'path' => $file['path'],
+						'side' => 'new',
+						'line' => intval( $row['new_line'] ),
+					);
+				}
+				if ( ! empty( $row['old_line'] ) ) {
+					return array(
+						'path' => $file['path'],
+						'side' => 'old',
+						'line' => intval( $row['old_line'] ),
+					);
+				}
+			}
+		}
+
+		return array();
 	}
 
 	private function find_branch_metadata( $branches, $branch_name ) {

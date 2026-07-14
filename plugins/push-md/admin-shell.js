@@ -14,8 +14,12 @@
 	var nonce             = config.nonce || '';
 	var statusUrl         = config.statusUrl || '';
 	var retryUrl          = config.retryUrl || '';
-	var branchesUrl       = config.branchesUrl || '';
+	var pullRequestsUrl   = config.pullRequestsUrl || '';
+	var commentsUrl       = config.commentsUrl || '';
 	var mergeBranchUrl    = config.mergeBranchUrl || '';
+	var adminPageUrl      = config.adminPageUrl || '';
+	var pullRequestId     = intval( config.pullRequestId );
+	var reviewStates      = config.reviewStates || {};
 	var remoteUrl         = config.remoteUrl || '';
 	var checkoutDir       = config.checkoutDir || 'site';
 	var cloneCommand      = config.cloneCommand || ('git clone ' + remoteUrl + ' ' + checkoutDir);
@@ -32,6 +36,7 @@
 	var cwdEl             = document.getElementById( 'push-md-prompt-cwd' );
 	var titleEl           = document.getElementById( 'push-md-terminal-title' );
 	var commitListEl      = document.getElementById( 'push-md-commit-list' );
+	var branchPanelEl     = document.getElementById( 'push-md-branches-panel' );
 	var branchListEl      = document.getElementById( 'push-md-branch-list' );
 	var branchMessageEl   = document.getElementById( 'push-md-branches-message' );
 	var branchRefreshEl   = document.getElementById( 'push-md-branches-refresh' );
@@ -40,6 +45,11 @@
 	var history           = [];
 	var historyIndex      = 0;
 	var hasAnnouncedReady = progress.state === 'done';
+
+	if (pullRequestId) {
+		bootPullRequestReview();
+		return;
+	}
 
 	if ( ! stateEl || ! outputEl || ! inputEl) {
 		return;
@@ -157,13 +167,13 @@
 	}
 
 	function fetchBranches() {
-		if ( ! branchesUrl || ! branchListEl || ! branchMessageEl) {
+		if ( ! pullRequestsUrl || ! branchListEl || ! branchMessageEl) {
 			return;
 		}
 
-		setBranchMessage( __( 'Loading preview branches...', 'push-md' ), 'is-muted' );
+		setBranchMessage( __( 'Loading Pull Requests...', 'push-md' ), 'is-muted' );
 		fetch(
-			branchesUrl,
+			pullRequestsUrl + '?context=edit&per_page=100&status=push_md_active,push_md_merged,push_md_closed&_fields=id,title,status,date,modified,meta,push_md_preview_url',
 			{
 				credentials: 'same-origin',
 				headers: { 'X-WP-Nonce': nonce }
@@ -172,19 +182,39 @@
 			parseJsonResponse
 		).then(
 			function (data) {
-				renderBranches( data.branches || [] );
+				renderBranches( (data || []).map( normalizePullRequest ) );
 			}
 		).catch(
 			function (error) {
 				branchListEl.textContent = '';
-				setBranchMessage( error.message || __( 'Could not load preview branches.', 'push-md' ), 'is-error' );
+				setBranchMessage( error.message || __( 'Could not load Pull Requests.', 'push-md' ), 'is-error' );
 			}
 		);
 	}
 
+	function normalizePullRequest(item) {
+		var meta = item.meta || {};
+		return {
+			id: item.id,
+			branch: meta.push_md_branch || (item.title && (item.title.raw || item.title.rendered)) || '',
+			base_oid: meta.push_md_base_oid || '',
+			tip_oid: meta.push_md_tip_oid || '',
+			review_state: meta.push_md_review_state || 'pending',
+			description: item.content && (item.content.raw || item.content.rendered) ? (item.content.raw || stripHtml( item.content.rendered )) : '',
+			description_rendered: item.content && item.content.rendered ? item.content.rendered : '',
+			status: item.status || '',
+			url: item.push_md_preview_url || '',
+			pull_request_url: adminPageUrl + '&pr=' + item.id,
+			updated_at: Math.floor( Date.parse( item.modified || item.date || '' ) / 1000 )
+		};
+	}
+
 	function renderBranches(branches) {
 		branchListEl.textContent = '';
-		branches = Array.isArray( branches ) ? branches.slice( 0 ) : [];
+		branches                 = Array.isArray( branches ) ? branches.slice( 0 ) : [];
+		if (branchPanelEl) {
+			branchPanelEl.hidden = ! branches.length;
+		}
 		branches.sort(
 			function (left, right) {
 				return intval( right.updated_at ) - intval( left.updated_at );
@@ -192,16 +222,19 @@
 		);
 
 		if ( ! branches.length) {
-			setBranchMessage( __( 'No preview branches.', 'push-md' ), 'is-muted' );
+			setBranchMessage( __( 'No Pull Requests.', 'push-md' ), 'is-muted' );
 			return;
 		}
 
 		var activeBranches = [];
 		var mergedBranches = [];
+		var closedBranches = [];
 		branches.forEach(
 			function (branch) {
-				if (branch.merged_at) {
+				if (branch.status === 'push_md_merged') {
 					mergedBranches.push( branch );
+				} else if (branch.status === 'push_md_closed') {
+					closedBranches.push( branch );
 				} else {
 					activeBranches.push( branch );
 				}
@@ -210,13 +243,16 @@
 
 		setBranchMessage( '' );
 		if (activeBranches.length) {
-			branchListEl.appendChild( createBranchSection( __( 'Active previews', 'push-md' ), activeBranches, 'is-active' ) );
+			branchListEl.appendChild( createBranchSection( __( 'Open', 'push-md' ), activeBranches, 'is-active' ) );
 		}
 		if (mergedBranches.length) {
-			branchListEl.appendChild( createBranchSection( __( 'Merged branches', 'push-md' ), mergedBranches, 'is-merged' ) );
+			branchListEl.appendChild( createBranchSection( __( 'Merged', 'push-md' ), mergedBranches, 'is-merged' ) );
+		}
+		if (closedBranches.length) {
+			branchListEl.appendChild( createBranchSection( __( 'Closed', 'push-md' ), closedBranches, 'is-closed' ) );
 		}
 		if ( ! activeBranches.length) {
-			setBranchMessage( __( 'No active preview branches.', 'push-md' ), 'is-muted' );
+			setBranchMessage( __( 'No open Pull Requests.', 'push-md' ), 'is-muted' );
 		}
 	}
 
@@ -224,8 +260,8 @@
 		var section = document.createElement( 'div' );
 		var heading = document.createElement( 'h3' );
 
-		section.className = 'push-md-branch-section ' + className;
-		heading.className = 'push-md-branch-section-title';
+		section.className   = 'push-md-branch-section ' + className;
+		heading.className   = 'push-md-branch-section-title';
 		heading.textContent = title;
 		section.appendChild( heading );
 
@@ -241,22 +277,23 @@
 	function createBranchRow(branch) {
 		var branchName = String( branch.branch || '' );
 		var previewUrl = String( branch.url || '' );
-		var isMerged   = Boolean( branch.merged_at );
+		var isActive   = branch.status === 'push_md_active';
 		var row        = document.createElement( 'div' );
 		var details    = document.createElement( 'div' );
 		var actions    = document.createElement( 'div' );
-		var name       = document.createElement( 'code' );
+		var name       = document.createElement( 'a' );
 		var meta       = document.createElement( 'div' );
 		var preview    = document.createElement( 'a' );
 		var copy       = document.createElement( 'button' );
 		var merge      = document.createElement( 'button' );
 
-		row.className     = 'push-md-branch-row' + (isMerged ? ' is-merged' : '');
+		row.className     = 'push-md-branch-row' + (isActive ? '' : ' is-merged');
 		details.className = 'push-md-branch-details';
 		actions.className = 'push-md-branch-actions';
 		name.className    = 'push-md-branch-name';
 		meta.className    = 'push-md-branch-meta';
 		name.textContent  = branchName;
+		name.href         = branch.pull_request_url;
 
 		meta.appendChild(
 			createMetaItem(
@@ -270,20 +307,17 @@
 		if (branch.base_oid) {
 			meta.appendChild( createMetaItem( __( 'Base', 'push-md' ), shortOid( branch.base_oid ) ) );
 		}
-		if (branch.merged_at) {
-			meta.appendChild( createMetaItem( __( 'Merged', 'push-md' ), formatTimestamp( branch.merged_at ) ) );
-		}
-
 		details.appendChild( name );
+		details.appendChild( createReviewStateBadge( branch.review_state ) );
 		details.appendChild( meta );
-		details.appendChild( createChangedUrlList( branch.changed_urls || [], isMerged ) );
 
-		if (isMerged) {
-			merge.type        = 'button';
-			merge.className   = 'button';
-			merge.disabled    = true;
-			merge.textContent = __( 'Merged', 'push-md' );
-			actions.appendChild( merge );
+		var review         = document.createElement( 'a' );
+		review.className   = 'button';
+		review.href        = branch.pull_request_url;
+		review.textContent = __( 'Review', 'push-md' );
+		actions.appendChild( review );
+
+		if ( ! isActive) {
 			row.appendChild( details );
 			row.appendChild( actions );
 
@@ -316,7 +350,9 @@
 			}
 		);
 
-		actions.appendChild( preview );
+		if (previewUrl) {
+			actions.appendChild( preview );
+		}
 		actions.appendChild( copy );
 		actions.appendChild( merge );
 		row.appendChild( details );
@@ -326,10 +362,10 @@
 	}
 
 	function createMetaItem(label, value) {
-		var item        = document.createElement( 'span' );
-		var labelEl     = document.createElement( 'span' );
-		var valueEl     = document.createElement( 'strong' );
-		item.className  = 'push-md-branch-meta-item';
+		var item            = document.createElement( 'span' );
+		var labelEl         = document.createElement( 'span' );
+		var valueEl         = document.createElement( 'strong' );
+		item.className      = 'push-md-branch-meta-item';
 		labelEl.textContent = label + ': ';
 		valueEl.textContent = value;
 		item.appendChild( labelEl );
@@ -338,13 +374,26 @@
 		return item;
 	}
 
+	function reviewStateLabel(state) {
+		return reviewStates[state] && reviewStates[state].label ? reviewStates[state].label : state;
+	}
+
+	function createReviewStateBadge(state) {
+		var badge         = document.createElement( 'span' );
+		state             = String( state || 'pending' );
+		badge.className   = 'push-md-review-state is-' + state.replace( /[^a-z0-9_-]/g, '-' );
+		badge.textContent = reviewStateLabel( state );
+
+		return badge;
+	}
+
 	function createChangedUrlList(changedUrls, isMerged) {
-		var list = document.createElement( 'ul' );
+		var list       = document.createElement( 'ul' );
 		list.className = 'push-md-changed-url-list';
-		changedUrls = Array.isArray( changedUrls ) ? changedUrls : [];
+		changedUrls    = Array.isArray( changedUrls ) ? changedUrls : [];
 
 		if ( ! changedUrls.length) {
-			var empty = document.createElement( 'li' );
+			var empty         = document.createElement( 'li' );
 			empty.className   = 'is-muted';
 			empty.textContent = __( 'No changed preview URLs available.', 'push-md' );
 			list.appendChild( empty );
@@ -390,6 +439,454 @@
 		return __( 'Changed', 'push-md' );
 	}
 
+	function bootPullRequestReview() {
+		var view    = document.getElementById( 'push-md-pr-view' );
+		var message = document.getElementById( 'push-md-pr-message' );
+		if ( ! view || ! pullRequestsUrl || ! commentsUrl) {
+			return;
+		}
+
+		message.textContent = __( 'Loading Pull Request...', 'push-md' );
+		Promise.all(
+			[
+				fetch(
+					pullRequestsUrl + '/' + pullRequestId + '?context=edit&_fields=id,title,content,status,date,modified,meta,push_md_diff,push_md_preview_url',
+					{ credentials: 'same-origin', headers: { 'X-WP-Nonce': nonce } }
+				).then( parseJsonResponse ),
+				fetch(
+					commentsUrl + '?context=edit&post=' + pullRequestId + '&type=note&status=all&per_page=100&_fields=id,author_name,date,content,meta,parent,push_md_tip_oid',
+					{ credentials: 'same-origin', headers: { 'X-WP-Nonce': nonce } }
+				).then( parseJsonResponse )
+			]
+		).then(
+			function (results) {
+				message.textContent = '';
+				renderPullRequestReview( normalizePullRequest( results[0] ), results[0].push_md_diff || { files: [] }, results[1] || [] );
+			}
+		).catch(
+			function (error) {
+				view.textContent    = '';
+				message.textContent = error.message || __( 'Could not load Pull Request.', 'push-md' );
+				message.className   = 'push-md-branch-message is-error';
+			}
+		);
+	}
+
+	function renderPullRequestReview(pullRequest, diff, notes) {
+		var view         = document.getElementById( 'push-md-pr-view' );
+		var header       = document.createElement( 'div' );
+		var title        = document.createElement( 'h1' );
+		var status       = document.createElement( 'span' );
+		var reviewState  = createReviewStateBadge( pullRequest.review_state );
+		var statusGroup  = document.createElement( 'div' );
+		var meta         = document.createElement( 'div' );
+		var actions      = document.createElement( 'div' );
+		var isActive     = pullRequest.status === 'push_md_active';
+		var usedNoteIds  = {};
+		var generalNotes = notes.filter(
+			function (note) {
+				return ! note.meta || ! note.meta.push_md_path;
+			}
+		);
+
+		view.textContent      = '';
+		header.className      = 'push-md-pr-header';
+		title.textContent     = pullRequest.branch;
+		status.className      = 'push-md-pr-status ' + pullRequest.status;
+		status.textContent    = pullRequest.status === 'push_md_merged' ? __( 'Merged', 'push-md' ) : (pullRequest.status === 'push_md_closed' ? __( 'Closed', 'push-md' ) : __( 'Open', 'push-md' ));
+		statusGroup.className = 'push-md-pr-states';
+		statusGroup.appendChild( status );
+		statusGroup.appendChild( reviewState );
+		meta.className = 'push-md-branch-meta';
+		meta.appendChild( createMetaItem( __( 'Base', 'push-md' ), shortOid( pullRequest.base_oid ) ) );
+		meta.appendChild( createMetaItem( __( 'Tip', 'push-md' ), shortOid( pullRequest.tip_oid ) ) );
+		meta.appendChild( createMetaItem( __( 'Updated', 'push-md' ), formatTimestamp( pullRequest.updated_at ) ) );
+		actions.className = 'push-md-pr-actions';
+		if (isActive && pullRequest.url) {
+			var preview         = document.createElement( 'a' );
+			preview.className   = 'button';
+			preview.href        = pullRequest.url;
+			preview.target      = '_blank';
+			preview.rel         = 'noopener noreferrer';
+			preview.textContent = __( 'Preview', 'push-md' );
+			actions.appendChild( preview );
+
+			var merge         = document.createElement( 'button' );
+			merge.type        = 'button';
+			merge.className   = 'button button-primary';
+			merge.textContent = __( 'Merge', 'push-md' );
+			merge.addEventListener(
+				'click',
+				function () {
+					mergeBranch( pullRequest.branch, merge ); }
+			);
+			actions.appendChild( merge );
+		}
+		header.appendChild( statusGroup );
+		header.appendChild( title );
+		header.appendChild( meta );
+		header.appendChild( actions );
+		header.appendChild( createDescriptionPanel( pullRequest, isActive ) );
+		view.appendChild( header );
+		view.appendChild( createCommitHistoryPanel( diff && diff.commits ? diff.commits : [] ) );
+		view.appendChild( createConversationPanel( generalNotes, isActive, usedNoteIds ) );
+
+		var files = diff && Array.isArray( diff.files ) ? diff.files : [];
+		files.forEach(
+			function (file) {
+				view.appendChild( createDiffFile( file, notes, isActive, usedNoteIds ) );
+			}
+		);
+		if ( ! files.length) {
+			var empty         = document.createElement( 'div' );
+			empty.className   = 'push-md-panel';
+			empty.textContent = __( 'No changed files.', 'push-md' );
+			view.appendChild( empty );
+		}
+
+		var unplaced = notes.filter(
+			function (note) {
+				return note.meta && note.meta.push_md_path && ! usedNoteIds[note.id];
+			}
+		);
+		if (unplaced.length) {
+			var unplacedPanel         = document.createElement( 'div' );
+			var unplacedTitle         = document.createElement( 'h2' );
+			unplacedPanel.className   = 'push-md-panel';
+			unplacedTitle.textContent = __( 'Unplaced comments', 'push-md' );
+			unplacedPanel.appendChild( unplacedTitle );
+			unplaced.forEach(
+				function (note) {
+					unplacedPanel.appendChild( createNote( note, noteAnchorLabel( note ) ) ); }
+			);
+			view.appendChild( unplacedPanel );
+		}
+	}
+
+	function createDescriptionPanel(pullRequest, isActive) {
+		var panel         = document.createElement( 'section' );
+		var title         = document.createElement( 'h2' );
+		var description   = document.createElement( 'div' );
+		panel.className   = 'push-md-pr-description';
+		title.textContent = __( 'Description', 'push-md' );
+		panel.appendChild( title );
+		description.className = 'push-md-pr-description-content' + (pullRequest.description ? '' : ' is-empty');
+		description.innerHTML = pullRequest.description_rendered || '';
+
+		if ( ! isActive) {
+			if ( ! pullRequest.description) {
+				description.textContent = __( 'No description provided.', 'push-md' );
+			}
+			panel.appendChild( description );
+
+			return panel;
+		}
+
+		var form                    = document.createElement( 'form' );
+		var button                  = document.createElement( 'button' );
+		var initialContent          = description.innerHTML;
+		form.className              = 'push-md-pr-description-form';
+		description.contentEditable = 'true';
+		description.setAttribute( 'role', 'textbox' );
+		description.setAttribute( 'aria-multiline', 'true' );
+		description.setAttribute( 'data-placeholder', __( 'Describe this Pull Request.', 'push-md' ) );
+		button.type        = 'submit';
+		button.className   = 'button button-primary';
+		button.textContent = __( 'Save description', 'push-md' );
+		button.hidden      = true;
+		form.appendChild( description );
+		form.appendChild( button );
+		description.addEventListener(
+			'input',
+			function () {
+				description.classList.toggle( 'is-empty', '' === description.textContent.trim() );
+				button.hidden = description.innerHTML === initialContent;
+			}
+		);
+		form.addEventListener(
+			'submit',
+			function (event) {
+				event.preventDefault();
+				if (button.hidden) {
+					return;
+				}
+				button.disabled = true;
+				updatePullRequestDescription( description.textContent.trim() ? description.innerHTML : '' ).catch(
+					function (error) {
+						button.disabled = false;
+						window.alert( error.message || __( 'Could not save the Pull Request description.', 'push-md' ) );
+					}
+				);
+			}
+		);
+		panel.appendChild( form );
+
+		return panel;
+	}
+
+	function createCommitHistoryPanel(commits) {
+		var panel         = document.createElement( 'section' );
+		var title         = document.createElement( 'h2' );
+		var list          = document.createElement( 'ol' );
+		panel.className   = 'push-md-panel push-md-pr-commit-history';
+		title.textContent = __( 'Commit history', 'push-md' );
+		list.className    = 'push-md-pr-commit-list';
+		panel.appendChild( title );
+		panel.appendChild( list );
+		commits = Array.isArray( commits ) ? commits : [];
+		if ( ! commits.length) {
+			var empty         = document.createElement( 'li' );
+			empty.className   = 'is-empty';
+			empty.textContent = __( 'No commits in this Pull Request.', 'push-md' );
+			list.appendChild( empty );
+
+			return panel;
+		}
+
+		commits.forEach(
+			function (commit) {
+				var item            = document.createElement( 'li' );
+				var oid             = document.createElement( 'code' );
+				var copy            = document.createElement( 'div' );
+				var subject         = document.createElement( 'strong' );
+				oid.textContent     = shortOid( commit.oid );
+				subject.textContent = commit.subject || __( '(no message)', 'push-md' );
+				copy.className      = 'push-md-pr-commit-copy';
+				item.appendChild( oid );
+				copy.appendChild( subject );
+				if (commit.description) {
+					var description         = document.createElement( 'p' );
+					description.textContent = commit.description;
+					copy.appendChild( description );
+				}
+				item.appendChild( copy );
+				list.appendChild( item );
+			}
+		);
+
+		return panel;
+	}
+
+	function createConversationPanel(notes, isActive, usedNoteIds) {
+		var panel         = document.createElement( 'div' );
+		var title         = document.createElement( 'h2' );
+		var list          = document.createElement( 'div' );
+		panel.className   = 'push-md-panel push-md-conversation';
+		title.textContent = __( 'Conversation', 'push-md' );
+		list.className    = 'push-md-notes';
+		notes.forEach(
+			function (note) {
+				usedNoteIds[note.id] = true;
+				list.appendChild( createNote( note, '' ) );
+			}
+		);
+		panel.appendChild( title );
+		panel.appendChild( list );
+		if (isActive) {
+			panel.appendChild( createNoteForm( {}, __( 'Leave a comment', 'push-md' ), true ) );
+		}
+		return panel;
+	}
+
+	function createDiffFile(file, notes, isActive, usedNoteIds) {
+		var container       = document.createElement( 'section' );
+		var header          = document.createElement( 'div' );
+		var path            = document.createElement( 'code' );
+		var badge           = document.createElement( 'span' );
+		var rows            = document.createElement( 'div' );
+		container.className = 'push-md-diff-file';
+		header.className    = 'push-md-diff-header';
+		path.textContent    = file.path;
+		badge.className     = 'push-md-changed-action';
+		badge.textContent   = formatChangedAction( file.action );
+		header.appendChild( path );
+		header.appendChild( badge );
+		if (file.preview_url) {
+			var preview         = document.createElement( 'a' );
+			preview.href        = file.preview_url;
+			preview.target      = '_blank';
+			preview.rel         = 'noopener noreferrer';
+			preview.textContent = __( 'Preview file', 'push-md' );
+			header.appendChild( preview );
+		}
+		rows.className = 'push-md-diff-rows';
+		(file.rows || []).forEach(
+			function (row) {
+				var line              = document.createElement( 'div' );
+				var add               = document.createElement( 'button' );
+				var oldNumber         = document.createElement( 'span' );
+				var newNumber         = document.createElement( 'span' );
+				var content           = document.createElement( 'code' );
+				var anchorSide        = row.new_line !== null ? 'new' : 'old';
+				var anchorLine        = row.new_line !== null ? row.new_line : row.old_line;
+				line.className        = 'push-md-diff-line is-' + row.type;
+				add.type              = 'button';
+				add.className         = 'push-md-diff-add';
+				add.textContent       = '+';
+				add.title             = __( 'Comment on this line', 'push-md' );
+				add.disabled          = ! isActive;
+				oldNumber.textContent = row.old_line === null ? '' : row.old_line;
+				newNumber.textContent = row.new_line === null ? '' : row.new_line;
+				content.textContent   = row.content;
+				line.appendChild( add );
+				line.appendChild( oldNumber );
+				line.appendChild( newNumber );
+				line.appendChild( content );
+				if (isActive) {
+					add.addEventListener(
+						'click',
+						function () {
+							var existing = line.nextSibling;
+							if (existing && existing.classList && existing.classList.contains( 'push-md-inline-form' )) {
+								existing.remove();
+								return;
+							}
+							var form = createNoteForm(
+								{ push_md_path: file.path, push_md_side: anchorSide, push_md_line: anchorLine },
+								__( 'Comment on line', 'push-md' ) + ' ' + anchorLine
+							);
+							form.classList.add( 'push-md-inline-form' );
+							line.parentNode.insertBefore( form, line.nextSibling );
+						}
+					);
+				}
+				rows.appendChild( line );
+				appendAnchoredNotes( rows, notes, file.path, row, usedNoteIds );
+			}
+		);
+		container.appendChild( header );
+		container.appendChild( rows );
+		return container;
+	}
+
+	function appendAnchoredNotes(container, notes, path, row, usedNoteIds) {
+		notes.forEach(
+			function (note) {
+				var meta       = note.meta || {};
+				var matchesOld = meta.push_md_path === path && meta.push_md_side === 'old' && intval( meta.push_md_line ) === intval( row.old_line );
+				var matchesNew = meta.push_md_path === path && meta.push_md_side === 'new' && intval( meta.push_md_line ) === intval( row.new_line );
+				if (matchesOld || matchesNew) {
+					usedNoteIds[note.id] = true;
+					container.appendChild( createNote( note, noteAnchorLabel( note ) ) );
+				}
+			}
+		);
+	}
+
+	function createNote(note, label) {
+		var element         = document.createElement( 'article' );
+		var header          = document.createElement( 'div' );
+		var content         = document.createElement( 'div' );
+		element.className   = 'push-md-note';
+		header.className    = 'push-md-note-header';
+		var stateLabel      = note.meta && note.meta.push_md_review_state
+			? sprintf( __( 'Changed state to %s', 'push-md' ), reviewStateLabel( note.meta.push_md_review_state ) )
+			: '';
+		header.textContent  = (note.author_name || __( 'Reviewer', 'push-md' )) + (label ? ' · ' + label : '') + (stateLabel ? ' · ' + stateLabel : '');
+		content.className   = 'push-md-note-content';
+		content.textContent = note.content && (note.content.raw || note.content.rendered) ? (note.content.raw || stripHtml( note.content.rendered )) : '';
+		element.appendChild( header );
+		element.appendChild( content );
+		return element;
+	}
+
+	function createNoteForm(meta, label, allowReviewState) {
+		var form             = document.createElement( 'form' );
+		var textarea         = document.createElement( 'textarea' );
+		var button           = document.createElement( 'button' );
+		var stateSelect      = null;
+		form.className       = 'push-md-note-form';
+		textarea.rows        = 3;
+		textarea.placeholder = label;
+		button.type          = 'submit';
+		button.className     = 'button button-primary';
+		button.textContent   = __( 'Comment', 'push-md' );
+		form.appendChild( textarea );
+		if (allowReviewState) {
+			var stateField             = document.createElement( 'label' );
+			var stateFieldText         = document.createElement( 'span' );
+			stateSelect                = document.createElement( 'select' );
+			stateField.className       = 'push-md-note-state-field';
+			stateFieldText.textContent = __( 'Change state', 'push-md' );
+			var noChange               = document.createElement( 'option' );
+			noChange.value             = '';
+			noChange.textContent       = __( 'No state change', 'push-md' );
+			stateSelect.appendChild( noChange );
+			Object.keys( reviewStates ).forEach(
+				function (state) {
+					var option         = document.createElement( 'option' );
+					option.value       = state;
+					option.textContent = reviewStateLabel( state );
+					stateSelect.appendChild( option );
+				}
+			);
+			stateField.appendChild( stateFieldText );
+			stateField.appendChild( stateSelect );
+			form.appendChild( stateField );
+		}
+		form.appendChild( button );
+		form.addEventListener(
+			'submit',
+			function (event) {
+				event.preventDefault();
+				if ( ! textarea.value.trim()) {
+					return;
+				}
+				var submittedMeta = {};
+				Object.keys( meta ).forEach(
+					function (key) {
+						submittedMeta[key] = meta[key]; }
+				);
+				if (stateSelect && stateSelect.value) {
+					submittedMeta.push_md_review_state = stateSelect.value;
+				}
+				button.disabled = true;
+				postNote( textarea.value, submittedMeta ).catch(
+					function (error) {
+						button.disabled = false;
+						window.alert( error.message || __( 'Could not save comment.', 'push-md' ) );
+					}
+				);
+			}
+		);
+		return form;
+	}
+
+	function postNote(content, meta) {
+		return fetch(
+			commentsUrl,
+			{
+				method: 'POST',
+				credentials: 'same-origin',
+				headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': nonce },
+				body: JSON.stringify( { post: pullRequestId, type: 'note', content: content, meta: meta } )
+			}
+		).then( parseJsonResponse ).then( bootPullRequestReview );
+	}
+
+	function updatePullRequestDescription(content) {
+		return fetch(
+			pullRequestsUrl + '/' + pullRequestId,
+			{
+				method: 'POST',
+				credentials: 'same-origin',
+				headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': nonce },
+				body: JSON.stringify( { content: content } )
+			}
+		).then( parseJsonResponse ).then( bootPullRequestReview );
+	}
+
+	function noteAnchorLabel(note) {
+		var meta = note.meta || {};
+		return String( meta.push_md_path || '' ) + ':' + String( meta.push_md_line || '' ) + ' (' + String( meta.push_md_side || '' ) + ')';
+	}
+
+	function stripHtml(value) {
+		var element       = document.createElement( 'div' );
+		element.innerHTML = String( value || '' );
+		return element.textContent || '';
+	}
+
 	function mergeBranch(branchName, button) {
 		if ( ! mergeBranchUrl) {
 			return;
@@ -419,8 +916,12 @@
 		).then(
 			function (data) {
 				setBranchMessage( sprintf( __( 'Merged %s into live content.', 'push-md' ), data.branch || branchName ), 'is-success' );
-				fetchBranches();
-				poll();
+				if (pullRequestId) {
+					bootPullRequestReview();
+				} else {
+					fetchBranches();
+					poll();
+				}
 			}
 		).catch(
 			function (error) {
