@@ -10,7 +10,12 @@ if [ ! -f "$ZIP_PATH" ]; then
 fi
 
 CONTENTS_FILE="$(mktemp)"
-trap 'rm -f "$CONTENTS_FILE"' EXIT
+EXTRACT_DIR="$(mktemp -d)"
+cleanup() {
+	rm -f "$CONTENTS_FILE"
+	rm -rf "$EXTRACT_DIR"
+}
+trap cleanup EXIT
 
 zipinfo -1 "$ZIP_PATH" > "$CONTENTS_FILE"
 
@@ -62,6 +67,9 @@ require_file 'push-md/skills/default-agent-skill.md'
 require_file 'push-md/skills/default-template-editor-skill.md'
 require_file 'push-md/php-toolkit/vendor/composer/ClassLoader.php'
 require_file 'push-md/php-toolkit/components/Markdown/class-markdownconsumer.php'
+require_file 'push-md/php-toolkit/components/Merge/Diff/class-diff.php'
+require_file 'push-md/php-toolkit/components/Merge/Diff/class-differ.php'
+require_file 'push-md/php-toolkit/components/Merge/Diff/class-linediffer.php'
 require_file 'push-md/php-toolkit/components/Markdown/vendor-patched/league/commonmark/LICENSE'
 require_file 'push-md/php-toolkit/components/Markdown/vendor-patched/league/config/LICENSE.md'
 require_file 'push-md/php-toolkit/components/Markdown/vendor-patched/dflydev/dot-access-data/LICENSE'
@@ -94,5 +102,25 @@ reject_content_pattern 'class[[:space:]]+PMD_|interface[[:space:]]+PMD_|trait[[:
 reject_content_pattern '['\''"]pmd_(seed|auth|required|forbidden|error|invalid|files|directory_entries)' 'Push MD zip must not use old three-letter pmd_ storage or error identifiers.'
 reject_content_pattern '['\''"]guideline_source['\''"]' 'Push MD zip must not use the unprefixed guideline_source post meta key.'
 reject_content_pattern '^Contributors:.*automattic' 'Push MD readme lists the unusual automattic contributor.'
+
+unzip -q "$ZIP_PATH" -d "$EXTRACT_DIR"
+PUSH_MD_INSPECT_PLUGIN_DIR="$EXTRACT_DIR/push-md" php <<'PHP'
+<?php
+
+define( 'ABSPATH', sys_get_temp_dir() . '/' );
+require getenv( 'PUSH_MD_INSPECT_PLUGIN_DIR' ) . '/push-md-toolkit-bootstrap.php';
+
+$line_differ_class = 'PushMDVendor\\WordPress\\Merge\\Diff\\LineDiffer';
+if ( ! class_exists( $line_differ_class ) ) {
+	fwrite( STDERR, "Push MD bundled runtime cannot autoload LineDiffer.\n" );
+	exit( 1 );
+}
+
+$changes = ( new $line_differ_class() )->diff( 'before', 'after' )->get_changes();
+if ( empty( $changes ) ) {
+	fwrite( STDERR, "Push MD bundled LineDiffer did not produce a diff.\n" );
+	exit( 1 );
+}
+PHP
 
 echo "Push MD zip contents look submission-ready: $ZIP_PATH"

@@ -195,6 +195,8 @@ class PMD_End_To_End_Test extends TestCase {
 		$this->assertStringContainsString( 'Push MD stored preview branch ' . $branch . ' without changing WordPress content.', $push_result['output'] );
 		$this->assertStringContainsString( 'Preview: ', $push_result['output'] );
 		$this->assertStringContainsString( '?branch=', $push_result['output'] );
+		$this->assertStringContainsString( 'Pull request: ', $push_result['output'] );
+		$this->assertStringContainsString( '/wp-admin/tools.php?page=push-md&pr=', $push_result['output'] );
 		$this->assertStringContainsString( 'Changed preview URLs:', $push_result['output'] );
 		$this->assertStringContainsString( 'Updated post/' . $slug . '.md: ', $push_result['output'] );
 		$this->assertStringContainsString( 'Created post/' . $new_slug . '.md: ', $push_result['output'] );
