@@ -2208,7 +2208,7 @@ class Push_MD_Plugin {
 			$push_header['validation_old_oid'],
 			$push_header['new_oid']
 		);
-		self::update_preview_branch_metadata( $push_header );
+		$push_header['pull_request_id'] = self::update_preview_branch_metadata( $push_header );
 	}
 
 	private static function is_commit_ancestor( GitRepository $repository, $ancestor, $descendant ) {
@@ -3107,6 +3107,12 @@ class Push_MD_Plugin {
 			'Preview: %s',
 			self::sanitize_push_summary_text( self::get_preview_branch_url( $push_header['branch_name'] ) )
 		);
+		if ( ! empty( $push_header['pull_request_id'] ) ) {
+			$messages[] = sprintf(
+				'Pull request: %s',
+				self::sanitize_push_summary_text( Push_MD_Pull_Requests::get_pull_request_admin_url( $push_header['pull_request_id'] ) )
+			);
+		}
 
 		$changed_urls = array();
 		if ( $repository ) {
@@ -3406,7 +3412,7 @@ class Push_MD_Plugin {
 	}
 
 	private static function update_preview_branch_metadata( $push_header ) {
-		Push_MD_Pull_Requests::update_active_pull_request( $push_header );
+		return Push_MD_Pull_Requests::update_active_pull_request( $push_header );
 	}
 
 	private static function delete_preview_branch_metadata( $branch_name ) {
