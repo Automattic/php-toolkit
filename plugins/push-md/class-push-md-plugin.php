@@ -10,6 +10,8 @@ use WordPress\Git\Model\TreeEntry;
 use WordPress\Git\Protocol\GitProtocolEncoderPipe;
 use WordPress\Markdown\MarkdownConsumer;
 use WordPress\Markdown\MarkdownProducer;
+use WordPress\Merge\Diff\Diff;
+use WordPress\Merge\Diff\LineDiffer;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -85,6 +87,7 @@ class Push_MD_Plugin {
 
 		Push_MD_Seeder::bootstrap();
 		Push_MD_Admin::bootstrap();
+		Push_MD_Pull_Requests::bootstrap();
 	}
 
 	public static function on_activation() {
@@ -724,6 +727,8 @@ class Push_MD_Plugin {
 		if ( ! self::is_branch_preview_active() ) {
 			return;
 		}
+		$pull_request     = Push_MD_Pull_Requests::get_active_pull_request_for_branch( self::$active_preview_branch );
+		$pull_request_url = $pull_request ? Push_MD_Pull_Requests::get_pull_request_admin_url( $pull_request->ID ) : '';
 		?>
 		<div id="push-md-branch-preview-notice" style="position:fixed;right:16px;bottom:16px;z-index:99999;padding:8px 10px;border-radius:4px;background:#1d2327;color:#f6f7f7;font:13px/1.4 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;box-shadow:0 6px 18px rgba(0,0,0,.2);">
 			<?php
@@ -735,6 +740,9 @@ class Push_MD_Plugin {
 				)
 			);
 			?>
+			<?php if ( $pull_request_url ) : ?>
+				<a href="<?php echo esc_url( $pull_request_url ); ?>" style="margin-left:8px;color:#72aee6;text-decoration:underline;"><?php esc_html_e( 'Review pull request', 'push-md' ); ?></a>
+			<?php endif; ?>
 		</div>
 		<?php
 	}
@@ -3158,6 +3166,135 @@ class Push_MD_Plugin {
 		return $items;
 	}
 
+	public static function get_pull_request_diff( $post_id ) {
+		$post = get_post( $post_id );
+		if ( ! $post || Push_MD_Pull_Requests::POST_TYPE !== $post->post_type ) {
+			return array(
+				'files'   => array(),
+				'commits' => array(),
+			);
+		}
+
+		$base_oid = get_post_meta( $post->ID, 'push_md_base_oid', true );
+		$tip_oid  = get_post_meta( $post->ID, 'push_md_tip_oid', true );
+		if ( ! is_string( $base_oid ) || ! is_string( $tip_oid ) || Commit::is_null_hash( $tip_oid ) ) {
+			return array(
+				'files'   => array(),
+				'commits' => array(),
+			);
+		}
+
+		$repository = self::open_repository();
+		if ( ! $repository->has_object( $tip_oid ) || ( ! Commit::is_null_hash( $base_oid ) && ! $repository->has_object( $base_oid ) ) ) {
+			return array(
+				'files'   => array(),
+				'commits' => array(),
+			);
+		}
+
+		$commits = array();
+		try {
+			$commit_oids = $repository->get_commits_range(
+				$tip_oid,
+				$base_oid,
+				array( 'include_ancestor' => false )
+			);
+			foreach ( array_slice( $commit_oids, 0, 100 ) as $commit_oid ) {
+				$commit      = $repository->read_object( $commit_oid )->as_commit();
+				$message     = trim( (string) $commit->message );
+				$message     = preg_split( "/\r\n|\n|\r/", $message );
+				$subject     = is_array( $message ) && ! empty( $message ) ? trim( array_shift( $message ) ) : '';
+				$description = is_array( $message ) ? trim( implode( "\n", $message ) ) : '';
+				$commits[]   = array(
+					'oid'         => $commit_oid,
+					'subject'     => '' !== $subject ? $subject : __( '(no message)', 'push-md' ),
+					'description' => $description,
+				);
+			}
+		} catch ( Throwable $exception ) {
+			unset( $exception );
+		}
+
+		$base_files = Commit::is_null_hash( $base_oid )
+			? array()
+			: self::read_repository_entries_from_commit( $repository, $base_oid );
+		$tip_files  = self::read_repository_entries_from_commit( $repository, $tip_oid );
+		$paths      = self::calculate_repository_changed_paths( $base_files, $tip_files );
+		ksort( $paths );
+		$branch_name = get_post_meta( $post->ID, 'push_md_branch', true );
+		$line_differ = new LineDiffer();
+		$files       = array();
+
+		foreach ( array_keys( $paths ) as $path ) {
+			$old_entry = isset( $base_files[ $path ] ) ? $base_files[ $path ] : null;
+			$new_entry = isset( $tip_files[ $path ] ) ? $tip_files[ $path ] : null;
+			$old_text  = is_array( $old_entry ) ? $old_entry['content'] : '';
+			$new_text  = is_array( $new_entry ) ? $new_entry['content'] : '';
+			$rows      = array();
+			$old_line  = 1;
+			$new_line  = 1;
+
+			foreach ( $line_differ->diff( $old_text, $new_text )->get_changes() as $change ) {
+				$row = array(
+					'type'     => 'context',
+					'old_line' => null,
+					'new_line' => null,
+					'content'  => rtrim( $change[1], "\n" ),
+				);
+				if ( Diff::DIFF_DELETE === $change[0] ) {
+					$row['type']     = 'deleted';
+					$row['old_line'] = $old_line;
+					++$old_line;
+				} elseif ( Diff::DIFF_INSERT === $change[0] ) {
+					$row['type']     = 'added';
+					$row['new_line'] = $new_line;
+					++$new_line;
+				} else {
+					$row['old_line'] = $old_line;
+					$row['new_line'] = $new_line;
+					++$old_line;
+					++$new_line;
+				}
+				$rows[] = $row;
+			}
+
+			$preview_entry = $new_entry ? $new_entry : $old_entry;
+			$files[]       = array(
+				'action'      => $new_entry ? ( $old_entry ? 'updated' : 'created' ) : 'deleted',
+				'path'        => $path,
+				'preview_url' => Push_MD_Pull_Requests::STATUS_ACTIVE === $post->post_status
+					? self::get_preview_url_for_repository_path( $path, $preview_entry, $branch_name )
+					: '',
+				'rows'        => $rows,
+			);
+		}
+
+		return array(
+			'files'   => $files,
+			'commits' => $commits,
+		);
+	}
+
+	public static function pull_request_diff_has_anchor( $post_id, $path, $side, $line ) {
+		if ( ! in_array( $side, array( 'old', 'new' ), true ) || $line < 1 ) {
+			return false;
+		}
+
+		$diff = self::get_pull_request_diff( $post_id );
+		foreach ( $diff['files'] as $file ) {
+			if ( $path !== $file['path'] ) {
+				continue;
+			}
+			foreach ( $file['rows'] as $row ) {
+				if ( $line === $row[ $side . '_line' ] ) {
+					return true;
+				}
+			}
+		}
+
+		return false;
+	}
+
 	private static function get_preview_url_for_repository_path( $path, $entry, $branch_name ) {
 		$branch_url = self::get_preview_branch_url( $branch_name );
 		if ( ! is_array( $entry ) || TreeEntry::FILE_MODE_SYMBOLIC_LINK === $entry['mode'] ) {
@@ -3240,6 +3377,10 @@ class Push_MD_Plugin {
 	}
 
 	public static function get_preview_branches() {
+		if ( class_exists( 'Push_MD_Pull_Requests' ) ) {
+			return Push_MD_Pull_Requests::get_branch_metadata_map();
+		}
+
 		$branches = get_option( self::BRANCH_PREVIEWS_OPTION, array() );
 
 		return is_array( $branches ) ? $branches : array();
@@ -3265,32 +3406,11 @@ class Push_MD_Plugin {
 	}
 
 	private static function update_preview_branch_metadata( $push_header ) {
-		$branches    = self::get_preview_branches();
-		$branch_name = $push_header['branch_name'];
-		$existing    = isset( $branches[ $branch_name ] ) && is_array( $branches[ $branch_name ] )
-			? $branches[ $branch_name ]
-			: array();
-		$created_at  = isset( $existing['created_at'] ) && ! self::is_preview_branch_merged( $existing ) ? intval( $existing['created_at'] ) : time();
-
-		$branches[ $branch_name ] = array(
-			'branch'     => $branch_name,
-			'ref'        => $push_header['ref_name'],
-			'owner'      => get_current_user_id(),
-			'base_oid'   => $push_header['base_oid'],
-			'tip_oid'    => $push_header['new_oid'],
-			'url'        => self::get_preview_branch_url( $branch_name ),
-			'created_at' => $created_at,
-			'updated_at' => time(),
-		);
-
-		update_option( self::BRANCH_PREVIEWS_OPTION, $branches, false );
+		Push_MD_Pull_Requests::update_active_pull_request( $push_header );
 	}
 
 	private static function delete_preview_branch_metadata( $branch_name ) {
-		$branches = self::get_preview_branches();
-		unset( $branches[ $branch_name ] );
-
-		update_option( self::BRANCH_PREVIEWS_OPTION, $branches, false );
+		Push_MD_Pull_Requests::close_pull_request( $branch_name );
 	}
 
 	public static function list_preview_branches() {
@@ -3354,27 +3474,17 @@ class Push_MD_Plugin {
 		$branch_metadata = isset( $branches[ $branch_name ] ) && is_array( $branches[ $branch_name ] )
 			? $branches[ $branch_name ]
 			: array();
+		if ( empty( $branch_metadata ) ) {
+			throw new Exception( 'Active Pull Request not found.' );
+		}
 		if ( self::is_preview_branch_merged( $branch_metadata ) ) {
 			throw new Exception( 'Preview branch has already been merged.' );
 		}
 
-		$base_oid     = isset( $branch_metadata['base_oid'] ) && is_string( $branch_metadata['base_oid'] )
+		$base_oid   = isset( $branch_metadata['base_oid'] ) && is_string( $branch_metadata['base_oid'] )
 			? $branch_metadata['base_oid']
 			: $current_head;
-		$merged_oid   = $branch_tip;
-		$changed_urls = array();
-		try {
-			$changed_urls = self::get_preview_branch_changed_url_items(
-				$repository,
-				array(
-					'branch_name' => $branch_name,
-					'base_oid'    => $base_oid,
-					'new_oid'     => $branch_tip,
-				)
-			);
-		} catch ( Throwable $exception ) {
-			$changed_urls = array();
-		}
+		$merged_oid = $branch_tip;
 
 		$can_fast_forward = true;
 		$range_exception  = null;
@@ -3408,27 +3518,7 @@ class Push_MD_Plugin {
 			$repository->set_branch_tip( 'refs/heads/' . self::DEFAULT_BRANCH, $merged_oid );
 		}
 
-		$merged_at                 = time();
-		$archived_branch           = $branch_metadata;
-		$archived_branch['branch'] = $branch_name;
-		$archived_branch['ref']    = $ref_name;
-		if ( ! isset( $archived_branch['owner'] ) ) {
-			$archived_branch['owner'] = get_current_user_id();
-		}
-		if ( ! isset( $archived_branch['created_at'] ) ) {
-			$archived_branch['created_at'] = $merged_at;
-		}
-		$archived_branch['updated_at']     = isset( $archived_branch['updated_at'] ) ? intval( $archived_branch['updated_at'] ) : $merged_at;
-		$archived_branch['base_oid']       = $base_oid;
-		$archived_branch['tip_oid']        = $branch_tip;
-		$archived_branch['merged_oid']     = $merged_oid;
-		$archived_branch['merged_at']      = $merged_at;
-		$archived_branch['merged_by']      = get_current_user_id();
-		$archived_branch['url']            = self::get_preview_branch_url( $branch_name );
-		$archived_branch['changed_urls']   = $changed_urls;
-		$archived_branch['ref_deleted_at'] = 0;
-		$branches[ $branch_name ]          = $archived_branch;
-		update_option( self::BRANCH_PREVIEWS_OPTION, $branches, false );
+		Push_MD_Pull_Requests::merge_pull_request( $branch_name, $merged_oid );
 
 		$branch_deleted = false;
 		try {
@@ -3438,13 +3528,6 @@ class Push_MD_Plugin {
 			}
 		} catch ( Throwable $exception ) {
 			$branch_deleted = false;
-		}
-
-		if ( $branch_deleted ) {
-			$branches                                      = self::get_preview_branches();
-			$branches[ $branch_name ]['ref_deleted_at']    = time();
-			$branches[ $branch_name ]['ref_delete_failed'] = false;
-			update_option( self::BRANCH_PREVIEWS_OPTION, $branches, false );
 		}
 
 		return array(

@@ -52,9 +52,27 @@ function push_md_uninstall_cleanup() {
 function push_md_uninstall_cleanup_site() {
 	delete_option( 'push_md_seed_state' );
 	delete_option( 'push_md_seed_progress' );
+	delete_option( 'push_md_branch_previews' );
 	delete_transient( 'push_md_seed_lock' );
 	wp_clear_scheduled_hook( 'push_md_seed_tick' );
+	push_md_uninstall_delete_pull_requests();
 	push_md_uninstall_drop_repository_tables();
+}
+
+/**
+ * Delete Pull Requests through WordPress so their Notes and metadata follow.
+ */
+function push_md_uninstall_delete_pull_requests() {
+	global $wpdb;
+
+	// The CPT and its custom statuses are not registered while uninstall.php runs.
+	// Read only the IDs directly, then use WordPress deletion APIs for all cleanup.
+	// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+	$post_ids = $wpdb->get_col( $wpdb->prepare( "SELECT ID FROM {$wpdb->posts} WHERE post_type = %s", 'push_md_pull_request' ) );
+
+	foreach ( $post_ids as $post_id ) {
+		wp_delete_post( intval( $post_id ), true );
+	}
 }
 
 /**

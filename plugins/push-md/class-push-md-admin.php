@@ -13,9 +13,8 @@ class Push_MD_Admin {
 	const REST_NAMESPACE = 'push-md/v1';
 	const STATUS_ROUTE   = '/seed-status';
 	const RETRY_ROUTE    = '/seed-retry';
-	const BRANCHES_ROUTE = '/branches';
 	const MERGE_ROUTE    = '/branches/merge';
-	const ASSET_VERSION  = '0.6.8';
+	const ASSET_VERSION  = '0.7.1';
 
 	public static function bootstrap() {
 		add_action( 'admin_menu', array( __CLASS__, 'register_menu' ) );
@@ -76,15 +75,6 @@ class Push_MD_Admin {
 		);
 		register_rest_route(
 			self::REST_NAMESPACE,
-			self::BRANCHES_ROUTE,
-			array(
-				'methods'             => 'GET',
-				'callback'            => array( __CLASS__, 'rest_branches' ),
-				'permission_callback' => array( __CLASS__, 'admin_only' ),
-			)
-		);
-		register_rest_route(
-			self::REST_NAMESPACE,
 			self::MERGE_ROUTE,
 			array(
 				'methods'             => 'POST',
@@ -117,14 +107,6 @@ class Push_MD_Admin {
 		Push_MD_Seeder::tick();
 
 		return rest_ensure_response( Push_MD_Seeder::get_progress() );
-	}
-
-	public static function rest_branches() {
-		return rest_ensure_response(
-			array(
-				'branches' => Push_MD_Plugin::list_preview_branches(),
-			)
-		);
 	}
 
 	public static function rest_merge_branch( WP_REST_Request $request ) {
@@ -170,17 +152,24 @@ class Push_MD_Admin {
 			return;
 		}
 
+		$pull_request_id = isset( $_GET['pr'] ) ? absint( wp_unslash( $_GET['pr'] ) ) : 0; // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Selects a read-only admin view.
+		if ( $pull_request_id ) {
+			self::render_pull_request_page( $pull_request_id );
+			return;
+		}
+
 		// Drive the seeder before painting so the first screen already
 		// has real checkout state whenever the host can do quick work.
 		Push_MD_Seeder::drive( 1.5 );
-		$progress     = Push_MD_Seeder::get_progress();
-		$nonce        = wp_create_nonce( 'wp_rest' );
-		$status_url   = esc_url_raw( rest_url( self::REST_NAMESPACE . self::STATUS_ROUTE ) );
-		$retry_url    = esc_url_raw( rest_url( self::REST_NAMESPACE . self::RETRY_ROUTE ) );
-		$branches_url = esc_url_raw( rest_url( self::REST_NAMESPACE . self::BRANCHES_ROUTE ) );
-		$merge_url    = esc_url_raw( rest_url( self::REST_NAMESPACE . self::MERGE_ROUTE ) );
-		$git_url      = esc_url_raw( rest_url( Push_MD_Plugin::ROUTE_NAMESPACE . '/md.git' ) );
-		$user         = wp_get_current_user();
+		$progress          = Push_MD_Seeder::get_progress();
+		$nonce             = wp_create_nonce( 'wp_rest' );
+		$status_url        = esc_url_raw( rest_url( self::REST_NAMESPACE . self::STATUS_ROUTE ) );
+		$retry_url         = esc_url_raw( rest_url( self::REST_NAMESPACE . self::RETRY_ROUTE ) );
+		$pull_requests_url = esc_url_raw( rest_url( 'wp/v2/push-md-pull-requests' ) );
+		$comments_url      = esc_url_raw( rest_url( 'wp/v2/comments' ) );
+		$merge_url         = esc_url_raw( rest_url( self::REST_NAMESPACE . self::MERGE_ROUTE ) );
+		$git_url           = esc_url_raw( rest_url( Push_MD_Plugin::ROUTE_NAMESPACE . '/md.git' ) );
+		$user              = wp_get_current_user();
 		if ( $user && $user->exists() ) {
 			$git_url = self::add_username_to_url( $git_url, $user->user_login );
 		}
@@ -213,8 +202,11 @@ class Push_MD_Admin {
 			'nonce'           => $nonce,
 			'statusUrl'       => $status_url,
 			'retryUrl'        => $retry_url,
-			'branchesUrl'     => $branches_url,
+			'pullRequestsUrl' => $pull_requests_url,
+			'commentsUrl'     => $comments_url,
 			'mergeBranchUrl'  => $merge_url,
+			'adminPageUrl'    => admin_url( 'tools.php?page=' . self::PAGE_SLUG ),
+			'reviewStates'    => Push_MD_Pull_Requests::get_review_states(),
 			'remoteUrl'       => $git_url,
 			'cloneCommand'    => $clone_command,
 			'checkoutDir'     => $site_slug,
@@ -245,6 +237,15 @@ class Push_MD_Admin {
 						<span class="push-md-state-dot" aria-hidden="true"></span>
 						<span id="push-md-state"><?php echo esc_html( $progress['state'] ); ?></span>
 					</div>
+				</div>
+
+				<div class="push-md-panel push-md-branches-panel" id="push-md-branches-panel" hidden>
+					<div class="push-md-branches-header">
+						<h2><?php esc_html_e( 'Pull Requests', 'push-md' ); ?></h2>
+						<button type="button" class="button" id="push-md-branches-refresh"><?php esc_html_e( 'Refresh', 'push-md' ); ?></button>
+					</div>
+					<div class="push-md-branch-message" id="push-md-branches-message" aria-live="polite"></div>
+					<div class="push-md-branch-list" id="push-md-branch-list"></div>
 				</div>
 
 				<div class="push-md-emulator-note">
@@ -321,15 +322,6 @@ class Push_MD_Admin {
 					</table>
 				</div>
 
-				<div class="push-md-panel push-md-branches-panel">
-					<div class="push-md-branches-header">
-						<h2><?php esc_html_e( 'Branch Previews', 'push-md' ); ?></h2>
-						<button type="button" class="button" id="push-md-branches-refresh"><?php esc_html_e( 'Refresh', 'push-md' ); ?></button>
-					</div>
-					<div class="push-md-branch-message" id="push-md-branches-message" aria-live="polite"></div>
-					<div class="push-md-branch-list" id="push-md-branch-list"></div>
-				</div>
-
 				<div class="push-md-panel push-md-commit-panel">
 					<h2><?php esc_html_e( 'Commit History', 'push-md' ); ?></h2>
 					<ul class="push-md-commit-list" id="push-md-commit-list"></ul>
@@ -358,6 +350,37 @@ class Push_MD_Admin {
 					</div>
 					<p class="push-md-message" id="push-md-message"><?php echo esc_html( $progress['message'] ); ?></p>
 				</div>
+			</div>
+		</div>
+		<?php
+	}
+
+	private static function render_pull_request_page( $pull_request_id ) {
+		$post = get_post( $pull_request_id );
+		if ( ! $post || Push_MD_Pull_Requests::POST_TYPE !== $post->post_type ) {
+			wp_die( esc_html__( 'Pull Request not found.', 'push-md' ) );
+		}
+
+		$config = array(
+			'nonce'           => wp_create_nonce( 'wp_rest' ),
+			'pullRequestsUrl' => esc_url_raw( rest_url( 'wp/v2/push-md-pull-requests' ) ),
+			'commentsUrl'     => esc_url_raw( rest_url( 'wp/v2/comments' ) ),
+			'mergeBranchUrl'  => esc_url_raw( rest_url( self::REST_NAMESPACE . self::MERGE_ROUTE ) ),
+			'adminPageUrl'    => admin_url( 'tools.php?page=' . self::PAGE_SLUG ),
+			'pullRequestId'   => $pull_request_id,
+			'reviewStates'    => Push_MD_Pull_Requests::get_review_states(),
+		);
+		wp_add_inline_script(
+			'push-md-admin-shell',
+			'window.pushMdAdminShell = ' . wp_json_encode( $config ) . ';',
+			'before'
+		);
+		?>
+		<div class="wrap push-md-shell-page" id="push-md-admin">
+			<div class="push-md-shell-frame push-md-review-frame">
+				<p><a href="<?php echo esc_url( admin_url( 'tools.php?page=' . self::PAGE_SLUG ) ); ?>">&larr; <?php esc_html_e( 'All Pull Requests', 'push-md' ); ?></a></p>
+				<div id="push-md-pr-message" class="push-md-branch-message" aria-live="polite"><?php esc_html_e( 'Loading Pull Request…', 'push-md' ); ?></div>
+				<div id="push-md-pr-view"></div>
 			</div>
 		</div>
 		<?php

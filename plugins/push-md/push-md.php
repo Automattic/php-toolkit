@@ -3,7 +3,7 @@
  * Plugin Name: Push MD
  * Plugin URI: https://pushmd.blog/
  * Description: Edit WordPress content with Git, Markdown and block files, reviewable diffs, and safe pushes.
- * Version: 0.6.8
+ * Version: 0.7.0
  * Requires at least: 6.9
  * Requires PHP: 7.2
  * Author: Automattic
@@ -32,6 +32,7 @@ require_once __DIR__ . '/class-push-md-plugin.php';
 require_once __DIR__ . '/class-push-md-buffering-response.php';
 require_once __DIR__ . '/class-push-md-seeder.php';
 require_once __DIR__ . '/class-push-md-admin.php';
+require_once __DIR__ . '/class-push-md-pull-requests.php';
 
 if ( ! defined( 'PUSH_MD_PLUGIN_FILE' ) ) {
 	define( 'PUSH_MD_PLUGIN_FILE', __FILE__ );
