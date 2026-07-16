@@ -167,6 +167,22 @@ class PMD_Export_Path_Test extends TestCase {
 		$this->assertSame( array( array( 'wordpress' ) ), $result['topics'] );
 	}
 
+	public function testAdapterMetadataIsExtractedFromInlineJsonArrays() {
+		$consumer = new WordPress\Markdown\MarkdownConsumer(
+			"---\ncollections: [\"guides\",\"reference\"]\ntopics: [\"wordpress\"]\n---\n\nContent\n"
+		);
+		$method = new ReflectionMethod( Push_MD_Plugin::class, 'extract_adapter_metadata' );
+		$method->setAccessible( true );
+
+		$this->assertSame(
+			array(
+				'collections' => array( 'guides', 'reference' ),
+				'topics'      => array( 'wordpress' ),
+			),
+			$method->invoke( null, 'wpdocs_document', $consumer->consume()->get_all_metadata() )
+		);
+	}
+
 	public function testDuplicateAdapterRegistrationIsRejected() {
 		$this->expectException( InvalidArgumentException::class );
 		Push_MD_Plugin::register_content_adapter( 'wpdocs_document' );
