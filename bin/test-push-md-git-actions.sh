@@ -254,6 +254,49 @@ cd "$CLONE_DIR"
 git config user.name "Push MD E2E"
 git config user.email "push-md-e2e@example.com"
 
+ADAPTER_SUFFIX="adapter-$(date +%s)-$$"
+ADAPTER_FIXTURE="$(
+	php -r 'echo json_encode(array("suffix" => $argv[1]));' "$ADAPTER_SUFFIX" |
+		curl -sS -f \
+			-X POST \
+			-H "Authorization: Basic $AUTH_HEADER" \
+			-H "Content-Type: application/json" \
+			--data-binary @- \
+			"$BASE_URL/wp-json/push-md-test/v1/adapter-fixture"
+)"
+ADAPTER_CHILD_ID="$(printf '%s' "$ADAPTER_FIXTURE" | php -r '$fixture = json_decode(stream_get_contents(STDIN), true); echo $fixture["child_id"];')"
+ADAPTER_PATH="$(printf '%s' "$ADAPTER_FIXTURE" | php -r '$fixture = json_decode(stream_get_contents(STDIN), true); echo $fixture["path"];')"
+ADAPTER_COLLECTIONS="$(printf '%s' "$ADAPTER_FIXTURE" | php -r '$fixture = json_decode(stream_get_contents(STDIN), true); echo json_encode($fixture["collections"]);')"
+ADAPTER_TOPICS="$(printf '%s' "$ADAPTER_FIXTURE" | php -r '$fixture = json_decode(stream_get_contents(STDIN), true); echo json_encode($fixture["topics"]);')"
+ADAPTER_RETAINED_TOPIC="$(printf '%s' "$ADAPTER_FIXTURE" | php -r '$fixture = json_decode(stream_get_contents(STDIN), true); echo $fixture["topics"][1];')"
+git pull --rebase origin trunk
+test -f "$CLONE_DIR/$ADAPTER_PATH"
+grep -Fq "collections: $ADAPTER_COLLECTIONS" "$CLONE_DIR/$ADAPTER_PATH"
+grep -Fq "topics: $ADAPTER_TOPICS" "$CLONE_DIR/$ADAPTER_PATH"
+php -r '
+$path = $argv[1];
+$contents = file_get_contents($path);
+$contents = str_replace($argv[2], $argv[3], $contents);
+$contents = str_replace("topics: " . $argv[4], "topics: " . json_encode(array($argv[5])), $contents);
+file_put_contents($path, $contents);
+' "$CLONE_DIR/$ADAPTER_PATH" "Adapter child $ADAPTER_SUFFIX" "Adapter child updated from Git $ADAPTER_SUFFIX" "$ADAPTER_TOPICS" "$ADAPTER_RETAINED_TOPIC"
+git add "$ADAPTER_PATH"
+git commit -m "Update plugin-defined adapter content"
+if ! PUSH_OUTPUT="$(git push origin trunk 2>&1)"; then
+	printf '%s\n' "$PUSH_OUTPUT" >&2
+	exit 1
+fi
+assert_push_summary_contains "$PUSH_OUTPUT" 'Push MD applied 1 content change:'
+curl -sS -f --retry 5 --retry-all-errors --retry-delay 1 \
+	-H "Authorization: Basic $AUTH_HEADER" \
+	"$BASE_URL/wp-json/push-md-test/v1/adapter-document/$ADAPTER_CHILD_ID" |
+	php -r '
+$document = json_decode(stream_get_contents(STDIN), true);
+if (false === strpos($document["content"], $argv[1])) { exit(1); }
+if (array($argv[2]) !== $document["topics"]) { exit(1); }
+' "Adapter child updated from Git $ADAPTER_SUFFIX" "$ADAPTER_RETAINED_TOPIC"
+git pull --rebase origin trunk
+
 grep -Fq "id: \"$PAGE_ID\"" "$CLONE_DIR/page/sample-page.md"
 git mv page/sample-page.md page/renamed-sample-page.md
 php -r '

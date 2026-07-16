@@ -12,6 +12,17 @@ if ( ! class_exists( 'WP_Post' ) ) {
 		public $post_type   = 'post';
 		public $post_name   = '';
 		public $post_parent = 0;
+		public $post_status = 'publish';
+	}
+}
+
+$push_md_test_posts = array();
+
+if ( ! function_exists( 'get_post' ) ) {
+	function get_post( $post_id ) {
+		global $push_md_test_posts;
+
+		return isset( $push_md_test_posts[ $post_id ] ) ? $push_md_test_posts[ $post_id ] : null;
 	}
 }
 
@@ -26,7 +37,25 @@ if ( ! function_exists( 'sanitize_title' ) ) {
 
 if ( ! function_exists( 'post_type_exists' ) ) {
 	function post_type_exists( $post_type ) {
-		return in_array( $post_type, array( 'post', 'page' ), true );
+		return in_array( $post_type, array( 'post', 'page', 'wpdocs_document' ), true );
+	}
+}
+
+if ( ! function_exists( 'sanitize_key' ) ) {
+	function sanitize_key( $key ) {
+		return preg_replace( '/[^a-z0-9_\-]/', '', strtolower( (string) $key ) );
+	}
+}
+
+if ( ! function_exists( 'wp_parse_args' ) ) {
+	function wp_parse_args( $args, $defaults = array() ) {
+		return array_merge( $defaults, $args );
+	}
+}
+
+if ( ! function_exists( 'esc_html' ) ) {
+	function esc_html( $text ) {
+		return (string) $text;
 	}
 }
 
@@ -41,6 +70,21 @@ if ( ! function_exists( 'taxonomy_exists' ) ) {
 require_once dirname( __DIR__ ) . '/class-push-md-plugin.php';
 
 class PMD_Export_Path_Test extends TestCase {
+	public static function setUpBeforeClass(): void {
+		Push_MD_Plugin::register_content_adapter(
+			'wpdocs_document',
+			array(
+				'hierarchical'       => true,
+				'frontmatter_fields' => array( 'collections', 'topics' ),
+				'export_metadata'    => function () {
+					return array(
+						'collections' => array( 'reference', 'guides', 'guides' ),
+						'topics'      => array( 'wordpress' ),
+					);
+				},
+			)
+		);
+	}
 
 	public function testPostWithEmptySlugUsesStableIdFallbackPath() {
 		$this->assertSame(
@@ -100,12 +144,61 @@ class PMD_Export_Path_Test extends TestCase {
 		);
 	}
 
+	public function testCustomHierarchicalAdapterBuildsStableNestedPath() {
+		global $push_md_test_posts;
+
+		$parent                    = $this->post( 900, 'wpdocs_document', 'guides' );
+		$push_md_test_posts[900]    = $parent;
+		$child                     = $this->post( 901, 'wpdocs_document', 'getting-started' );
+		$child->post_parent        = 900;
+
+		$this->assertSame(
+			'wpdocs_document/guides/getting-started.md',
+			Push_MD_Plugin::build_markdown_path( $child )
+		);
+	}
+
+	public function testAdapterMetadataIsDeterministicAndDeduplicated() {
+		$method = new ReflectionMethod( Push_MD_Plugin::class, 'export_adapter_metadata' );
+		$method->setAccessible( true );
+		$result = $method->invoke( null, $this->post( 902, 'wpdocs_document', 'metadata' ) );
+
+		$this->assertSame( array( array( 'guides', 'reference' ) ), $result['collections'] );
+		$this->assertSame( array( array( 'wordpress' ) ), $result['topics'] );
+	}
+
+	public function testDuplicateAdapterRegistrationIsRejected() {
+		$this->expectException( InvalidArgumentException::class );
+		Push_MD_Plugin::register_content_adapter( 'wpdocs_document' );
+	}
+
+	/**
+	 * @dataProvider reservedAdapterFieldProvider
+	 */
+	public function testAdapterCannotClaimPushMdFrontMatterFields( $field ) {
+		$this->expectException( InvalidArgumentException::class );
+		Push_MD_Plugin::register_content_adapter(
+			'reserved_' . $field,
+			array( 'frontmatter_fields' => array( $field ) )
+		);
+	}
+
+	public function reservedAdapterFieldProvider() {
+		return array(
+			'identity slug'   => array( 'slug' ),
+			'identity type'   => array( 'type' ),
+			'content id'      => array( 'id' ),
+			'conflict marker' => array( 'modified_gmt' ),
+		);
+	}
+
 	private function post( $id, $post_type, $post_name ) {
 		$post              = new WP_Post();
 		$post->ID          = $id;
 		$post->post_type   = $post_type;
 		$post->post_name   = $post_name;
 		$post->post_parent = 0;
+		$post->post_status = 'publish';
 
 		return $post;
 	}

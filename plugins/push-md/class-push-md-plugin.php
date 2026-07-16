@@ -55,8 +55,10 @@ class Push_MD_Plugin {
 	const BRANCH_PREVIEWS_OPTION       = 'push_md_branch_previews';
 	const BRANCH_QUERY_PARAM           = 'branch';
 
-	public static $supported_post_types    = array( 'post', 'page' );
-	public static $supported_post_statuses = array( 'publish', 'draft', 'pending', 'private', 'future' );
+	public static $supported_post_types     = array( 'post', 'page' );
+	public static $supported_post_statuses  = array( 'publish', 'draft', 'pending', 'private', 'future' );
+	private static $content_adapters        = array();
+	private static $content_adapters_frozen = false;
 
 	private static $raw_block_post_types = array( 'wp_template', 'wp_template_part', 'wp_navigation' );
 
@@ -78,6 +80,7 @@ class Push_MD_Plugin {
 	);
 
 	public static function bootstrap() {
+		add_action( 'init', array( __CLASS__, 'freeze_content_adapters' ), 100 );
 		add_action( 'init', array( __CLASS__, 'install_default_agent_skill' ), 20 );
 		add_action( 'parse_request', array( __CLASS__, 'maybe_enable_branch_preview' ), 1 );
 		add_action( 'admin_bar_menu', array( __CLASS__, 'add_admin_bar_branch_switcher' ), 90 );
@@ -123,7 +126,7 @@ class Push_MD_Plugin {
 
 	public static function get_supported_post_types() {
 		$post_types = array_merge(
-			self::$supported_post_types,
+			self::get_supported_markdown_post_types(),
 			self::get_existing_raw_block_post_types(),
 			self::get_existing_json_post_types()
 		);
@@ -131,7 +134,154 @@ class Push_MD_Plugin {
 			$post_types[] = 'wp_guideline';
 		}
 
-		return $post_types;
+		return array_values( array_unique( $post_types ) );
+	}
+
+	public static function register_content_adapter( $post_type, $args = array() ) {
+		if ( self::$content_adapters_frozen ) {
+			throw new LogicException( 'Push MD content adapters must be registered before the init hook reaches priority 100.' );
+		}
+
+		$requested_post_type = (string) $post_type;
+		$post_type           = sanitize_key( $requested_post_type );
+		$reserved_post_types = array_merge( self::$supported_post_types, self::$raw_block_post_types, self::$json_post_types, array( 'wp_guideline' ) );
+		if ( '' === $post_type || $post_type !== $requested_post_type || in_array( $post_type, $reserved_post_types, true ) || isset( self::$content_adapters[ $post_type ] ) ) {
+			throw new InvalidArgumentException( 'Push MD content adapters require a unique custom post type.' );
+		}
+
+		$args            = wp_parse_args(
+			$args,
+			array(
+				'hierarchical'       => false,
+				'frontmatter_fields' => array(),
+				'export_metadata'    => null,
+				'validate_metadata'  => null,
+				'apply_metadata'     => null,
+			)
+		);
+		$fields          = array();
+		$reserved_fields = array( 'id', 'title', 'date', 'date_gmt', 'modified_gmt', 'status', 'description', 'slug', 'type' );
+		foreach ( (array) $args['frontmatter_fields'] as $field ) {
+			$requested_field = (string) $field;
+			$field           = sanitize_key( $requested_field );
+			if ( '' === $field || $field !== $requested_field || in_array( $field, $reserved_fields, true ) ) {
+				throw new InvalidArgumentException( 'Push MD adapter front matter fields must be unique custom keys.' );
+			}
+			$fields[] = $field;
+		}
+		if ( count( $fields ) !== count( array_unique( $fields ) ) ) {
+			throw new InvalidArgumentException( 'Push MD adapter front matter fields must not contain duplicates.' );
+		}
+		foreach ( array( 'export_metadata', 'validate_metadata', 'apply_metadata' ) as $callback ) {
+			if ( null !== $args[ $callback ] && ! is_callable( $args[ $callback ] ) ) {
+				throw new InvalidArgumentException( 'Push MD adapter callbacks must be callable.' );
+			}
+		}
+
+		$args['post_type']                    = $post_type;
+		$args['hierarchical']                 = (bool) $args['hierarchical'];
+		$args['frontmatter_fields']           = $fields;
+		self::$content_adapters[ $post_type ] = $args;
+	}
+
+	public static function freeze_content_adapters() {
+		foreach ( self::$content_adapters as $post_type => $adapter ) {
+			if ( ! post_type_exists( $post_type ) ) {
+				throw new LogicException( 'Push MD content adapter post type is not registered: ' . esc_html( $post_type ) );
+			}
+		}
+		self::$content_adapters_frozen = true;
+	}
+
+	private static function get_supported_markdown_post_types() {
+		return array_merge( self::$supported_post_types, array_keys( self::$content_adapters ) );
+	}
+
+	private static function get_content_adapter( $post_type ) {
+		return isset( self::$content_adapters[ $post_type ] ) ? self::$content_adapters[ $post_type ] : null;
+	}
+
+	private static function is_hierarchical_markdown_post_type( $post_type ) {
+		if ( 'page' === $post_type ) {
+			return true;
+		}
+
+		$adapter = self::get_content_adapter( $post_type );
+		return $adapter && ! empty( $adapter['hierarchical'] );
+	}
+
+	private static function export_adapter_metadata( WP_Post $post ) {
+		$adapter = self::get_content_adapter( $post->post_type );
+		if ( ! $adapter || ! $adapter['export_metadata'] ) {
+			return array();
+		}
+
+		$exported = call_user_func( $adapter['export_metadata'], $post );
+		if ( ! is_array( $exported ) ) {
+			throw new UnexpectedValueException( 'Push MD adapter export_metadata callbacks must return an array.' );
+		}
+
+		$metadata = array();
+		foreach ( $exported as $field => $values ) {
+			if ( ! in_array( $field, $adapter['frontmatter_fields'], true ) ) {
+				throw new UnexpectedValueException( 'Push MD adapter exported an undeclared front matter field.' );
+			}
+			$values = is_array( $values ) ? $values : array( $values );
+			$values = array_map(
+				function ( $value ) use ( $field ) {
+					if ( ! is_scalar( $value ) || is_bool( $value ) ) {
+						throw new UnexpectedValueException( 'Push MD adapter front matter values must be scalar: ' . esc_html( $field ) );
+					}
+					return (string) $value;
+				},
+				$values
+			);
+			$values = array_values( array_unique( $values ) );
+			sort( $values, SORT_STRING );
+			$metadata[ $field ] = array( $values );
+		}
+
+		return $metadata;
+	}
+
+	private static function extract_adapter_metadata( $post_type, $raw_metadata ) {
+		$adapter = self::get_content_adapter( $post_type );
+		if ( ! $adapter ) {
+			return array();
+		}
+
+		$metadata = array();
+		foreach ( $adapter['frontmatter_fields'] as $field ) {
+			if ( ! array_key_exists( $field, $raw_metadata ) ) {
+				continue;
+			}
+			$values = is_array( $raw_metadata[ $field ] ) ? $raw_metadata[ $field ] : array( $raw_metadata[ $field ] );
+			if ( 1 === count( $values ) && is_array( reset( $values ) ) ) {
+				$values = reset( $values );
+			}
+			foreach ( $values as $value ) {
+				if ( ! is_scalar( $value ) || is_bool( $value ) ) {
+					throw new Exception( 'Push rejected because adapter front matter values must be scalar strings or numbers.' );
+				}
+			}
+			$metadata[ $field ] = array_values( array_map( 'strval', $values ) );
+		}
+
+		return $metadata;
+	}
+
+	private static function validate_adapter_metadata( $post_type, $metadata, $context ) {
+		$adapter = self::get_content_adapter( $post_type );
+		if ( $adapter && $adapter['validate_metadata'] ) {
+			call_user_func( $adapter['validate_metadata'], $metadata, $context );
+		}
+	}
+
+	private static function apply_adapter_metadata( $post_type, $post_id, $metadata, $context ) {
+		$adapter = self::get_content_adapter( $post_type );
+		if ( $adapter && $adapter['apply_metadata'] ) {
+			call_user_func( $adapter['apply_metadata'], $post_id, $metadata, $context );
+		}
 	}
 
 	private static function guidelines_available() {
@@ -998,11 +1148,11 @@ class Push_MD_Plugin {
 			'filter'                => 'raw',
 		);
 
-		if ( 'page' === $post_type ) {
-			$parent_slugs = self::path_to_page_slugs( $path );
+		if ( self::is_hierarchical_markdown_post_type( $post_type ) ) {
+			$parent_slugs = self::path_to_hierarchical_slugs( $path );
 			array_pop( $parent_slugs );
 			if ( ! empty( $parent_slugs ) ) {
-				$post_obj->post_parent = -1 * abs( crc32( 'page/' . implode( '/', $parent_slugs ) . '.md' ) );
+				$post_obj->post_parent = -1 * abs( crc32( $post_type . '/' . implode( '/', $parent_slugs ) . '.md' ) );
 			}
 		}
 
@@ -1774,8 +1924,8 @@ class Push_MD_Plugin {
 					self::get_post_theme_slug( $post_or_type )
 				);
 			}
-			if ( 'page' === $post_or_type->post_type ) {
-				return self::build_page_markdown_path( $post_or_type );
+			if ( self::is_hierarchical_markdown_post_type( $post_or_type->post_type ) ) {
+				return self::build_hierarchical_markdown_path( $post_or_type );
 			}
 
 			return ltrim( $post_or_type->post_type . '/' . self::get_export_post_slug( $post_or_type ) . '.md', '/' );
@@ -1832,9 +1982,9 @@ class Push_MD_Plugin {
 			return false;
 		}
 
-		if ( 'page' === $post_type ) {
-			foreach ( self::path_to_page_slugs( $path ) as $slug ) {
-				if ( self::get_id_from_fallback_slug( 'page', $slug ) ) {
+		if ( self::is_hierarchical_markdown_post_type( $post_type ) ) {
+			foreach ( self::path_to_hierarchical_slugs( $path ) as $slug ) {
+				if ( self::get_id_from_fallback_slug( $post_type, $slug ) ) {
 					return true;
 				}
 			}
@@ -1857,22 +2007,22 @@ class Push_MD_Plugin {
 		throw new Exception( 'Push rejected because this fallback filename is stale after WordPress assigned the post a slug. Pull the latest changes and edit the slug-based file path.' );
 	}
 
-	private static function build_page_markdown_path( WP_Post $post ) {
+	private static function build_hierarchical_markdown_path( WP_Post $post ) {
 		$segments  = array( self::get_export_post_slug( $post ) );
 		$seen      = array( intval( $post->ID ) => true );
 		$parent_id = intval( $post->post_parent );
 
 		while ( $parent_id > 0 ) {
 			if ( ! empty( $seen[ $parent_id ] ) ) {
-				throw new Exception( 'Git export rejected because a WordPress page hierarchy contains a cycle.' );
+				throw new Exception( 'page' === $post->post_type ? 'Git export rejected because a WordPress page hierarchy contains a cycle.' : 'Git export rejected because a hierarchical WordPress content tree contains a cycle.' );
 			}
 
 			$parent = get_post( $parent_id );
-			if ( ! $parent || 'page' !== $parent->post_type ) {
-				throw new Exception( 'Git export rejected because a WordPress page has an invalid parent.' );
+			if ( ! $parent || $post->post_type !== $parent->post_type ) {
+				throw new Exception( 'page' === $post->post_type ? 'Git export rejected because a WordPress page has an invalid parent.' : 'Git export rejected because hierarchical WordPress content has an invalid parent.' );
 			}
 			if ( ! in_array( $parent->post_status, self::$supported_post_statuses, true ) ) {
-				throw new Exception( 'Git export rejected because a WordPress page has a non-exported parent page. Restore, publish, or reparent the child page before cloning.' );
+				throw new Exception( 'page' === $post->post_type ? 'Git export rejected because a WordPress page has a non-exported parent page. Restore, publish, or reparent the child page before cloning.' : 'Git export rejected because hierarchical WordPress content has a non-exported parent. Restore, publish, or reparent the child before cloning.' );
 			}
 
 			array_unshift( $segments, self::get_export_post_slug( $parent ) );
@@ -1880,7 +2030,7 @@ class Push_MD_Plugin {
 			$parent_id          = intval( $parent->post_parent );
 		}
 
-		return 'page/' . implode( '/', $segments ) . '.md';
+		return $post->post_type . '/' . implode( '/', $segments ) . '.md';
 	}
 
 	private static function build_raw_block_path( $post_type, $slug, $theme_slug = '' ) {
@@ -1978,6 +2128,7 @@ class Push_MD_Plugin {
 		if ( '' !== trim( $post->post_excerpt ) ) {
 			$metadata['description'] = array( $post->post_excerpt );
 		}
+		$metadata = array_merge( $metadata, self::export_adapter_metadata( $post ) );
 
 		$producer = new MarkdownProducer(
 			new BlocksWithMetadata(
@@ -2274,7 +2425,7 @@ class Push_MD_Plugin {
 		self::reject_deleted_raw_block_files( $old_files, $new_files );
 		self::reject_deleted_theme_base_files( $old_files, $new_files );
 		self::reject_deleted_global_styles_files( $old_files, $new_files );
-		self::reject_deleted_page_parent_files_with_remaining_children( $old_files, $new_files );
+		self::reject_deleted_hierarchical_parent_files_with_remaining_children( $old_files, $new_files );
 
 		foreach ( $new_files as $path => $entry ) {
 			if ( isset( $old_files[ $path ] ) && self::repository_entries_match( $old_files[ $path ], $entry ) ) {
@@ -2311,7 +2462,7 @@ class Push_MD_Plugin {
 		self::reject_deleted_raw_block_files( $old_files, $new_files );
 		self::reject_deleted_theme_base_files( $old_files, $new_files );
 		self::reject_deleted_global_styles_files( $old_files, $new_files );
-		self::reject_deleted_page_parent_files_with_remaining_children( $old_files, $new_files );
+		self::reject_deleted_hierarchical_parent_files_with_remaining_children( $old_files, $new_files );
 
 		foreach ( $new_files as $path => $entry ) {
 			if ( isset( $old_files[ $path ] ) && self::repository_entries_match( $old_files[ $path ], $entry ) ) {
@@ -2483,16 +2634,16 @@ class Push_MD_Plugin {
 		}
 	}
 
-	private static function reject_deleted_page_parent_files_with_remaining_children( $old_files, $new_files ) {
+	private static function reject_deleted_hierarchical_parent_files_with_remaining_children( $old_files, $new_files ) {
 		foreach ( $old_files as $path => $entry ) {
 			if ( isset( $new_files[ $path ] ) ) {
 				continue;
 			}
-			if ( TreeEntry::FILE_MODE_SYMBOLIC_LINK === $entry['mode'] || ! self::is_page_markdown_path( $path ) ) {
+			if ( TreeEntry::FILE_MODE_SYMBOLIC_LINK === $entry['mode'] || ! self::is_hierarchical_markdown_path( $path ) ) {
 				continue;
 			}
 
-			$descendant_prefix = self::page_descendant_prefix_from_path( $path );
+			$descendant_prefix = self::hierarchical_descendant_prefix_from_path( $path );
 			if ( '' === $descendant_prefix ) {
 				continue;
 			}
@@ -2500,26 +2651,28 @@ class Push_MD_Plugin {
 			foreach ( $new_files as $new_path => $new_entry ) {
 				unset( $new_entry );
 				if ( 0 === strpos( $new_path, $descendant_prefix ) ) {
-					throw new Exception( 'Push rejected because deleting a parent page while keeping nested child page files would move child content. Delete the nested child page files too, or keep the parent page.' );
+					$post_type = self::path_to_post_type( $path );
+					throw new Exception( 'page' === $post_type ? 'Push rejected because deleting a parent page while keeping nested child page files would move child content. Delete the nested child page files too, or keep the parent page.' : 'Push rejected because deleting hierarchical parent content while keeping nested child files would move child content. Delete the nested child files too, or keep the parent.' );
 				}
 			}
 		}
 	}
 
-	private static function is_page_markdown_path( $path ) {
+	private static function is_hierarchical_markdown_path( $path ) {
 		$segments = explode( '/', ltrim( $path, '/' ) );
 		return isset( $segments[0] )
-			&& 'page' === $segments[0]
+			&& self::is_hierarchical_markdown_post_type( $segments[0] )
 			&& 'md' === pathinfo( basename( $path ), PATHINFO_EXTENSION );
 	}
 
-	private static function page_descendant_prefix_from_path( $path ) {
-		$relative_path = substr( ltrim( $path, '/' ), strlen( 'page/' ) );
+	private static function hierarchical_descendant_prefix_from_path( $path ) {
+		$post_type     = self::path_to_post_type( $path );
+		$relative_path = substr( ltrim( $path, '/' ), strlen( $post_type . '/' ) );
 		if ( '.md' !== substr( $relative_path, - strlen( '.md' ) ) ) {
 			return '';
 		}
 
-		return 'page/' . substr( $relative_path, 0, - strlen( '.md' ) ) . '/';
+		return $post_type . '/' . substr( $relative_path, 0, - strlen( '.md' ) ) . '/';
 	}
 
 	private static function reject_symlink_file_changes( $old_files, $new_files ) {
@@ -2571,18 +2724,30 @@ class Push_MD_Plugin {
 		$consumer = new MarkdownConsumer( $markdown );
 		$result   = $consumer->consume();
 		self::assert_block_markup_is_safe( $result->get_block_markup() );
-		$metadata = array();
-		foreach ( $result->get_all_metadata() as $key => $value ) {
+		$raw_metadata     = $result->get_all_metadata();
+		$adapter_metadata = self::extract_adapter_metadata( $post_type, $raw_metadata );
+		$metadata         = array();
+		foreach ( $raw_metadata as $key => $value ) {
+			if ( array_key_exists( $key, $adapter_metadata ) ) {
+				continue;
+			}
 			$metadata[ $key ] = is_array( $value ) ? reset( $value ) : $value;
 		}
 
 		self::reject_path_identity_frontmatter( $metadata );
-		$metadata      = self::normalize_supported_frontmatter(
+		$metadata        = self::normalize_supported_frontmatter(
 			$metadata,
 			array( 'id', 'title', 'date', 'status', 'description' )
 		);
-		$post_id       = self::find_post_id_by_path_metadata( $path, $metadata );
-		$existing_post = $post_id ? get_post( $post_id ) : null;
+		$post_id         = self::find_post_id_by_path_metadata( $path, $metadata );
+		$existing_post   = $post_id ? get_post( $post_id ) : null;
+		$adapter_context = array(
+			'path'          => $path,
+			'post_type'     => $post_type,
+			'existing_post' => $existing_post,
+			'dry_run'       => ! empty( $options['dry_run'] ),
+		);
+		self::validate_adapter_metadata( $post_type, $adapter_metadata, $adapter_context );
 		if ( $existing_post ) {
 			self::assert_id_fallback_path_is_current( $path, $existing_post );
 		}
@@ -2592,7 +2757,7 @@ class Push_MD_Plugin {
 		);
 		self::validate_post_status( $post_status, $post_type );
 		self::assert_can_set_post_status( $post_type, $post_status, $existing_post );
-		$post_parent = 'page' === $post_type ? self::path_to_page_parent_id( $path, false ) : 0;
+		$post_parent = self::is_hierarchical_markdown_post_type( $post_type ) ? self::path_to_hierarchical_parent_id( $path, false ) : 0;
 
 		if (
 			$existing_post &&
@@ -2618,7 +2783,7 @@ class Push_MD_Plugin {
 		if ( ! $existing_post || ! self::is_current_slugless_fallback_path( $path, $existing_post ) ) {
 			$postarr['post_name'] = $slug;
 		}
-		if ( 'page' === $post_type ) {
+		if ( self::is_hierarchical_markdown_post_type( $post_type ) ) {
 			$postarr['post_parent'] = $post_parent;
 		}
 
@@ -2652,7 +2817,10 @@ class Push_MD_Plugin {
 			throw new Exception( esc_html( $post_id->get_error_message() ) );
 		}
 
-		$post = get_post( $post_id );
+		$post                             = get_post( $post_id );
+		$adapter_context['existing_post'] = $post;
+		$adapter_context['dry_run']       = false;
+		self::apply_adapter_metadata( $post_type, $post_id, $adapter_metadata, $adapter_context );
 
 		return array(
 			'post_id' => $post_id,
@@ -3335,7 +3503,7 @@ class Push_MD_Plugin {
 	}
 
 	private static function get_preview_page_permalink_for_path( $path ) {
-		$page_path = implode( '/', self::path_to_page_slugs( $path ) );
+		$page_path = implode( '/', self::path_to_hierarchical_slugs( $path ) );
 		if ( '' === (string) get_option( 'permalink_structure' ) ) {
 			return add_query_arg( 'pagename', $page_path, home_url( '/' ) );
 		}
@@ -3878,12 +4046,12 @@ class Push_MD_Plugin {
 				$include_trash
 			);
 		}
-		if ( 'page' === $post_type ) {
+		if ( self::is_hierarchical_markdown_post_type( $post_type ) ) {
 			if ( isset( $metadata['id'] ) ) {
 				return self::find_post_id_by_frontmatter_id( $path, $metadata, $include_trash );
 			}
 
-			return self::find_page_id_by_path( $path, $include_trash );
+			return self::find_hierarchical_post_id_by_path( $path, $include_trash );
 		}
 
 		if ( isset( $metadata['id'] ) ) {
@@ -3970,16 +4138,17 @@ class Push_MD_Plugin {
 		return intval( $id );
 	}
 
-	private static function find_page_id_by_path( $path, $include_trash = true ) {
-		$slugs     = self::path_to_page_slugs( $path );
+	private static function find_hierarchical_post_id_by_path( $path, $include_trash = true ) {
+		$post_type = self::path_to_post_type( $path );
+		$slugs     = self::path_to_hierarchical_slugs( $path );
 		$slug      = array_pop( $slugs );
-		$parent_id = self::resolve_page_parent_id( $slugs, $include_trash );
+		$parent_id = self::resolve_hierarchical_parent_id( $post_type, $slugs, $include_trash );
 		$statuses  = $include_trash
 			? array_merge( self::$supported_post_statuses, array( 'trash' ) )
 			: self::$supported_post_statuses;
 		$posts     = get_posts(
 			array(
-				'post_type'      => 'page',
+				'post_type'      => $post_type,
 				'name'           => $slug,
 				'post_parent'    => $parent_id,
 				'post_status'    => $statuses,
@@ -3989,19 +4158,19 @@ class Push_MD_Plugin {
 		);
 
 		if ( empty( $posts ) ) {
-			$page_id = self::find_slugless_page_id_by_fallback_slug( $slug, $parent_id, $statuses );
-			if ( $page_id ) {
-				return $page_id;
+			$post_id = self::find_slugless_hierarchical_id_by_fallback_slug( $post_type, $slug, $parent_id, $statuses );
+			if ( $post_id ) {
+				return $post_id;
 			}
 
 			if ( ! $include_trash ) {
-				self::reject_unsupported_status_slug_collision( 'page', $slug, self::$supported_post_statuses, $parent_id );
+				self::reject_unsupported_status_slug_collision( $post_type, $slug, self::$supported_post_statuses, $parent_id );
 				return 0;
 			}
 
 			$posts = get_posts(
 				array(
-					'post_type'      => 'page',
+					'post_type'      => $post_type,
 					'name'           => $slug . '__trashed',
 					'post_parent'    => $parent_id,
 					'post_status'    => array( 'trash' ),
@@ -4010,13 +4179,13 @@ class Push_MD_Plugin {
 				)
 			);
 			if ( empty( $posts ) ) {
-				$page_id = self::find_slugless_page_id_by_fallback_slug( $slug, $parent_id, array( 'trash' ) );
-				if ( $page_id ) {
-					return $page_id;
+				$post_id = self::find_slugless_hierarchical_id_by_fallback_slug( $post_type, $slug, $parent_id, array( 'trash' ) );
+				if ( $post_id ) {
+					return $post_id;
 				}
 
 				self::reject_unsupported_status_slug_collision(
-					'page',
+					$post_type,
 					$slug,
 					array_merge( self::$supported_post_statuses, array( 'trash' ) ),
 					$parent_id
@@ -4028,7 +4197,7 @@ class Push_MD_Plugin {
 		return intval( $posts[0] );
 	}
 
-	private static function resolve_page_parent_id( $parent_slugs, $include_trash = true ) {
+	private static function resolve_hierarchical_parent_id( $post_type, $parent_slugs, $include_trash = true ) {
 		$parent_id = 0;
 		$statuses  = $include_trash
 			? array_merge( self::$supported_post_statuses, array( 'trash' ) )
@@ -4037,7 +4206,7 @@ class Push_MD_Plugin {
 		foreach ( $parent_slugs as $slug ) {
 			$parents = get_posts(
 				array(
-					'post_type'      => 'page',
+					'post_type'      => $post_type,
 					'name'           => $slug,
 					'post_parent'    => $parent_id,
 					'post_status'    => $statuses,
@@ -4046,12 +4215,12 @@ class Push_MD_Plugin {
 				)
 			);
 			if ( empty( $parents ) ) {
-				$page_id = self::find_slugless_page_id_by_fallback_slug( $slug, $parent_id, $statuses );
-				if ( ! $page_id ) {
-					throw new Exception( 'Push rejected because nested page paths must reference existing WordPress parent pages.' );
+				$post_id = self::find_slugless_hierarchical_id_by_fallback_slug( $post_type, $slug, $parent_id, $statuses );
+				if ( ! $post_id ) {
+					throw new Exception( 'page' === $post_type ? 'Push rejected because nested page paths must reference existing WordPress parent pages.' : 'Push rejected because nested paths must reference existing WordPress parent content.' );
 				}
 
-				$parent_id = $page_id;
+				$parent_id = $post_id;
 				continue;
 			}
 
@@ -4061,8 +4230,8 @@ class Push_MD_Plugin {
 		return $parent_id;
 	}
 
-	private static function find_slugless_page_id_by_fallback_slug( $slug, $parent_id, $statuses ) {
-		$id = self::get_id_from_fallback_slug( 'page', $slug );
+	private static function find_slugless_hierarchical_id_by_fallback_slug( $post_type, $slug, $parent_id, $statuses ) {
+		$id = self::get_id_from_fallback_slug( $post_type, $slug );
 		if ( ! $id ) {
 			return 0;
 		}
@@ -4070,7 +4239,7 @@ class Push_MD_Plugin {
 		$post = get_post( $id );
 		if (
 			! $post ||
-			'page' !== $post->post_type ||
+			$post_type !== $post->post_type ||
 			'' !== $post->post_name ||
 			intval( $post->post_parent ) !== intval( $parent_id ) ||
 			! in_array( $post->post_status, $statuses, true )
@@ -4081,11 +4250,12 @@ class Push_MD_Plugin {
 		return intval( $post->ID );
 	}
 
-	private static function path_to_page_parent_id( $path, $include_trash = true ) {
-		$slugs = self::path_to_page_slugs( $path );
+	private static function path_to_hierarchical_parent_id( $path, $include_trash = true ) {
+		$post_type = self::path_to_post_type( $path );
+		$slugs     = self::path_to_hierarchical_slugs( $path );
 		array_pop( $slugs );
 
-		return self::resolve_page_parent_id( $slugs, $include_trash );
+		return self::resolve_hierarchical_parent_id( $post_type, $slugs, $include_trash );
 	}
 
 	private static function reject_unsupported_status_slug_collision( $post_type, $slug, $allowed_statuses, $post_parent = null ) {
@@ -4197,8 +4367,8 @@ class Push_MD_Plugin {
 		if ( 'post' === $segments[0] && 2 !== count( $segments ) ) {
 			throw new Exception( 'Push rejected because post Markdown files must use post/<slug>.md paths.' );
 		}
-		if ( 'page' === $segments[0] ) {
-			$slugs = self::path_to_page_slugs( $path );
+		if ( self::is_hierarchical_markdown_post_type( $segments[0] ) ) {
+			$slugs = self::path_to_hierarchical_slugs( $path );
 
 			return end( $slugs );
 		}
@@ -4214,10 +4384,10 @@ class Push_MD_Plugin {
 		return $slug;
 	}
 
-	private static function path_to_page_slugs( $path ) {
+	private static function path_to_hierarchical_slugs( $path ) {
 		$segments = explode( '/', ltrim( $path, '/' ) );
-		if ( count( $segments ) < 2 || 'page' !== $segments[0] ) {
-			throw new Exception( 'Push rejected because page Markdown files must use page/<slug>.md or page/<parent>/<slug>.md paths.' );
+		if ( count( $segments ) < 2 || ! self::is_hierarchical_markdown_post_type( $segments[0] ) ) {
+			throw new Exception( isset( $segments[0] ) && 'page' === $segments[0] ? 'Push rejected because page Markdown files must use page/<slug>.md or page/<parent>/<slug>.md paths.' : 'Push rejected because hierarchical Markdown files must use <post-type>/<slug>.md or <post-type>/<parent>/<slug>.md paths.' );
 		}
 
 		$basename = array_pop( $segments );

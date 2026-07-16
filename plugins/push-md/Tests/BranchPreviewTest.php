@@ -16,6 +16,7 @@ if ( ! class_exists( 'WP_Post' ) ) {
 		public $post_type   = 'post';
 		public $post_name   = '';
 		public $post_parent = 0;
+		public $post_status = 'publish';
 	}
 }
 
