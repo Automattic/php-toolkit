@@ -1,0 +1,25 @@
+{
+  "id": "push-md",
+  "remote_url": "https://github.com/Automattic/php-toolkit.git",
+  "remote_path": "../wp-content/plugins/push-md",
+  "build_artifact": "dist/plugins/push-md.zip",
+  "extract_command": "tmp=$(mktemp -d) && unzip -q {artifact} -d \"$tmp\" && cp -a \"$tmp/push-md/.\" . && rm -rf \"$tmp\" {artifact}",
+  "extensions": {
+    "wordpress": {}
+  },
+  "version_targets": [
+    {
+      "file": "plugins/push-md/push-md.php",
+      "artifact_path": "push-md/push-md.php",
+      "pattern": "Version:\\s*([0-9.]+)"
+    }
+  ],
+  "scripts": {
+    "build": [
+      "bash bin/build-plugins.sh"
+    ],
+    "test": [
+      "bash bin/inspect-push-md-zip.sh dist/plugins/push-md.zip"
+    ]
+  }
+}
