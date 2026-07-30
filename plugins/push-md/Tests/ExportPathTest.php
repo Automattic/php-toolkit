@@ -122,6 +122,23 @@ class PMD_Export_Path_Test extends TestCase {
 		);
 	}
 
+	public function testDuplicateDraftSlugsExportWithIdFallback() {
+		$post1              = $this->post( 101, 'post', 'sendgrid-alternatives-2' );
+		$post1->post_status = 'draft';
+		$post2              = $this->post( 202, 'post', 'sendgrid-alternatives-2' );
+		$post2->post_status = 'draft';
+
+		$path1 = Push_MD_Plugin::build_markdown_path( $post1 );
+		$this->assertSame( 'post/sendgrid-alternatives-2.md', $path1 );
+
+		$method = new ReflectionMethod( Push_MD_Plugin::class, 'build_id_fallback_markdown_path' );
+		if ( PHP_VERSION_ID < 80100 ) {
+			$method->setAccessible( true );
+		}
+		$fallback_path2 = $method->invoke( null, $post2 );
+		$this->assertSame( 'post/post-202.md', $fallback_path2 );
+	}
+
 	private function post( $id, $post_type, $post_name ) {
 		$post              = new WP_Post();
 		$post->ID          = $id;
