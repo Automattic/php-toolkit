@@ -4,6 +4,20 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+if ( ! function_exists( 'push_md_register_content_adapter' ) ) {
+	/**
+	 * Registers an explicit custom post type mapping for Push MD.
+	 *
+	 * Register the post type and adapter on init before priority 100.
+	 *
+	 * @param string $post_type Custom post type key.
+	 * @param array  $args      Adapter configuration and callbacks.
+	 */
+	function push_md_register_content_adapter( $post_type, $args = array() ) {
+		Push_MD_Plugin::register_content_adapter( $post_type, $args );
+	}
+}
+
 if ( ! function_exists( 'push_md_install_skill' ) ) {
 	function push_md_install_skill( string $source_identifier, string $title, string $excerpt, string $content, array $extras = array() ) {
 		if ( '' === $source_identifier ) {

@@ -65,6 +65,8 @@ changes back through WordPress post APIs.
 Supported exported content includes:
 
 - Posts and pages as Markdown files.
+- Custom post types explicitly registered by another plugin through a Push MD
+  content adapter.
 - Block theme templates, template parts, and navigation posts as raw Gutenberg
   block HTML.
 - Active theme `theme.json` files as read-only context.
@@ -73,7 +75,41 @@ Supported exported content includes:
   features are available.
 
 Push MD does not deploy PHP code, plugin code, theme source, uploads, media
-files, arbitrary custom post types, or arbitrary database tables.
+files, unregistered custom post types, or arbitrary database tables.
+
+## Content Adapters
+
+Plugins may register an explicit custom post type mapping on `init` before
+priority 100. The post type must be registered before Push MD freezes the
+adapter registry:
+
+```php
+push_md_register_content_adapter(
+	'book',
+	array(
+		'hierarchical'       => true,
+		'frontmatter_fields' => array( 'genres' ),
+		'export_metadata'    => 'my_exported_book_metadata',
+		'validate_metadata'  => 'my_validate_book_metadata',
+		'apply_metadata'     => 'my_apply_book_metadata',
+	)
+);
+```
+
+`export_metadata( WP_Post $post )` returns declared field values. Push MD
+normalizes each field to a sorted, unique array of scalar strings.
+`validate_metadata( array $metadata, array $context )` runs during the dry-run
+plan before WordPress is changed. `apply_metadata( int $post_id, array
+$metadata, array $context )` applies the already validated values after the
+post write. The context contains `path`, `post_type`, `existing_post`, and
+`dry_run`.
+
+Adapters are fail-closed: post type keys and front matter keys must be
+canonical and unique, callbacks must be callable, Push MD-owned front matter
+keys are reserved, and an adapter whose post type is absent at `init` priority
+100 stops initialization. Hierarchical adapters use nested
+`<post-type>/<parent>/<item>.md` paths and require parent content to exist
+before a nested child is pushed.
 
 ## Privacy And Security Model
 

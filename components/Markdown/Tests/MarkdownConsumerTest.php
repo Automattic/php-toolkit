@@ -252,6 +252,27 @@ MD;
 		);
 	}
 
+	public function test_frontmatter_inline_json_arrays_are_preserved() {
+		$markdown = <<<MD
+---
+collections: ["guides","reference"]
+topics: []
+---
+
+Content
+MD;
+		$consumer = new MarkdownConsumer( $markdown );
+		$result   = $consumer->consume();
+
+		$this->assertEquals(
+			array(
+				'collections' => array( array( 'guides', 'reference' ) ),
+				'topics'      => array( array() ),
+			),
+			$result->get_all_metadata()
+		);
+	}
+
 	public function test_gutenberg_fence_is_preserved_as_block_markup() {
 		$markdown = <<<MD
 ```gutenberg

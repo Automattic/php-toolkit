@@ -443,7 +443,16 @@ class MarkdownConsumer implements DataFormatConsumer {
 	}
 
 	private function parse_frontmatter_scalar( $raw ) {
-		if ( preg_match( '/^\[|\{|- /', $raw ) ) {
+		if ( '[' === substr( $raw, 0, 1 ) ) {
+			$decoded = json_decode( $raw, true );
+			if ( JSON_ERROR_NONE === json_last_error() && is_array( $decoded ) ) {
+				return $decoded;
+			}
+
+			return array();
+		}
+
+		if ( preg_match( '/^\{|- /', $raw ) ) {
 			return array();
 		}
 

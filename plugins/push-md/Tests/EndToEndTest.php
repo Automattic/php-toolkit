@@ -154,6 +154,59 @@ class PMD_End_To_End_Test extends TestCase {
 		}
 	}
 
+	public function testPluginDefinedHierarchicalAdapterRoundTripsMetadata() {
+		$suffix   = uniqid( 'adapter-' );
+		$response = $this->curl_post_json(
+			$this->base_url . '/wp-json/push-md-test/v1/adapter-fixture',
+			array( 'suffix' => $suffix )
+		);
+		$this->assertSame( 200, $response['status'], 'Adapter fixture creation failed: ' . $response['body'] );
+		$fixture = json_decode( $response['body'], true );
+		$this->assertIsArray( $fixture );
+
+		$clone_dir = $this->clone_repo( 'content-adapter' );
+		$this->configure_git( $clone_dir );
+		$file = $clone_dir . '/' . $fixture['path'];
+		$this->assertFileExists( $file );
+		$markdown = file_get_contents( $file );
+		$this->assertStringContainsString( 'collections: ' . json_encode( $fixture['collections'] ), $markdown );
+		$this->assertStringContainsString( 'topics: ' . json_encode( $fixture['topics'] ), $markdown );
+
+		$updated_text = 'Adapter child updated from Git ' . $suffix;
+		$markdown     = str_replace( 'Adapter child ' . $suffix, $updated_text, $markdown );
+		$markdown     = str_replace(
+			'topics: ' . json_encode( $fixture['topics'] ),
+			'topics: ' . json_encode( array( $fixture['topics'][1] ) ),
+			$markdown
+		);
+		file_put_contents( $file, $markdown );
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'add', $fixture['path'] ) );
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'commit', '-m', 'Update plugin-defined adapter content' ) );
+		$push = $this->run_cmd( array( 'git', '-C', $clone_dir, 'push', 'origin', 'trunk' ) );
+		$this->assertStringContainsString( 'Push MD applied 1 content change:', $push['output'] );
+
+		$document = $this->curl_get( $this->base_url . '/wp-json/push-md-test/v1/adapter-document/' . $fixture['child_id'] );
+		$document = json_decode( $document, true );
+		$this->assertStringContainsString( $updated_text, $document['content'] );
+		$this->assertSame( array( $fixture['topics'][1] ), $document['topics'] );
+		$this->assertSame( $fixture['collections'], $document['collections'] );
+
+		$invalid = str_replace(
+			'topics: ' . json_encode( array( $fixture['topics'][1] ) ),
+			'topics: ' . json_encode( array( 'missing-' . $suffix ) ),
+			$markdown
+		);
+		file_put_contents( $file, $invalid );
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'add', $fixture['path'] ) );
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'commit', '-m', 'Reject missing adapter term' ) );
+		$rejected = $this->run_cmd( array( 'git', '-C', $clone_dir, 'push', 'origin', 'trunk' ), true );
+		$this->assertNotSame( 0, $rejected['code'] );
+		$this->assertStringContainsString( 'Push MD test adapter terms must already exist.', $rejected['output'] );
+
+		$document = json_decode( $this->curl_get( $this->base_url . '/wp-json/push-md-test/v1/adapter-document/' . $fixture['child_id'] ), true );
+		$this->assertSame( array( $fixture['topics'][1] ), $document['topics'] );
+	}
+
 	public function testBranchPreviewPushRendersForAuthenticatedAdminWithoutMutatingLiveContent() {
 		$suffix       = uniqid( 'branch-preview-' );
 		$slug         = $suffix;
