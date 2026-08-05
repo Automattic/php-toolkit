@@ -387,8 +387,8 @@ class Push_MD_Seeder {
 			'.claude/skills',
 			'AGENTS.md',
 			'CLAUDE.md',
-			'wp_guideline/skills/push-md/SKILL.md',
-			'wp_guideline/skills/push-md-template-editor/SKILL.md',
+			'wp_knowledge/skills/push-md/SKILL.md',
+			'wp_knowledge/skills/push-md-template-editor/SKILL.md',
 		);
 	}
 

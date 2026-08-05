@@ -66,17 +66,16 @@ class Push_MD_Plugin {
 	private static $active_preview_files         = null;
 	private static $active_preview_changed_paths = array();
 
-	private static $guideline_type_directories = array(
-		'artifact'    => 'artifacts',
-		'content'     => 'content',
-		'instruction' => 'instructions',
-		'memory'      => 'memories',
-		'plan'        => 'plans',
-		'skill'       => 'skills',
+	private static $knowledge_type_directories = array(
+		'guideline' => 'guidelines',
+		'memory'    => 'memories',
+		'note'      => 'notes',
+		'skill'     => 'skills',
 	);
 
 	public static function bootstrap() {
-		add_action( 'init', array( __CLASS__, 'install_default_agent_skill' ), 20 );
+		add_filter( 'wp_knowledge_types', array( __CLASS__, 'register_knowledge_types' ) );
+		add_action( 'admin_init', array( __CLASS__, 'install_default_agent_skill' ) );
 		add_action( 'parse_request', array( __CLASS__, 'maybe_enable_branch_preview' ), 1 );
 		add_action( 'admin_bar_menu', array( __CLASS__, 'add_admin_bar_branch_switcher' ), 90 );
 		add_action( 'rest_api_init', array( __CLASS__, 'register_routes' ) );
@@ -92,8 +91,26 @@ class Push_MD_Plugin {
 		Push_MD_Seeder::on_activation();
 	}
 
+	public static function register_knowledge_types( $types ) {
+		$types['skill'] = array(
+			'title' => __( 'Skill', 'push-md' ),
+		);
+
+		return $types;
+	}
+
 	public static function install_default_agent_skill() {
-		if ( ! self::guidelines_available() || ! function_exists( 'push_md_install_skill' ) ) {
+		$knowledge_post_type = get_post_type_object( 'wp_knowledge' );
+		$publish_capability  = $knowledge_post_type && isset( $knowledge_post_type->cap->publish_posts )
+			? $knowledge_post_type->cap->publish_posts
+			: 'publish_posts';
+
+		if (
+			! self::knowledge_available() ||
+			! function_exists( 'push_md_install_skill' ) ||
+			! current_user_can( 'manage_options' ) ||
+			! current_user_can( $publish_capability )
+		) {
 			return;
 		}
 
@@ -124,25 +141,15 @@ class Push_MD_Plugin {
 			self::get_existing_raw_block_post_types(),
 			self::get_existing_json_post_types()
 		);
-		if ( self::guidelines_available() ) {
-			$post_types[] = 'wp_guideline';
+		if ( self::knowledge_available() ) {
+			$post_types[] = 'wp_knowledge';
 		}
 
 		return $post_types;
 	}
 
-	private static function guidelines_available() {
-		return post_type_exists( 'wp_guideline' ) && taxonomy_exists( 'wp_guideline_type' );
-	}
-
-	private static function guidelines_enabled() {
-		if ( self::guidelines_available() ) {
-			return true;
-		}
-
-		$experiments = get_option( 'gutenberg-experiments' );
-
-		return is_array( $experiments ) && ! empty( $experiments['gutenberg-guidelines'] );
+	private static function knowledge_available() {
+		return post_type_exists( 'wp_knowledge' ) && taxonomy_exists( 'wp_knowledge_type' );
 	}
 
 	private static function get_default_agent_skill_content() {
@@ -196,10 +203,6 @@ class Push_MD_Plugin {
 	}
 
 	private static function current_user_can_read_exported_content() {
-		if ( current_user_can( 'edit_others_posts' ) ) {
-			return true;
-		}
-
 		$post_ids = get_posts(
 			array(
 				'post_type'      => self::get_export_post_types(),
@@ -213,6 +216,10 @@ class Push_MD_Plugin {
 		);
 
 		foreach ( $post_ids as $post_id ) {
+			$post = get_post( $post_id );
+			if ( ! self::should_export_post( $post ) ) {
+				continue;
+			}
 			if ( ! current_user_can( 'read_post', intval( $post_id ) ) ) {
 				return false;
 			}
@@ -897,11 +904,11 @@ class Push_MD_Plugin {
 			return null;
 		}
 
-		if ( 'wp_guideline' === $post_type ) {
+		if ( 'wp_knowledge' === $post_type ) {
 			$metadata     = array();
 			$block_markup = $entry['content'];
-			if ( self::is_guideline_skill_path( $path ) ) {
-				$skill        = self::split_guideline_skill_markdown( $entry['content'] );
+			if ( self::is_knowledge_skill_path( $path ) ) {
+				$skill        = self::split_knowledge_skill_markdown( $entry['content'] );
 				$metadata     = $skill['metadata'];
 				$block_markup = $skill['content'];
 			}
@@ -1477,11 +1484,13 @@ class Push_MD_Plugin {
 		);
 
 		$files                  = array();
-		$has_guideline_skills   = false;
+		$has_knowledge_skills   = false;
 		$agent_guide_skill_path = null;
-		$can_read_all_exports   = current_user_can( 'edit_others_posts' );
 		foreach ( $posts as $post ) {
-			if ( ! $can_read_all_exports && ! current_user_can( 'read_post', intval( $post->ID ) ) ) {
+			if ( ! self::should_export_post( $post ) ) {
+				continue;
+			}
+			if ( ! current_user_can( 'read_post', intval( $post->ID ) ) ) {
 				throw new Exception( 'Git export rejected because you do not have permission to read all Push MD content.' );
 			}
 
@@ -1498,18 +1507,18 @@ class Push_MD_Plugin {
 				'content' => $content,
 			);
 
-			if ( 'wp_guideline' === $post->post_type && self::is_guideline_skill_path( $path ) ) {
-				$has_guideline_skills = true;
-				if ( self::AGENT_SKILL_SOURCE === get_post_meta( $post->ID, 'push_md_guideline_source', true ) ) {
+			if ( 'wp_knowledge' === $post->post_type && self::is_knowledge_skill_path( $path ) ) {
+				$has_knowledge_skills = true;
+				if ( self::AGENT_SKILL_SOURCE === get_post_meta( $post->ID, 'push_md_knowledge_source', true ) ) {
 					$agent_guide_skill_path = $path;
 				}
 			}
 		}
 
-		self::add_default_agent_guidance_files( $files, $has_guideline_skills, $agent_guide_skill_path );
+		self::add_default_agent_guidance_files( $files, $has_knowledge_skills, $agent_guide_skill_path );
 		self::add_global_styles_overlay_file( $files );
 
-		if ( $has_guideline_skills ) {
+		if ( $has_knowledge_skills ) {
 			foreach ( self::get_agent_skills_directory_symlink_paths() as $symlink_path => $target ) {
 				$files[ $symlink_path ] = array(
 					'post'    => null,
@@ -1534,8 +1543,8 @@ class Push_MD_Plugin {
 		return $files;
 	}
 
-	private static function add_default_agent_guidance_files( &$files, &$has_guideline_skills, &$agent_guide_skill_path ) {
-		if ( ! self::guidelines_enabled() ) {
+	private static function add_default_agent_guidance_files( &$files, &$has_knowledge_skills, &$agent_guide_skill_path ) {
+		if ( ! self::knowledge_available() ) {
 			return;
 		}
 
@@ -1551,7 +1560,7 @@ class Push_MD_Plugin {
 		);
 
 		foreach ( $default_skills as $slug => $skill ) {
-			$path = 'wp_guideline/skills/' . $slug . '/SKILL.md';
+			$path = 'wp_knowledge/skills/' . $slug . '/SKILL.md';
 			if ( ! isset( $files[ $path ] ) ) {
 				$files[ $path ] = array(
 					'post'    => null,
@@ -1564,11 +1573,11 @@ class Push_MD_Plugin {
 				);
 			}
 
-			$has_guideline_skills = true;
+			$has_knowledge_skills = true;
 		}
 
 		if ( ! $agent_guide_skill_path ) {
-			$agent_guide_skill_path = 'wp_guideline/skills/' . self::AGENT_SKILL_SLUG . '/SKILL.md';
+			$agent_guide_skill_path = 'wp_knowledge/skills/' . self::AGENT_SKILL_SLUG . '/SKILL.md';
 		}
 	}
 
@@ -1719,6 +1728,18 @@ class Push_MD_Plugin {
 		return self::get_supported_post_types();
 	}
 
+	private static function should_export_post( $post ) {
+		if ( ! $post instanceof WP_Post || 'wp_knowledge' !== $post->post_type ) {
+			return true;
+		}
+
+		if ( ! in_array( $post->post_status, array( 'publish', 'private' ), true ) ) {
+			return false;
+		}
+
+		return isset( self::$knowledge_type_directories[ self::get_knowledge_type_slug( $post->ID ) ] );
+	}
+
 	private static function get_existing_raw_block_post_types() {
 		$post_types = array();
 		foreach ( self::$raw_block_post_types as $post_type ) {
@@ -1751,8 +1772,8 @@ class Push_MD_Plugin {
 
 	public static function build_markdown_path( $post_or_type, $slug = null ) {
 		if ( $post_or_type instanceof WP_Post ) {
-			if ( 'wp_guideline' === $post_or_type->post_type ) {
-				return self::build_guideline_markdown_path( $post_or_type );
+			if ( 'wp_knowledge' === $post_or_type->post_type ) {
+				return self::build_knowledge_markdown_path( $post_or_type );
 			}
 			if ( self::is_raw_block_post_type( $post_or_type->post_type ) ) {
 				return self::build_raw_block_path(
@@ -1820,7 +1841,7 @@ class Push_MD_Plugin {
 
 	private static function path_uses_id_fallback_slug( $path ) {
 		$post_type = self::path_to_post_type( $path );
-		if ( self::is_raw_block_post_type( $post_type ) || 'wp_global_styles' === $post_type || 'wp_guideline' === $post_type ) {
+		if ( self::is_raw_block_post_type( $post_type ) || 'wp_global_styles' === $post_type || 'wp_knowledge' === $post_type ) {
 			return false;
 		}
 
@@ -1947,9 +1968,9 @@ class Push_MD_Plugin {
 	 * seeder can reuse the conversion without duplicating logic.
 	 */
 	public static function export_post_to_markdown( WP_Post $post ) {
-		if ( 'wp_guideline' === $post->post_type ) {
-			if ( 'skill' === self::get_guideline_type_slug( $post->ID ) ) {
-				return self::export_guideline_skill_to_markdown( $post );
+		if ( 'wp_knowledge' === $post->post_type ) {
+			if ( 'skill' === self::get_knowledge_type_slug( $post->ID ) ) {
+				return self::export_knowledge_skill_to_markdown( $post );
 			}
 
 			return $post->post_content;
@@ -2015,7 +2036,7 @@ class Push_MD_Plugin {
 		return 3;
 	}
 
-	private static function export_guideline_skill_to_markdown( WP_Post $post ) {
+	private static function export_knowledge_skill_to_markdown( WP_Post $post ) {
 		return self::format_skill_markdown(
 			$post->post_name,
 			trim( $post->post_excerpt ),
@@ -2044,28 +2065,28 @@ class Push_MD_Plugin {
 		return $encoded;
 	}
 
-	private static function build_guideline_markdown_path( WP_Post $post ) {
-		$type_slug = self::get_guideline_type_slug( $post->ID );
-		$directory = self::guideline_type_to_directory( $type_slug );
+	private static function build_knowledge_markdown_path( WP_Post $post ) {
+		$type_slug = self::get_knowledge_type_slug( $post->ID );
+		$directory = self::knowledge_type_to_directory( $type_slug );
 
 		if ( 'skill' === $type_slug ) {
-			return 'wp_guideline/' . $directory . '/' . $post->post_name . '/SKILL.md';
+			return 'wp_knowledge/' . $directory . '/' . $post->post_name . '/SKILL.md';
 		}
 
-		return 'wp_guideline/' . $directory . '/' . $post->post_name . '.md';
+		return 'wp_knowledge/' . $directory . '/' . $post->post_name . '.md';
 	}
 
-	private static function get_guideline_type_slug( $post_id ) {
-		if ( ! taxonomy_exists( 'wp_guideline_type' ) ) {
-			return 'artifact';
+	private static function get_knowledge_type_slug( $post_id ) {
+		if ( ! taxonomy_exists( 'wp_knowledge_type' ) ) {
+			return 'note';
 		}
 
-		$terms = get_the_terms( $post_id, 'wp_guideline_type' );
+		$terms = get_the_terms( $post_id, 'wp_knowledge_type' );
 		if ( is_wp_error( $terms ) || empty( $terms ) ) {
-			return 'artifact';
+			return 'note';
 		}
 
-		$known_types = array_keys( self::$guideline_type_directories );
+		$known_types = array_keys( self::$knowledge_type_directories );
 		foreach ( $known_types as $known_type ) {
 			foreach ( $terms as $term ) {
 				if ( $known_type === $term->slug ) {
@@ -2077,27 +2098,27 @@ class Push_MD_Plugin {
 		return $terms[0]->slug;
 	}
 
-	private static function guideline_type_to_directory( $type_slug ) {
-		if ( isset( self::$guideline_type_directories[ $type_slug ] ) ) {
-			return self::$guideline_type_directories[ $type_slug ];
+	private static function knowledge_type_to_directory( $type_slug ) {
+		if ( isset( self::$knowledge_type_directories[ $type_slug ] ) ) {
+			return self::$knowledge_type_directories[ $type_slug ];
 		}
 
 		return sanitize_title( $type_slug ) . 's';
 	}
 
-	private static function guideline_directory_to_type( $directory ) {
-		$type_slug = array_search( $directory, self::$guideline_type_directories, true );
+	private static function knowledge_directory_to_type( $directory ) {
+		$type_slug = array_search( $directory, self::$knowledge_type_directories, true );
 		if ( false !== $type_slug ) {
 			return $type_slug;
 		}
 
-		throw new Exception( 'Push rejected because the guideline type directory is not supported yet.' );
+		throw new Exception( 'Push rejected because the Knowledge type directory is not supported.' );
 	}
 
 	private static function get_agent_skills_directory_symlink_paths() {
 		return array(
-			'.agents/skills' => '../wp_guideline/skills',
-			'.claude/skills' => '../wp_guideline/skills',
+			'.agents/skills' => '../wp_knowledge/skills',
+			'.claude/skills' => '../wp_knowledge/skills',
 		);
 	}
 
@@ -2109,7 +2130,7 @@ class Push_MD_Plugin {
 	}
 
 	public static function get_default_agent_guidance_preview_files() {
-		if ( ! self::guidelines_enabled() ) {
+		if ( ! self::knowledge_available() ) {
 			return array();
 		}
 
@@ -2126,7 +2147,7 @@ class Push_MD_Plugin {
 		);
 
 		foreach ( $default_skills as $slug => $skill ) {
-			$files[ 'wp_guideline/skills/' . $slug . '/SKILL.md' ] = array(
+			$files[ 'wp_knowledge/skills/' . $slug . '/SKILL.md' ] = array(
 				'mode'    => TreeEntry::FILE_MODE_REGULAR_NON_EXECUTABLE,
 				'content' => self::format_skill_markdown(
 					$slug,
@@ -2143,7 +2164,7 @@ class Push_MD_Plugin {
 			);
 		}
 
-		foreach ( self::get_agent_entrypoint_symlink_paths( 'wp_guideline/skills/' . self::AGENT_SKILL_SLUG . '/SKILL.md' ) as $path => $target ) {
+		foreach ( self::get_agent_entrypoint_symlink_paths( 'wp_knowledge/skills/' . self::AGENT_SKILL_SLUG . '/SKILL.md' ) as $path => $target ) {
 			$files[ $path ] = array(
 				'mode'    => TreeEntry::FILE_MODE_SYMBOLIC_LINK,
 				'content' => $target,
@@ -2549,8 +2570,8 @@ class Push_MD_Plugin {
 		self::assert_content_has_no_nul_bytes( $markdown );
 		$post_type = self::path_to_post_type( $path );
 		$slug      = self::path_to_slug( $path );
-		if ( 'wp_guideline' === $post_type ) {
-			return self::upsert_guideline_from_markdown( $path, $markdown, $options );
+		if ( 'wp_knowledge' === $post_type ) {
+			return self::upsert_knowledge_from_markdown( $path, $markdown, $options );
 		}
 		if ( self::is_raw_block_post_type( $post_type ) ) {
 			return self::upsert_raw_block_post_from_html( $path, $markdown, $options );
@@ -2931,16 +2952,16 @@ class Push_MD_Plugin {
 		return true;
 	}
 
-	private static function upsert_guideline_from_markdown( $path, $markdown, $options = array() ) {
-		if ( ! self::guidelines_available() ) {
-			throw new Exception( 'Push rejected because Gutenberg Guidelines are not available on this site.' );
+	private static function upsert_knowledge_from_markdown( $path, $markdown, $options = array() ) {
+		if ( ! self::knowledge_available() ) {
+			throw new Exception( 'Push rejected because WordPress Knowledge is not available on this site.' );
 		}
 
 		$slug                = self::path_to_slug( $path );
-		$guideline_type_slug = self::path_to_guideline_type_slug( $path );
+		$knowledge_type_slug = self::path_to_knowledge_type_slug( $path );
 		$metadata            = array();
-		if ( 'skill' === $guideline_type_slug ) {
-			$skill_document = self::split_guideline_skill_markdown( $markdown );
+		if ( 'skill' === $knowledge_type_slug ) {
+			$skill_document = self::split_knowledge_skill_markdown( $markdown );
 			$metadata       = $skill_document['metadata'];
 			$markdown       = $skill_document['content'];
 			self::assert_block_markup_is_safe( $markdown );
@@ -2959,12 +2980,12 @@ class Push_MD_Plugin {
 		$post_id       = self::find_post_id_by_path_metadata( $path, $metadata );
 		$existing_post = $post_id ? get_post( $post_id ) : null;
 
-		$default_status = $existing_post && 'trash' !== $existing_post->post_status ? $existing_post->post_status : 'draft';
+		$default_status = $existing_post && 'trash' !== $existing_post->post_status ? $existing_post->post_status : 'private';
 		$post_status    = self::normalize_frontmatter_status(
 			isset( $metadata['status'] ) ? $metadata['status'] : $default_status
 		);
-		self::validate_post_status( $post_status, 'wp_guideline' );
-		self::assert_can_set_post_status( 'wp_guideline', $post_status, $existing_post );
+		self::validate_post_status( $post_status, 'wp_knowledge' );
+		self::assert_can_set_post_status( 'wp_knowledge', $post_status, $existing_post );
 
 		if (
 			$existing_post &&
@@ -2978,13 +2999,13 @@ class Push_MD_Plugin {
 		if ( $existing_post ) {
 			self::assert_can_edit_post( $existing_post->ID );
 		} else {
-			self::assert_can_create_post_type( 'wp_guideline' );
+			self::assert_can_create_post_type( 'wp_knowledge' );
 		}
 
 		$postarr = array(
-			'post_type'    => 'wp_guideline',
+			'post_type'    => 'wp_knowledge',
 			'post_name'    => $slug,
-			'post_title'   => self::guideline_title_from_metadata( $metadata, $slug, $existing_post ),
+			'post_title'   => self::knowledge_title_from_metadata( $metadata, $slug, $existing_post ),
 			'post_status'  => $post_status,
 			'post_content' => $markdown,
 		);
@@ -3013,8 +3034,8 @@ class Push_MD_Plugin {
 			throw new Exception( esc_html( $post_id->get_error_message() ) );
 		}
 
-		$term_id   = self::get_or_create_guideline_type_term_id( $guideline_type_slug );
-		$set_terms = wp_set_object_terms( $post_id, array( $term_id ), 'wp_guideline_type' );
+		$term_id   = self::get_or_create_knowledge_type_term_id( $knowledge_type_slug );
+		$set_terms = wp_set_object_terms( $post_id, array( $term_id ), 'wp_knowledge_type' );
 		if ( is_wp_error( $set_terms ) ) {
 			throw new Exception( esc_html( $set_terms->get_error_message() ) );
 		}
@@ -4073,21 +4094,21 @@ class Push_MD_Plugin {
 
 	private static function path_to_post_type( $path ) {
 		$segments = explode( '/', ltrim( $path, '/' ) );
-		if ( ! empty( $segments[0] ) && 'wp_guideline' === $segments[0] && ! self::guidelines_available() ) {
-			throw new Exception( 'Push rejected because Gutenberg Guidelines are not available on this site.' );
+		if ( ! empty( $segments[0] ) && 'wp_knowledge' === $segments[0] && ! self::knowledge_available() ) {
+			throw new Exception( 'Push rejected because WordPress Knowledge is not available on this site.' );
 		}
 		if ( empty( $segments[0] ) || ! in_array( $segments[0], self::get_supported_post_types(), true ) ) {
 			throw new Exception( 'Push rejected because the file path is outside the supported post type directories.' );
 		}
-		if ( 'wp_guideline' === $segments[0] ) {
-			self::path_to_guideline_type_slug( $path );
+		if ( 'wp_knowledge' === $segments[0] ) {
+			self::path_to_knowledge_type_slug( $path );
 		}
 
 		return $segments[0];
 	}
 
 	private static function path_to_slug( $path ) {
-		if ( self::is_guideline_skill_path( $path ) ) {
+		if ( self::is_knowledge_skill_path( $path ) ) {
 			$segments = explode( '/', ltrim( $path, '/' ) );
 			self::assert_markdown_slug_is_canonical( $segments[2] );
 			return $segments[2];
@@ -4257,36 +4278,36 @@ class Push_MD_Plugin {
 		return ! empty( $segments[0] ) && 'wp_global_styles' === $segments[0];
 	}
 
-	private static function path_to_guideline_type_slug( $path ) {
+	private static function path_to_knowledge_type_slug( $path ) {
 		$segments = explode( '/', ltrim( $path, '/' ) );
 		if (
 			count( $segments ) < 3 ||
-			'wp_guideline' !== $segments[0] ||
-			! in_array( $segments[1], self::$guideline_type_directories, true )
+			'wp_knowledge' !== $segments[0] ||
+			! in_array( $segments[1], self::$knowledge_type_directories, true )
 		) {
-			throw new Exception( 'Push rejected because guideline files must live under wp_guideline/<type> directories.' );
+			throw new Exception( 'Push rejected because Knowledge files must live under supported wp_knowledge/<type> directories.' );
 		}
 
-		$type_slug = self::guideline_directory_to_type( $segments[1] );
+		$type_slug = self::knowledge_directory_to_type( $segments[1] );
 		if ( 'skill' === $type_slug ) {
 			if ( 4 !== count( $segments ) || 'SKILL.md' !== $segments[3] ) {
-				throw new Exception( 'Push rejected because guideline skills must use wp_guideline/skills/<name>/SKILL.md.' );
+				throw new Exception( 'Push rejected because Knowledge skills must use wp_knowledge/skills/<name>/SKILL.md.' );
 			}
 			return $type_slug;
 		}
 
 		if ( 3 !== count( $segments ) || 'md' !== pathinfo( $segments[2], PATHINFO_EXTENSION ) ) {
-			throw new Exception( 'Push rejected because guideline files must be Markdown files.' );
+			throw new Exception( 'Push rejected because Knowledge files must be Markdown files.' );
 		}
 
 		return $type_slug;
 	}
 
-	private static function is_guideline_skill_path( $path ) {
+	private static function is_knowledge_skill_path( $path ) {
 		$segments = explode( '/', ltrim( $path, '/' ) );
 
 		return 4 === count( $segments )
-			&& 'wp_guideline' === $segments[0]
+			&& 'wp_knowledge' === $segments[0]
 			&& 'skills' === $segments[1]
 			&& '' !== $segments[2]
 			&& 'SKILL.md' === $segments[3];
@@ -4303,7 +4324,7 @@ class Push_MD_Plugin {
 		return $metadata;
 	}
 
-	private static function split_guideline_skill_markdown( $markdown ) {
+	private static function split_knowledge_skill_markdown( $markdown ) {
 		$metadata = array();
 		$content  = $markdown;
 
@@ -4319,7 +4340,7 @@ class Push_MD_Plugin {
 		);
 	}
 
-	private static function guideline_title_from_metadata( $metadata, $slug, $existing_post = null ) {
+	private static function knowledge_title_from_metadata( $metadata, $slug, $existing_post = null ) {
 		if ( isset( $metadata['title'] ) && '' !== trim( (string) $metadata['title'] ) ) {
 			return $metadata['title'];
 		}
@@ -4333,15 +4354,15 @@ class Push_MD_Plugin {
 		return ucwords( str_replace( '-', ' ', $slug ) );
 	}
 
-	private static function get_or_create_guideline_type_term_id( $slug ) {
-		$term = get_term_by( 'slug', $slug, 'wp_guideline_type' );
+	private static function get_or_create_knowledge_type_term_id( $slug ) {
+		$term = get_term_by( 'slug', $slug, 'wp_knowledge_type' );
 		if ( $term ) {
 			return (int) $term->term_id;
 		}
 
 		$inserted = wp_insert_term(
 			ucwords( str_replace( '-', ' ', $slug ) ),
-			'wp_guideline_type',
+			'wp_knowledge_type',
 			array( 'slug' => $slug )
 		);
 

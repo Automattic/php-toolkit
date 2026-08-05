@@ -69,8 +69,8 @@ Supported exported content includes:
   block HTML.
 - Active theme `theme.json` files as read-only context.
 - Global Styles overlays as editable JSON.
-- Gutenberg Guidelines and generated agent guidance when those WordPress
-  features are available.
+- WordPress Knowledge and generated agent guidance when the complete Knowledge
+  post type and taxonomy are available.
 
 Push MD does not deploy PHP code, plugin code, theme source, uploads, media
 files, arbitrary custom post types, or arbitrary database tables.
@@ -141,7 +141,7 @@ push_md_seed_tick
 
 The database tables contain derived Git repository data and Push MD Git
 history. WordPress posts, pages, templates, Global Styles, navigation posts, and
-Guidelines remain in their normal WordPress storage.
+Knowledge rows remain in their normal WordPress storage.
 
 ## Lifecycle Behavior
 
@@ -157,7 +157,7 @@ losing Push MD Git history.
 Uninstall is destructive for Push MD's derived data only. `uninstall.php`
 removes the Push MD Git object-store tables, seed progress options, transient
 import lock, and scheduled seed task. It does not delete WordPress posts, pages,
-templates, navigation posts, Global Styles, Guidelines, or other WordPress
+templates, navigation posts, Global Styles, Knowledge, or other WordPress
 content.
 
 On multisite, uninstall iterates through sites and removes each site's per-site

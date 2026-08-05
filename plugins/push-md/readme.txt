@@ -28,7 +28,7 @@ This gives Markdown-first teams and coding agents a Git-shaped workflow without 
 * Pull WP-Admin edits before continuing local work.
 * Let authenticated coding agents work in an ordinary checkout.
 * Keep WordPress roles, revisions, previews, publishing, and rendering in the loop.
-* Work with block theme files, Global Styles, and Gutenberg Guidelines when available.
+* Work with block theme files, Global Styles, and WordPress Knowledge when available.
 
 = How it works =
 
@@ -49,7 +49,7 @@ A checkout can include:
 * `wp_navigation/{slug}.html` for navigation posts.
 * `wp_theme/{theme}/theme.json` as read-only context.
 * `wp_global_styles/{theme}.json` for editable Global Styles overlays.
-* `wp_guideline/skills/{slug}/SKILL.md` for Gutenberg Guidelines skills and Push MD's built-in agent skills.
+* `wp_knowledge/skills/{slug}/SKILL.md` for Knowledge skills and Push MD's built-in agent skills.
 * `AGENTS.md`, `CLAUDE.md`, `.agents/skills`, and `.claude/skills` for agent guidance when available.
 
 Markdown files use a small front matter contract: `title`, `date`, `status`, and optional `description`. File paths identify content.
@@ -94,7 +94,7 @@ Yes. Your WordPress database remains authoritative. Git clients read and write t
 
 = Which content types are exported? =
 
-Posts, pages, supported block theme templates, template parts, navigation posts, read-only theme JSON context, Global Styles overlays, Gutenberg Guidelines when available, and built-in agent guidance.
+Posts, pages, supported block theme templates, template parts, navigation posts, read-only theme JSON context, Global Styles overlays, WordPress Knowledge when available, and built-in agent guidance.
 
 = Which branch should I use? =
 
@@ -118,7 +118,7 @@ Yes. Accepted content updates go through WordPress post APIs and create normal W
 
 = How do agent skills become available? =
 
-Push MD stores agent skills as WordPress Guidelines. Today, that means the site needs the Gutenberg plugin installed and active, with the Guidelines experiment enabled from the Gutenberg Experiments page. After that, skills appear in the checkout under `wp_guideline/skills/{slug}/SKILL.md`, with generated aliases such as `AGENTS.md` for agent discovery.
+Push MD stores agent skills as WordPress Knowledge. Until Knowledge ships in WordPress Core, the site needs WordPress 7.0+ and Gutenberg 23.6+ with the Guidelines experiment enabled. Push MD detects the complete Knowledge post type and taxonomy; without them, the rest of Push MD continues to work and Knowledge files are omitted. When available, skills appear under `wp_knowledge/skills/{slug}/SKILL.md`, with generated aliases such as `AGENTS.md` for agent discovery.
 
 = Is this a static site generator? =
 
@@ -144,7 +144,7 @@ Authorized clones can include supported content and prior Git revisions. Private
 
 = What happens when I uninstall Push MD? =
 
-Uninstalling Push MD removes its Git object-store database tables, seed progress options, transient import lock, and scheduled seed task. It does not delete WordPress posts, pages, templates, navigation posts, Global Styles, Guidelines, or other WordPress content.
+Uninstalling Push MD removes its Git object-store database tables, seed progress options, transient import lock, and scheduled seed task. It does not delete WordPress posts, pages, templates, navigation posts, Global Styles, Knowledge, or other WordPress content.
 
 The removed tables contain Push MD's derived Git repository history. Reinstalling Push MD can seed a new repository from the current WordPress content, but it cannot restore the previous Push MD Git history unless you kept a clone or database backup.
 

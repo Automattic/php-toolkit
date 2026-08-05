@@ -123,7 +123,7 @@ Current exported paths:
 - `wp_navigation/{slug}.html` for navigation posts.
 - `wp_theme/{theme}/theme.json` for read-only theme JSON context.
 - `wp_global_styles/{theme}.json` for editable Global Styles overlays.
-- `wp_guideline/skills/{slug}/SKILL.md` for Gutenberg Guidelines skills and
+- `wp_knowledge/skills/{slug}/SKILL.md` for WordPress Knowledge skills and
   Push MD's built-in agent skills.
 - `AGENTS.md`, `CLAUDE.md`, `.agents/skills`, and `.claude/skills` as generated
   or symlinked agent guidance when available.
@@ -132,10 +132,11 @@ Paths are part of the content identity. Push MD should reject unsupported
 directories, unexpected extensions, path traversal, non-canonical slugs, and
 ambiguous mappings.
 
-Push MD's built-in agent skills are generated only when Gutenberg Guidelines
-are enabled and no matching Guideline exists. Editing the canonical
-`wp_guideline/skills/{slug}/SKILL.md` file can create or update the matching
-Guideline, while generated aliases such as `AGENTS.md` and `.agents/skills`
+Push MD's built-in agent skills are generated only when the complete WordPress
+Knowledge post type and taxonomy are available and no matching Knowledge row
+exists. Editing the canonical
+`wp_knowledge/skills/{slug}/SKILL.md` file can create or update the matching
+Knowledge skill, while generated aliases such as `AGENTS.md` and `.agents/skills`
 remain read-only.
 
 ## 6. Posts And Pages
