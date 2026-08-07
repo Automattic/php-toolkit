@@ -26,7 +26,7 @@ jobs:
           --health-retries=10
 
     env:
-      WP_VERSION: '6.9.4'
+      WP_VERSION: '7.0'
       WP_DIR: ${{ github.workspace }}/.ci/wordpress
       WP_URL: http://127.0.0.1:8080
       WP_ADMIN_USER: admin
@@ -87,6 +87,9 @@ jobs:
           wp --path="$WP_DIR" option update permalink_structure '/%postname%/'
           wp --path="$WP_DIR" rewrite flush --hard
           wp --path="$WP_DIR" option update gutenberg-experiments '{"gutenberg-guidelines":true}' --format=json
+
+      - name: Install Gutenberg Knowledge support
+        run: wp --path="$WP_DIR" plugin install gutenberg --activate
 
       - name: Seed Hello World post, Sample Page, and Template
         run: |

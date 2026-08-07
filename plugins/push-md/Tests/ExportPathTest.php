@@ -38,9 +38,31 @@ if ( ! function_exists( 'taxonomy_exists' ) ) {
 	}
 }
 
+if ( ! function_exists( '__' ) ) {
+	function __( $text ) {
+		return $text;
+	}
+}
+
 require_once dirname( __DIR__ ) . '/class-push-md-plugin.php';
 
 class PMD_Export_Path_Test extends TestCase {
+
+	public function testKnowledgeIsOptionalWhenItsStorageIsUnavailable() {
+		$this->assertNotContains( 'wp_knowledge', Push_MD_Plugin::get_supported_post_types() );
+		$this->assertSame( array(), Push_MD_Plugin::get_default_agent_guidance_preview_files() );
+	}
+
+	public function testPushMdRegistersTheKnowledgeSkillType() {
+		$types = Push_MD_Plugin::register_knowledge_types(
+			array(
+				'note' => array( 'title' => 'Note' ),
+			)
+		);
+
+		$this->assertSame( 'Note', $types['note']['title'] );
+		$this->assertSame( 'Skill', $types['skill']['title'] );
+	}
 
 	public function testPostWithEmptySlugUsesStableIdFallbackPath() {
 		$this->assertSame(

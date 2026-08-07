@@ -11,8 +11,8 @@ This repository is a Git checkout of a WordPress site exposed by Push MD. WordPr
 - `wp_template/{slug}.html`, `wp_template_part/{slug}.html`, and `wp_navigation/{slug}.html` contain raw Gutenberg block markup for structural site entities. Theme-qualified WordPress slugs may appear as nested paths such as `wp_template_part/{theme}/header.html`.
 - `wp_theme/{theme}/theme.json` contains read-only theme-provided design settings for agent context.
 - `wp_global_styles/{theme}.json` contains the editable Global Styles overlay for the active theme. Edit this file for site-wide styles and settings instead of editing `wp_theme/{theme}/theme.json`.
-- `wp_guideline/skills/{slug}/SKILL.md` contains coding-agent skills stored as Gutenberg Guidelines.
-- `.agents/skills` and `.claude/skills` point to `wp_guideline/skills` for agent discovery.
+- `wp_knowledge/skills/{slug}/SKILL.md` contains coding-agent skills stored as WordPress Knowledge.
+- `.agents/skills` and `.claude/skills` point to `wp_knowledge/skills` for agent discovery.
 - `AGENTS.md` and `CLAUDE.md` point to this guide.
 
 ## Pulling And Pushing
@@ -27,7 +27,7 @@ This repository is a Git checkout of a WordPress site exposed by Push MD. WordPr
 ## Editing Rules
 
 - Preserve post and page front matter unless you are intentionally changing that WordPress metadata.
-- Guideline skill front matter is generated from WordPress fields. Keep the body focused on the guideline content.
+- Knowledge skill front matter is generated from WordPress fields. Keep the body focused on the skill content.
 - Template HTML files must stay raw Gutenberg block markup without front matter.
 - Template HTML files may be created or updated, but deletes and renames are rejected because their paths are their WordPress identity.
 - Theme base files are checked out for context. Editing theme-provided templates creates WordPress customizations; `wp_theme/{theme}/theme.json` is read-only in this checkout.

@@ -903,8 +903,8 @@ class PMD_End_To_End_Test extends TestCase {
 		$this->assertNotEmpty( glob( $clone_dir . '/wp_template_part/*/*.html' ), 'Expected active theme base template parts to be exported.' );
 		$this->assertNotEmpty( glob( $clone_dir . '/wp_theme/*/theme.json' ), 'Expected active theme theme.json to be exported.' );
 		$this->assertNotEmpty( glob( $clone_dir . '/wp_global_styles/*.json' ), 'Expected active theme Global Styles overlay to be exported.' );
-		$this->assertFileExists( $clone_dir . '/wp_guideline/skills/push-md/SKILL.md' );
-		$this->assertFileExists( $clone_dir . '/wp_guideline/skills/push-md-template-editor/SKILL.md' );
+		$this->assertFileExists( $clone_dir . '/wp_knowledge/skills/push-md/SKILL.md' );
+		$this->assertFileExists( $clone_dir . '/wp_knowledge/skills/push-md-template-editor/SKILL.md' );
 		$this->assertStringContainsString(
 			'Hello from WordPress',
 			file_get_contents( $clone_dir . '/post/hello-world.md' )
@@ -913,8 +913,8 @@ class PMD_End_To_End_Test extends TestCase {
 			'Template from WordPress',
 			file_get_contents( $clone_dir . '/wp_template/blog-home.html' )
 		);
-		$pmd_skill              = file_get_contents( $clone_dir . '/wp_guideline/skills/push-md/SKILL.md' );
-		$template_editor_skill  = file_get_contents( $clone_dir . '/wp_guideline/skills/push-md-template-editor/SKILL.md' );
+		$pmd_skill              = file_get_contents( $clone_dir . '/wp_knowledge/skills/push-md/SKILL.md' );
+		$template_editor_skill  = file_get_contents( $clone_dir . '/wp_knowledge/skills/push-md-template-editor/SKILL.md' );
 		$this->assertStringContainsString(
 			'Use the `push-md-template-editor` skill before editing',
 			$pmd_skill
