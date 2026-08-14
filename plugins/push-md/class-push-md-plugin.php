@@ -17,6 +17,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+require_once __DIR__ . '/class-push-md-master-metadata.php';
+
 /**
  * Push MD – exposes WordPress as a Git remote.
  *
@@ -931,7 +933,7 @@ class Push_MD_Plugin {
 			}
 			$metadata = self::normalize_supported_frontmatter(
 				$metadata,
-				array( 'id', 'title', 'date', 'status', 'description' )
+				self::get_supported_frontmatter_keys( $post_type )
 			);
 		}
 
@@ -1525,6 +1527,7 @@ class Push_MD_Plugin {
 
 		self::add_default_agent_guidance_files( $files, $has_knowledge_skills, $agent_guide_skill_path );
 		self::add_global_styles_overlay_file( $files );
+		Push_MD_Master_Metadata::add_master_taxonomy_and_author_files( $files );
 
 		if ( $has_knowledge_skills ) {
 			foreach ( self::get_agent_skills_directory_symlink_paths() as $symlink_path => $target ) {
@@ -2334,6 +2337,15 @@ class Push_MD_Plugin {
 		self::reject_deleted_global_styles_files( $old_files, $new_files );
 		self::reject_deleted_page_parent_files_with_remaining_children( $old_files, $new_files );
 
+		foreach ( array( 'categories.md', 'tags.md', 'authors.md' ) as $master_file ) {
+			if ( isset( $new_files[ $master_file ] ) ) {
+				$master_entry = $new_files[ $master_file ];
+				if ( ! isset( $old_files[ $master_file ] ) || ! self::repository_entries_match( $old_files[ $master_file ], $master_entry ) ) {
+					Push_MD_Master_Metadata::upsert_master_metadata_from_markdown( $master_file, $master_entry['content'], array( 'dry_run' => $dry_run ) );
+				}
+			}
+		}
+
 		foreach ( $new_files as $path => $entry ) {
 			if ( isset( $old_files[ $path ] ) && self::repository_entries_match( $old_files[ $path ], $entry ) ) {
 				continue;
@@ -2576,6 +2588,10 @@ class Push_MD_Plugin {
 
 	private static function upsert_post_from_markdown( $path, $markdown, $options = array() ) {
 		self::assert_content_has_no_nul_bytes( $markdown );
+		if ( Push_MD_Master_Metadata::is_master_metadata_path( $path ) ) {
+			return Push_MD_Master_Metadata::upsert_master_metadata_from_markdown( $path, $markdown, $options );
+		}
+
 		$post_type = self::path_to_post_type( $path );
 		$slug      = self::path_to_slug( $path );
 		if ( 'wp_knowledge' === $post_type ) {
@@ -2588,7 +2604,7 @@ class Push_MD_Plugin {
 			return self::upsert_global_styles_from_json( $path, $markdown, $options );
 		}
 
-		self::assert_markdown_front_matter_is_closed( $markdown );
+		self::assert_markdown_front_matter_is_closed( $markdown, $path );
 		$consumer = new MarkdownConsumer( $markdown );
 		$result   = $consumer->consume();
 		self::assert_block_markup_is_safe( $result->get_block_markup() );
@@ -2598,10 +2614,12 @@ class Push_MD_Plugin {
 		}
 
 		self::reject_path_identity_frontmatter( $metadata );
-		$metadata      = self::normalize_supported_frontmatter(
+		$metadata = self::normalize_supported_frontmatter(
 			$metadata,
-			array( 'id', 'title', 'date', 'status', 'description' )
+			self::get_supported_frontmatter_keys( $post_type )
 		);
+		Push_MD_Master_Metadata::validate_post_frontmatter_references( $metadata, $post_type, $options, $path );
+
 		$post_id       = self::find_post_id_by_path_metadata( $path, $metadata );
 		$existing_post = $post_id ? get_post( $post_id ) : null;
 		if ( $existing_post ) {
@@ -2653,6 +2671,13 @@ class Push_MD_Plugin {
 			$postarr['post_excerpt'] = $metadata['description'];
 		}
 
+		if ( isset( $metadata['author'] ) && '' !== trim( $metadata['author'] ) ) {
+			$author_id = Push_MD_Master_Metadata::resolve_frontmatter_author_id( $metadata['author'] );
+			if ( $author_id > 0 ) {
+				$postarr['post_author'] = $author_id;
+			}
+		}
+
 		$change_action = $existing_post && 'trash' === $existing_post->post_status ? 'restored' : ( $existing_post ? 'updated' : 'created' );
 		if ( ! empty( $options['dry_run'] ) ) {
 			return array(
@@ -2671,6 +2696,13 @@ class Push_MD_Plugin {
 
 		if ( is_wp_error( $post_id ) ) {
 			throw new Exception( esc_html( $post_id->get_error_message() ) );
+		}
+
+		if ( isset( $metadata['categories'] ) ) {
+			Push_MD_Master_Metadata::assign_post_categories( $post_id, $metadata['categories'] );
+		}
+		if ( isset( $metadata['tags'] ) ) {
+			Push_MD_Master_Metadata::assign_post_tags( $post_id, $metadata['tags'] );
 		}
 
 		$post = get_post( $post_id );
@@ -2855,12 +2887,24 @@ class Push_MD_Plugin {
 		}
 	}
 
-	private static function assert_markdown_front_matter_is_closed( $markdown ) {
+	private static function push_rejection_message( $reason, $path = '' ) {
+		$reason       = trim( (string) $reason );
+		$path         = trim( (string) $path );
+		$file_context = '' !== $path ? sprintf( ' in file "%s"', esc_html( $path ) ) : '';
+
+		return sprintf( 'Push rejected%s because %s', $file_context, $reason );
+	}
+
+	public static function throw_push_rejection( $reason, $path = '' ) {
+		throw new Exception( self::push_rejection_message( $reason, $path ) );
+	}
+
+	public static function assert_markdown_front_matter_is_closed( $markdown, $path = '' ) {
 		if (
 			preg_match( '/\A---\r?\n/', $markdown ) &&
 			! preg_match( '/\A---\r?\n.*?\r?\n---(?:\r?\n|\z)/s', $markdown )
 		) {
-			throw new Exception( 'Push rejected because Markdown front matter is missing its closing --- fence.' );
+			self::throw_push_rejection( 'Markdown front matter is missing its closing --- fence.', $path );
 		}
 	}
 
@@ -3839,6 +3883,21 @@ class Push_MD_Plugin {
 		}
 	}
 
+	private static function get_supported_frontmatter_keys( $post_type = 'post' ) {
+		$keys = array(
+			'id',
+			'title',
+			'date',
+			'status',
+			'description',
+			'author',
+			'categories',
+			'tags',
+		);
+
+		return apply_filters( 'push_md_supported_frontmatter_keys', $keys, $post_type );
+	}
+
 	private static function normalize_supported_frontmatter( $metadata, $allowed_keys ) {
 		$allowed = array();
 		foreach ( $allowed_keys as $key ) {
@@ -4182,6 +4241,10 @@ class Push_MD_Plugin {
 	}
 
 	private static function path_to_post_type( $path ) {
+		if ( Push_MD_Master_Metadata::is_master_metadata_path( $path ) ) {
+			return 'master_metadata';
+		}
+
 		$segments = explode( '/', ltrim( $path, '/' ) );
 		if ( ! empty( $segments[0] ) && 'wp_knowledge' === $segments[0] && ! self::knowledge_available() ) {
 			throw new Exception( 'Push rejected because WordPress Knowledge is not available on this site.' );
@@ -4197,6 +4260,10 @@ class Push_MD_Plugin {
 	}
 
 	private static function path_to_slug( $path ) {
+		if ( Push_MD_Master_Metadata::is_master_metadata_path( $path ) ) {
+			return pathinfo( basename( $path ), PATHINFO_FILENAME );
+		}
+
 		if ( self::is_knowledge_skill_path( $path ) ) {
 			$segments = explode( '/', ltrim( $path, '/' ) );
 			self::assert_markdown_slug_is_canonical( $segments[2] );

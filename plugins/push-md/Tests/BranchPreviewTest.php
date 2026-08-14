@@ -50,6 +50,14 @@ if ( ! function_exists( 'get_option' ) ) {
 	}
 }
 
+if ( ! function_exists( 'get_posts' ) ) {
+	function get_posts( $args = array() ) {
+		unset( $args );
+
+		return array();
+	}
+}
+
 require_once dirname( __DIR__ ) . '/class-push-md-plugin.php';
 
 class BranchPreviewTest extends TestCase {
