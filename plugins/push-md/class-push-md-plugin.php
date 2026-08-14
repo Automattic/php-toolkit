@@ -17,6 +17,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+require_once __DIR__ . '/class-push-md-path-filter.php';
+
 /**
  * Push MD – exposes WordPress as a Git remote.
  *
@@ -2338,7 +2340,7 @@ class Push_MD_Plugin {
 			if ( isset( $old_files[ $path ] ) && self::repository_entries_match( $old_files[ $path ], $entry ) ) {
 				continue;
 			}
-			if ( TreeEntry::FILE_MODE_SYMBOLIC_LINK === $entry['mode'] ) {
+			if ( TreeEntry::FILE_MODE_SYMBOLIC_LINK === $entry['mode'] || Push_MD_Path_Filter::is_ignored_path( $path ) ) {
 				continue;
 			}
 
@@ -2367,7 +2369,7 @@ class Push_MD_Plugin {
 			if ( isset( $new_files[ $path ] ) ) {
 				continue;
 			}
-			if ( TreeEntry::FILE_MODE_SYMBOLIC_LINK === $entry['mode'] ) {
+			if ( TreeEntry::FILE_MODE_SYMBOLIC_LINK === $entry['mode'] || Push_MD_Path_Filter::is_ignored_path( $path ) ) {
 				continue;
 			}
 
@@ -2545,7 +2547,7 @@ class Push_MD_Plugin {
 
 	private static function reject_symlink_file_changes( $old_files, $new_files ) {
 		foreach ( $new_files as $path => $entry ) {
-			if ( TreeEntry::FILE_MODE_SYMBOLIC_LINK !== $entry['mode'] ) {
+			if ( TreeEntry::FILE_MODE_SYMBOLIC_LINK !== $entry['mode'] || Push_MD_Path_Filter::is_ignored_path( $path ) ) {
 				continue;
 			}
 			if ( ! isset( $old_files[ $path ] ) || ! self::repository_entries_match( $old_files[ $path ], $entry ) ) {
@@ -2554,7 +2556,7 @@ class Push_MD_Plugin {
 		}
 
 		foreach ( $old_files as $path => $entry ) {
-			if ( TreeEntry::FILE_MODE_SYMBOLIC_LINK !== $entry['mode'] ) {
+			if ( TreeEntry::FILE_MODE_SYMBOLIC_LINK !== $entry['mode'] || Push_MD_Path_Filter::is_ignored_path( $path ) ) {
 				continue;
 			}
 			if ( ! isset( $new_files[ $path ] ) || ! self::repository_entries_match( $entry, $new_files[ $path ] ) ) {
@@ -2565,7 +2567,7 @@ class Push_MD_Plugin {
 
 	private static function reject_executable_file_changes( $old_files, $new_files ) {
 		foreach ( $new_files as $path => $entry ) {
-			if ( TreeEntry::FILE_MODE_REGULAR_EXECUTABLE !== $entry['mode'] ) {
+			if ( TreeEntry::FILE_MODE_REGULAR_EXECUTABLE !== $entry['mode'] || Push_MD_Path_Filter::is_ignored_path( $path ) ) {
 				continue;
 			}
 			if ( ! isset( $old_files[ $path ] ) || ! self::repository_entries_match( $old_files[ $path ], $entry ) ) {
@@ -3079,20 +3081,45 @@ class Push_MD_Plugin {
 			return array();
 		}
 
-		$messages   = array();
-		$messages[] = sprintf(
-			'Push MD applied %d content %s:',
-			count( $push_summary ),
-			1 === count( $push_summary ) ? 'change' : 'changes'
-		);
+		$messages = array();
+		$applied  = array();
+		$ignored  = array();
 
 		foreach ( $push_summary as $change ) {
+			if ( 'ignored' === $change['action'] ) {
+				$ignored[] = $change;
+			} else {
+				$applied[] = $change;
+			}
+		}
+
+		if ( ! empty( $applied ) ) {
 			$messages[] = sprintf(
-				'- %s %s: %s',
-				ucfirst( $change['action'] ),
-				$change['post_type'],
-				self::sanitize_push_summary_text( $change['url'] ? $change['url'] : $change['path'] )
+				'Push MD applied %d content %s:',
+				count( $applied ),
+				1 === count( $applied ) ? 'change' : 'changes'
 			);
+
+			foreach ( $applied as $change ) {
+				$messages[] = sprintf(
+					'- %s %s: %s',
+					ucfirst( $change['action'] ),
+					$change['post_type'],
+					self::sanitize_push_summary_text( $change['url'] ? $change['url'] : $change['path'] )
+				);
+			}
+		}
+
+		if ( ! empty( $ignored ) ) {
+			if ( empty( $applied ) ) {
+				$messages[] = 'Push MD received push (no WordPress content changes):';
+			}
+			foreach ( $ignored as $change ) {
+				$messages[] = sprintf(
+					'- Ignored unsupported path: %s',
+					self::sanitize_push_summary_text( $change['path'] )
+				);
+			}
 		}
 
 		return $messages;
