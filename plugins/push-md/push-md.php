@@ -28,6 +28,10 @@ if ( file_exists( __DIR__ . '/php-toolkit/vendor/composer/ClassLoader.php' ) ) {
 }
 
 require_once __DIR__ . '/functions.php';
+require_once __DIR__ . '/class-push-md-callouts.php';
+require_once __DIR__ . '/class-push-md-html-converter.php';
+require_once __DIR__ . '/class-push-md-markdown-producer.php';
+require_once __DIR__ . '/class-push-md-markdown-consumer.php';
 require_once __DIR__ . '/class-push-md-plugin.php';
 require_once __DIR__ . '/class-push-md-buffering-response.php';
 require_once __DIR__ . '/class-push-md-seeder.php';
