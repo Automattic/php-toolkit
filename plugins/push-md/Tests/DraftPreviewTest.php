@@ -152,6 +152,9 @@ if ( ! function_exists( 'get_posts' ) ) {
 			if ( isset( $args['post_status'] ) && $post->post_status !== $args['post_status'] ) {
 				continue;
 			}
+			if ( isset( $args['name'] ) && $post->post_name !== $args['name'] ) {
+				continue;
+			}
 			if ( isset( $args['meta_key'] ) ) {
 				$key   = $args['meta_key'];
 				$has_meta = isset( $mock_wp_postmeta[ $post->ID ][ $key ] );
@@ -425,5 +428,39 @@ class DraftPreviewTest extends TestCase {
 		$exported = Push_MD_Plugin::export_post_to_markdown( $post );
 		$this->assertStringContainsString( 'status: "published"', $exported );
 		$this->assertStringContainsString( 'Live Content', $exported );
+	}
+
+	public function testStandardCoreRevisionIsNotDetectedAsDraftPreview() {
+		$post               = new WP_Post();
+		$post->ID           = 88;
+		$post->post_title   = 'Published Post With Core Revision';
+		$post->post_name    = 'published-post';
+		$post->post_status  = 'publish';
+		$post->post_content = 'Live Published Content';
+		$post->post_date_gmt = '2026-01-01 00:00:00';
+		$post->post_date     = '2026-01-01 00:00:00';
+		$post->post_excerpt  = '';
+
+		global $mock_wp_posts;
+		$mock_wp_posts[88] = $post;
+
+		// Simulate standard WordPress history revision (e.g. created by WP Core editor save)
+		$core_revision               = new WP_Post();
+		$core_revision->ID           = 8801;
+		$core_revision->post_type    = 'revision';
+		$core_revision->post_parent  = 88;
+		$core_revision->post_name    = '88-revision-v1';
+		$core_revision->post_status  = 'inherit';
+		$core_revision->post_content = 'Old Core History Content';
+		$mock_wp_posts[8801]         = $core_revision;
+
+		// Verify find_preview_revision returns null
+		$this->assertNull( Push_MD_Draft_Previews::find_preview_revision( 88 ) );
+
+		// Verify export respects published status
+		$exported = Push_MD_Plugin::export_post_to_markdown( $post );
+		$this->assertStringContainsString( 'status: "published"', $exported );
+		$this->assertStringContainsString( 'Live Published Content', $exported );
+		$this->assertStringNotContainsString( 'Old Core History Content', $exported );
 	}
 }

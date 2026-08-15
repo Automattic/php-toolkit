@@ -137,6 +137,7 @@ class Push_MD_Draft_Previews {
 			array(
 				'post_type'      => 'revision',
 				'post_parent'    => $post_id,
+				'name'           => $post_id . '-pushmd-preview',
 				'post_status'    => 'inherit',
 				'posts_per_page' => 1,
 				'orderby'        => 'ID',
