@@ -1178,17 +1178,16 @@ class PMD_End_To_End_Test extends TestCase {
 		$this->run_cmd( array( 'git', '-C', $clone_dir, 'reset', '--hard', 'HEAD~1' ) );
 
 		file_put_contents(
-			$clone_dir . '/post/rejected-slug-frontmatter.md',
-			"---\nslug: \"rejected-slug-frontmatter\"\nstatus: \"publish\"\ntitle: \"Rejected Slug Front Matter\"\n---\n\nThis push must be rejected.\n"
+			$clone_dir . '/post/accepted-slug-frontmatter.md',
+			"---\nslug: \"custom-slug-frontmatter\"\nstatus: \"publish\"\ntitle: \"Accepted Slug Front Matter\"\n---\n\nThis push must be accepted.\n"
 		);
-		$this->run_cmd( array( 'git', '-C', $clone_dir, 'add', 'post/rejected-slug-frontmatter.md' ) );
-		$this->run_cmd( array( 'git', '-C', $clone_dir, 'commit', '-m', 'Reject post slug front matter' ) );
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'add', 'post/accepted-slug-frontmatter.md' ) );
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'commit', '-m', 'Accept post slug front matter' ) );
 		$push_result = $this->run_cmd(
 			array( 'git', '-C', $clone_dir, 'push', 'origin', 'trunk' ),
 			true
 		);
-		$this->assertNotSame( 0, $push_result['code'], 'Slug front matter should have been rejected.' );
-		$this->assertStringContainsString( 'Push rejected because Markdown front matter must not include a slug.', $push_result['output'] );
+		$this->assertSame( 0, $push_result['code'], 'Slug front matter should be supported and accepted.' );
 		$this->run_cmd( array( 'git', '-C', $clone_dir, 'reset', '--hard', 'HEAD~1' ) );
 
 		file_put_contents(

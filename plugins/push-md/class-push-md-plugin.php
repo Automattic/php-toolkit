@@ -3874,12 +3874,9 @@ class Push_MD_Plugin {
 		return isset( $statuses[ $key ] ) ? $statuses[ $key ] : $post_status;
 	}
 
-	private static function reject_path_identity_frontmatter( $metadata ) {
-		if ( isset( $metadata['slug'] ) ) {
-			throw new Exception( 'Push rejected because Markdown front matter must not include a slug. Rename the file path only when creating distinct content.' );
-		}
+	private static function reject_path_identity_frontmatter( $metadata, $path = '' ) {
 		if ( isset( $metadata['type'] ) ) {
-			throw new Exception( 'Push rejected because Markdown front matter must not include a type. The directory determines the post type.' );
+			self::throw_push_rejection( 'Markdown front matter must not include a "type" field. The directory determines the post type.', $path );
 		}
 	}
 
