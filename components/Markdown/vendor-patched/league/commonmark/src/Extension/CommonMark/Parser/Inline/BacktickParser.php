@@ -98,9 +98,10 @@ final class BacktickParser implements InlineParserInterface
     private function findMatchingTicks(int $openTickLength, Cursor $cursor): bool
     {
         // Reset the seenBackticks cache if this is a new cursor
-        if ($this->lastCursor === null || $this->lastCursor->get() !== $cursor) {
+        $currentCursor = ($this->lastCursor !== null && \class_exists('WeakReference') && $this->lastCursor instanceof \WeakReference) ? $this->lastCursor->get() : $this->lastCursor;
+        if ($this->lastCursor === null || $currentCursor !== $cursor) {
             $this->seenBackticks     = [];
-            $this->lastCursor        = \WeakReference::create($cursor);
+            $this->lastCursor        = \class_exists('WeakReference') ? \WeakReference::create($cursor) : $cursor;
             $this->lastCursorScanned = false;
         }
 
