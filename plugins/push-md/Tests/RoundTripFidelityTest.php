@@ -6,6 +6,21 @@ if ( ! defined( 'ABSPATH' ) ) {
 	define( 'ABSPATH', '/tmp/wp/' );
 }
 
+if ( ! class_exists( 'WeakReference' ) ) {
+	class WeakReference {
+		private $target;
+		public function __construct( $target ) {
+			$this->target = $target;
+		}
+		public static function create( $target ) {
+			return new self( $target );
+		}
+		public function get() {
+			return $this->target;
+		}
+	}
+}
+
 if ( ! function_exists( 'wp_strip_all_tags' ) ) {
 	function wp_strip_all_tags( $string, $remove_breaks = false ) {
 		$string = strip_tags( $string );
