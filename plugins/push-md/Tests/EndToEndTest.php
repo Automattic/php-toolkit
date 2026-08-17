@@ -1189,6 +1189,7 @@ class PMD_End_To_End_Test extends TestCase {
 		);
 		$this->assertSame( 0, $push_result['code'], 'Slug front matter should be supported and accepted.' );
 		$this->run_cmd( array( 'git', '-C', $clone_dir, 'reset', '--hard', 'HEAD~1' ) );
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'push', '--force', 'origin', 'trunk' ) );
 
 		file_put_contents(
 			$clone_dir . '/post/rejected-type-frontmatter.md',
