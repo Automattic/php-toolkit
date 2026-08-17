@@ -17,6 +17,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+require_once __DIR__ . '/class-push-md-media.php';
+
 /**
  * Push MD – exposes WordPress as a Git remote.
  *
@@ -931,7 +933,7 @@ class Push_MD_Plugin {
 			}
 			$metadata = self::normalize_supported_frontmatter(
 				$metadata,
-				array( 'id', 'title', 'date', 'status', 'description' )
+				self::get_supported_frontmatter_keys( $post_type )
 			);
 		}
 
@@ -1525,6 +1527,22 @@ class Push_MD_Plugin {
 
 		self::add_default_agent_guidance_files( $files, $has_knowledge_skills, $agent_guide_skill_path );
 		self::add_global_styles_overlay_file( $files );
+
+		$media_files = Push_MD_Media::export_media_content();
+		foreach ( $media_files as $m_path => $m_entry ) {
+			$files[ $m_path ] = $m_entry;
+		}
+
+		// Always keep a placeholder so the media/ staging directory exists in the
+		// repository tree even after all uploaded images have been cleaned up.
+		// Without this, git would delete the empty directory on git pull.
+		if ( ! isset( $files['media/.gitkeep'] ) ) {
+			$files['media/.gitkeep'] = array(
+				'post'    => null,
+				'mode'    => TreeEntry::FILE_MODE_REGULAR_NON_EXECUTABLE,
+				'content' => '',
+			);
+		}
 
 		if ( $has_knowledge_skills ) {
 			foreach ( self::get_agent_skills_directory_symlink_paths() as $symlink_path => $target ) {
@@ -2334,6 +2352,8 @@ class Push_MD_Plugin {
 		self::reject_deleted_global_styles_files( $old_files, $new_files );
 		self::reject_deleted_page_parent_files_with_remaining_children( $old_files, $new_files );
 
+		$uploaded_media_map = Push_MD_Media::process_commit_media_files( $new_files, $dry_run );
+
 		foreach ( $new_files as $path => $entry ) {
 			if ( isset( $old_files[ $path ] ) && self::repository_entries_match( $old_files[ $path ], $entry ) ) {
 				continue;
@@ -2348,6 +2368,8 @@ class Push_MD_Plugin {
 				array(
 					'dry_run'             => true,
 					'skip_modified_check' => $skip_modified_checks,
+					'uploaded_media_map'  => $uploaded_media_map,
+					'commit_files'        => $new_files,
 				)
 			);
 			$post_id = $planned['post_id'];
@@ -2400,7 +2422,11 @@ class Push_MD_Plugin {
 			$applied = self::upsert_post_from_markdown(
 				$plan['path'],
 				$plan['content'],
-				array( 'skip_modified_check' => $skip_modified_checks )
+				array(
+					'skip_modified_check' => $skip_modified_checks,
+					'uploaded_media_map'  => $uploaded_media_map,
+					'commit_files'        => $new_files,
+				)
 			);
 			if ( $applied['post_id'] ) {
 				$changes[] = $applied['change'];
@@ -2600,7 +2626,7 @@ class Push_MD_Plugin {
 		self::reject_path_identity_frontmatter( $metadata );
 		$metadata      = self::normalize_supported_frontmatter(
 			$metadata,
-			array( 'id', 'title', 'date', 'status', 'description' )
+			self::get_supported_frontmatter_keys( $post_type )
 		);
 		$post_id       = self::find_post_id_by_path_metadata( $path, $metadata );
 		$existing_post = $post_id ? get_post( $post_id ) : null;
@@ -2671,6 +2697,10 @@ class Push_MD_Plugin {
 
 		if ( is_wp_error( $post_id ) ) {
 			throw new Exception( esc_html( $post_id->get_error_message() ) );
+		}
+
+		if ( isset( $metadata['featured_image'] ) ) {
+			self::assign_post_featured_image( $post_id, $metadata['featured_image'], $options );
 		}
 
 		$post = get_post( $post_id );
@@ -3837,6 +3867,26 @@ class Push_MD_Plugin {
 		if ( isset( $metadata['type'] ) ) {
 			throw new Exception( 'Push rejected because Markdown front matter must not include a type. The directory determines the post type.' );
 		}
+	}
+
+	private static function assign_post_featured_image( $post_id, $img_val, $options = array() ) {
+		$commit_files       = isset( $options['commit_files'] ) && is_array( $options['commit_files'] ) ? $options['commit_files'] : array();
+		$uploaded_media_map = isset( $options['uploaded_media_map'] ) && is_array( $options['uploaded_media_map'] ) ? $options['uploaded_media_map'] : array();
+		$dry_run            = ! empty( $options['dry_run'] );
+		Push_MD_Media::handle_featured_image( $post_id, $img_val, $uploaded_media_map, $commit_files, $dry_run );
+	}
+
+	private static function get_supported_frontmatter_keys( $post_type = 'post' ) {
+		$keys = array(
+			'id',
+			'title',
+			'date',
+			'status',
+			'description',
+			'featured_image',
+		);
+
+		return apply_filters( 'push_md_supported_frontmatter_keys', $keys, $post_type );
 	}
 
 	private static function normalize_supported_frontmatter( $metadata, $allowed_keys ) {
