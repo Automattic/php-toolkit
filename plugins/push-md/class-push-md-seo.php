@@ -127,7 +127,7 @@ class Push_MD_SEO {
 
 		// 1. Simple text fields.
 		foreach ( self::$simple_field_map as $fm_key => $field_slug ) {
-			$val = self::get_post_seo_field_meta( $post_id, $field_slug );
+			$val = trim( (string) self::get_post_seo_field_meta( $post_id, $field_slug ) );
 			if ( '' !== $val ) {
 				$metadata[ $fm_key ] = array( $val );
 			}
@@ -419,7 +419,7 @@ class Push_MD_SEO {
 		}
 
 		// Fallback attachment ID resolution via core function if still 0.
-		if ( 0 === $attachment_id && function_exists( 'attachment_url_to_postid' ) && ( 0 === strpos( $image_url, 'http://' ) || 0 === strpos( $image_url, 'https://' ) ) ) {
+		if ( 0 === $attachment_id && ! empty( $image_url ) && is_string( $image_url ) && function_exists( 'attachment_url_to_postid' ) && ( 0 === strpos( $image_url, 'http://' ) || 0 === strpos( $image_url, 'https://' ) ) ) {
 			$found_id = attachment_url_to_postid( $image_url );
 			if ( $found_id > 0 ) {
 				$attachment_id = (int) $found_id;
