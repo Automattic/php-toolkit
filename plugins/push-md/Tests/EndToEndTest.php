@@ -1174,22 +1174,20 @@ class PMD_End_To_End_Test extends TestCase {
 			true
 		);
 		$this->assertNotSame( 0, $push_result['code'], 'ID front matter should have been rejected.' );
-		$this->assertStringContainsString( 'Push rejected because Markdown front matter id must be a positive integer.', $push_result['output'] );
+		$this->assertStringContainsString( 'Push rejected in file "post/rejected-id-frontmatter.md" because Markdown front matter id must be a positive integer.', $push_result['output'] );
 		$this->run_cmd( array( 'git', '-C', $clone_dir, 'reset', '--hard', 'HEAD~1' ) );
 
 		file_put_contents(
-			$clone_dir . '/post/rejected-slug-frontmatter.md',
-			"---\nslug: \"rejected-slug-frontmatter\"\nstatus: \"publish\"\ntitle: \"Rejected Slug Front Matter\"\n---\n\nThis push must be rejected.\n"
+			$clone_dir . '/post/accepted-slug-frontmatter.md',
+			"---\nslug: \"custom-slug-frontmatter\"\nstatus: \"publish\"\ntitle: \"Accepted Slug Front Matter\"\n---\n\nThis push must be accepted.\n"
 		);
-		$this->run_cmd( array( 'git', '-C', $clone_dir, 'add', 'post/rejected-slug-frontmatter.md' ) );
-		$this->run_cmd( array( 'git', '-C', $clone_dir, 'commit', '-m', 'Reject post slug front matter' ) );
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'add', 'post/accepted-slug-frontmatter.md' ) );
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'commit', '-m', 'Accept post slug front matter' ) );
 		$push_result = $this->run_cmd(
 			array( 'git', '-C', $clone_dir, 'push', 'origin', 'trunk' ),
 			true
 		);
-		$this->assertNotSame( 0, $push_result['code'], 'Slug front matter should have been rejected.' );
-		$this->assertStringContainsString( 'Push rejected because Markdown front matter must not include a slug.', $push_result['output'] );
-		$this->run_cmd( array( 'git', '-C', $clone_dir, 'reset', '--hard', 'HEAD~1' ) );
+		$this->assertSame( 0, $push_result['code'], 'Slug front matter should be supported and accepted.' );
 
 		file_put_contents(
 			$clone_dir . '/post/rejected-type-frontmatter.md',
@@ -1202,7 +1200,7 @@ class PMD_End_To_End_Test extends TestCase {
 			true
 		);
 		$this->assertNotSame( 0, $push_result['code'], 'Type front matter should have been rejected.' );
-		$this->assertStringContainsString( 'Push rejected because Markdown front matter must not include a type.', $push_result['output'] );
+		$this->assertStringContainsString( 'Push rejected in file "post/rejected-type-frontmatter.md" because Markdown front matter must not include a "type" field.', $push_result['output'] );
 		$this->run_cmd( array( 'git', '-C', $clone_dir, 'reset', '--hard', 'HEAD~1' ) );
 
 		mkdir( $clone_dir . '/post/nested-path' );
@@ -1495,7 +1493,8 @@ class PMD_End_To_End_Test extends TestCase {
 			true
 		);
 		$this->assertNotSame( 0, $push_result['code'], 'Unknown front matter should have been rejected.' );
-		$this->assertStringContainsString( 'Push rejected because Markdown front matter field "author" is not supported.', $push_result['output'] );
+		$this->assertStringContainsString( 'Push rejected in file "post/rejected-unknown-frontmatter.md" because Markdown front matter field "author" is not supported.', $push_result['output'] );
+		$this->assertStringContainsString( 'Supported front matter fields are:', $push_result['output'] );
 		$this->run_cmd( array( 'git', '-C', $clone_dir, 'reset', '--hard', 'HEAD~1' ) );
 
 		file_put_contents(
