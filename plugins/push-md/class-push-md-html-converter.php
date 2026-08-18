@@ -25,6 +25,10 @@ class Push_MD_HTML_Converter {
 	 * @return string Clean Markdown.
 	 */
 	public static function convert( $html ) {
+		if ( empty( $html ) || ! is_string( $html ) ) {
+			return '';
+		}
+
 		$filtered = apply_filters( 'push_md_html_to_markdown', null, $html );
 		if ( null !== $filtered ) {
 			return (string) $filtered;
@@ -89,9 +93,6 @@ class Push_MD_HTML_Converter {
 				// from parsing them as raw HTML tags.
 				if ( ! in_array( 'CODE', $active_inlines, true ) ) {
 					$text = str_replace( array( '<', '>' ), array( '\<', '\>' ), $text );
-					// Escape ordered list markers (e.g. "1. " or "2) ") at the beginning of lines or text nodes
-					// to prevent them from being parsed as Markdown ordered lists (which would cause the number to be lost).
-					$text = preg_replace( '/^(\s*\d+)([\.\)])(\s+)/m', '$1\\\\$2$3', $text );
 				}
 
 				$output .= $text;
@@ -529,7 +530,7 @@ class Push_MD_HTML_Converter {
 	 * @return string Normalized Markdown text.
 	 */
 	public static function normalize_markdown( $markdown ) {
-		if ( '' === $markdown ) {
+		if ( empty( $markdown ) || ! is_string( $markdown ) ) {
 			return '';
 		}
 
@@ -560,6 +561,10 @@ class Push_MD_HTML_Converter {
 	 * @return string Normalized fragment.
 	 */
 	private static function normalize_inline_delimiters( $text ) {
+		if ( empty( $text ) || ! is_string( $text ) ) {
+			return (string) $text;
+		}
+
 		$text = self::shift_delimiter_spaces( $text, '/\*\*\*([^\*\r\n]+?)\*\*\*/u', '***' );
 		$text = self::shift_delimiter_spaces( $text, '/\*\*([^\*\r\n]+?)\*\*/u', '**' );
 		$text = self::shift_delimiter_spaces( $text, '/(?<!\*)\*([^\*\r\n]+?)\*(?!\*)/u', '*' );
@@ -600,6 +605,10 @@ class Push_MD_HTML_Converter {
 	 * @return string Text with shifted spaces.
 	 */
 	private static function shift_delimiter_spaces( $text, $pattern, $delimiter ) {
+		if ( empty( $text ) || ! is_string( $text ) ) {
+			return (string) $text;
+		}
+
 		return preg_replace_callback(
 			$pattern,
 			function ( $matches ) use ( $delimiter ) {

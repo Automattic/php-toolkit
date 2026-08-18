@@ -535,6 +535,10 @@ class Push_MD_Callouts {
 	 * @return string Processed Markdown / HTML.
 	 */
 	public static function process_markdown_to_html( $markdown, $use_block_comments ) {
+		if ( empty( $markdown ) || ! is_string( $markdown ) ) {
+			return (string) $markdown;
+		}
+
 		// Normalize GFM callouts (> [!type]) and code block admonitions (```ad-type) into :::type directives first.
 		$markdown = self::normalize_callout_syntaxes( $markdown );
 
@@ -657,6 +661,10 @@ class Push_MD_Callouts {
 	 * @return string Normalized Markdown string.
 	 */
 	public static function normalize_callout_syntaxes( $markdown ) {
+		if ( empty( $markdown ) || ! is_string( $markdown ) ) {
+			return (string) $markdown;
+		}
+
 		if ( false === strpos( $markdown, '[!' ) && false === strpos( $markdown, 'ad-' ) ) {
 			return $markdown;
 		}
@@ -671,7 +679,7 @@ class Push_MD_Callouts {
 	 * Normalizes GFM callout blocks (`> [!type] Title`) into `:::type title="..."` directives.
 	 */
 	private static function normalize_gfm_callouts( $markdown ) {
-		if ( false === strpos( $markdown, '[!' ) ) {
+		if ( empty( $markdown ) || ! is_string( $markdown ) || false === strpos( $markdown, '[!' ) ) {
 			return $markdown;
 		}
 
@@ -801,6 +809,10 @@ class Push_MD_Callouts {
 	 * Post-processes Gutenberg export to convert unknown blocks serialized as fences back to :::.
 	 */
 	public static function process_gutenberg_to_markdown( $markdown ) {
+		if ( empty( $markdown ) || ! is_string( $markdown ) ) {
+			return (string) $markdown;
+		}
+
 		$pattern = '/```gutenberg\r?\n<!-- wp:([a-zA-Z0-9_-]+\/[a-zA-Z0-9_-]+)(?: (.*?))? -->\r?\n(.*?)\r?\n<!-- \/wp:\1 -->\r?\n```/ms';
 
 		return preg_replace_callback(
@@ -863,7 +875,7 @@ class Push_MD_Callouts {
 	 * @return string Processed content.
 	 */
 	public static function process_html_directives_in_content( $content ) {
-		if ( empty( self::$registry ) || false === strpos( $content, '<' ) ) {
+		if ( empty( $content ) || ! is_string( $content ) || empty( self::$registry ) || false === strpos( $content, '<' ) ) {
 			return $content;
 		}
 
