@@ -25,6 +25,10 @@ class Push_MD_HTML_Converter {
 	 * @return string Clean Markdown.
 	 */
 	public static function convert( $html ) {
+		if ( empty( $html ) || ! is_string( $html ) ) {
+			return '';
+		}
+
 		$filtered = apply_filters( 'push_md_html_to_markdown', null, $html );
 		if ( null !== $filtered ) {
 			return (string) $filtered;
@@ -48,7 +52,7 @@ class Push_MD_HTML_Converter {
 	 * @param string $html HTML fragment.
 	 * @return string Markdown.
 	 */
-	private static function convert_fragment( $html ) {
+	public static function convert_fragment( $html ) {
 		$processor = DataLiberationHTMLProcessor::create_fragment( $html );
 		$output    = '';
 
@@ -89,9 +93,6 @@ class Push_MD_HTML_Converter {
 				// from parsing them as raw HTML tags.
 				if ( ! in_array( 'CODE', $active_inlines, true ) ) {
 					$text = str_replace( array( '<', '>' ), array( '\<', '\>' ), $text );
-					// Escape ordered list markers (e.g. "1. " or "2) ") at the beginning of lines or text nodes
-					// to prevent them from being parsed as Markdown ordered lists (which would cause the number to be lost).
-					$text = preg_replace( '/^(\s*\d+)([\.\)])(\s+)/m', '$1\\\\$2$3', $text );
 				}
 
 				$output .= $text;
@@ -106,6 +107,16 @@ class Push_MD_HTML_Converter {
 			$is_closer = $processor->is_tag_closer();
 
 			if ( ! $is_closer ) {
+				$custom_markdown = class_exists( 'Push_MD_Callouts' ) ? Push_MD_Callouts::convert_node( $processor, static::class ) : null;
+				if ( null !== $custom_markdown ) {
+					$output   .= $custom_markdown;
+					$void_tags = array( 'img', 'br', 'hr', 'input', 'meta', 'link', 'embed', 'param', 'source', 'track', 'wbr' );
+					if ( ! in_array( strtolower( $tag ), $void_tags, true ) ) {
+						$processor->skip_to_closer();
+					}
+					continue;
+				}
+
 				// Check for raw HTML preservation based on tag name or CSS classes.
 				if ( self::should_preserve_element( $processor, $tag ) ) {
 					$container_tags = array( 'div', 'aside', 'section', 'article', 'header', 'footer', 'nav', 'main', 'figure', 'blockquote' );
@@ -519,7 +530,7 @@ class Push_MD_HTML_Converter {
 	 * @return string Normalized Markdown text.
 	 */
 	public static function normalize_markdown( $markdown ) {
-		if ( '' === $markdown ) {
+		if ( empty( $markdown ) || ! is_string( $markdown ) ) {
 			return '';
 		}
 
@@ -550,6 +561,10 @@ class Push_MD_HTML_Converter {
 	 * @return string Normalized fragment.
 	 */
 	private static function normalize_inline_delimiters( $text ) {
+		if ( empty( $text ) || ! is_string( $text ) ) {
+			return (string) $text;
+		}
+
 		$text = self::shift_delimiter_spaces( $text, '/\*\*\*([^\*\r\n]+?)\*\*\*/u', '***' );
 		$text = self::shift_delimiter_spaces( $text, '/\*\*([^\*\r\n]+?)\*\*/u', '**' );
 		$text = self::shift_delimiter_spaces( $text, '/(?<!\*)\*([^\*\r\n]+?)\*(?!\*)/u', '*' );
@@ -590,6 +605,10 @@ class Push_MD_HTML_Converter {
 	 * @return string Text with shifted spaces.
 	 */
 	private static function shift_delimiter_spaces( $text, $pattern, $delimiter ) {
+		if ( empty( $text ) || ! is_string( $text ) ) {
+			return (string) $text;
+		}
+
 		return preg_replace_callback(
 			$pattern,
 			function ( $matches ) use ( $delimiter ) {
@@ -886,7 +905,7 @@ class Push_MD_HTML_Converter {
 	 * @param string                      $tag       The tag name.
 	 * @return string Outer HTML element string.
 	 */
-	private static function get_outer_html( $processor, $tag ) {
+	public static function get_outer_html( $processor, $tag ) {
 		$tag        = strtolower( (string) $tag );
 		$attr_names = $processor->get_attribute_names_with_prefix( '' );
 		$attr_str   = '';

@@ -152,7 +152,7 @@ class HtmlMarkdownConversionTest extends TestCase {
 		$html     = '<h2>Title</h2><p>Body text here.</p>';
 		$markdown = Push_MD_HTML_Converter::convert( $html );
 		// There should be a blank line between the heading and paragraph.
-		$this->assertMatchesRegularExpression( '/## Title\n\nBody text here\./', $markdown );
+		$this->assertTrue( (bool) preg_match( '/## Title\n\nBody text here\./', $markdown ) );
 	}
 
 	public function test_figure_with_img_in_correct_block() {
@@ -497,5 +497,14 @@ class HtmlMarkdownConversionTest extends TestCase {
 		$this->assertStringContainsString( 'Check out [Icegram Express](https://example.com/express)!', $md );
 		$this->assertStringNotContainsString( ")\n\n,", $md );
 		$this->assertStringNotContainsString( ")\n\n!", $md );
+	}
+
+	public function test_null_handling_does_not_trigger_php_8_1_deprecations() {
+		$this->assertSame( '', Push_MD_HTML_Converter::convert( null ) );
+		if ( class_exists( 'Push_MD_Callouts' ) ) {
+			$this->assertSame( '', Push_MD_Callouts::process_gutenberg_to_markdown( null ) );
+			$this->assertNull( Push_MD_Callouts::process_html_directives_in_content( null ) );
+			$this->assertSame( '', Push_MD_Callouts::process_markdown_to_html( null, true ) );
+		}
 	}
 }

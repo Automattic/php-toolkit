@@ -3,6 +3,10 @@
 use WordPress\DataLiberation\DataFormatConsumer\BlocksWithMetadata;
 use WordPress\Markdown\MarkdownConsumer;
 
+if ( file_exists( __DIR__ . '/class-push-md-callouts.php' ) ) {
+	require_once __DIR__ . '/class-push-md-callouts.php';
+}
+
 /**
  * Thin wrapper around MarkdownConsumer that optionally strips Gutenberg
  * block comment wrappers from the generated HTML.
@@ -59,6 +63,10 @@ class Push_MD_Markdown_Consumer {
 			return $this->result;
 		}
 
+		if ( class_exists( 'Push_MD_Callouts' ) ) {
+			$this->markdown = Push_MD_Callouts::process_markdown_to_html( $this->markdown, $this->use_block_comments );
+		}
+
 		$inner_consumer = new MarkdownConsumer( $this->markdown );
 		$raw_result     = $inner_consumer->consume();
 
@@ -84,6 +92,10 @@ class Push_MD_Markdown_Consumer {
 	 * @return string Markup with literal < and > escaped as &lt; and &gt;.
 	 */
 	private function escape_literal_angle_brackets( $markup ) {
+		if ( empty( $markup ) || ! is_string( $markup ) ) {
+			return (string) $markup;
+		}
+
 		$tags  = 'p|h[1-6]|ul|ol|li|blockquote|figure|figcaption|aside|table|thead|tbody|tfoot|tr|th|td|hr|div|pre|code|span|a|b|i|strong|em|img|svg|canvas|sub|sup|del|s|section|article|header|footer|nav|main';
 		$parts = preg_split( '#(<(?:code|pre|script|style|textarea)\b[^>]*>.*?</(?:code|pre|script|style|textarea)>)#is', $markup, -1, PREG_SPLIT_DELIM_CAPTURE );
 		if ( false === $parts || 1 === count( $parts ) ) {
@@ -109,6 +121,10 @@ class Push_MD_Markdown_Consumer {
 	 * @return string Fragment with literal < and > escaped.
 	 */
 	private function escape_literal_angle_brackets_in_fragment( $fragment, $tags ) {
+		if ( empty( $fragment ) || ! is_string( $fragment ) ) {
+			return (string) $fragment;
+		}
+
 		$sub_parts = preg_split( '/(<!--.*?-->|<\/?(?:' . $tags . ')\b[^>]*>)/s', $fragment, -1, PREG_SPLIT_DELIM_CAPTURE );
 		if ( false === $sub_parts || 1 === count( $sub_parts ) ) {
 			return $fragment;
@@ -133,6 +149,10 @@ class Push_MD_Markdown_Consumer {
 	 * @return string Markup with un-escaped inline HTML tags.
 	 */
 	private function unescape_inline_html_tags( $markup ) {
+		if ( empty( $markup ) || ! is_string( $markup ) ) {
+			return (string) $markup;
+		}
+
 		// Raw-text elements (script, style, pre, textarea) are deliberately excluded:
 		// un-escaping their start tags turns escaped source text into real elements
 		// that can swallow the rest of the document (e.g. an unclosed <script> inside
@@ -177,6 +197,10 @@ class Push_MD_Markdown_Consumer {
 	 * @return string Markup with bare ampersands encoded.
 	 */
 	private function encode_bare_ampersands( $markup ) {
+		if ( empty( $markup ) || ! is_string( $markup ) ) {
+			return (string) $markup;
+		}
+
 		return preg_replace( '/&(?!(?:#[0-9]+|#[xX][0-9a-fA-F]+|[a-zA-Z][a-zA-Z0-9]*);)/', '&amp;', $markup );
 	}
 
@@ -192,6 +216,9 @@ class Push_MD_Markdown_Consumer {
 	 * @return string Plain HTML without block comments.
 	 */
 	private function strip_block_comments( $markup ) {
+		if ( empty( $markup ) || ! is_string( $markup ) ) {
+			return (string) $markup;
+		}
 		// Remove block comment lines (including any trailing newline).
 		$markup = preg_replace( '/<!--\s+\/?wp:[^>]+-->\n?/', '', $markup );
 		// Remove wp-specific CSS classes that only make sense in the block editor.
