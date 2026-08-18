@@ -9,7 +9,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-use WordPress\Git\TreeEntry;
+use WordPress\Git\Model\TreeEntry;
 
 /**
  * Class Push_MD_Master_Metadata
@@ -898,7 +898,7 @@ class Push_MD_Master_Metadata {
 			}
 		}
 
-		if ( 0 === strpos( $img_val, 'http://' ) || 0 === strpos( $img_val, 'https://' ) || 0 === strpos( $img_val, '//' ) ) {
+		if ( ! empty( $img_val ) && is_string( $img_val ) && ( 0 === strpos( $img_val, 'http://' ) || 0 === strpos( $img_val, 'https://' ) || 0 === strpos( $img_val, '//' ) ) ) {
 			return -1;
 		}
 

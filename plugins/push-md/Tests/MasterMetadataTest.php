@@ -10,6 +10,18 @@ if ( ! class_exists( 'WP_Error' ) ) {
 	class WP_Error {}
 }
 
+if ( ! function_exists( 'post_type_exists' ) ) {
+	function post_type_exists( $post_type ) {
+		return in_array( $post_type, array( 'post', 'page' ), true );
+	}
+}
+
+if ( ! function_exists( 'get_option' ) ) {
+	function get_option( $option, $default = false ) {
+		return isset( $GLOBALS['mock_options'][ $option ] ) ? $GLOBALS['mock_options'][ $option ] : $default;
+	}
+}
+
 if ( ! function_exists( 'is_wp_error' ) ) {
 	function is_wp_error( $thing ) {
 		return $thing instanceof WP_Error;
