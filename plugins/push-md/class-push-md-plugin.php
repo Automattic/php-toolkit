@@ -922,7 +922,10 @@ class Push_MD_Plugin {
 			}
 		} else {
 			self::assert_markdown_front_matter_is_closed( $entry['content'] );
-			$consumer     = new MarkdownConsumer( $entry['content'] );
+			$consumer     = new Push_MD_Markdown_Consumer(
+				$entry['content'],
+				self::is_block_editor_enabled( $post_type )
+			);
 			$result       = $consumer->consume();
 			$block_markup = $result->get_block_markup();
 			$metadata     = array();
@@ -2000,7 +2003,7 @@ class Push_MD_Plugin {
 			$metadata['description'] = array( $post->post_excerpt );
 		}
 
-		$producer = new MarkdownProducer(
+		$producer = new Push_MD_Markdown_Producer(
 			new BlocksWithMetadata(
 				$post->post_content,
 				$metadata
@@ -2589,7 +2592,10 @@ class Push_MD_Plugin {
 		}
 
 		self::assert_markdown_front_matter_is_closed( $markdown );
-		$consumer = new MarkdownConsumer( $markdown );
+		$consumer = new Push_MD_Markdown_Consumer(
+			$markdown,
+			self::is_block_editor_enabled( $post_type )
+		);
 		$result   = $consumer->consume();
 		self::assert_block_markup_is_safe( $result->get_block_markup() );
 		$metadata = array();
@@ -4400,6 +4406,28 @@ class Push_MD_Plugin {
 			&& 'skills' === $segments[1]
 			&& '' !== $segments[2]
 			&& 'SKILL.md' === $segments[3];
+	}
+
+	/**
+	 * Returns true when the block editor (Gutenberg) is active for the given
+	 * post type, meaning imported Markdown should be stored as Gutenberg block
+	 * markup. Returns false for classic-editor sites, which expect plain HTML.
+	 *
+	 * The result can be overridden by the `push_md_use_block_editor` filter.
+	 *
+	 * @param string $post_type WordPress post type slug.
+	 * @return bool
+	 */
+	private static function is_block_editor_enabled( $post_type ) {
+		$override = apply_filters( 'push_md_use_block_editor', null, $post_type );
+		if ( null !== $override ) {
+			return (bool) $override;
+		}
+		if ( function_exists( 'use_block_editor_for_post_type' ) ) {
+			return (bool) use_block_editor_for_post_type( $post_type );
+		}
+		// Fallback: assume Gutenberg is available if the block API is registered.
+		return function_exists( 'register_block_type' );
 	}
 
 	private static function parse_markdown_metadata( $markdown ) {

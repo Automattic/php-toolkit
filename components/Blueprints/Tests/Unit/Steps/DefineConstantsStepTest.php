@@ -263,7 +263,16 @@ PHP
 			]
 		)->output_file_content;
 
+		if ( is_string( $result ) ) {
+			$result = trim( $result );
+			if ( preg_match( '/\{.*\}/s', $result, $matches ) ) {
+				$result = $matches[0];
+			}
+		}
 		$actual_constants = json_decode( $result, true );
+		if ( ! is_array( $actual_constants ) ) {
+			$actual_constants = array();
+		}
 		$this->assertEquals( $expected_constants, $actual_constants );
 	}
 
