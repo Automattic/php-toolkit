@@ -17,6 +17,7 @@ if ( ! class_exists( 'WP_Post' ) ) {
 		public $post_excerpt      = '';
 		public $post_status       = 'publish';
 		public $post_content      = '';
+		public $post_date         = '2026-01-01 00:00:00';
 		public $post_date_gmt     = '2026-01-01 00:00:00';
 		public $post_modified     = '2026-01-01 00:00:00';
 		public $post_modified_gmt = '2026-01-01 00:00:00';
@@ -303,7 +304,7 @@ class DraftPreviewTest extends TestCase {
 		$this->assertSame( 32, strlen( $token1 ) );
 		$this->assertSame( 32, strlen( $token2 ) );
 		$this->assertNotEquals( $token1, $token2 );
-		$this->assertMatchesRegularExpression( '/^[a-f0-9]{32}$/', $token1 );
+		$this->assertTrue( (bool) preg_match( '/^[a-f0-9]{32}$/', $token1 ) );
 	}
 
 	public function testCreateAndUpdatePreviewRevision() {
