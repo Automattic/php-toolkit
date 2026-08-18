@@ -8,10 +8,19 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 if ( ! class_exists( 'WP_Post' ) ) {
 	class WP_Post {
-		public $ID          = 0;
-		public $post_type   = 'post';
-		public $post_name   = '';
-		public $post_parent = 0;
+		public $ID                = 0;
+		public $post_type         = 'post';
+		public $post_name         = '';
+		public $post_parent       = 0;
+		public $post_author       = 1;
+		public $post_title        = '';
+		public $post_excerpt      = '';
+		public $post_status       = 'publish';
+		public $post_content      = '';
+		public $post_date         = '2026-01-01 00:00:00';
+		public $post_date_gmt     = '2026-01-01 00:00:00';
+		public $post_modified     = '2026-01-01 00:00:00';
+		public $post_modified_gmt = '2026-01-01 00:00:00';
 	}
 }
 
@@ -120,6 +129,23 @@ class PMD_Export_Path_Test extends TestCase {
 				$this->post( 4937, 'post', 'post-4937' )
 			)
 		);
+	}
+
+	public function testDuplicateDraftSlugsExportWithIdFallback() {
+		$post1              = $this->post( 101, 'post', 'sendgrid-alternatives-2' );
+		$post1->post_status = 'draft';
+		$post2              = $this->post( 202, 'post', 'sendgrid-alternatives-2' );
+		$post2->post_status = 'draft';
+
+		$path1 = Push_MD_Plugin::build_markdown_path( $post1 );
+		$this->assertSame( 'post/sendgrid-alternatives-2.md', $path1 );
+
+		$method = new ReflectionMethod( Push_MD_Plugin::class, 'build_id_fallback_markdown_path' );
+		if ( PHP_VERSION_ID < 80100 ) {
+			$method->setAccessible( true );
+		}
+		$fallback_path2 = $method->invoke( null, $post2 );
+		$this->assertSame( 'post/post-202.md', $fallback_path2 );
 	}
 
 	private function post( $id, $post_type, $post_name ) {

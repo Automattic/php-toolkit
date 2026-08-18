@@ -1491,6 +1491,27 @@ class Push_MD_Plugin {
 			)
 		);
 
+		usort(
+			$posts,
+			function ( $a, $b ) {
+				$status_order = array(
+					'publish' => 1,
+					'private' => 2,
+					'future'  => 3,
+					'pending' => 4,
+					'draft'   => 5,
+				);
+				$a_order      = isset( $status_order[ $a->post_status ] ) ? $status_order[ $a->post_status ] : 10;
+				$b_order      = isset( $status_order[ $b->post_status ] ) ? $status_order[ $b->post_status ] : 10;
+
+				if ( $a_order !== $b_order ) {
+					return $a_order - $b_order;
+				}
+
+				return intval( $a->ID ) - intval( $b->ID );
+			}
+		);
+
 		$files                  = array();
 		$has_knowledge_skills   = false;
 		$agent_guide_skill_path = null;
@@ -1503,6 +1524,9 @@ class Push_MD_Plugin {
 			}
 
 			$path = self::build_markdown_path( $post );
+			if ( isset( $files[ $path ] ) ) {
+				$path = self::build_id_fallback_markdown_path( $post );
+			}
 			if ( isset( $files[ $path ] ) ) {
 				throw new Exception( 'Git export rejected because multiple WordPress entities map to the same Push MD path: ' . esc_html( $path ) );
 			}
@@ -1827,6 +1851,36 @@ class Push_MD_Plugin {
 		}
 
 		return $post_type . '-' . intval( $post_id );
+	}
+
+	private static function build_id_fallback_markdown_path( WP_Post $post ) {
+		if ( 'page' === $post->post_type ) {
+			$segments  = array( self::get_id_fallback_slug( 'page', $post->ID ) );
+			$seen      = array( intval( $post->ID ) => true );
+			$parent_id = intval( $post->post_parent );
+
+			while ( $parent_id > 0 ) {
+				if ( ! empty( $seen[ $parent_id ] ) ) {
+					throw new Exception( 'Git export rejected because a WordPress page hierarchy contains a cycle.' );
+				}
+
+				$parent = get_post( $parent_id );
+				if ( ! $parent || 'page' !== $parent->post_type ) {
+					throw new Exception( 'Git export rejected because a WordPress page has an invalid parent.' );
+				}
+				if ( ! in_array( $parent->post_status, self::$supported_post_statuses, true ) ) {
+					throw new Exception( 'Git export rejected because a WordPress page has a non-exported parent page. Restore, publish, or reparent the child page before cloning.' );
+				}
+
+				array_unshift( $segments, self::get_export_post_slug( $parent ) );
+				$seen[ $parent_id ] = true;
+				$parent_id          = intval( $parent->post_parent );
+			}
+
+			return 'page/' . implode( '/', $segments ) . '.md';
+		}
+
+		return ltrim( $post->post_type . '/' . self::get_id_fallback_slug( $post->post_type, $post->ID ) . '.md', '/' );
 	}
 
 	private static function get_id_from_fallback_slug( $post_type, $slug ) {
