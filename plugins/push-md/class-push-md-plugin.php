@@ -2004,6 +2004,7 @@ class Push_MD_Plugin {
 		}
 
 		$metadata = apply_filters( 'push_md_export_frontmatter', $metadata, $post );
+		$metadata = self::clean_metadata_value( $metadata );
 
 		$producer = new MarkdownProducer(
 			new BlocksWithMetadata(
@@ -2013,6 +2014,23 @@ class Push_MD_Plugin {
 		);
 
 		return $producer->produce();
+	}
+
+	public static function clean_metadata_value( $value ) {
+		if ( is_string( $value ) ) {
+			$cleaned = stripslashes( $value );
+			$cleaned = html_entity_decode( $cleaned, ENT_QUOTES | ENT_HTML5, 'UTF-8' );
+			$cleaned = preg_replace( '/\s+/u', ' ', $cleaned );
+			return trim( (string) $cleaned );
+		}
+		if ( is_array( $value ) ) {
+			$cleaned_array = array();
+			foreach ( $value as $k => $v ) {
+				$cleaned_array[ $k ] = self::clean_metadata_value( $v );
+			}
+			return $cleaned_array;
+		}
+		return $value;
 	}
 
 	private static function export_global_styles_to_json( WP_Post $post ) {
@@ -2058,6 +2076,9 @@ class Push_MD_Plugin {
 	}
 
 	private static function format_skill_markdown( $name, $description, $content ) {
+		$name        = self::clean_metadata_value( $name );
+		$description = self::clean_metadata_value( $description );
+
 		$frontmatter = array(
 			'---',
 			'name: ' . self::quote_yaml_scalar( $name ),

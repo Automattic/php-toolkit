@@ -251,4 +251,28 @@ class SeoSupportTest extends TestCase {
 			$this->assertSame( array( 'true' ), $exported['seo_is_pillar'] );
 		}
 	}
+
+	public function testCleanMetadataValueCollapsesNewlinesAndWhitespace() {
+		$raw = "SEO description line 1.\n\nLine 2.\t  Line 3.";
+		$cleaned = Push_MD_Plugin::clean_metadata_value( $raw );
+		$this->assertEquals( 'SEO description line 1. Line 2. Line 3.', $cleaned );
+	}
+
+	public function testExportPostWithMultilineSeoAndExcerptProducesSingleLineFrontmatter() {
+		$post_id                               = 405;
+		$GLOBALS['mock_post_meta'][ $post_id ] = array(
+			'rank_math_description'          => "Rank Math meta description line 1.\n\nLine 2.",
+			'rank_math_facebook_description' => "Facebook description line 1.\n\tLine 2.",
+		);
+
+		$post            = new stdClass();
+		$post->ID        = $post_id;
+		$post->post_type = 'post';
+
+		$exported = Push_MD_SEO::export_frontmatter( array(), $post );
+		$cleaned  = Push_MD_Plugin::clean_metadata_value( $exported );
+
+		$this->assertSame( array( 'Rank Math meta description line 1. Line 2.' ), $cleaned['seo_description'] );
+		$this->assertSame( array( 'Facebook description line 1. Line 2.' ), $cleaned['og_description'] );
+	}
 }
