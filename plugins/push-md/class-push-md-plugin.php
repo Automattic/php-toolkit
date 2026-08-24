@@ -17,6 +17,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+require_once __DIR__ . '/class-push-md-seo.php';
+
 /**
  * Push MD – exposes WordPress as a Git remote.
  *
@@ -76,6 +78,7 @@ class Push_MD_Plugin {
 	);
 
 	public static function bootstrap() {
+		Push_MD_SEO::bootstrap();
 		add_filter( 'wp_knowledge_types', array( __CLASS__, 'register_knowledge_types' ) );
 		add_action( 'admin_init', array( __CLASS__, 'install_default_agent_skill' ) );
 		add_action( 'parse_request', array( __CLASS__, 'maybe_enable_branch_preview' ), 1 );
@@ -931,7 +934,7 @@ class Push_MD_Plugin {
 			}
 			$metadata = self::normalize_supported_frontmatter(
 				$metadata,
-				array( 'id', 'title', 'date', 'status', 'description' )
+				self::get_supported_frontmatter_keys( $post_type )
 			);
 		}
 
@@ -2000,6 +2003,9 @@ class Push_MD_Plugin {
 			$metadata['description'] = array( $post->post_excerpt );
 		}
 
+		$metadata = apply_filters( 'push_md_export_frontmatter', $metadata, $post );
+		$metadata = self::clean_metadata_value( $metadata );
+
 		$producer = new MarkdownProducer(
 			new BlocksWithMetadata(
 				$post->post_content,
@@ -2008,6 +2014,23 @@ class Push_MD_Plugin {
 		);
 
 		return $producer->produce();
+	}
+
+	public static function clean_metadata_value( $value ) {
+		if ( is_string( $value ) ) {
+			$cleaned = stripslashes( $value );
+			$cleaned = html_entity_decode( $cleaned, ENT_QUOTES | ENT_HTML5, 'UTF-8' );
+			$cleaned = preg_replace( '/\s+/u', ' ', $cleaned );
+			return trim( (string) $cleaned );
+		}
+		if ( is_array( $value ) ) {
+			$cleaned_array = array();
+			foreach ( $value as $k => $v ) {
+				$cleaned_array[ $k ] = self::clean_metadata_value( $v );
+			}
+			return $cleaned_array;
+		}
+		return $value;
 	}
 
 	private static function export_global_styles_to_json( WP_Post $post ) {
@@ -2053,6 +2076,9 @@ class Push_MD_Plugin {
 	}
 
 	private static function format_skill_markdown( $name, $description, $content ) {
+		$name        = self::clean_metadata_value( $name );
+		$description = self::clean_metadata_value( $description );
+
 		$frontmatter = array(
 			'---',
 			'name: ' . self::quote_yaml_scalar( $name ),
@@ -2600,7 +2626,7 @@ class Push_MD_Plugin {
 		self::reject_path_identity_frontmatter( $metadata );
 		$metadata      = self::normalize_supported_frontmatter(
 			$metadata,
-			array( 'id', 'title', 'date', 'status', 'description' )
+			self::get_supported_frontmatter_keys( $post_type )
 		);
 		$post_id       = self::find_post_id_by_path_metadata( $path, $metadata );
 		$existing_post = $post_id ? get_post( $post_id ) : null;
@@ -2632,20 +2658,15 @@ class Push_MD_Plugin {
 
 		$postarr = array(
 			'post_type'    => $post_type,
-			'post_title'   => isset( $metadata['title'] ) ? $metadata['title'] : ucwords( str_replace( '-', ' ', $slug ) ),
+			'post_name'    => $slug,
+			'post_title'   => isset( $metadata['title'] ) && '' !== trim( (string) $metadata['title'] ) ? $metadata['title'] : ucwords( str_replace( '-', ' ', $slug ) ),
 			'post_status'  => $post_status,
 			'post_content' => $result->get_block_markup(),
+			'post_parent'  => $post_parent,
 		);
-		if ( ! $existing_post || ! self::is_current_slugless_fallback_path( $path, $existing_post ) ) {
-			$postarr['post_name'] = $slug;
-		}
-		if ( 'page' === $post_type ) {
-			$postarr['post_parent'] = $post_parent;
-		}
 
-		$post_date_gmt = self::frontmatter_date_to_mysql_gmt( $metadata );
-		self::assert_frontmatter_date_matches_status( $post_status, $post_date_gmt );
-		if ( '' !== $post_date_gmt ) {
+		if ( isset( $metadata['date'] ) && '' !== trim( (string) $metadata['date'] ) ) {
+			$post_date_gmt            = self::parse_frontmatter_date_to_gmt( $metadata['date'] );
 			$postarr['post_date_gmt'] = $post_date_gmt;
 			$postarr['post_date']     = get_date_from_gmt( $post_date_gmt );
 		}
@@ -2672,6 +2693,8 @@ class Push_MD_Plugin {
 		if ( is_wp_error( $post_id ) ) {
 			throw new Exception( esc_html( $post_id->get_error_message() ) );
 		}
+
+		do_action( 'push_md_import_frontmatter', $post_id, $metadata, $postarr, $existing_post );
 
 		$post = get_post( $post_id );
 
@@ -3837,6 +3860,18 @@ class Push_MD_Plugin {
 		if ( isset( $metadata['type'] ) ) {
 			throw new Exception( 'Push rejected because Markdown front matter must not include a type. The directory determines the post type.' );
 		}
+	}
+
+	private static function get_supported_frontmatter_keys( $post_type = 'post' ) {
+		$keys = array(
+			'id',
+			'title',
+			'date',
+			'status',
+			'description',
+		);
+
+		return apply_filters( 'push_md_supported_frontmatter_keys', $keys, $post_type );
 	}
 
 	private static function normalize_supported_frontmatter( $metadata, $allowed_keys ) {

@@ -32,6 +32,7 @@ require_once __DIR__ . '/class-push-md-plugin.php';
 require_once __DIR__ . '/class-push-md-buffering-response.php';
 require_once __DIR__ . '/class-push-md-seeder.php';
 require_once __DIR__ . '/class-push-md-admin.php';
+require_once __DIR__ . '/class-push-md-seo.php';
 require_once __DIR__ . '/class-push-md-pull-requests.php';
 
 if ( ! defined( 'PUSH_MD_PLUGIN_FILE' ) ) {
