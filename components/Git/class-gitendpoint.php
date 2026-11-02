@@ -73,7 +73,7 @@ class GitEndpoint {
 				$this->respond_with_ls_refs(
 					$git_response,
 					array(
-						'capabilities' => 'report-status report-status-v2 delete-refs side-band-64k ofs-delta atomic object-format=sha1 quiet agent=github/spokes-receive-pack-bff11521ff0f3fc96efd2ba7a18ecebb89dc6949 session-id=26DD:527D3:3A481E46:3BF47E4D:677BF4BA push-options',
+						'capabilities' => 'report-status report-status-v2 delete-refs side-band-64k ofs-delta object-format=sha1 quiet agent=github/spokes-receive-pack-bff11521ff0f3fc96efd2ba7a18ecebb89dc6949 session-id=26DD:527D3:3A481E46:3BF47E4D:677BF4BA',
 					)
 				);
 				break;
@@ -416,7 +416,7 @@ class GitEndpoint {
 		try {
 			$commands = self::parse_receive_pack_commands( $request_bytes );
 		} catch ( GitException $e ) {
-			$git_response->append_error_packet_line( "error invalid push request\n" );
+			$git_response->append_error_packet_line( 'error ' . $e->getMessage() . "\n" );
 			$git_response->append_error_packet_line( '0000' );
 
 			return false;
@@ -433,6 +433,13 @@ class GitEndpoint {
 		$old_oid  = $command['old_oid'];
 		$new_oid  = $command['new_oid'];
 		$ref_name = $command['ref_name'];
+
+		if ( 0 !== strpos( $ref_name, 'refs/heads/' ) ) {
+			$git_response->append_error_packet_line( "error only branch refs can be pushed: $ref_name\n" );
+			$git_response->append_error_packet_line( '0000' );
+
+			return false;
+		}
 
 		if ( null !== $this->expected_push_command && ! self::is_same_push_command( $this->expected_push_command, $command ) ) {
 			$git_response->append_error_packet_line( "error ref update was not authorized: $ref_name\n" );
@@ -555,6 +562,9 @@ class GitEndpoint {
 				$line = substr( $line, 0, -1 );
 			}
 
+			if ( 0 === strpos( $line, 'shallow ' ) ) {
+				throw new GitException( 'Pushing from a shallow clone is not supported. Run git fetch --unshallow and try again.' );
+			}
 			if ( ! preg_match( '/\A([0-9a-f]{40}) ([0-9a-f]{40}) (refs\/[^\x00-\x20\x7f]+)\z/', $line, $matches ) ) {
 				throw new GitException( 'Invalid push request: malformed command' );
 			}

@@ -53,7 +53,7 @@ class Push_MD_Plugin {
 	const THEME_BASE_SYNC_MESSAGE      = 'Sync theme base from WordPress';
 	const WORDPRESS_SYNC_MESSAGE       = 'Sync from WordPress';
 	const BRANCH_PREVIEWS_OPTION       = 'push_md_branch_previews';
-	const MAX_GZIP_REQUEST_BYTES       = 33554432;
+	const MAX_GZIP_REQUEST_BYTES       = 8388608;
 	const BRANCH_QUERY_PARAM           = 'branch';
 
 	public static $supported_post_types    = array( 'post', 'page' );
@@ -1128,7 +1128,11 @@ class Push_MD_Plugin {
 			$request_body = file_get_contents( 'php://input' );
 			// Git gzips larger fetch negotiation requests.
 			if ( 'gzip' === strtolower( trim( (string) $request->get_header( 'content_encoding' ) ) ) ) {
-				$request_body = function_exists( 'gzdecode' ) ? gzdecode( $request_body, self::MAX_GZIP_REQUEST_BYTES ) : false;
+				try {
+					$request_body = function_exists( 'gzdecode' ) ? gzdecode( $request_body, self::MAX_GZIP_REQUEST_BYTES ) : false;
+				} catch ( Throwable $exception ) {
+					$request_body = false;
+				}
 				if ( false === $request_body ) {
 					$service = self::git_service_from_request( $git_path, $request );
 
@@ -4604,7 +4608,13 @@ class Push_MD_Plugin {
 	}
 
 	private static function parse_push_header( $request_bytes, GitRepository $repository, $current_head ) {
-		$commands = self::parse_push_commands( $request_bytes );
+		try {
+			$commands = self::parse_push_commands( $request_bytes );
+		} catch ( GitException $exception ) {
+			return array(
+				'error' => $exception->getMessage(),
+			);
+		}
 		if ( empty( $commands ) ) {
 			return false;
 		}
@@ -4665,11 +4675,17 @@ class Push_MD_Plugin {
 		$metadata          = self::get_preview_branches();
 		$existing_metadata = isset( $metadata[ $branch_name ] ) && is_array( $metadata[ $branch_name ] ) ? $metadata[ $branch_name ] : array();
 
-		// Anyone who can push may open a preview branch, but only its owner or
-		// an editor may move or delete someone else's.
+		// A ref without a Pull Request was not created by a validated push;
+		// refuse to move or delete it over Git. Anyone who can push may open a
+		// preview branch, but only its owner or an editor may change someone else's.
+		if ( $branch_exists && ! isset( $existing_metadata['owner'] ) ) {
+			return array(
+				'error' => 'Push rejected because this branch has no Pull Request. Remove it from the Push MD Tools page and push again.',
+			);
+		}
 		if (
 			$branch_exists &&
-			( ! isset( $existing_metadata['owner'] ) || get_current_user_id() !== intval( $existing_metadata['owner'] ) ) &&
+			get_current_user_id() !== intval( $existing_metadata['owner'] ) &&
 			! current_user_can( 'edit_others_posts' )
 		) {
 			return array(
@@ -4698,10 +4714,13 @@ class Push_MD_Plugin {
 		if ( ! is_string( $branch_name ) || '' === $branch_name ) {
 			return false;
 		}
-		if ( self::DEFAULT_BRANCH === $branch_name || '_push_md_seed' === $branch_name || 'HEAD' === strtoupper( $branch_name ) ) {
+		// The WPDB filesystem compares paths with the site's collation, which is
+		// usually case-insensitive, so protect these names in any case.
+		$lower_name = strtolower( $branch_name );
+		if ( in_array( $lower_name, array( strtolower( self::DEFAULT_BRANCH ), '_push_md_seed', 'head' ), true ) ) {
 			return false;
 		}
-		if ( 0 === strpos( $branch_name, 'push-md/' ) ) {
+		if ( 0 === strpos( $lower_name, 'push-md/' ) ) {
 			return false;
 		}
 		if (
@@ -4740,11 +4759,7 @@ class Push_MD_Plugin {
 		// Use the exact parser GitEndpoint executes with, so the update that is
 		// authorized here is the update that gets applied. Any malformed command
 		// rejects the whole push.
-		try {
-			$commands = GitEndpoint::parse_receive_pack_commands( $request_bytes );
-		} catch ( GitException $exception ) {
-			return array();
-		}
+		$commands = GitEndpoint::parse_receive_pack_commands( $request_bytes );
 
 		$parsed = array();
 		foreach ( $commands as $command ) {

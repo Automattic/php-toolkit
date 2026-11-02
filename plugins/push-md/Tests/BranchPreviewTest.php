@@ -108,6 +108,7 @@ class BranchPreviewTest extends TestCase {
 		$current    = $repository->get_branch_tip( 'refs/heads/trunk' );
 		$branch_tip = '3333333333333333333333333333333333333333';
 		$repository->set_branch_tip( 'refs/heads/preview-home', $branch_tip );
+		$this->set_preview_branch_owner( 'preview-home', 1 );
 
 		$header = $this->parse_push_header(
 			$this->push_request( $branch_tip, '4444444444444444444444444444444444444444', 'refs/heads/preview-home' ),
@@ -124,6 +125,7 @@ class BranchPreviewTest extends TestCase {
 		$current    = $repository->get_branch_tip( 'refs/heads/trunk' );
 		$branch_tip = '4444444444444444444444444444444444444444';
 		$repository->set_branch_tip( 'refs/heads/preview-home', $branch_tip );
+		$this->set_preview_branch_owner( 'preview-home', 1 );
 
 		$header = $this->parse_push_header(
 			$this->push_request( $branch_tip, Commit::NULL_HASH, 'refs/heads/preview-home' ),
@@ -199,7 +201,7 @@ class BranchPreviewTest extends TestCase {
 			)
 		);
 
-		$this->assertFalse( $this->parse_push_header( $request, $repository, $current ) );
+		$this->assertArrayHasKey( 'error', $this->parse_push_header( $request, $repository, $current ) );
 	}
 
 	public function testMalformedCommandAfterValidCommandIsRejected() {
@@ -213,7 +215,7 @@ class BranchPreviewTest extends TestCase {
 			)
 		);
 
-		$this->assertFalse( $this->parse_push_header( $request, $repository, $current ) );
+		$this->assertArrayHasKey( 'error', $this->parse_push_header( $request, $repository, $current ) );
 	}
 
 	public function testMultipleCommandsAreRejected() {
@@ -274,6 +276,65 @@ class BranchPreviewTest extends TestCase {
 
 			$this->assertTrue( $header['is_preview'] );
 		}
+	}
+
+	/**
+	 * @dataProvider provide_case_variants_of_protected_names
+	 */
+	public function testProtectedNamesAreRejectedInAnyCase( $branch_name ) {
+		$repository = $this->repository();
+		$current    = $repository->get_branch_tip( 'refs/heads/trunk' );
+		$header     = $this->parse_push_header(
+			$this->push_request( Commit::NULL_HASH, '8888888888888888888888888888888888888888', 'refs/heads/' . $branch_name ),
+			$repository,
+			$current
+		);
+
+		$this->assertSame( 'Push rejected because the preview branch name is not supported.', $header['error'] );
+	}
+
+	public static function provide_case_variants_of_protected_names() {
+		return array(
+			array( 'Trunk' ),
+			array( 'TRUNK' ),
+			array( '_Push_MD_Seed' ),
+			array( 'Push-MD/theme-base' ),
+			array( 'head' ),
+		);
+	}
+
+	public function testRefWithoutPullRequestCannotBePushedEvenByEditors() {
+		$repository = $this->repository();
+		$current    = $repository->get_branch_tip( 'refs/heads/trunk' );
+		$branch_tip = '3333333333333333333333333333333333333333';
+		$repository->set_branch_tip( 'refs/heads/preview-home', $branch_tip );
+		$GLOBALS['pmd_test_caps'] = array( 'edit_others_posts' );
+
+		$header = $this->parse_push_header(
+			$this->push_request( $branch_tip, Commit::NULL_HASH, 'refs/heads/preview-home' ),
+			$repository,
+			$current
+		);
+
+		$this->assertStringContainsString( 'has no Pull Request', $header['error'] );
+	}
+
+	public function testShallowClonePushGetsAClearError() {
+		$repository = $this->repository();
+		$current    = $repository->get_branch_tip( 'refs/heads/trunk' );
+		$header     = $this->parse_push_header(
+			GitProtocolEncoderPipe::encode_packet_lines(
+				array(
+					"shallow 1111111111111111111111111111111111111111\n",
+					$current . ' 2222222222222222222222222222222222222222 refs/heads/trunk' . "\0report-status\n",
+					'0000',
+				)
+			),
+			$repository,
+			$current
+		);
+
+		$this->assertStringContainsString( 'shallow clone', $header['error'] );
 	}
 
 	private function set_preview_branch_owner( $branch_name, $owner ) {

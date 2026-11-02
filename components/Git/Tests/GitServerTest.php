@@ -640,6 +640,16 @@ RESPONSE
 					return array( "$null $new refs/heads/forged\0report-status\n" );
 				},
 			),
+			'tag ref'                        => array(
+				function ( $main, $new ) use ( $null ) {
+					return array( "$null $new refs/tags/v1\0report-status\n", '0000' );
+				},
+			),
+			'shallow line'                   => array(
+				function ( $main, $new ) use ( $null ) {
+					return array( "shallow $main\n", "$null $new refs/heads/forged\0report-status\n", '0000' );
+				},
+			),
 			'unauthorized command'           => array(
 				function ( $main, $new ) use ( $null ) {
 					return array( "$null $new refs/heads/forged\0report-status\n", '0000' );
