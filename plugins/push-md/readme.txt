@@ -4,7 +4,7 @@ Tags: git, markdown, content, workflow
 Requires at least: 6.9
 Tested up to: 7.0
 Requires PHP: 7.2
-Stable tag: 0.6.10
+Stable tag: 0.6.11
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -149,6 +149,10 @@ Uninstalling Push MD removes its Git object-store database tables, seed progress
 The removed tables contain Push MD's derived Git repository history. Reinstalling Push MD can seed a new repository from the current WordPress content, but it cannot restore the previous Push MD Git history unless you kept a clone or database backup.
 
 == Changelog ==
+
+= 0.6.11 =
+
+Security release. Git pushes are validated and executed by one strict parser that also verifies the current branch tip. Branch previews render only branches created by a validated push and filter markup from users without the unfiltered_html capability, in the preview and when merging. Preview branches can be updated or deleted only by their owner or an editor. Gzip-encoded fetch requests are decoded.
 
 = 0.6.7 =
 
