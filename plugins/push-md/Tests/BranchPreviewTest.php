@@ -44,15 +44,31 @@ if ( ! function_exists( 'taxonomy_exists' ) ) {
 
 if ( ! function_exists( 'get_option' ) ) {
 	function get_option( $option, $default = false ) {
-		unset( $option );
+		return isset( $GLOBALS['pmd_test_options'][ $option ] ) ? $GLOBALS['pmd_test_options'][ $option ] : $default;
+	}
+}
 
-		return $default;
+if ( ! function_exists( 'get_current_user_id' ) ) {
+	function get_current_user_id() {
+		return isset( $GLOBALS['pmd_test_user_id'] ) ? $GLOBALS['pmd_test_user_id'] : 1;
+	}
+}
+
+if ( ! function_exists( 'current_user_can' ) ) {
+	function current_user_can( $capability ) {
+		$caps = isset( $GLOBALS['pmd_test_caps'] ) ? $GLOBALS['pmd_test_caps'] : array( 'edit_others_posts' );
+
+		return in_array( $capability, $caps, true );
 	}
 }
 
 require_once dirname( __DIR__ ) . '/class-push-md-plugin.php';
 
 class BranchPreviewTest extends TestCase {
+
+	protected function tearDown(): void {
+		unset( $GLOBALS['pmd_test_options'], $GLOBALS['pmd_test_user_id'], $GLOBALS['pmd_test_caps'] );
+	}
 
 	public function testTrunkPushRemainsPublishingPush() {
 		$repository = $this->repository();
@@ -214,6 +230,57 @@ class BranchPreviewTest extends TestCase {
 		$this->assertSame(
 			'Push rejected because Push MD only accepts one ref update at a time.',
 			$this->parse_push_header( $request, $repository, $current )['error']
+		);
+	}
+
+	public function testNonOwnerWithoutEditOthersPostsCannotUpdateOrDeletePreviewBranch() {
+		$repository = $this->repository();
+		$current    = $repository->get_branch_tip( 'refs/heads/trunk' );
+		$branch_tip = '3333333333333333333333333333333333333333';
+		$repository->set_branch_tip( 'refs/heads/preview-home', $branch_tip );
+		$this->set_preview_branch_owner( 'preview-home', 1 );
+		$GLOBALS['pmd_test_user_id'] = 2;
+		$GLOBALS['pmd_test_caps']    = array();
+
+		foreach ( array( '4444444444444444444444444444444444444444', Commit::NULL_HASH ) as $new_oid ) {
+			$header = $this->parse_push_header(
+				$this->push_request( $branch_tip, $new_oid, 'refs/heads/preview-home' ),
+				$repository,
+				$current
+			);
+
+			$this->assertSame(
+				'Push rejected because only the Pull Request owner or an editor can update or delete this preview branch.',
+				$header['error']
+			);
+		}
+	}
+
+	public function testOwnerAndEditorsCanUpdatePreviewBranch() {
+		$repository = $this->repository();
+		$current    = $repository->get_branch_tip( 'refs/heads/trunk' );
+		$branch_tip = '3333333333333333333333333333333333333333';
+		$repository->set_branch_tip( 'refs/heads/preview-home', $branch_tip );
+		$this->set_preview_branch_owner( 'preview-home', 2 );
+
+		foreach ( array( array( 2, array() ), array( 3, array( 'edit_others_posts' ) ) ) as $user ) {
+			$GLOBALS['pmd_test_user_id'] = $user[0];
+			$GLOBALS['pmd_test_caps']    = $user[1];
+			$header                      = $this->parse_push_header(
+				$this->push_request( $branch_tip, '4444444444444444444444444444444444444444', 'refs/heads/preview-home' ),
+				$repository,
+				$current
+			);
+
+			$this->assertTrue( $header['is_preview'] );
+		}
+	}
+
+	private function set_preview_branch_owner( $branch_name, $owner ) {
+		$GLOBALS['pmd_test_options'] = array(
+			'push_md_branch_previews' => array(
+				$branch_name => array( 'owner' => $owner ),
+			),
 		);
 	}
 

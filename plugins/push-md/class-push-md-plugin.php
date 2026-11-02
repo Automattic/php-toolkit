@@ -53,6 +53,7 @@ class Push_MD_Plugin {
 	const THEME_BASE_SYNC_MESSAGE      = 'Sync theme base from WordPress';
 	const WORDPRESS_SYNC_MESSAGE       = 'Sync from WordPress';
 	const BRANCH_PREVIEWS_OPTION       = 'push_md_branch_previews';
+	const MAX_GZIP_REQUEST_BYTES       = 33554432;
 	const BRANCH_QUERY_PARAM           = 'branch';
 
 	public static $supported_post_types    = array( 'post', 'page' );
@@ -1125,7 +1126,19 @@ class Push_MD_Plugin {
 			}
 
 			$request_body = file_get_contents( 'php://input' );
-			$repository   = self::open_repository();
+			// Git gzips larger fetch negotiation requests.
+			if ( 'gzip' === strtolower( trim( (string) $request->get_header( 'content_encoding' ) ) ) ) {
+				$request_body = function_exists( 'gzdecode' ) ? gzdecode( $request_body, self::MAX_GZIP_REQUEST_BYTES ) : false;
+				if ( false === $request_body ) {
+					$service = self::git_service_from_request( $git_path, $request );
+
+					return self::build_protocol_error_response(
+						$service ? $service : 'git-upload-pack',
+						'Could not decompress the gzip request body.'
+					);
+				}
+			}
+			$repository = self::open_repository();
 			try {
 				self::sync_repository_from_wordpress( $repository );
 			} catch ( Throwable $exception ) {
@@ -4649,8 +4662,21 @@ class Push_MD_Plugin {
 			);
 		}
 
-		$metadata           = self::get_preview_branches();
-		$existing_metadata  = isset( $metadata[ $branch_name ] ) && is_array( $metadata[ $branch_name ] ) ? $metadata[ $branch_name ] : array();
+		$metadata          = self::get_preview_branches();
+		$existing_metadata = isset( $metadata[ $branch_name ] ) && is_array( $metadata[ $branch_name ] ) ? $metadata[ $branch_name ] : array();
+
+		// Anyone who can push may open a preview branch, but only its owner or
+		// an editor may move or delete someone else's.
+		if (
+			$branch_exists &&
+			( ! isset( $existing_metadata['owner'] ) || get_current_user_id() !== intval( $existing_metadata['owner'] ) ) &&
+			! current_user_can( 'edit_others_posts' )
+		) {
+			return array(
+				'error' => 'Push rejected because only the Pull Request owner or an editor can update or delete this preview branch.',
+			);
+		}
+
 		$base_oid           = ! self::is_preview_branch_merged( $existing_metadata ) && isset( $existing_metadata['base_oid'] ) && is_string( $existing_metadata['base_oid'] )
 			? $existing_metadata['base_oid']
 			: $current_head;

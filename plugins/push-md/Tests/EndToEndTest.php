@@ -847,6 +847,70 @@ class PMD_End_To_End_Test extends TestCase {
 		$this->assertStringNotContainsString( '<script', $this->fetch_content( $post_id, 'posts' ) );
 	}
 
+	public function testOnlyOwnerOrEditorCanUpdateOrDeletePreviewBranch() {
+		$suffix    = uniqid( 'owner-' );
+		$branch    = 'preview/' . $suffix;
+		$author    = $this->create_user_with_application_password( 'author', $suffix );
+		$reader    = $this->create_user_with_application_password( 'subscriber', $suffix );
+		$post_id   = $this->create_post_via_rest(
+			array(
+				'slug'    => $suffix,
+				'title'   => 'Owner ' . $suffix,
+				'status'  => 'publish',
+				'author'  => $author['id'],
+				'content' => '<!-- wp:paragraph --><p>Owner live ' . $suffix . '</p><!-- /wp:paragraph -->',
+			)
+		);
+		$admin_dir = $this->clone_repo( 'owner-admin' );
+		$this->configure_git( $admin_dir );
+		$this->run_cmd( array( 'git', '-C', $admin_dir, 'checkout', '-b', $branch ) );
+		$this->edit_file( $admin_dir . '/post/' . $suffix . '.md', 'Owner live', 'Admin preview' );
+		$this->run_cmd( array( 'git', '-C', $admin_dir, 'commit', '-am', 'Admin preview' ) );
+		$this->run_cmd( array( 'git', '-C', $admin_dir, 'push', 'origin', 'HEAD:refs/heads/' . $branch ) );
+		$admin_tip = trim( $this->run_cmd( array( 'git', '-C', $admin_dir, 'rev-parse', 'HEAD' ) )['output'] );
+
+		$author_dir = $this->clone_repo( 'owner-author', $author['username'], $author['password'] );
+		$this->configure_git( $author_dir );
+		$this->edit_file( $author_dir . '/post/' . $suffix . '.md', 'Owner live', 'Author replacement' );
+		$this->run_cmd( array( 'git', '-C', $author_dir, 'commit', '-am', 'Author replacement' ) );
+		$replace = $this->run_cmd( array( 'git', '-C', $author_dir, 'push', '--force-with-lease=' . $branch . ':' . $admin_tip, 'origin', 'HEAD:refs/heads/' . $branch ), true );
+
+		$reader_dir = $this->clone_repo( 'owner-reader', $reader['username'], $reader['password'] );
+		$delete     = $this->run_cmd( array( 'git', '-C', $reader_dir, 'push', 'origin', ':refs/heads/' . $branch ), true );
+
+		$this->assertNotSame( 0, $replace['code'] );
+		$this->assertStringContainsString( 'only the Pull Request owner or an editor', $replace['output'] );
+		$this->assertNotSame( 0, $delete['code'] );
+		$this->assertStringContainsString( 'only the Pull Request owner or an editor', $delete['output'] );
+		$this->assertStringContainsString( $admin_tip . "\trefs/heads/" . $branch, $this->run_cmd( array( 'git', 'ls-remote', $this->remote_url() ) )['output'] );
+		$this->assertStringContainsString( 'Owner live', $this->fetch_content( $post_id, 'posts' ) );
+
+		$this->delete_preview_branch( $admin_dir, $branch );
+	}
+
+	public function testGzipEncodedUploadPackRequestIsDecoded() {
+		$body = gzencode( "0014command=ls-refs\n0001000bunborn\n0000" );
+		$ch   = curl_init( $this->base_url . '/wp-json/git/v1/md.git/git-upload-pack' );
+		curl_setopt_array(
+			$ch,
+			array(
+				CURLOPT_RETURNTRANSFER => true,
+				CURLOPT_CUSTOMREQUEST  => 'POST',
+				CURLOPT_HTTPHEADER     => array(
+					$this->auth_header,
+					'Content-Type: application/x-git-upload-pack-request',
+					'Content-Encoding: gzip',
+					'Git-Protocol: version=2',
+				),
+				CURLOPT_POSTFIELDS     => $body,
+			)
+		);
+		$response = curl_exec( $ch );
+		curl_close( $ch );
+
+		$this->assertStringContainsString( 'refs/heads/trunk', $response );
+	}
+
 	public function testPreviewBranchRendersChangedTemplatePartForAuthenticatedAdminWithoutMutatingLiveContent() {
 		$suffix       = uniqid( 'branch-template-' );
 		$branch       = 'preview/' . $suffix;
