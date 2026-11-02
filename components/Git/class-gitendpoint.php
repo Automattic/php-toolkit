@@ -19,8 +19,25 @@ class GitEndpoint {
 	 */
 	private $repository;
 
-	public function __construct( GitRepository $repository ) {
-		$this->repository = $repository;
+	/**
+	 * The only ref update a receive-pack request may perform, or null to
+	 * allow any well-formed single ref update.
+	 *
+	 * @var array{old_oid: string, new_oid: string, ref_name: string}|null
+	 */
+	private $expected_push_command;
+
+	/**
+	 * @param GitRepository $repository The repository to serve.
+	 * @param array         $options {
+	 *     @type array $expected_push_command Optional. The exact ref update,
+	 *                                        as returned by parse_receive_pack_commands(),
+	 *                                        that a push is authorized to perform.
+	 * }
+	 */
+	public function __construct( GitRepository $repository, $options = array() ) {
+		$this->repository            = $repository;
+		$this->expected_push_command = $options['expected_push_command'] ?? null;
 	}
 
 	public function handle_request( $path, $request_bytes, ResponseWriteStream $http_response ) {
@@ -56,7 +73,7 @@ class GitEndpoint {
 				$this->respond_with_ls_refs(
 					$git_response,
 					array(
-						'capabilities' => 'report-status report-status-v2 delete-refs side-band-64k ofs-delta atomic object-format=sha1 quiet agent=github/spokes-receive-pack-bff11521ff0f3fc96efd2ba7a18ecebb89dc6949 session-id=26DD:527D3:3A481E46:3BF47E4D:677BF4BA push-options',
+						'capabilities' => 'report-status report-status-v2 delete-refs side-band-64k ofs-delta object-format=sha1 quiet agent=github/spokes-receive-pack-bff11521ff0f3fc96efd2ba7a18ecebb89dc6949 session-id=26DD:527D3:3A481E46:3BF47E4D:677BF4BA',
 					)
 				);
 				break;
@@ -396,29 +413,49 @@ class GitEndpoint {
 	 * @return bool Success status
 	 */
 	public function handle_push_request( $request_bytes, GitProtocolEncoderPipe $git_response ) {
-		$protocol_reader = new GitProtocolDecoder(
-			new MemoryPipe( $request_bytes ),
-			array( 'write_to_repository' => $this->repository )
-		);
-		$header          = $this->parse_push_header( $protocol_reader );
-		if ( ! $header || empty( $header['new_oid'] ) ) {
-			$git_response->append_error_packet_line( "error header is empty\n" );
+		try {
+			$commands = self::parse_receive_pack_commands( $request_bytes );
+		} catch ( GitException $e ) {
+			$git_response->append_error_packet_line( 'error ' . $e->getMessage() . "\n" );
 			$git_response->append_error_packet_line( '0000' );
 
 			return false;
 		}
 
-		$old_oid = $header['old_oid'];
-		// @TODO: Verify the old_oid is the ref_name tip.
-		$new_oid  = $header['new_oid'];
-		$ref_name = $header['ref_name'];
-
-		// Validate ref name.
-		if ( ! preg_match( '|^refs/|', $ref_name ) ) {
-			$git_response->append_error_packet_line( "error invalid ref name: $ref_name\n" );
+		if ( 1 !== count( $commands ) ) {
+			$git_response->append_error_packet_line( "error only one ref update per push is supported\n" );
 			$git_response->append_error_packet_line( '0000' );
 
-			// @TODO: Throw / catch?
+			return false;
+		}
+
+		$command  = $commands[0];
+		$old_oid  = $command['old_oid'];
+		$new_oid  = $command['new_oid'];
+		$ref_name = $command['ref_name'];
+
+		if ( 0 !== strpos( $ref_name, 'refs/heads/' ) ) {
+			$git_response->append_error_packet_line( "error only branch refs can be pushed: $ref_name\n" );
+			$git_response->append_error_packet_line( '0000' );
+
+			return false;
+		}
+
+		if ( null !== $this->expected_push_command && ! self::is_same_push_command( $this->expected_push_command, $command ) ) {
+			$git_response->append_error_packet_line( "error ref update was not authorized: $ref_name\n" );
+			$git_response->append_error_packet_line( '0000' );
+
+			return false;
+		}
+
+		// Compare-and-swap: refuse to move a ref the client has a stale view of.
+		$current_oid = $this->repository->branch_exists( $ref_name )
+			? $this->repository->get_branch_tip( $ref_name )
+			: Commit::NULL_HASH;
+		if ( $current_oid !== $old_oid ) {
+			$git_response->append_error_packet_line( "error stale old oid for $ref_name\n" );
+			$git_response->append_error_packet_line( '0000' );
+
 			return false;
 		}
 
@@ -440,12 +477,13 @@ class GitEndpoint {
 		}
 
 		// Process the incoming pack.
+		$protocol_reader = new GitProtocolDecoder(
+			new MemoryPipe( $request_bytes ),
+			array( 'write_to_repository' => $this->repository )
+		);
 		try {
-			$had_pack = false;
 			while ( $protocol_reader->next_token() ) {
-				if ( '#pack' === $protocol_reader->get_token_type() ) {
-					$had_pack = true;
-				}
+				// The decoder writes PACKed objects to the repository as it goes.
 			}
 		} catch ( GitException $e ) {
 			$git_response->append_error_packet_line( "error unpack failed\n" );
@@ -474,29 +512,120 @@ class GitEndpoint {
 	}
 
 	/**
-	 * Parse a push request according to Git protocol v2
+	 * Parse the command list of a receive-pack request.
 	 *
-	 * @param  GitProtocolDecoder $protocol_reader  The protocol decoder
+	 * Every pkt-line before the flush packet must be a complete
+	 * "<old-oid> <new-oid> <ref-name>" command. Only the first command may
+	 * carry capabilities. Anything else rejects the whole request, so callers
+	 * that authorize a push and the code that executes it can never disagree
+	 * about which ref updates the request contains.
 	 *
-	 * @return array|false Parsed request data or false on error
+	 * @param string $request_bytes The raw receive-pack request body.
+	 *
+	 * @return array<int, array{old_oid: string, new_oid: string, ref_name: string, capabilities: string[]}>
+	 * @throws GitException When the command list is malformed or empty.
 	 */
-	private function parse_push_header( GitProtocolDecoder $protocol_reader ) {
-		while ( $protocol_reader->next_token() ) {
-			switch ( $protocol_reader->get_token_type() ) {
-				case '#packet-footer':
-					$line = $protocol_reader->get_packet_body();
-					if ( ! preg_match( '/^(?:([0-9a-f]{40}) )?([0-9a-f]{40}) (.+?)\0(.*?)$/', $line, $matches ) ) {
-						throw new GitException( 'Invalid push request' );
-					}
+	public static function parse_receive_pack_commands( $request_bytes ) {
+		$commands = array();
+		$offset   = 0;
+		$length   = strlen( $request_bytes );
 
-					return array(
-						'old_oid'      => $matches[1],
-						'new_oid'      => $matches[2],
-						'ref_name'     => $matches[3],
-						'capabilities' => explode( ' ', trim( $matches[4] ) ),
-					);
+		while ( true ) {
+			if ( $offset + 4 > $length ) {
+				throw new GitException( 'Invalid push request: missing flush packet' );
+			}
+
+			$line_length_hex = substr( $request_bytes, $offset, 4 );
+			if ( ! ctype_xdigit( $line_length_hex ) ) {
+				throw new GitException( 'Invalid push request: malformed packet length' );
+			}
+
+			$line_length = hexdec( $line_length_hex );
+			$offset     += 4;
+			if ( 0 === $line_length ) {
+				break;
+			}
+			if ( $line_length <= 4 || $offset + $line_length - 4 > $length ) {
+				throw new GitException( 'Invalid push request: malformed packet length' );
+			}
+
+			$line    = substr( $request_bytes, $offset, $line_length - 4 );
+			$offset += $line_length - 4;
+
+			$capabilities = array();
+			if ( empty( $commands ) && false !== strpos( $line, "\0" ) ) {
+				list( $line, $capabilities_line ) = explode( "\0", $line, 2 );
+				$capabilities_line                = trim( $capabilities_line );
+				$capabilities                     = '' === $capabilities_line ? array() : explode( ' ', $capabilities_line );
+			}
+			if ( "\n" === substr( $line, -1 ) ) {
+				$line = substr( $line, 0, -1 );
+			}
+
+			if ( 0 === strpos( $line, 'shallow ' ) ) {
+				throw new GitException( 'Pushing from a shallow clone is not supported. Run git fetch --unshallow and try again.' );
+			}
+			if ( ! preg_match( '/\A([0-9a-f]{40}) ([0-9a-f]{40}) (refs\/[^\x00-\x20\x7f]+)\z/', $line, $matches ) ) {
+				throw new GitException( 'Invalid push request: malformed command' );
+			}
+			if ( ! self::is_valid_ref_name( $matches[3] ) ) {
+				throw new GitException( 'Invalid push request: invalid ref name' );
+			}
+
+			$commands[] = array(
+				'old_oid'      => $matches[1],
+				'new_oid'      => $matches[2],
+				'ref_name'     => $matches[3],
+				'capabilities' => $capabilities,
+			);
+		}
+
+		if ( empty( $commands ) ) {
+			throw new GitException( 'Invalid push request: no commands' );
+		}
+
+		return $commands;
+	}
+
+	/**
+	 * A conservative subset of `git check-ref-format` for refs/ names.
+	 *
+	 * @param string $ref_name The full ref name, e.g. refs/heads/trunk.
+	 *
+	 * @return bool
+	 */
+	public static function is_valid_ref_name( $ref_name ) {
+		if ( ! is_string( $ref_name ) || 0 !== strpos( $ref_name, 'refs/' ) ) {
+			return false;
+		}
+		if ( preg_match( '/[\x00-\x20\x7f~^:?*\[\\\\]/', $ref_name ) ) {
+			return false;
+		}
+		if (
+			false !== strpos( $ref_name, '..' ) ||
+			false !== strpos( $ref_name, '@{' ) ||
+			'/' === substr( $ref_name, -1 ) ||
+			'.' === substr( $ref_name, -1 )
+		) {
+			return false;
+		}
+		foreach ( explode( '/', $ref_name ) as $segment ) {
+			if ( '' === $segment || '.' === $segment[0] || '.lock' === substr( $segment, -5 ) ) {
+				return false;
 			}
 		}
+
+		return true;
+	}
+
+	private static function is_same_push_command( $expected, $actual ) {
+		foreach ( array( 'old_oid', 'new_oid', 'ref_name' ) as $key ) {
+			if ( ! isset( $expected[ $key ] ) || $expected[ $key ] !== $actual[ $key ] ) {
+				return false;
+			}
+		}
+
+		return true;
 	}
 
 	private function parse_filter( $filter ) {

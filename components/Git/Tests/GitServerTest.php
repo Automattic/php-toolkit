@@ -522,7 +522,7 @@ RESPONSE
 			'basic push' => array(
 				'request'      => GitProtocolEncoderPipe::encode_packet_lines(
 					array(
-						"0000000000000000000000000000000000000000 $commit_oid refs/heads/main\0\n",
+						"{$this->main_branch_oid} $commit_oid refs/heads/main\0\n",
 						'0000',
 					)
 				),
@@ -576,6 +576,162 @@ RESPONSE
 				);
 			}
 		}
+	}
+
+	/**
+	 * @dataProvider provide_rejected_push_commands
+	 */
+	public function test_handle_push_request_rejects_unsafe_commands( $build_lines, $endpoint_options = array() ) {
+		$commit_oid = $this->create_push_commit();
+		$main_oid   = $this->main_branch_oid;
+		$request    = GitProtocolEncoderPipe::encode_packet_lines( $build_lines( $main_oid, $commit_oid ) );
+		$server     = new GitEndpoint( $this->repository, $endpoint_options );
+		$response   = new GitProtocolEncoderPipe(
+			$this->getMockBuilder( BufferingResponseWriter::class )->onlyMethods( array( 'close_writing' ) )->getMock()
+		);
+
+		$this->assertFalse( $server->handle_push_request( $request, $response ) );
+		$this->assertStringNotContainsString( 'ok refs/', $response->consume_all() );
+		$this->assertSame( $main_oid, $this->repository->get_branch_tip( 'refs/heads/main' ) );
+		$this->assertFalse( $this->repository->branch_exists( 'refs/heads/forged' ) );
+	}
+
+	public static function provide_rejected_push_commands() {
+		$null = Commit::NULL_HASH;
+
+		return array(
+			'missing old oid'                => array(
+				function ( $main, $new ) use ( $null ) {
+					return array( "$new refs/heads/forged\0report-status\n", '0000' );
+				},
+			),
+			'malformed command before valid' => array(
+				function ( $main, $new ) use ( $null ) {
+					return array( "$new refs/heads/forged\0report-status\n", "$main $main refs/heads/main\n", '0000' );
+				},
+			),
+			'malformed command after valid'  => array(
+				function ( $main, $new ) use ( $null ) {
+					return array( "$null $new refs/heads/forged\0report-status\n", "garbage\n", '0000' );
+				},
+			),
+			'multiple commands'              => array(
+				function ( $main, $new ) use ( $null ) {
+					return array( "$null $new refs/heads/forged\0report-status\n", "$main $new refs/heads/main\n", '0000' );
+				},
+			),
+			'stale old oid'                  => array(
+				function ( $main, $new ) use ( $null ) {
+					return array( "$null $new refs/heads/main\0report-status\n", '0000' );
+				},
+			),
+			'stale old oid on delete'        => array(
+				function ( $main, $new ) use ( $null ) {
+					return array( "$new $null refs/heads/main\0report-status\n", '0000' );
+				},
+			),
+			'invalid ref name'               => array(
+				function ( $main, $new ) use ( $null ) {
+					return array( "$null $new refs/heads/forged/../../main\0report-status\n", '0000' );
+				},
+			),
+			'missing flush packet'           => array(
+				function ( $main, $new ) use ( $null ) {
+					return array( "$null $new refs/heads/forged\0report-status\n" );
+				},
+			),
+			'tag ref'                        => array(
+				function ( $main, $new ) use ( $null ) {
+					return array( "$null $new refs/tags/v1\0report-status\n", '0000' );
+				},
+			),
+			'shallow line'                   => array(
+				function ( $main, $new ) use ( $null ) {
+					return array( "shallow $main\n", "$null $new refs/heads/forged\0report-status\n", '0000' );
+				},
+			),
+			'unauthorized command'           => array(
+				function ( $main, $new ) use ( $null ) {
+					return array( "$null $new refs/heads/forged\0report-status\n", '0000' );
+				},
+				array(
+					'expected_push_command' => array(
+						'old_oid'  => $null,
+						'new_oid'  => $null,
+						'ref_name' => 'refs/heads/forged',
+					),
+				),
+			),
+		);
+	}
+
+	public function test_handle_push_request_accepts_authorized_command() {
+		$commit_oid = $this->create_push_commit();
+		$server     = new GitEndpoint(
+			$this->repository,
+			array(
+				'expected_push_command' => array(
+					'old_oid'  => Commit::NULL_HASH,
+					'new_oid'  => $commit_oid,
+					'ref_name' => 'refs/heads/forged',
+				),
+			)
+		);
+		$response   = new GitProtocolEncoderPipe(
+			$this->getMockBuilder( BufferingResponseWriter::class )->onlyMethods( array( 'close_writing' ) )->getMock()
+		);
+		$request    = GitProtocolEncoderPipe::encode_packet_lines(
+			array( Commit::NULL_HASH . " $commit_oid refs/heads/forged\0report-status\n", '0000' )
+		);
+
+		$this->assertTrue( $server->handle_push_request( $request, $response ) );
+		$this->assertSame( $commit_oid, $this->repository->get_branch_tip( 'refs/heads/forged' ) );
+	}
+
+	public function test_parse_receive_pack_commands_returns_capabilities_of_first_command() {
+		$main     = $this->main_branch_oid;
+		$commands = GitEndpoint::parse_receive_pack_commands(
+			GitProtocolEncoderPipe::encode_packet_lines(
+				array( "$main $main refs/heads/main\0report-status side-band-64k\n", '0000' )
+			) . 'PACK'
+		);
+
+		$this->assertSame(
+			array(
+				array(
+					'old_oid'      => $main,
+					'new_oid'      => $main,
+					'ref_name'     => 'refs/heads/main',
+					'capabilities' => array( 'report-status', 'side-band-64k' ),
+				),
+			),
+			$commands
+		);
+	}
+
+	private function create_push_commit() {
+		$blob_oid = $this->repository->add_object( 'blob', '# Forged' );
+		$tree_oid = $this->repository->add_object(
+			'tree',
+			GitProtocolEncoderPipe::encode_tree_bytes(
+				new Tree(
+					array(
+						new TreeEntry(
+							array(
+								'mode' => TreeEntry::FILE_MODE_REGULAR_NON_EXECUTABLE,
+								'name' => 'README.md',
+								'hash' => $blob_oid,
+							)
+						),
+					)
+				)
+			)
+		);
+
+		return $this->repository->add_object(
+			'commit',
+			"tree $tree_oid\nparent {$this->main_branch_oid}\nauthor Test <test@example.com> 1234567890 +0000\ncommitter Test <test@example.com> 1234567890 +0000\n\nForged\n"
+		);
 	}
 
 	public function assertBinaryEquals( $expected, $actual, $message = null ) {

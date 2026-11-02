@@ -368,10 +368,15 @@ class Push_MD_Pull_Requests {
 			if ( is_wp_error( $post_id ) ) {
 				throw new Exception( $post_id->get_error_message() );
 			}
+			update_post_meta( $post_id, 'push_md_unfiltered_html', current_user_can( 'unfiltered_html' ) ? 1 : 0 );
 
 			return $post_id;
 		}
 
+		// Sticky: one push without unfiltered_html makes the whole preview sanitized.
+		if ( ! current_user_can( 'unfiltered_html' ) ) {
+			update_post_meta( $post->ID, 'push_md_unfiltered_html', 0 );
+		}
 		update_post_meta( $post->ID, 'push_md_base_oid', sanitize_text_field( $push_header['base_oid'] ) );
 		update_post_meta( $post->ID, 'push_md_tip_oid', sanitize_text_field( $push_header['new_oid'] ) );
 		$result = wp_update_post(
@@ -713,6 +718,7 @@ class Push_MD_Pull_Requests {
 			'owner'            => intval( $post->post_author ),
 			'base_oid'         => get_post_meta( $post->ID, 'push_md_base_oid', true ),
 			'tip_oid'          => get_post_meta( $post->ID, 'push_md_tip_oid', true ),
+			'unfiltered_html'  => '1' === (string) get_post_meta( $post->ID, 'push_md_unfiltered_html', true ),
 			'url'              => Push_MD_Plugin::get_preview_branch_url( $branch_name ),
 			'created_at'       => get_post_time( 'U', true, $post ),
 			'updated_at'       => get_post_modified_time( 'U', true, $post ),
