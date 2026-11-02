@@ -169,6 +169,54 @@ class BranchPreviewTest extends TestCase {
 		);
 	}
 
+	public function testMalformedCommandBeforeTrunkNoOpIsRejected() {
+		// HackerOne #4164135: a first command without an old OID used to be
+		// ignored here but executed by GitEndpoint.
+		$repository = $this->repository();
+		$current    = $repository->get_branch_tip( 'refs/heads/trunk' );
+		$new_oid    = '9999999999999999999999999999999999999999';
+		$request    = GitProtocolEncoderPipe::encode_packet_lines(
+			array(
+				$new_oid . " refs/heads/forged-admin-preview\0report-status side-band-64k\n",
+				$current . ' ' . $current . " refs/heads/trunk\n",
+				'0000',
+			)
+		);
+
+		$this->assertFalse( $this->parse_push_header( $request, $repository, $current ) );
+	}
+
+	public function testMalformedCommandAfterValidCommandIsRejected() {
+		$repository = $this->repository();
+		$current    = $repository->get_branch_tip( 'refs/heads/trunk' );
+		$request    = GitProtocolEncoderPipe::encode_packet_lines(
+			array(
+				$current . ' ' . $current . " refs/heads/trunk\0report-status\n",
+				"garbage\n",
+				'0000',
+			)
+		);
+
+		$this->assertFalse( $this->parse_push_header( $request, $repository, $current ) );
+	}
+
+	public function testMultipleCommandsAreRejected() {
+		$repository = $this->repository();
+		$current    = $repository->get_branch_tip( 'refs/heads/trunk' );
+		$request    = GitProtocolEncoderPipe::encode_packet_lines(
+			array(
+				Commit::NULL_HASH . ' 9999999999999999999999999999999999999999 refs/heads/preview-home' . "\0report-status\n",
+				$current . ' ' . $current . " refs/heads/trunk\n",
+				'0000',
+			)
+		);
+
+		$this->assertSame(
+			'Push rejected because Push MD only accepts one ref update at a time.',
+			$this->parse_push_header( $request, $repository, $current )['error']
+		);
+	}
+
 	private function repository() {
 		$repository = new GitRepository(
 			InMemoryFilesystem::create(),

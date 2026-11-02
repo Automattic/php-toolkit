@@ -64,9 +64,10 @@ class Push_MD_Plugin {
 
 	private static $json_post_types = array( 'wp_global_styles' );
 
-	private static $active_preview_branch        = null;
-	private static $active_preview_files         = null;
-	private static $active_preview_changed_paths = array();
+	private static $active_preview_branch                 = null;
+	private static $active_preview_files                  = null;
+	private static $active_preview_allows_unfiltered_html = false;
+	private static $active_preview_changed_paths          = array();
 
 	private static $knowledge_type_directories = array(
 		'guideline' => 'guidelines',
@@ -261,11 +262,17 @@ class Push_MD_Plugin {
 				return;
 			}
 
-			$branches        = self::get_preview_branches();
-			$branch_metadata = isset( $branches[ $branch_name ] ) && is_array( $branches[ $branch_name ] )
-				? $branches[ $branch_name ]
-				: array();
+			// Only render branches created through the validated preview push,
+			// and only at the tip that push recorded.
+			$branches = self::get_preview_branches();
+			if ( ! isset( $branches[ $branch_name ] ) || ! is_array( $branches[ $branch_name ] ) ) {
+				return;
+			}
+			$branch_metadata = $branches[ $branch_name ];
 			if ( self::is_preview_branch_merged( $branch_metadata ) ) {
+				return;
+			}
+			if ( ! isset( $branch_metadata['tip_oid'] ) || $tip !== $branch_metadata['tip_oid'] ) {
 				return;
 			}
 
@@ -277,9 +284,10 @@ class Push_MD_Plugin {
 				$base_files = self::read_repository_entries_from_commit( $repository, $base_oid );
 			}
 
-			self::$active_preview_branch        = $branch_name;
-			self::$active_preview_files         = self::read_repository_entries_from_commit( $repository, $tip );
-			self::$active_preview_changed_paths = self::calculate_preview_changed_paths( $base_files, self::$active_preview_files );
+			self::$active_preview_allows_unfiltered_html = ! empty( $branch_metadata['unfiltered_html'] );
+			self::$active_preview_branch                 = $branch_name;
+			self::$active_preview_files                  = self::read_repository_entries_from_commit( $repository, $tip );
+			self::$active_preview_changed_paths          = self::calculate_preview_changed_paths( $base_files, self::$active_preview_files );
 
 			add_filter( 'posts_pre_query', array( __CLASS__, 'filter_preview_posts_pre_query' ), 10, 2 );
 			add_filter( 'the_posts', array( __CLASS__, 'filter_preview_posts' ), 10, 2 );
@@ -293,9 +301,10 @@ class Push_MD_Plugin {
 			add_action( 'send_headers', array( __CLASS__, 'send_branch_preview_headers' ) );
 			add_action( 'wp_footer', array( __CLASS__, 'render_branch_preview_notice' ) );
 		} catch ( Throwable $exception ) {
-			self::$active_preview_branch        = null;
-			self::$active_preview_files         = null;
-			self::$active_preview_changed_paths = array();
+			self::$active_preview_allows_unfiltered_html = false;
+			self::$active_preview_branch                 = null;
+			self::$active_preview_files                  = null;
+			self::$active_preview_changed_paths          = array();
 		}
 	}
 
@@ -688,9 +697,28 @@ class Push_MD_Plugin {
 		}
 
 		$config = self::parse_global_styles_json( $path, self::$active_preview_files[ $path ]['content'] );
+		if ( ! self::$active_preview_allows_unfiltered_html ) {
+			if ( ! class_exists( 'WP_Theme_JSON' ) ) {
+				return $theme_json;
+			}
+			$config = WP_Theme_JSON::remove_insecure_properties( $config );
+		}
 		$theme_json->update_with( $config );
 
 		return $theme_json;
+	}
+
+	/**
+	 * Branch previews bypass wp_insert_post(), so they also bypass kses. Apply
+	 * the same filtering WordPress would on save unless everyone who pushed
+	 * to the branch could publish unfiltered HTML.
+	 */
+	private static function sanitize_preview_markup( $markup, $context = 'post' ) {
+		if ( self::$active_preview_allows_unfiltered_html ) {
+			return $markup;
+		}
+
+		return 'data' === $context ? wp_kses_data( $markup ) : wp_kses_post( $markup );
 	}
 
 	public static function filter_preview_navigation_block( $block_content, $block ) {
@@ -708,7 +736,7 @@ class Push_MD_Plugin {
 			return $block_content;
 		}
 
-		return do_blocks( self::$active_preview_files[ $path ]['content'] );
+		return do_blocks( self::sanitize_preview_markup( self::$active_preview_files[ $path ]['content'] ) );
 	}
 
 	public static function filter_preview_shortlink( $shortlink, $id, $context, $allow_slugs ) {
@@ -941,9 +969,9 @@ class Push_MD_Plugin {
 			return null;
 		}
 
-		$post->post_content = $block_markup;
-		$post->post_title   = isset( $metadata['title'] ) ? $metadata['title'] : ( $post->post_title ? $post->post_title : ucwords( str_replace( '-', ' ', $slug ) ) );
-		$post->post_excerpt = isset( $metadata['description'] ) ? $metadata['description'] : $post->post_excerpt;
+		$post->post_content = self::sanitize_preview_markup( $block_markup );
+		$post->post_title   = isset( $metadata['title'] ) ? self::sanitize_preview_markup( $metadata['title'], 'data' ) : ( $post->post_title ? $post->post_title : ucwords( str_replace( '-', ' ', $slug ) ) );
+		$post->post_excerpt = isset( $metadata['description'] ) ? self::sanitize_preview_markup( $metadata['description'], 'data' ) : $post->post_excerpt;
 		if ( isset( $metadata['status'] ) ) {
 			$post->post_status = self::normalize_frontmatter_status( $metadata['status'] );
 		}
@@ -1056,7 +1084,7 @@ class Push_MD_Plugin {
 
 		$template->id             = '' !== $theme && self::is_theme_scoped_raw_block_post_type( $identity['post_type'] ) ? $theme . '//' . $identity['slug'] : $identity['slug'];
 		$template->theme          = $theme;
-		$template->content        = $entry['content'];
+		$template->content        = self::sanitize_preview_markup( $entry['content'] );
 		$template->slug           = $identity['slug'];
 		$template->source         = 'custom';
 		$template->type           = $identity['post_type'];
@@ -1132,10 +1160,35 @@ class Push_MD_Plugin {
 			}
 
 			$response = new Push_MD_Buffering_Response();
-			$endpoint = new GitEndpoint( $repository );
+			$endpoint = new GitEndpoint(
+				$repository,
+				array(
+					'expected_push_command' => $push_header ? array(
+						'old_oid'  => $push_header['old_oid'],
+						'new_oid'  => $push_header['new_oid'],
+						'ref_name' => $push_header['ref_name'],
+					) : null,
+				)
+			);
 			$endpoint->handle_request( $git_path, $request_body, $response );
 
 			if ( self::is_push_request( $git_path ) ) {
+				$ref_oid   = self::get_ref_oid( $repository, $push_header['ref_name'] );
+				$trunk_oid = self::get_ref_oid( $repository, 'refs/heads/' . self::DEFAULT_BRANCH );
+				if ( $ref_oid === $push_header['old_oid'] && $trunk_oid === $current_head ) {
+					// GitEndpoint refused the update and its response says why.
+					return $response->to_rest_response();
+				}
+				$expected_trunk_oid = $push_header['is_preview'] ? $current_head : $push_header['new_oid'];
+				if ( $ref_oid !== $push_header['new_oid'] || $trunk_oid !== $expected_trunk_oid ) {
+					self::rollback_rejected_push_ref( $repository, $push_header );
+
+					return self::build_protocol_error_response(
+						'git-receive-pack',
+						'Push rejected because the repository changed unexpectedly. Fetch and try again.'
+					);
+				}
+
 				try {
 					if ( $push_header['is_preview'] ) {
 						self::finalize_preview_branch_push( $repository, $push_header );
@@ -2230,6 +2283,10 @@ class Push_MD_Plugin {
 			$push_header['new_oid']
 		);
 		$push_header['pull_request_id'] = self::update_preview_branch_metadata( $push_header );
+	}
+
+	private static function get_ref_oid( GitRepository $repository, $ref_name ) {
+		return $repository->branch_exists( $ref_name ) ? $repository->get_branch_tip( $ref_name ) : Commit::NULL_HASH;
 	}
 
 	private static function is_commit_ancestor( GitRepository $repository, $ancestor, $descendant ) {
@@ -3507,6 +3564,9 @@ class Push_MD_Plugin {
 		if ( self::is_preview_branch_merged( $branch_metadata ) ) {
 			throw new Exception( 'Preview branch has already been merged.' );
 		}
+		if ( ! isset( $branch_metadata['tip_oid'] ) || $branch_tip !== $branch_metadata['tip_oid'] ) {
+			throw new Exception( 'Preview branch does not match its Pull Request. Push the branch again before merging.' );
+		}
 
 		$base_oid   = isset( $branch_metadata['base_oid'] ) && is_string( $branch_metadata['base_oid'] )
 			? $branch_metadata['base_oid']
@@ -3528,21 +3588,33 @@ class Push_MD_Plugin {
 			$range_exception  = $exception;
 		}
 
-		if ( $can_fast_forward ) {
-			self::validate_repository_changes_for_wordpress( $repository, $current_head, $branch_tip );
-			$push_summary = self::apply_repository_diff_to_wordpress( $repository, $current_head, $branch_tip, false );
-			$repository->set_branch_tip( 'refs/heads/' . self::DEFAULT_BRANCH, $branch_tip );
-		} else {
-			if ( ! is_string( $base_oid ) || '' === $base_oid || Commit::is_null_hash( $base_oid ) || ! $repository->has_object( $base_oid ) ) {
-				throw $range_exception;
-			}
+		// Merging applies content as the reviewer, so keep kses on unless
+		// everyone who pushed to the branch could publish unfiltered HTML.
+		$force_kses = empty( $branch_metadata['unfiltered_html'] ) && current_user_can( 'unfiltered_html' );
+		if ( $force_kses ) {
+			kses_init_filters();
+		}
+		try {
+			if ( $can_fast_forward ) {
+				self::validate_repository_changes_for_wordpress( $repository, $current_head, $branch_tip );
+				$push_summary = self::apply_repository_diff_to_wordpress( $repository, $current_head, $branch_tip, false );
+				$repository->set_branch_tip( 'refs/heads/' . self::DEFAULT_BRANCH, $branch_tip );
+			} else {
+				if ( ! is_string( $base_oid ) || '' === $base_oid || Commit::is_null_hash( $base_oid ) || ! $repository->has_object( $base_oid ) ) {
+					throw $range_exception;
+				}
 
-			self::assert_preview_branch_merge_has_no_overlapping_changes( $repository, $base_oid, $current_head, $branch_tip );
-			self::validate_repository_changes_for_wordpress( $repository, $base_oid, $branch_tip );
-			$merged_oid = self::replay_preview_branch_commits_onto_trunk( $repository, $branch_name, $base_oid, $branch_tip, $current_head );
-			self::validate_repository_changes_for_wordpress( $repository, $current_head, $merged_oid );
-			$push_summary = self::apply_repository_diff_to_wordpress( $repository, $current_head, $merged_oid, false );
-			$repository->set_branch_tip( 'refs/heads/' . self::DEFAULT_BRANCH, $merged_oid );
+				self::assert_preview_branch_merge_has_no_overlapping_changes( $repository, $base_oid, $current_head, $branch_tip );
+				self::validate_repository_changes_for_wordpress( $repository, $base_oid, $branch_tip );
+				$merged_oid = self::replay_preview_branch_commits_onto_trunk( $repository, $branch_name, $base_oid, $branch_tip, $current_head );
+				self::validate_repository_changes_for_wordpress( $repository, $current_head, $merged_oid );
+				$push_summary = self::apply_repository_diff_to_wordpress( $repository, $current_head, $merged_oid, false );
+				$repository->set_branch_tip( 'refs/heads/' . self::DEFAULT_BRANCH, $merged_oid );
+			}
+		} finally {
+			if ( $force_kses ) {
+				kses_remove_filters();
+			}
 		}
 
 		Push_MD_Pull_Requests::merge_pull_request( $branch_name, $merged_oid );
@@ -4639,46 +4711,25 @@ class Push_MD_Plugin {
 	}
 
 	private static function parse_push_commands( $request_bytes ) {
-		$commands = array();
-		$offset   = 0;
-		$length   = strlen( $request_bytes );
-
-		while ( $offset + 4 <= $length ) {
-			$line_length_hex = substr( $request_bytes, $offset, 4 );
-			if ( ! ctype_xdigit( $line_length_hex ) ) {
-				break;
-			}
-
-			$line_length = hexdec( $line_length_hex );
-			$offset     += 4;
-			if ( 0 === $line_length ) {
-				break;
-			}
-			if ( $line_length < 4 || $offset + $line_length - 4 > $length ) {
-				break;
-			}
-
-			$line    = substr( $request_bytes, $offset, $line_length - 4 );
-			$offset += $line_length - 4;
-			$line    = explode( "\0", $line, 2 );
-			$line    = rtrim( $line[0], "\r\n" );
-
-			if (
-				preg_match(
-					'/\A(?P<old_oid>[0-9a-f]{40}) (?P<new_oid>[0-9a-f]{40}) (?P<ref>\S+)\z/',
-					$line,
-					$matches
-				)
-			) {
-				$commands[] = array(
-					'old_oid' => $matches['old_oid'],
-					'new_oid' => $matches['new_oid'],
-					'ref'     => $matches['ref'],
-				);
-			}
+		// Use the exact parser GitEndpoint executes with, so the update that is
+		// authorized here is the update that gets applied. Any malformed command
+		// rejects the whole push.
+		try {
+			$commands = GitEndpoint::parse_receive_pack_commands( $request_bytes );
+		} catch ( GitException $exception ) {
+			return array();
 		}
 
-		return $commands;
+		$parsed = array();
+		foreach ( $commands as $command ) {
+			$parsed[] = array(
+				'old_oid' => $command['old_oid'],
+				'new_oid' => $command['new_oid'],
+				'ref'     => $command['ref_name'],
+			);
+		}
+
+		return $parsed;
 	}
 
 	private static function assert_can_edit_post( $post_id ) {

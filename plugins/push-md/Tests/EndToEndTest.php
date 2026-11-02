@@ -761,6 +761,92 @@ class PMD_End_To_End_Test extends TestCase {
 		$this->delete_preview_branch( $clone_dir, $branch );
 	}
 
+	/**
+	 * HackerOne #4164135: a receive-pack request whose first command omits
+	 * the old OID must not smuggle a ref update past the permission checks.
+	 */
+	public function testSubscriberCannotSmuggleRefUpdateThroughMalformedReceivePackCommand() {
+		$suffix    = uniqid( 'smuggle-' );
+		$slug      = $suffix;
+		$branch    = 'forged-' . $suffix;
+		$live_text = 'Admin-owned content ' . $suffix;
+		$marker    = '<script>window.name = "pmd-xss-' . $suffix . '";</script>';
+		$post_id   = $this->create_post_via_rest(
+			array(
+				'slug'    => $slug,
+				'title'   => 'Smuggle ' . $suffix,
+				'status'  => 'publish',
+				'content' => '<!-- wp:paragraph --><p>' . $live_text . '</p><!-- /wp:paragraph -->',
+			)
+		);
+		$user      = $this->create_user_with_application_password( 'subscriber', $suffix );
+		$clone_dir = $this->clone_repo( 'smuggle', $user['username'], $user['password'] );
+		$this->configure_git( $clone_dir );
+		file_put_contents( $clone_dir . '/post/' . $slug . '.md', "\n" . $marker . "\n", FILE_APPEND );
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'commit', '-am', 'Forged preview' ) );
+		$old_oid = trim( $this->run_cmd( array( 'git', '-C', $clone_dir, 'rev-parse', 'origin/trunk' ) )['output'] );
+		$new_oid = trim( $this->run_cmd( array( 'git', '-C', $clone_dir, 'rev-parse', 'HEAD' ) )['output'] );
+		$pack    = $this->build_pack( $clone_dir, $old_oid, $new_oid );
+
+		$control = $this->post_receive_pack(
+			array( "0000000000000000000000000000000000000000 $new_oid refs/heads/control-$branch\0report-status side-band-64k\n" ),
+			$pack,
+			$user['header']
+		);
+		$smuggle = $this->post_receive_pack(
+			array(
+				"$new_oid refs/heads/$branch\0report-status side-band-64k\n",
+				"$old_oid $old_oid refs/heads/trunk\n",
+			),
+			$pack,
+			$user['header']
+		);
+		$refs    = $this->run_cmd( array( 'git', 'ls-remote', $this->remote_url() ) )['output'];
+		$preview = $this->curl_get_with_headers( $this->base_url . '/' . rawurlencode( $slug ) . '/?branch=' . rawurlencode( $branch ), true );
+
+		$this->assertStringContainsString( 'permission to edit', $control['body'] );
+		$this->assertStringNotContainsString( 'ok refs/heads/' . $branch, $smuggle['body'] );
+		$this->assertStringNotContainsString( 'refs/heads/' . $branch, $refs );
+		$this->assertStringContainsString( $old_oid . "\trefs/heads/trunk", $refs );
+		$this->assertStringNotContainsString( $marker, $preview['body'] );
+		$this->assertStringContainsString( $live_text, $this->fetch_content( $post_id, 'posts' ) );
+	}
+
+	public function testPreviewBranchFromUserWithoutUnfilteredHtmlIsSanitizedInPreviewAndMerge() {
+		$suffix    = uniqid( 'kses-' );
+		$slug      = $suffix;
+		$branch    = 'preview/' . $suffix;
+		$live_text = 'Author content ' . $suffix;
+		$safe_text = 'Author preview ' . $suffix;
+		$marker    = '<script>window.name = "pmd-xss-' . $suffix . '";</script>';
+		$user      = $this->create_user_with_application_password( 'author', $suffix );
+		$post_id   = $this->create_post_via_rest(
+			array(
+				'slug'    => $slug,
+				'title'   => 'Kses ' . $suffix,
+				'status'  => 'publish',
+				'author'  => $user['id'],
+				'content' => '<!-- wp:paragraph --><p>' . $live_text . '</p><!-- /wp:paragraph -->',
+			)
+		);
+		$clone_dir = $this->clone_repo( 'kses', $user['username'], $user['password'] );
+		$this->configure_git( $clone_dir );
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'checkout', '-b', $branch ) );
+		$this->edit_file( $clone_dir . '/post/' . $slug . '.md', $live_text, $safe_text . "\n\n" . $marker );
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'commit', '-am', 'Author preview with script' ) );
+		$this->run_cmd( array( 'git', '-C', $clone_dir, 'push', 'origin', 'HEAD:refs/heads/' . $branch ) );
+
+		$preview = $this->curl_get_with_headers( $this->base_url . '/' . rawurlencode( $slug ) . '/?branch=' . rawurlencode( $branch ), true );
+		$this->assertSame( 200, $preview['status'] );
+		$this->assertStringContainsString( $safe_text, $preview['body'] );
+		$this->assertStringNotContainsString( $marker, $preview['body'] );
+
+		$merge = $this->curl_post_json( $this->base_url . '/wp-json/push-md/v1/branches/merge', array( 'branch' => $branch ) );
+		$this->assertSame( 200, $merge['status'], 'Admin merge failed: ' . $merge['body'] );
+		$this->assertStringContainsString( $safe_text, $this->fetch_content( $post_id, 'posts' ) );
+		$this->assertStringNotContainsString( '<script', $this->fetch_content( $post_id, 'posts' ) );
+	}
+
 	public function testPreviewBranchRendersChangedTemplatePartForAuthenticatedAdminWithoutMutatingLiveContent() {
 		$suffix       = uniqid( 'branch-template-' );
 		$branch       = 'preview/' . $suffix;
@@ -1626,18 +1712,18 @@ class PMD_End_To_End_Test extends TestCase {
 		);
 	}
 
-	private function remote_url() {
+	private function remote_url( $username = null, $password = null ) {
 		$parts = parse_url( $this->base_url );
-		$auth  = rawurlencode( $this->username ) . ':' . rawurlencode( $this->password );
+		$auth  = rawurlencode( $username ? $username : $this->username ) . ':' . rawurlencode( $password ? $password : $this->password );
 		$host  = $parts['host'] . ( isset( $parts['port'] ) ? ':' . $parts['port'] : '' );
 
 		return $parts['scheme'] . '://' . $auth . '@' . $host . '/wp-json/git/v1/md.git';
 	}
 
-	private function clone_repo( $name ) {
+	private function clone_repo( $name, $username = null, $password = null ) {
 		$dir = $this->work_dir . '/' . $name;
 		$this->run_cmd(
-			array( 'git', '-c', 'protocol.version=2', 'clone', $this->remote_url(), $dir )
+			array( 'git', '-c', 'protocol.version=2', 'clone', $this->remote_url( $username, $password ), $dir )
 		);
 		$status = $this->run_cmd( array( 'git', '-C', $dir, 'status', '--porcelain' ) );
 		$this->assertSame( '', trim( $status['output'] ), 'Fresh clones should not have staged or unstaged changes.' );
@@ -1824,6 +1910,63 @@ class PMD_End_To_End_Test extends TestCase {
 		$this->assertArrayHasKey( 'password', $app_password, 'REST application password create response had no password: ' . $response['body'] );
 
 		return preg_replace( '/\s+/', '', $app_password['password'] );
+	}
+
+	private function create_user_with_application_password( $role, $suffix ) {
+		$username = 'pmd-reader-' . $role . '-' . $suffix;
+		$user_id  = $this->create_user_via_rest(
+			array(
+				'username' => $username,
+				'email'    => $username . '@example.com',
+				'password' => 'password-' . $suffix,
+				'roles'    => array( $role ),
+			)
+		);
+		$password = $this->create_application_password_via_rest( $user_id, ucfirst( $role ) . ' E2E ' . $suffix );
+
+		return array(
+			'id'       => $user_id,
+			'username' => $username,
+			'password' => $password,
+			'header'   => 'Authorization: Basic ' . base64_encode( $username . ':' . $password ),
+		);
+	}
+
+	private function build_pack( $clone_dir, $old_oid, $new_oid ) {
+		$pack_file = $this->work_dir . '/objects.pack';
+		$command   = 'printf %s ' . escapeshellarg( "$new_oid\n^$old_oid\n" )
+			. ' | git -C ' . escapeshellarg( $clone_dir ) . ' pack-objects --stdout --revs > ' . escapeshellarg( $pack_file );
+		exec( $command, $output, $code );
+		$this->assertSame( 0, $code, 'git pack-objects failed.' );
+
+		return file_get_contents( $pack_file );
+	}
+
+	private function post_receive_pack( array $command_lines, $pack, $auth_header ) {
+		$body = '';
+		foreach ( $command_lines as $line ) {
+			$body .= sprintf( '%04x', strlen( $line ) + 4 ) . $line;
+		}
+		$body .= '0000' . $pack;
+
+		$ch = curl_init( $this->base_url . '/wp-json/git/v1/md.git/git-receive-pack' );
+		curl_setopt_array(
+			$ch,
+			array(
+				CURLOPT_RETURNTRANSFER => true,
+				CURLOPT_CUSTOMREQUEST  => 'POST',
+				CURLOPT_HTTPHEADER     => array( $auth_header, 'Content-Type: application/x-git-receive-pack-request' ),
+				CURLOPT_POSTFIELDS     => $body,
+			)
+		);
+		$response = curl_exec( $ch );
+		$status   = curl_getinfo( $ch, CURLINFO_HTTP_CODE );
+		curl_close( $ch );
+
+		return array(
+			'status' => $status,
+			'body'   => $response,
+		);
 	}
 
 	private function curl_get( $url ) {

@@ -104,3 +104,24 @@ add_action(
 		);
 	}
 );
+
+// Low-privilege E2E users ("pmd-reader-*") may read every exported item, as
+// on a site whose content is all public. Push MD only lets users who can read
+// all of it use the Git endpoint, and the shared CI site also holds drafts and
+// templates. Reading is all this grants; editing still follows the role.
+add_filter(
+	'map_meta_cap',
+	static function ( $caps, $cap, $user_id ) {
+		if ( 'read_post' !== $cap ) {
+			return $caps;
+		}
+		$user = get_userdata( $user_id );
+		if ( $user && 0 === strpos( $user->user_login, 'pmd-reader-' ) ) {
+			return array( 'read' );
+		}
+
+		return $caps;
+	},
+	10,
+	3
+);
